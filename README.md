@@ -16,7 +16,7 @@
 - **Security Level (SEC001+)**: Security vulnerabilities and dangerous operations
 - **Performance Level (P001-P999)**: Optimization opportunities and efficiency improvements
 
-📖 **For complete rule descriptions with examples and implementation details, see [docs/Batch-File-Linter-Requirements.md](docs/Batch-File-Linter-Requirements.md)**
+📖 **For complete rule descriptions with examples and implementation details, see [Batch-File-Linter-Requirements.md](https://github.com/tboy1337/Blinter/blob/main/docs/Batch-File-Linter-Requirements.md)**
 
 ### 📋 **Output Format**
 - **Rule Codes**: Each issue has a unique identifier (e.g., E002, W005, SEC003)
@@ -36,39 +36,81 @@
 - **Large File Handling**: Efficiently processes files up to 10MB+ with performance warnings
 - **Robust Encoding Detection**: Handles UTF-8, UTF-16, Latin-1 and 6 more encoding formats
 
-## 🚀 Quick Start
+## Configuration 📝
 
-**Get started in 30 seconds:**
+Blinter supports configuration files to customize its behavior. Create a `blinter.ini` file in your project directory to set default options.
 
-1. **Install Blinter:**
-   ```cmd
-   pip install Blinter
-   ```
+### Creating a Configuration File
 
-2. **Analyze your batch file:**
-   ```cmd
-   blinter script.bat
-   ```
+Generate a default configuration file with all available options:
 
-3. **That's it!** Blinter will show you all issues with detailed explanations and fix recommendations.
+```cmd
+python blinter.py --create-config
+```
 
-**Alternative: No Python? No problem!**
-- Download the [standalone executable](https://github.com/tboy1337/Blinter/releases) and run `Blinter.exe script.bat`
+This creates a `blinter.ini` file with default settings.
+
+### Configuration Options
+
+| Section | Setting | Description | Default |
+|---------|---------|-------------|---------|
+| `[general]` | `recursive` | Search subdirectories when analyzing folders | `true` |
+| `[general]` | `show_summary` | Display summary statistics after analysis | `false` |
+| `[general]` | `max_line_length` | Maximum line length for S011 rule | `120` |
+| `[general]` | `min_severity` | Minimum severity level to report | None (all) |
+| `[rules]` | `enabled_rules` | Comma-separated list of rules to enable exclusively | None (all enabled) |
+| `[rules]` | `disabled_rules` | Comma-separated list of rules to disable | None |
+
+### Command Line Override
+
+Command line options always override configuration file settings:
+
+```cmd
+# Use config file settings
+python blinter.py myscript.bat
+
+# Override config to show summary
+python blinter.py myscript.bat --summary
+
+# Ignore config file completely
+python blinter.py myscript.bat --no-config
+```
+
+### Example Configurations
+
+**Strict Mode (Errors and Security Only):**
+```ini
+[rules]
+enabled_rules = E001,E002,E003,E004,E005,E006,E007,E008,E009,E010,E011,E012,E013,E014,E015,E016,E017,E018,SEC001,SEC002,SEC003,SEC004,SEC005,SEC006,SEC007,SEC008,SEC009,SEC010,SEC011,SEC012,SEC013
+```
+
+**Style-Free Mode (Disable All Style Rules):**
+```ini
+[rules]
+disabled_rules = S001,S002,S003,S004,S005,S006,S007,S008,S009,S010,S011,S012,S013,S014,S015,S016,S017,S018,S019,S020
+```
+
+**CI/CD Mode (Warnings and Above Only):**
+```ini
+[general]
+min_severity = WARNING
+show_summary = true
+```
 
 ## Installation 🛠️
 
 ### 🚀 Quick Start (Recommended)
 
-**Option 1: Install via pip (easiest)**
+**Option 1: Install via pip**
 ```cmd
 pip install Blinter
 ```
 
 **Option 2: Download standalone executable**
 - Download the latest `Blinter-v1.0.x-windows.zip` from [GitHub Releases](https://github.com/tboy1337/Blinter/releases)
-- Extract and run `Blinter.exe` directly (no Python installation required)
+- Extract and run
 
-### 🔧 Development Installation
+### 🔧 Manual Installation
 
 1. Clone the repository:
 ```cmd
@@ -82,7 +124,7 @@ python -m venv venv
 venv\Scripts\activate
 ```
 
-3. Install dependencies:
+3. (Optional but recommended) Install dependencies:
 ```cmd
 pip install -r requirements.txt
 ```
@@ -109,6 +151,12 @@ blinter /path/to/batch/files --no-recursive
 # Analyze with summary
 blinter script.bat --summary
 
+# Create configuration file
+blinter --create-config
+
+# Ignore configuration file
+blinter script.bat --no-config
+
 # Get help
 blinter --help
 ```
@@ -131,7 +179,7 @@ Blinter.exe script.bat --summary
 Blinter.exe --help
 ```
 
-**If using development/source installation:**
+**If using manual installation:**
 ```cmd
 # Analyze a single batch file
 python blinter.py script.bat
@@ -145,6 +193,12 @@ python blinter.py /path/to/batch/files --no-recursive
 # Analyze with summary
 python blinter.py script.bat --summary
 
+# Create configuration file
+python blinter.py --create-config
+
+# Ignore configuration file
+python blinter.py script.bat --no-config
+
 # Get help
 python blinter.py --help
 ```
@@ -155,7 +209,11 @@ python blinter.py --help
 - `--summary`: Display summary statistics of issues found
 - `--severity`: Show detailed severity level breakdown (always included)
 - `--no-recursive`: When processing directories, only analyze files in the specified directory (not subdirectories)
+- `--no-config`: Don't use configuration file (blinter.ini) even if it exists
+- `--create-config`: Create a default blinter.ini configuration file and exit
 - `--help`: Show help menu and rule categories
+
+**Note:** Command line options override configuration file settings. Blinter automatically looks for `blinter.ini` in the current directory.
 
 ### 🐍 **Programmatic API Usage**
 
@@ -168,10 +226,23 @@ import blinter
 issues = blinter.lint_batch_file("script.bat")
 for issue in issues:
     print(f"Line {issue.line_number}: {issue.rule.name} ({issue.rule.code})")
+
+# With custom configuration
+from blinter import BlinterConfig, RuleSeverity
+config = BlinterConfig(
+    max_line_length=80,
+    disabled_rules={"S007", "S011"},
+    min_severity=RuleSeverity.WARNING
+)
+issues = blinter.lint_batch_file("script.bat", config=config)
+
+# Process results
+for issue in issues:
+    print(f"Line {issue.line_number}: {issue.rule.name}")
     print(f"  {issue.rule.explanation}")
     print(f"  Fix: {issue.rule.recommendation}")
 
-# Advanced configuration
+# Legacy API (still supported for backward compatibility)
 issues = blinter.lint_batch_file(
     "script.bat",
     max_line_length=100,           # Custom line length limit  
@@ -227,7 +298,7 @@ Blinter.exe ./my-batch-scripts            # Analyze all files recursively
 Blinter.exe . --no-recursive             # Current directory only
 Blinter.exe ./scripts --summary          # With summary statistics
 
-# Development/source installation:
+# Manual installation:
 python blinter.py ./my-batch-scripts      # Analyze all files recursively
 python blinter.py . --no-recursive       # Current directory only  
 python blinter.py ./scripts --summary     # With summary statistics
@@ -265,4 +336,4 @@ python blinter.py ./scripts --summary     # With summary statistics
 
 ## License 📄
 
-This project is licensed under the CRL License - see [LICENSE.md](https://raw.githubusercontent.com/tboy1337/Blinter/main/LICENSE.md) for details.
+This project is licensed under the CRL License - see [LICENSE.md](https://github.com/tboy1337/Blinter/blob/main/LICENSE.md) for details.

@@ -16,13 +16,14 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.3
+Version: 1.0.4
 License: CRL
 """
 
 # pylint: disable=too-many-lines
 
 from collections import defaultdict
+import configparser
 from dataclasses import dataclass
 from enum import Enum
 import logging
@@ -32,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union
 import warnings
 
-__version__ = "1.0.3"
+__version__ = "1.0.4"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -89,6 +90,59 @@ class LintIssue:
             raise ValueError("Line number must be positive")
         if not isinstance(self.rule, Rule):
             raise ValueError("Rule must be a Rule instance")
+
+
+@dataclass
+class BlinterConfig:
+    """Configuration settings for blinter."""
+
+    # General settings
+    recursive: bool = True
+    show_summary: bool = False
+    max_line_length: int = 120
+
+    # Rule enablement - all rules enabled by default
+    enabled_rules: Optional[Set[str]] = None
+    disabled_rules: Optional[Set[str]] = None
+
+    # Severity filtering
+    min_severity: Optional[RuleSeverity] = None
+
+    def __post_init__(self) -> None:
+        """Initialize default values after creation."""
+        if self.enabled_rules is None:
+            self.enabled_rules = set()
+        if self.disabled_rules is None:
+            self.disabled_rules = set()
+
+    def is_rule_enabled(self, rule_code: str) -> bool:
+        """Check if a rule is enabled based on configuration."""
+        # If rule is explicitly disabled, return False
+        if self.disabled_rules and rule_code in self.disabled_rules:
+            return False
+
+        # If enabled_rules is empty, all rules are enabled by default
+        # If enabled_rules has items, only those rules are enabled
+        if self.enabled_rules:
+            return rule_code in self.enabled_rules
+
+        return True
+
+    def should_include_severity(self, severity: RuleSeverity) -> bool:
+        """Check if issues of this severity should be included."""
+        if self.min_severity is None:
+            return True
+
+        # Define severity order (higher values = more severe)
+        severity_order = {
+            RuleSeverity.STYLE: 1,
+            RuleSeverity.PERFORMANCE: 2,
+            RuleSeverity.WARNING: 3,
+            RuleSeverity.SECURITY: 4,
+            RuleSeverity.ERROR: 5,
+        }
+
+        return severity_order.get(severity, 0) >= severity_order.get(self.min_severity, 0)
 
 
 # Comprehensive rule definitions
@@ -1366,6 +1420,153 @@ SENSITIVE_ECHO_PATTERNS = [
 ]
 
 
+def _load_general_settings(config: BlinterConfig, parser: configparser.ConfigParser) -> None:
+    """Load general settings from config parser."""
+    if not parser.has_section("general"):
+        return
+
+    general = parser["general"]
+
+    config.recursive = general.getboolean("recursive", fallback=True)
+    config.show_summary = general.getboolean("show_summary", fallback=False)
+    config.max_line_length = general.getint("max_line_length", fallback=120)
+
+    severity_str = general.get("min_severity", "").strip()
+    if severity_str:
+        _set_min_severity(config, severity_str)
+
+
+def _set_min_severity(config: BlinterConfig, severity_str: str) -> None:
+    """Set minimum severity from string value."""
+    severity_map = {
+        "ERROR": RuleSeverity.ERROR,
+        "SECURITY": RuleSeverity.SECURITY,
+        "WARNING": RuleSeverity.WARNING,
+        "PERFORMANCE": RuleSeverity.PERFORMANCE,
+        "STYLE": RuleSeverity.STYLE,
+    }
+    severity_upper = severity_str.upper()
+    if severity_upper in severity_map:
+        config.min_severity = severity_map[severity_upper]
+    else:
+        logger.warning("Invalid min_severity value: %s", severity_str)
+
+
+def _load_rule_settings(config: BlinterConfig, parser: configparser.ConfigParser) -> None:
+    """Load rule settings from config parser."""
+    if not parser.has_section("rules"):
+        return
+
+    rules = parser["rules"]
+
+    # Handle enabled_rules
+    enabled_str = rules.get("enabled_rules", "").strip()
+    if enabled_str:
+        config.enabled_rules = set(rule.strip() for rule in enabled_str.split(",") if rule.strip())
+
+    # Handle disabled_rules
+    disabled_str = rules.get("disabled_rules", "").strip()
+    if disabled_str:
+        config.disabled_rules = set(
+            rule.strip() for rule in disabled_str.split(",") if rule.strip()
+        )
+
+
+def load_config(config_path: Optional[str] = None, use_config: bool = True) -> BlinterConfig:
+    """
+    Load configuration from blinter.ini file.
+
+    Args:
+        config_path: Optional path to config file. If None, looks for blinter.ini in
+            current directory
+        use_config: Whether to use config file at all
+
+    Returns:
+        BlinterConfig object with loaded settings
+    """
+    config = BlinterConfig()
+
+    if not use_config:
+        return config
+
+    # Determine config file path
+    config_path = config_path or "blinter.ini"
+    config_file = Path(config_path)
+
+    if not config_file.exists():
+        logger.info("No configuration file found at %s, using defaults", config_file)
+        return config
+
+    try:
+        parser = configparser.ConfigParser()
+        parser.read(config_file, encoding="utf-8")
+
+        _load_general_settings(config, parser)
+        _load_rule_settings(config, parser)
+
+        logger.info("Configuration loaded from %s", config_file)
+
+    except (configparser.Error, OSError, ValueError) as error:
+        logger.warning(
+            "Error loading configuration from %s: %s. Using defaults.", config_file, error
+        )
+
+    return config
+
+
+def create_default_config_file(config_path: str = "blinter.ini") -> None:
+    """
+    Create a default configuration file with all available options documented.
+
+    Args:
+        config_path: Path where to create the config file
+    """
+    config_content = """# Blinter Configuration File
+# This file configures the behavior of the blinter batch file linter.
+# All settings are optional - if not specified, defaults will be used.
+
+[general]
+# Whether to recursively search directories for batch files (default: true)
+recursive = true
+
+# Whether to show summary statistics at the end (default: false)  
+show_summary = false
+
+# Maximum line length before triggering S011 rule (default: 120)
+max_line_length = 120
+
+# Minimum severity level to report (default: none - show all)
+# Valid values: ERROR, SECURITY, WARNING, PERFORMANCE, STYLE
+# min_severity = WARNING
+
+[rules]
+# Comma-separated list of specific rules to enable (default: all rules enabled)
+# If specified, ONLY these rules will be checked
+# enabled_rules = E001,E002,W001,S001
+
+# Comma-separated list of rules to disable (default: none disabled)
+# These rules will be skipped even if they would normally be checked
+# disabled_rules = S007,S011
+
+# Examples:
+# To only check for errors and security issues:
+# enabled_rules = E001,E002,E003,E004,E005,E006,E007,E008,E009,E010,E011,E012,E013,E014,E015,E016,E017,E018,SEC001,SEC002,SEC003,SEC004,SEC005,SEC006,SEC007,SEC008,SEC009,SEC010,SEC011,SEC012,SEC013
+
+# To disable style checks but keep everything else:
+# disabled_rules = S001,S002,S003,S004,S005,S006,S007,S008,S009,S010,S011,S012,S013,S014,S015,S016,S017,S018,S019,S020
+
+# To only show warnings and errors (skip style, performance):
+# min_severity = WARNING
+"""
+
+    try:
+        with open(config_path, "w", encoding="utf-8") as config_file:
+            config_file.write(config_content)
+        print(f"Default configuration file created: {config_path}")
+    except OSError as error:
+        print(f"Error creating configuration file: {error}")
+
+
 def print_help() -> None:
     """Print help information for the blinter command."""
     help_text = """
@@ -1382,7 +1583,14 @@ Options:
   --summary           Show a summary section with total errors and most common error.
   --severity          Show error severity levels and their meaning.
   --no-recursive      When processing directories, don't search subdirectories (default: recursive).
+  --no-config         Don't use configuration file (blinter.ini) even if it exists.
+  --create-config     Create a default blinter.ini configuration file and exit.
   --help              Display this help menu and exit.
+
+Configuration:
+  Blinter automatically looks for a 'blinter.ini' file in the current directory.
+  If found, settings from this file will be used as defaults.
+  Command line options override configuration file settings.
 
 Rule Categories:
   E001-E999   Error Level    - Issues that will cause script failure
@@ -2897,6 +3105,7 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
 
 def lint_batch_file(  # pylint: disable=too-many-locals
     file_path: str,
+    config: Optional[BlinterConfig] = None,
     max_line_length: int = 120,
     enable_performance_rules: bool = True,
     enable_style_rules: bool = True,
@@ -2914,9 +3123,13 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     Args:
         file_path: Path to the batch file (.bat or .cmd) to lint.
                   Can be absolute or relative path.
+        config: BlinterConfig object with configuration settings. If None, uses defaults.
         max_line_length: Maximum allowed line length for S011 rule (default: 120)
+                        Deprecated: Use config.max_line_length instead
         enable_performance_rules: Whether to enable performance-related rules (default: True)
+                                 Deprecated: Use config rules settings instead
         enable_style_rules: Whether to enable style-related rules (default: True)
+                           Deprecated: Use config rules settings instead
 
     Returns:
         List of LintIssue objects containing detailed issue information.
@@ -2934,10 +3147,16 @@ def lint_batch_file(  # pylint: disable=too-many-locals
         ...     print(f"Line {issue.line_number}: {issue.rule.name}")
 
         >>> # With custom configuration
-        >>> issues = lint_batch_file("script.bat", max_line_length=100,
-        ...                         enable_style_rules=False)
+        >>> config = BlinterConfig(max_line_length=100)
+        >>> issues = lint_batch_file("script.bat", config=config)
     """
     logger.info("Starting lint analysis of file: %s", file_path)
+
+    # Use provided config or create default
+    if config is None:
+        config = BlinterConfig()
+        # Use legacy parameters for backward compatibility
+        config.max_line_length = max_line_length
 
     # Read and validate file
     lines, _encoding_used = _validate_and_read_file(file_path)
@@ -2947,12 +3166,12 @@ def lint_batch_file(  # pylint: disable=too-many-locals
 
     # Store original max_line_length for S011 rule
     original_s011_rule = RULES["S011"]
-    if max_line_length != 120:
+    if config.max_line_length != 120:
         RULES["S011"] = Rule(
             code="S011",
             name=original_s011_rule.name,
             severity=original_s011_rule.severity,
-            explanation=original_s011_rule.explanation.replace("120", str(max_line_length)),
+            explanation=original_s011_rule.explanation.replace("120", str(config.max_line_length)),
             recommendation=original_s011_rule.recommendation,
         )
 
@@ -2986,7 +3205,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
             has_set_commands,
             has_delayed_expansion,
             uses_delayed_vars,
-            max_line_length,
+            config.max_line_length,
             enable_performance_rules,
             enable_style_rules,
         )
@@ -2996,21 +3215,36 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     issues.extend(_check_new_global_rules(lines, file_path))
 
     # Restore original S011 rule if modified
-    if max_line_length != 120:
+    if config.max_line_length != 120:
         RULES["S011"] = original_s011_rule
+
+    # Filter issues based on configuration
+    filtered_issues = []
+    for issue in issues:
+        # Check if rule is enabled
+        if not config.is_rule_enabled(issue.rule.code):
+            continue
+
+        # Check if severity should be included
+        if not config.should_include_severity(issue.rule.severity):
+            continue
+
+        filtered_issues.append(issue)
+
     logger.info(
-        "Lint analysis completed. Found %d issues across %d error(s), "
+        "Lint analysis completed. Found %d issues (filtered to %d) across %d error(s), "
         "%d warning(s), %d style issue(s), %d security issue(s), "
         "%d performance issue(s)",
         len(issues),
-        len([i for i in issues if i.rule.severity == RuleSeverity.ERROR]),
-        len([i for i in issues if i.rule.severity == RuleSeverity.WARNING]),
-        len([i for i in issues if i.rule.severity == RuleSeverity.STYLE]),
-        len([i for i in issues if i.rule.severity == RuleSeverity.SECURITY]),
-        len([i for i in issues if i.rule.severity == RuleSeverity.PERFORMANCE]),
+        len(filtered_issues),
+        len([i for i in filtered_issues if i.rule.severity == RuleSeverity.ERROR]),
+        len([i for i in filtered_issues if i.rule.severity == RuleSeverity.WARNING]),
+        len([i for i in filtered_issues if i.rule.severity == RuleSeverity.STYLE]),
+        len([i for i in filtered_issues if i.rule.severity == RuleSeverity.SECURITY]),
+        len([i for i in filtered_issues if i.rule.severity == RuleSeverity.PERFORMANCE]),
     )
 
-    return issues
+    return filtered_issues
 
 
 def _check_new_global_rules(lines: List[str], file_path: str) -> List[LintIssue]:
@@ -3632,9 +3866,15 @@ def main() -> (
         print_help()
         return
 
+    # Handle special commands first
+    if "--create-config" in sys.argv:
+        create_default_config_file()
+        return
+
     target_path: Optional[str] = None
-    show_summary = False
-    recursive = True  # Default to recursive directory search
+    use_config = True
+    cli_show_summary = None  # None means use config default
+    cli_recursive = None  # None means use config default
 
     for arg in sys.argv[1:]:
         if not arg.startswith("--"):
@@ -3642,20 +3882,31 @@ def main() -> (
             if target_path is None:
                 target_path = arg
         elif arg == "--summary":
-            show_summary = True
+            cli_show_summary = True
         elif arg == "--severity":
             pass  # Severity is always shown
         elif arg == "--no-recursive":
-            recursive = False
+            cli_recursive = False
+        elif arg == "--no-config":
+            use_config = False
 
     if not target_path:
         print("Error: No batch file or directory provided.\n")
         print_help()
         return
 
+    # Load configuration
+    config = load_config(use_config=use_config)
+
+    # Override config with CLI arguments
+    if cli_show_summary is not None:
+        config.show_summary = cli_show_summary
+    if cli_recursive is not None:
+        config.recursive = cli_recursive
+
     # Find all batch files to process
     try:
-        batch_files = find_batch_files(target_path, recursive=recursive)
+        batch_files = find_batch_files(target_path, recursive=config.recursive)
     except FileNotFoundError:
         print(f"Error: Path '{target_path}' not found.")
         return
@@ -3678,7 +3929,7 @@ def main() -> (
 
     for batch_file in batch_files:
         try:
-            issues = lint_batch_file(str(batch_file))
+            issues = lint_batch_file(str(batch_file), config=config)
             file_results[str(batch_file)] = issues
             all_issues.extend(issues)
             total_files_processed += 1
@@ -3701,7 +3952,7 @@ def main() -> (
     is_directory = Path(target_path).is_dir()
 
     if is_directory:
-        print(f"\n🔍 Batch Files Analysis: {target_path}")
+        print(f"\n Batch Files Analysis: {target_path}")
         print("=" * (26 + len(target_path)))
         file_count_text = "s" if total_files_processed != 1 else ""
         print(f"Processed {total_files_processed} batch file{file_count_text}")
@@ -3711,29 +3962,29 @@ def main() -> (
         if len(file_results) > 1:
             for file_path, issues in file_results.items():
                 relative_path = Path(file_path).relative_to(Path(target_path))
-                print(f"\n📄 File: {relative_path}")
+                print(f"\n File: {relative_path}")
                 print("-" * (8 + len(str(relative_path))))
 
                 if issues:
                     print_detailed(issues)
                 else:
-                    print("No issues found! ✅")
+                    print("No issues found! OK")
                 print()
         else:
             # Single file in directory
             print_detailed(all_issues)
     else:
         # Single file processing
-        print(f"\n🔍 Batch File Analysis: {target_path}")
+        print(f"\n Batch File Analysis: {target_path}")
         print("=" * (25 + len(target_path)))
         print_detailed(all_issues)
 
     # Show combined summary if processing multiple files
     if is_directory and len(file_results) > 1:
-        print("\n📊 COMBINED RESULTS:")
+        print("\n COMBINED RESULTS:")
         print("===================")
 
-    if show_summary:
+    if config.show_summary:
         print_summary(all_issues)
 
     print_severity_info(all_issues)
@@ -3746,7 +3997,7 @@ def main() -> (
             error_text = "s" if error_count != 1 else ""
             file_text = "s" if files_with_errors != 1 else ""
             print(
-                f"\n⚠️  Found {error_count} critical error{error_text} "
+                f"\nWARNING  Found {error_count} critical error{error_text} "
                 f"across {files_with_errors} file{file_text} that must be fixed."
             )
             sys.exit(1)
@@ -3754,7 +4005,7 @@ def main() -> (
             issue_text = "s" if len(all_issues) != 1 else ""
             file_text = "s" if total_files_processed != 1 else ""
             print(
-                f"\n✅ No critical errors found, but {len(all_issues)} total "
+                f"\nOK No critical errors found, but {len(all_issues)} total "
                 f"issue{issue_text} detected across {total_files_processed} file{file_text}."
             )
             sys.exit(0)
@@ -3769,13 +4020,13 @@ def main() -> (
     else:
         if error_count > 0:
             print(
-                f"\n⚠️  Found {error_count} critical "
+                f"\nWARNING  Found {error_count} critical "
                 f"error{'s' if error_count != 1 else ''} that must be fixed."
             )
             sys.exit(1)
         elif all_issues:
             print(
-                f"\n✅ No critical errors found, but {len(all_issues)} "
+                f"\nOK No critical errors found, but {len(all_issues)} "
                 f"issue{'s' if len(all_issues) != 1 else ''} detected."
             )
             sys.exit(0)
