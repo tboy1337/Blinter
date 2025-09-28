@@ -1,0 +1,142 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools-scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Blinter"
+dynamic = ["version"]
+description = "Blinter is a linter for Windows batch files. It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems."
+readme = "README.md"
+license = {text = "CRL"}
+authors = [
+    {name = "tboy1337", email = "check@my-website.com"}
+]
+maintainers = [
+    {name = "tboy1337", email = "check@my-website.com"}
+]
+keywords = ["lint", "python", "windows", "analysis", "script", "linting", "linter", "static-analysis", "static", "batch", "batch-file", "cmd", "batch-script", "batchfile", "bat", "script-analysis"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: System :: Systems Administration",
+    "Environment :: Console",
+]
+requires-python = ">=3.9"
+dependencies = ["chardet"]
+
+[project.optional-dependencies]
+dev = [
+    # Core Testing Packages
+    "pytest",
+    "pytest-asyncio",
+    "pytest-timeout",
+    "pytest-xdist",
+    "pytest-mock",
+    "pytest-cov",
+    # Additional Testing Packages
+    "pytest-html",
+    "pytest-json-report",
+    "pytest-benchmark",
+    "pytest-rerunfailures",
+    # Linting
+    "pylint",
+    "mypy",
+    "autopep8",
+    # Code Formatting
+    "black",
+    "isort",
+]
+
+[project.urls]
+Homepage = "https://github.com/tboy1337/Blinter"
+Documentation = "https://github.com/tboy1337/Blinter"
+Repository = "https://github.com/tboy1337/Blinter.git"
+Issues = "https://github.com/tboy1337/Blinter/issues"
+
+[project.scripts]
+blinter = "blinter:main"
+
+[tool.setuptools]
+py-modules = ["blinter"]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "blinter.__version__"}
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+skip-string-normalization = false
+skip-magic-trailing-comma = false
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 100
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+src_paths = ["."]
+known_first_party = ["blinter"]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+default_section = "THIRDPARTY"
+force_single_line = false
+force_sort_within_sections = true
+lexicographical = true
+order_by_type = true
+single_line_exclusions = ["typing"]
+balanced_wrapping = true
+atomic = true
+lines_between_types = 1
+combine_as_imports = true
+combine_star = false
+from_first = false
+verbose = false
+quiet = false
+color_output = false
+
+[tool.mypy]
+# Configuration is in mypy.ini for compatibility and easier per-file overrides
+
+[tool.pylint]
+# Configuration is in pylintrc for full control and readability
+
+[tool.pytest.ini_options]
+# Configuration is in pytest.ini for compatibility
+
+[tool.coverage.run]
+# Configuration is in .coveragerc for full control
+
+[tool.coverage.report]
+# Configuration is in .coveragerc for full control
+
+[tool.coverage.html]
+# Configuration is in .coveragerc for full control

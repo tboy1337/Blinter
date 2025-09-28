@@ -1,0 +1,68 @@
+name: "Build-Release"
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Create virtual environment
+        run: |
+          python -m venv venv
+      - name: Install dependencies in virtual environment
+        run: |
+          .\venv\Scripts\Activate.ps1
+          python -m pip install --upgrade pip
+          python -m pip install --upgrade setuptools
+          python -m pip install --upgrade wheel
+          python -m pip install --upgrade pyinstaller
+          python -m pip install --upgrade -r requirements.txt
+        shell: pwsh
+      - name: Build executable
+        run: |
+          .\venv\Scripts\Activate.ps1
+          pyinstaller --onefile --name Blinter blinter.py
+        shell: pwsh
+      - name: Rename executable
+        run: |
+          Rename-Item -Path dist/Blinter.exe -NewName Blinter-v1.0.${{ github.run_number }}-windows.exe
+        shell: pwsh
+      - name: Zip the exe
+        run: |
+          Compress-Archive -Path "dist/Blinter-v1.0.${{ github.run_number }}-windows.exe" -DestinationPath "dist/Blinter-v1.0.${{ github.run_number }}-windows.zip"
+        shell: pwsh
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: dist/Blinter-v1.0.${{ github.run_number }}-windows.zip
+
+  create-release:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          path: ./build
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: ./build/*
+          tag: v1.0.${{ github.run_number }}
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,185 @@
+[run]
+# Source code directories
+source = blinter.py
+
+# Exclude patterns  
+omit =
+    */tests/*
+    */test_*
+    */__pycache__/*
+    */.*
+    */venv/*
+    */env/*
+    */build/*
+    */dist/*
+    */htmlcov/*
+    */coverage/*
+    */.tox/*
+    */.pytest_cache/*
+    */.mypy_cache/*
+    */site-packages/*
+    setup.py
+    conftest.py
+    */migrations/*
+    */locale/*
+    */static/*
+    */media/*
+    */node_modules/*
+
+# Branch coverage
+branch = True
+
+# Concurrency support (for multi-threading/multiprocessing)
+concurrency = thread,multiprocessing
+
+# Data file location
+data_file = .coverage
+
+# Parallel mode for multiple processes
+parallel = False
+
+# Relative file paths in reports
+relative_files = True 
+
+[report]
+# Fail if coverage is under this percentage
+fail_under = 95.0
+
+# Show missing line numbers
+show_missing = True
+
+# Skip covered files
+skip_covered = False
+
+# Skip empty files
+skip_empty = False
+
+# Precision for coverage percentages  
+precision = 2
+
+# Sort results
+sort = Cover
+
+# Include source code in HTML report (contexts may not be supported in all versions)
+
+# Exclude lines from coverage analysis
+exclude_lines =
+    # Have to re-enable the standard pragma
+    pragma: no cover
+    
+    # Don't complain about missing debug-only code:
+    def __repr__
+    if self\.debug
+    
+    # Don't complain if tests don't hit defensive assertion code:
+    raise AssertionError
+    raise NotImplementedError
+    
+    # Don't complain if non-runnable code isn't run:
+    if 0:
+    if False:
+    if __name__ .__eq__ .__main__.:
+    
+    # Don't complain about abstract methods
+    @(abc\.)?abstractmethod
+    
+    # Don't complain about type checking imports
+    if TYPE_CHECKING:
+    
+    # Don't complain about platform specific code
+    pragma: no cover
+    
+    # Don't complain about debug code  
+    if DEBUG:
+    
+    # Don't complain about version checks
+    if sys.version_info
+    
+    # Don't complain about OS specific code
+    if os.name
+    if platform.system
+    
+    # Don't complain about import fallbacks
+    except ImportError:
+    except ModuleNotFoundError:
+    
+    # Don't complain about protocol stubs
+    \.\.\.
+
+# Partial branches to exclude
+partial_branches =
+    # Have to re-enable the standard pragma
+    pragma: no branch
+    
+    # Don't complain about non-runnable code:
+    if 0:
+    if False:
+    if __name__ .__eq__ .__main__.:
+
+# Regular expressions for excluding lines
+exclude_also =
+    # Type checking imports
+    if TYPE_CHECKING:
+    
+    # Platform checks
+    if sys\.platform
+    if os\.name
+    
+    # Version checks  
+    if sys\.version_info
+    
+    # Abstract methods
+    @abc\.abstractmethod
+    
+    # Debug code
+    if DEBUG:
+    if __debug__:
+
+# Ignore errors
+ignore_errors = False
+
+[html]
+# HTML output directory
+directory = htmlcov
+
+# Title for HTML report
+title = Coverage Report for blinter (Batch File Linter)
+
+# Show contexts in HTML report (removed - not supported in all versions)
+
+# Skip files with 100% coverage in HTML report
+skip_covered = False
+
+# Skip empty files in HTML report
+skip_empty = False
+
+# Extra CSS for HTML report
+extra_css = 
+
+# Custom template directory (removed - not supported in all versions) 
+
+[xml]
+# XML output file
+output = coverage.xml
+
+# Package depth for XML report
+package_depth = 99
+
+[json]
+# JSON output file  
+output = coverage.json
+
+# Pretty print JSON
+pretty_print = True
+
+# Show contexts in JSON (removed - not supported in all versions)
+
+[lcov]
+# LCOV output file
+output = coverage.lcov
+
+[paths]
+# Path mapping for different environments
+source =
+    blinter.py
+    */site-packages/blinter.py

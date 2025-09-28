@@ -1,0 +1,25 @@
+# Main Requirements
+-r requirements.txt
+
+# Core Testing Packages
+pytest
+pytest-asyncio
+pytest-timeout
+pytest-xdist
+pytest-mock
+pytest-cov
+
+# Additional Testing Packages
+pytest-html
+pytest-json-report
+pytest-benchmark
+pytest-rerunfailures
+
+# Linting
+pylint
+mypy
+autopep8
+
+# Code Formatting
+black
+isort

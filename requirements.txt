@@ -1,0 +1,2 @@
+# For enhanced encoding detection (recommended but not required)
+chardet

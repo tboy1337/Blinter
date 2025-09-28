@@ -1,0 +1,190 @@
+# Set default behavior for all files - use auto normalization
+* text=auto
+
+# Windows-centric text files - use CRLF for better Windows compatibility
+*.txt text eol=crlf
+*.md text eol=crlf
+*.json text eol=crlf
+*.xml text eol=crlf
+*.yml text eol=crlf
+*.yaml text eol=crlf
+*.toml text eol=crlf
+*.ini text eol=crlf
+*.cfg text eol=crlf
+*.config text eol=crlf
+*.log text eol=crlf
+*.csv text eol=crlf
+*.tsv text eol=crlf
+
+# Source code files - CRLF for Windows development
+*.c text eol=crlf
+*.cpp text eol=crlf
+*.cxx text eol=crlf
+*.cc text eol=crlf
+*.h text eol=crlf
+*.hpp text eol=crlf
+*.hxx text eol=crlf
+*.cs text eol=crlf
+*.vb text eol=crlf
+*.fs text eol=crlf
+*.fsx text eol=crlf
+*.java text eol=crlf
+*.kt text eol=crlf
+*.scala text eol=crlf
+*.py text eol=crlf
+*.rb text eol=crlf
+*.php text eol=crlf
+*.js text eol=crlf
+*.ts text eol=crlf
+*.jsx text eol=crlf
+*.tsx text eol=crlf
+*.vue text eol=crlf
+*.html text eol=crlf
+*.htm text eol=crlf
+*.css text eol=crlf
+*.scss text eol=crlf
+*.sass text eol=crlf
+*.less text eol=crlf
+*.go text eol=crlf
+*.rs text eol=crlf
+*.swift text eol=crlf
+*.m text eol=crlf
+*.mm text eol=crlf
+*.pl text eol=crlf
+*.pm text eol=crlf
+*.sql text eol=crlf
+*.lua text eol=crlf
+*.r text eol=crlf
+*.R text eol=crlf
+*.tex text eol=crlf
+*.bib text eol=crlf
+
+# Windows-specific files
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.reg text eol=crlf
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+
+# Project files - CRLF for Windows tools
+*.sln text eol=crlf
+*.vcxproj text eol=crlf
+*.vcxproj.filters text eol=crlf
+*.vcxproj.user text eol=crlf
+*.csproj text eol=crlf
+*.vbproj text eol=crlf
+*.fsproj text eol=crlf
+*.props text eol=crlf
+*.targets text eol=crlf
+*.nuspec text eol=crlf
+
+# Git files - CRLF for consistency on Windows
+.gitignore text eol=crlf
+.gitattributes text eol=crlf
+.gitmodules text eol=crlf
+
+# Build files that benefit from CRLF on Windows
+*.cmake text eol=crlf
+CMakeLists.txt text eol=crlf
+
+# Files that should explicitly use LF (cross-platform compatibility required)
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+*.fish text eol=lf
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+Makefile text eol=lf
+makefile text eol=lf
+*.mk text eol=lf
+
+# Binary files (explicitly marked to avoid any processing)
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.a binary
+*.lib binary
+*.obj binary
+*.o binary
+*.pdb binary
+*.idb binary
+*.pch binary
+*.res binary
+*.rc2 binary
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.ico binary
+*.svg binary
+*.tiff binary
+*.webp binary
+
+# Archives and compressed files
+*.zip binary
+*.7z binary
+*.rar binary
+*.tar binary
+*.gz binary
+*.bz2 binary
+*.xz binary
+*.lz4 binary
+
+# Media files
+*.mp3 binary
+*.mp4 binary
+*.avi binary
+*.mov binary
+*.wmv binary
+*.flv binary
+*.wav binary
+*.ogg binary
+
+# Office documents
+*.doc binary
+*.docx binary
+*.xls binary
+*.xlsx binary
+*.ppt binary
+*.pptx binary
+*.pdf binary
+
+# Fonts
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+
+# Database files
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.mdb binary
+
+# Package files
+*.nupkg binary
+*.msi binary
+*.pkg binary
+*.deb binary
+*.rpm binary
+
+# Git LFS (Large File Storage) - uncomment if using LFS
+# *.psd filter=lfs diff=lfs merge=lfs -text
+# *.ai filter=lfs diff=lfs merge=lfs -text
+# *.sketch filter=lfs diff=lfs merge=lfs -text
+
+# Linguist overrides (for GitHub language detection)
+*.sql linguist-detectable=true
+*.html linguist-detectable=false
+*.css linguist-detectable=false
+vendor/* linguist-vendored
+node_modules/* linguist-vendored
+packages/* linguist-vendored
+*.min.js linguist-generated
+*.min.css linguist-generated

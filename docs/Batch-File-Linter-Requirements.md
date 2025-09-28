@@ -1,0 +1,1001 @@
+# Batch File Linter Requirements
+
+## Rule Categories Summary
+
+**Blinter** provides comprehensive static analysis with **114 Built-in Rules** across 5 severity levels:
+
+### Error Level Rules (E001-E999)
+**Critical issues that will cause script failure**
+
+- **E001**: Nested parentheses mismatch
+- **E002**: Missing label for GOTO statement
+- **E003**: IF statement improper formatting
+- **E004**: IF EXIST syntax mixing
+- **E005**: Invalid path syntax
+- **E006**: Undefined variable reference
+- **E007**: Empty variable check syntax error
+- **E008**: Unreachable code after EXIT or GOTO
+- **E009**: Mismatched quotes
+- **E010**: Malformed FOR loop missing DO
+- **E016**: Invalid errorlevel comparison syntax
+- **E017**: Invalid percent-tilde syntax
+- **E018**: Unix line endings detected  
+- **E019**: Percent-tilde on non-parameter variable
+- **E020**: Invalid FOR loop variable syntax
+- **E021**: Invalid string operation syntax
+- **E022**: Invalid arithmetic expression in SET /A
+- **E023**: Missing quotes in SET /A with special characters
+- **E024**: Invalid parameter modifier combination
+- **E025**: Parameter modifier on wrong context
+- **E027**: UNC path used as working directory
+- **E028**: Complex quote escaping error
+- **E029**: Complex SET /A expression errors
+
+### Warning Level Rules (W001-W999)
+**Issues that may cause problems**
+
+- **W001**: Missing exit code
+- **W002**: Missing ERRORLEVEL check
+- **W003**: Operation without error handling
+- **W004**: Potential infinite loop
+- **W005**: Unquoted variable with spaces
+- **W006**: Network operation without timeout
+- **W007**: File operation on potentially locked file
+- **W008**: Permanent PATH modification
+- **W009**: Windows version compatibility
+- **W010**: Architecture-specific operation
+- **W011**: Unicode handling issue
+- **W012**: Non-ASCII characters detected
+- **W013**: Duplicate label
+- **W017**: Errorlevel comparison semantic difference
+- **W018**: Multi-byte characters with potential line ending risks
+- **W019**: GOTO/CALL with potential line ending risks
+- **W020**: FOR loop missing /F options for complex parsing
+- **W021**: IF comparison without quotes
+- **W022**: Missing SETLOCAL EnableDelayedExpansion
+- **W023**: Inefficient nested FOR loops
+- **W024**: Deprecated command detected
+- **W025**: Missing error redirection
+- **W026**: Inefficient parameter modifier usage
+- **W027**: Command behavior differs between interpreters
+- **W028**: Errorlevel handling difference between .bat/.cmd
+- **W029**: 16-bit command in 64-bit context
+- **W030**: Non-ASCII characters may cause encoding issues
+- **W031**: Unicode filename in batch operation
+- **W032**: Missing character set declaration
+- **W033**: Command execution may be ambiguous
+
+### Style Level Rules (S001-S999)
+**Code style and formatting issues**
+
+- **S001**: Missing @ECHO OFF at file start
+- **S002**: ECHO OFF without @ prefix
+- **S003**: Inconsistent command capitalization
+- **S004**: Trailing whitespace
+- **S005**: Mixed line endings
+- **S006**: Inconsistent variable naming
+- **S007**: BAT extension used instead of CMD for newer Windows
+- **S008**: Missing comments for complex code
+- **S009**: Magic numbers used
+- **S010**: Dead code detected
+- **S011**: Line exceeds maximum length
+- **S016**: Potentially unsafe double-colon comment
+- **S017**: Inconsistent variable naming convention
+- **S018**: Missing function documentation
+- **S019**: Magic numbers in code
+- **S020**: Long line without continuation
+
+### Security Level Rules (SEC001+)
+**Security vulnerabilities and risks**
+
+- **SEC001**: Potential command injection vulnerability
+- **SEC002**: Unsafe SET command usage
+- **SEC003**: Dangerous command without confirmation
+- **SEC004**: Dangerous registry operation
+- **SEC005**: Missing privilege check
+- **SEC006**: Hardcoded absolute path
+- **SEC007**: Hardcoded temporary directory
+- **SEC011**: Unvalidated path traversal
+- **SEC012**: Unsafe temporary file creation
+- **SEC013**: Command injection via variable substitution
+- **SEC014**: UNC path without UAC elevation check
+- **SEC015**: Fork bomb pattern detected
+- **SEC016**: Potential hosts file modification
+- **SEC017**: Autorun.inf creation detected
+- **SEC018**: Batch file copying itself to removable media
+
+### Performance Level Rules (P001-P999)
+**Performance and efficiency improvements**
+
+- **P001**: Redundant file existence check
+- **P002**: Code duplication detected
+- **P003**: Unnecessary SETLOCAL
+- **P004**: Unnecessary ENABLEDELAYEDEXPANSION
+- **P005**: ENDLOCAL without SETLOCAL
+- **P006**: Missing ENDLOCAL before exit
+- **P007**: Temporary file without random name
+- **P008**: Delayed expansion without enablement
+- **P012**: Inefficient string operations
+- **P013**: Missing /B flag for large DIR operations
+- **P014**: Unnecessary command output
+- **P015**: Inefficient delay implementation
+
+## Implementation Guidelines
+*Each rule should provide clear explanations and actionable recommendations*
+
+### Output Format
+- **Line number**: Specify exact line where issue occurs
+- **Rule code**: Unique identifier (e.g., E001, W001, S001, P001) 
+- **Explanation**: Clear description of why this is an issue
+- **Recommendation**: Specific guidance on how to fix the problem
+- **Severity level**: Error, Warning, Style, Security, or Performance
+
+### Example Output Structure
+```
+Line 5: Missing '@ECHO OFF' at top of file (S001)
+- Explanation: Batch scripts usually start with '@ECHO OFF' to prevent command echoing during execution
+- Recommendation: Add '@ECHO OFF' as the first line of your script
+```
+
+## Error Level Rules
+*Issues that will cause the script to fail or behave incorrectly*
+
+### Syntax Errors
+- **Nested parentheses**: Error on improper nesting and matching of parentheses
+  ```batch
+  # Bad
+  if exist "file.txt" (
+      echo Found file
+  # Missing closing parenthesis
+  
+  # Good
+  if exist "file.txt" (
+      echo Found file
+  )
+  ```
+
+- **Missing labels**: Error on `GOTO` statements pointing to non-existent labels
+  ```batch
+  # Bad
+  GOTO nonexistent_label
+  
+  # Good
+  GOTO end
+  :end
+  ```
+
+- **IF statement formatting**: Error on improper spacing and syntax in conditional statements
+  ```batch
+  # Bad
+  IF"%VAR%"=="value"ECHO Match
+  
+  # Good
+  IF "%VAR%"=="value" ECHO Match
+  ```
+
+- **IF EXIST vs comparison**: Error when mixing IF EXIST and comparison syntax
+  ```batch
+  # Bad
+  IF EXIST file.txt == true ECHO Found
+  IF %FILE_EXISTS% EXIST ECHO Invalid
+  
+  # Good
+  IF EXIST file.txt ECHO Found
+  IF "%FILE_EXISTS%"=="true" ECHO Found
+  ```
+
+- **Path validation**: Error on invalid path syntax and paths exceeding length limits
+  ```batch
+  # Bad
+  COPY "C:\invalid<>path\file.txt" dest
+  
+  # Good
+  COPY "C:\valid\path\file.txt" dest
+  ```
+
+### Variable Errors
+- **Undefined variables**: Error on references to variables that were never set
+  ```batch
+  # Bad
+  ECHO %UNDEFINED_VAR%
+  
+  # Good
+  SET MY_VAR=value
+  ECHO %MY_VAR%
+  ```
+
+- **Empty variable checks**: Error on incorrect syntax for checking if variables are empty
+  ```batch
+  # Bad
+  IF %VAR%=="" ECHO Empty
+  
+  # Good
+  IF "%VAR%"=="" ECHO Empty
+  ```
+
+- **Invalid errorlevel syntax**: Error on improper errorlevel comparison syntax that will cause script failure
+  ```batch
+  # Bad - Missing comparison operator
+  IF NOT %ERRORLEVEL% 1 (
+      ECHO This syntax is invalid and causes errors
+  )
+  
+  # Good - Correct ERRORLEVEL keyword usage
+  IF NOT ERRORLEVEL 1 (
+      ECHO This is the correct syntax
+  )
+  
+  # Good - Explicit variable comparison
+  IF %ERRORLEVEL% NEQ 1 (
+      ECHO This explicit comparison works correctly
+  )
+  ```
+
+### Line Ending Issues
+- **Unix line endings**: Critical error that can cause GOTO/CALL failures due to Windows batch parser bugs
+  ```batch
+  # Bad - Unix line endings (LF-only) cause parser failures
+  @echo off\n
+  goto :main\n
+  :main\n
+  echo Hello\n
+  
+  # Good - Windows line endings (CRLF)
+  @echo off\r\n
+  goto :main\r\n
+  :main\r\n
+  echo Hello\r\n
+  ```
+
+### Advanced Variable Expansion Errors
+- **Percent-tilde syntax validation**: Error on malformed %~modifiers
+  ```batch
+  # Bad - Invalid modifier
+  echo %~q1%
+  
+  # Good - Valid modifiers
+  echo %~n1  :: filename
+  echo %~f1  :: full path
+  echo %~d1  :: drive letter
+  echo %~p1  :: path
+  echo %~x1  :: extension
+  ```
+
+- **Percent-tilde parameter validation**: Error when used on non-parameter variables
+  ```batch
+  # Bad - Can't use on regular variables
+  echo %~nMYVAR%
+  
+  # Good - Only on parameters and FOR variables
+  echo %~n1
+  echo %~f%%i  :: in FOR loop
+  ```
+
+- **FOR loop variable syntax**: Error on incorrect %/% usage in batch files
+  ```batch
+  # Bad - Single % in batch files
+  for %i in (*.txt) do echo %i
+  
+  # Good - Double %% in batch files
+  for %%i in (*.txt) do echo %%i
+  ```
+
+- **String operation syntax**: Error on malformed substring/replacement operations
+  ```batch
+  # Bad - Missing parameters
+  echo %var:~%
+  
+  # Good - Proper syntax
+  echo %var:~0,5%        :: substring
+  echo %var:old=new%     :: replacement
+  ```
+
+- **SET /A arithmetic**: Error on invalid expressions or unquoted special characters
+  ```batch
+  # Bad - Unquoted special characters
+  set /a result=5^2
+  
+  # Good - Quoted special characters
+  set /a "result=5^2"
+  set /a "result=(5+3)*2"
+  ```
+
+### Control Flow Errors
+- **Unreachable code**: Error on code after `EXIT` or `GOTO` statements
+  ```batch
+  # Bad
+  EXIT /b 0
+  ECHO This will never execute
+  
+  # Good
+  ECHO This executes
+  EXIT /b 0
+  ```
+
+## Warning Level Rules
+*Issues that are bad practice but won't necessarily break the script*
+
+### Missing Error Handling
+- **Exit codes**: Warn when scripts don't set appropriate exit codes
+  ```batch
+  # Bad
+  COPY file1.txt file2.txt
+  # Script ends without exit code
+  
+  # Good
+  COPY file1.txt file2.txt
+  IF ERRORLEVEL 1 EXIT /b 1
+  EXIT /b 0
+  ```
+
+- **Error checking**: Suggest checking `%ERRORLEVEL%` after critical operations
+  ```batch
+  # Bad
+  DEL important_file.txt
+  ECHO File deleted
+  
+  # Good
+  DEL important_file.txt
+  IF ERRORLEVEL 1 (
+      ECHO Error deleting file
+      EXIT /b 1
+  )
+  ECHO File deleted successfully
+  ```
+
+- **Missing error handling**: Flag operations that commonly fail without error checks
+  ```batch
+  # Bad
+  COPY source.txt destination.txt
+  
+  # Good
+  COPY source.txt destination.txt
+  IF NOT ERRORLEVEL 1 ECHO Copy successful
+  ```
+
+### Potential Issues
+- **Infinite loops**: Warn about potential infinite loops
+  ```batch
+  # Bad
+  :loop
+  ECHO Running
+  GOTO loop
+  
+  # Good
+  SET /a counter=0
+  :loop
+  SET /a counter+=1
+  IF "%counter%" LSS 10 GOTO loop
+  ```
+
+- **Quoting**: Warn when variables containing spaces aren't properly quoted
+  ```batch
+  # Bad
+  IF %PROGRAM_FILES%==C:\Program Files ECHO Match
+  
+  # Good
+  IF "%PROGRAM_FILES%"=="C:\Program Files" ECHO Match
+  ```
+
+- **Network operations**: Warn about operations that may hang without timeouts
+  ```batch
+  # Bad
+  PING google.com
+  
+  # Good
+  PING -n 4 google.com
+  ```
+
+- **File locking**: Warn about operations on files that may be in use
+  ```batch
+  # Potentially problematic
+  COPY "C:\Program Files\MyApp\config.ini" backup\
+  
+  # Better
+  TASKLIST | FIND "myapp.exe" >nul
+  IF NOT ERRORLEVEL 1 (
+      ECHO Warning: MyApp may be using this file
+  )
+  COPY "C:\Program Files\MyApp\config.ini" backup\
+  ```
+
+- **PATH modifications**: Warn about permanent PATH changes vs temporary ones
+  ```batch
+  # Bad (permanent)
+  SETX PATH "%PATH%;C:\MyApp"
+  
+  # Good (temporary)
+  SET "PATH=%PATH%;C:\MyApp"
+  ```
+
+- **Errorlevel semantic differences**: Warn about the specific semantic difference between `IF %ERRORLEVEL% NEQ 1` and `IF NOT ERRORLEVEL 1`
+  ```batch
+  # Problematic - matches ANY value except 1 (0, 2, 3, 4...)
+  IF %ERRORLEVEL% NEQ 1 (
+      ECHO This matches success (0) AND other errors (2, 3, 4...)
+  )
+  
+  # Correct - matches only success (errorlevel < 1, i.e., 0)
+  IF NOT ERRORLEVEL 1 (
+      ECHO This only matches success (errorlevel 0)
+  )
+  
+  # Also correct - explicit success check
+  IF %ERRORLEVEL% EQU 0 (
+      ECHO This explicitly checks for success only
+  )
+  
+  # Fine - other NEQ patterns don't have this issue
+  IF %ERRORLEVEL% NEQ 0 (
+      ECHO This correctly checks for any error
+  )
+  ```
+
+### Enhanced Command Validation Warnings
+- **FOR /F parsing options**: Warn when FOR /F lacks explicit tokens/delims options
+  ```batch
+  # Bad - No parsing options specified
+  for /f %i in ('dir') do echo %i
+  
+  # Good - Explicit parsing options
+  for /f "tokens=1,2 delims=," %i in (data.csv) do echo %i %j
+  for /f "tokens=*" %i in ('dir') do echo %i
+  ```
+
+- **IF comparison quoting**: Warn when IF comparisons lack proper quoting
+  ```batch
+  # Bad - Variables may contain spaces
+  if %username%==admin echo admin
+  if %path%==C:\Program Files echo match
+  
+  # Good - Proper quoting handles spaces
+  if "%username%"=="admin" echo admin
+  if "%path%"=="C:\Program Files" echo match
+  ```
+
+- **Missing delayed expansion setup**: Warn when using !var! without proper SETLOCAL
+  ```batch
+  # Bad - Using !var! without enabling delayed expansion
+  set var=hello
+  echo !var!
+  
+  # Good - Proper delayed expansion setup
+  setlocal EnableDelayedExpansion
+  set var=hello
+  echo !var!
+  ```
+
+- **Deprecated commands**: Warn about commands deprecated in modern Windows
+  ```batch
+  # Bad - Deprecated commands
+  xcopy source.txt dest.txt        :: Use robocopy
+  net send computer "message"      :: Use msg
+  at 14:00 script.bat              :: Use schtasks
+  cacls file.txt                   :: Use icacls
+  
+  # Good - Modern alternatives
+  robocopy source dest /s
+  msg computer "message"
+  schtasks /create /tn "Task" /tr script.bat /sc daily
+  icacls file.txt /grant user:F
+  ```
+
+- **Missing error redirection**: Warn when commands lack proper error handling
+  ```batch
+  # Bad - No error redirection
+  del temp.txt
+  copy file1.txt file2.txt
+  
+  # Good - Proper error redirection
+  del temp.txt 2>nul
+  copy file1.txt file2.txt 2>&1
+  ```
+
+### Line Ending Related Warnings
+- **Multi-byte characters with line ending risks**: UTF-8 characters combined with non-CRLF line endings can cause parser errors
+  ```batch
+  # Bad - Multi-byte characters with Unix line endings
+  @echo off\n
+  echo ═══════════════\n
+  
+  # Good - ASCII characters OR ensure CRLF line endings
+  @echo off\r\n
+  echo ===============\r\n
+  ```
+
+- **GOTO/CALL risks**: Label parsing may fail with non-CRLF line endings
+  ```batch
+  # Potentially problematic with Unix line endings
+  goto :main\n
+  :main\n
+  echo Hello\n
+  
+  # Safer - use CRLF line endings
+  goto :main\r\n
+  :main\r\n
+  echo Hello\r\n
+  ```
+
+### Compatibility Issues
+- **Windows version**: Flag commands not available in older Windows versions
+  ```batch
+  # May not work on older Windows
+  CHOICE /c yn /m "Continue?"
+  
+  # More compatible
+  SET /p answer="Continue? (y/n): "
+  ```
+
+- **Architecture**: Warn about 32-bit vs 64-bit specific operations
+  ```batch
+  # Architecture-specific
+  REG QUERY "HKLM\SOFTWARE\Wow6432Node\MyApp"
+  
+  # Architecture-aware
+  IF "%PROCESSOR_ARCHITECTURE%"=="AMD64" (
+      REG QUERY "HKLM\SOFTWARE\Wow6432Node\MyApp"
+  ) ELSE (
+      REG QUERY "HKLM\SOFTWARE\MyApp"
+  )
+  ```
+
+- **Unicode support**: Check for proper Unicode handling in file operations
+  ```batch
+  # May have issues with Unicode
+  TYPE file.txt
+  
+  # Better Unicode support
+  TYPE file.txt | MORE
+  ```
+
+- **Encoding**: Warn about non-ASCII characters that may cause issues
+  ```batch
+  # Bad
+  ECHO Héllo Wörld
+  
+  # Good
+  ECHO Hello World
+  ```
+
+## Style Level Rules
+*Code style and formatting issues*
+
+### Code Style
+- **Echo statements**: Error on `ECHO OFF` without `@` prefix (should be `@ECHO OFF`)
+  ```batch
+  # Bad
+  ECHO OFF
+  
+  # Good
+  @ECHO OFF
+  ```
+
+- **File header**: Warn when `@ECHO OFF` is missing at the top of the file
+  ```batch
+  # Bad
+  REM This script does something
+  ECHO Hello World
+  
+  # Good
+  @ECHO OFF
+  REM This script does something
+  ECHO Hello World
+  ```
+
+- **Command capitalization**: Recommend uppercase for all batch commands following standard conventions
+  ```batch
+  # Bad
+  echo Hello
+  set var=value
+  if exist file.txt del file.txt
+  
+  # Good
+  ECHO Hello
+  SET var=value
+  IF EXIST file.txt DEL file.txt
+  ```
+
+- **Case sensitivity**: Flag inconsistent casing in commands
+  ```batch
+  # Inconsistent (warn)
+  ECHO Hello
+  echo World
+  
+  # Consistent
+  ECHO Hello
+  ECHO World
+  ```
+
+- **Trailing whitespace**: Detect and warn about trailing spaces/tabs
+  ```batch
+  # Bad (spaces after command)
+  ECHO Hello   
+  
+  # Good
+  ECHO Hello
+  ```
+
+- **Line endings**: Warn about mixed line endings (CRLF vs LF)
+  ```batch
+  # Bad: Mixed line endings in same file
+  ECHO Line 1\r\n
+  ECHO Line 2\n
+  
+  # Good: Consistent CRLF line endings
+  ECHO Line 1\r\n
+  ECHO Line 2\r\n
+  ```
+
+- **Double-colon comments**: May be unsafe with non-CRLF line endings
+  ```batch
+  # Potentially problematic with Unix line endings
+  @echo off\n
+  :: This comment might be misinterpreted\n
+  echo Hello\n
+  
+  # Safer approach
+  @echo off\r\n
+  REM This comment is always safe\r\n
+  echo Hello\r\n
+  ```
+
+### Variable Naming
+- **Variable naming**: Enforce consistent naming conventions
+  ```batch
+  # Inconsistent
+  SET myvar=value
+  SET ANOTHER_VAR=value2
+  
+  # Consistent
+  SET MY_VAR=value
+  SET ANOTHER_VAR=value2
+  ```
+
+### File Extensions
+- The `.cmd` file extension is recommended over the `.bat` file extension
+  ```batch
+  # Recommended: script.cmd
+  # Not recommended: script.bat
+  ```
+
+### Code Quality
+- **Comments**: Encourage documentation for complex sections
+  ```batch
+  # Bad
+  FOR /f "tokens=2 delims==" %%a IN ('WMIC os get localdatetime /value') DO SET dt=%%a
+  
+  # Good
+  REM Get current date/time in format YYYYMMDDHHMMSS
+  FOR /f "tokens=2 delims==" %%a IN ('WMIC os get localdatetime /value') DO SET dt=%%a
+  ```
+
+- **Magic numbers**: Flag hardcoded values that should be variables
+  ```batch
+  # Bad
+  TIMEOUT /t 30
+  
+  # Good
+  SET TIMEOUT_SECONDS=30
+  TIMEOUT /t "%TIMEOUT_SECONDS%"
+  ```
+
+- **Dead code**: Detect unused labels or unreferenced subroutines
+  ```batch
+  # Bad
+  GOTO main
+  :unused_label
+  ECHO This is never called
+  :main
+  ECHO Hello
+  
+  # Good
+  ECHO Hello
+  ```
+
+### Advanced Style and Best Practice Rules
+- **Variable naming consistency**: Enforce consistent variable naming conventions
+  ```batch
+  # Bad - Inconsistent case styles
+  set UPPERCASE_VAR=value
+  set lowercase_var=value
+  set MiXeD_CaSe=value
+  
+  # Good - Consistent naming
+  set GLOBAL_VAR=value
+  set ANOTHER_GLOBAL=value
+  ```
+
+- **Function documentation**: Require documentation for functions and subroutines
+  ```batch
+  # Bad - No documentation
+  :MyFunction
+  echo Processing
+  goto :eof
+  
+  # Good - Documented function
+  REM Function: ProcessFile
+  REM Purpose: Processes a file and creates backup
+  REM Parameters: %1 = filename to process
+  REM Returns: Sets RESULT variable to success/failure
+  :ProcessFile
+  echo Processing %1
+  goto :eof
+  ```
+
+- **Magic numbers**: Flag numeric literals that should be named constants
+  ```batch
+  # Bad - Magic numbers
+  timeout 3600
+  ping -n 86400 localhost
+  
+  # Good - Named constants
+  set HOUR_SECONDS=3600
+  set DAY_SECONDS=86400
+  timeout %HOUR_SECONDS%
+  ping -n %DAY_SECONDS% localhost
+  ```
+
+- **Line length and continuation**: Flag long lines that should use continuation
+  ```batch
+  # Bad - Very long line
+  copy "C:\Very\Long\Path\With\Many\Directories\file.txt" "C:\Another\Very\Long\Destination\Path\file.txt"
+  
+  # Good - Use continuation
+  copy "C:\Very\Long\Path\With\Many\Directories\file.txt" ^
+       "C:\Another\Very\Long\Destination\Path\file.txt"
+  ```
+
+## Security Level Rules
+*Security-related issues that could pose risks*
+
+### Input Validation
+- **Command injection**: Detect potential injection vulnerabilities
+  ```batch
+  # Bad
+  SET /p input="Enter filename: "
+  DEL %input%
+  
+  # Good
+  SET /p input="Enter filename: "
+  IF DEFINED input DEL "%input%"
+  ```
+
+- **Unsafe SET usage**: Warn about SET commands without proper validation or quoting
+  ```batch
+  # Bad
+  SET var=Hello World
+  SET /p userfile="Enter file: "
+  COPY %userfile% backup\
+  
+  # Good  
+  SET "var=Hello World"
+  SET /p userfile="Enter file: "
+  IF DEFINED userfile COPY "%userfile%" backup\
+  ```
+
+### Dangerous Operations
+- **Dangerous commands**: Warn about destructive commands without confirmation
+  ```batch
+  # Bad
+  DEL *.* /q
+  
+  # Good
+  SET /p confirm="Delete all files? (y/n): "
+  IF /i "%confirm%"=="y" DEL *.* /q
+  ```
+
+- **Registry operations**: Flag potentially dangerous registry modifications
+  ```batch
+  # Dangerous
+  REG DELETE "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion" /f
+  
+  # Safer
+  REG QUERY "HKLM\SOFTWARE\MyApp" >nul 2>&1
+  ```
+
+### Privilege Issues
+- **Elevated privileges**: Warn when scripts require admin rights but don't check
+  ```batch
+  # Bad
+  REG ADD "HKLM\SOFTWARE\MyApp" /v Value /d Data
+  
+  # Good
+  NET SESSION >nul 2>&1
+  IF ERRORLEVEL 1 (
+      ECHO This script requires administrator privileges
+      EXIT /b 1
+  )
+  REG ADD "HKLM\SOFTWARE\MyApp" /v Value /d Data
+  ```
+
+### Path Security
+- **Hardcoded paths**: Flag absolute paths that may not exist on other systems
+  ```batch
+  # Bad
+  COPY "C:\Users\John\file.txt" dest
+  
+  # Good
+  COPY "%USERPROFILE%\file.txt" dest
+  ```
+
+- **Temporary directory**: Suggest using `%TEMP%` instead of hardcoded temp paths
+  ```batch
+  # Bad
+  ECHO data > C:\temp\myfile.txt
+  
+  # Good
+  ECHO data > "%TEMP%\myfile.txt"
+  ```
+
+### Enhanced Security Rules
+- **Path traversal attacks**: Detect potential directory traversal vulnerabilities
+  ```batch
+  # Bad - Path traversal risk
+  copy file.txt ..\..\..\windows\system32\
+  cd ..\..\..\sensitive\directory
+  
+  # Good - Validate paths, use absolute paths
+  set "DEST_DIR=C:\Safe\Directory"
+  copy file.txt "%DEST_DIR%\"
+  ```
+
+- **Unsafe temporary file creation**: Detect predictable temp file names
+  ```batch
+  # Bad - Predictable temp file
+  echo content > c:\temp\myfile.tmp
+  echo data > temp.txt
+  
+  # Good - Random component in temp files
+  echo content > "%TEMP%\myfile_%RANDOM%.tmp"
+  echo data > "temp_%RANDOM%_%TIME:~6,2%.txt"
+  ```
+
+- **Command injection via variables**: Detect variables used with shell operators
+  ```batch
+  # Bad - Variable content used with shell operators
+  set user_input=hello & del *.*
+  echo %user_input% | find "test"
+  
+  # Good - Validate and sanitize variables
+  set "user_input=hello world"
+  if defined user_input echo "%user_input%" | find "test"
+  ```
+
+## Performance Level Rules
+*Performance-related suggestions and optimizations*
+
+### Redundancy
+- **Redundant operations**: Detect unnecessary file existence checks
+  ```batch
+  # Bad
+  IF EXIST file.txt DEL file.txt
+  IF EXIST file.txt ECHO File still exists
+  
+  # Good
+  IF EXIST file.txt (
+      DEL file.txt
+      IF EXIST file.txt ECHO File still exists
+  )
+  ```
+
+- **Code duplication**: Identify repeated code blocks that could be functions
+  ```batch
+  # Bad
+  ECHO Processing file1
+  COPY file1.txt backup\
+  IF ERRORLEVEL 1 ECHO Error copying file1
+  ECHO Processing file2
+  COPY file2.txt backup\
+  IF ERRORLEVEL 1 ECHO Error copying file2
+  
+  # Good
+  CALL :backup_file file1.txt
+  CALL :backup_file file2.txt
+  GOTO :EOF
+  
+  :backup_file
+  ECHO Processing %1
+  COPY "%1" backup\
+  IF ERRORLEVEL 1 ECHO Error copying %1
+  GOTO :EOF
+  ```
+
+### Resource Management
+- **Unnecessary setlocal**: `SETLOCAL` is not needed if there is no `SET` command
+  ```batch
+  # Bad
+  SETLOCAL
+  ECHO Hello World
+  
+  # Good
+  ECHO Hello World
+  ```
+
+- **Unnecessary enabledelayedexpansion**: `SETLOCAL ENABLEDELAYEDEXPANSION` is not needed if there are no `!VARIABLES!`
+  ```batch
+  # Bad
+  SETLOCAL ENABLEDELAYEDEXPANSION
+  ECHO "%PATH%"
+  
+  # Good
+  SETLOCAL
+  ECHO "%PATH%"
+  ```
+
+- **Unnecessary endlocal**: `ENDLOCAL` is not needed if there is no `SETLOCAL`
+  ```batch
+  # Bad
+  ECHO Hello World
+  ENDLOCAL
+  
+  # Good
+  ECHO Hello World
+  ```
+
+- **Missing endlocal before exit**: If there is a `SETLOCAL` in the script, there should be an `ENDLOCAL` before every exit
+  ```batch
+  # Bad
+  SETLOCAL
+  SET MY_VAR=value
+  IF ERRORLEVEL 1 EXIT /b 1
+  ECHO Success
+  EXIT /b 0
+  
+  # Good
+  SETLOCAL
+  SET MY_VAR=value
+  IF ERRORLEVEL 1 (
+      ENDLOCAL
+      EXIT /b 1
+  )
+  ECHO Success
+  ENDLOCAL
+  EXIT /b 0
+  ```
+
+### File Operations
+- Temporary files should have %RANDOM% in their name to prevent file collisions
+  ```batch
+  # Bad
+  ECHO data > temp.txt
+  
+  # Good
+  ECHO data > "temp_%RANDOM%.txt"
+  ```
+
+### Enhanced Performance Rules
+- **String operation efficiency**: Detect multiple operations that could be combined
+  ```batch
+  # Bad - Multiple separate string operations
+  set var=%original:old1=new1%
+  set var=%var:old2=new2%
+  set var=%var:~0,10%
+  
+  # Good - Combined operations where possible
+  set "temp=%original:old1=new1%"
+  set "var=%temp:old2=new2:~0,10%"
+  ```
+
+- **DIR command optimization**: Suggest /B flag for performance when processing output
+  ```batch
+  # Bad - Verbose DIR output processed
+  dir *.txt | findstr "test"
+  for /f %i in ('dir *.log') do echo %i
+  
+  # Good - /B flag for bare format
+  dir /b *.txt | findstr "test"
+  for /f %i in ('dir /b *.log') do echo %i
+  ```
+
+- **Unnecessary command output**: Detect commands producing unwanted output
+  ```batch
+  # Bad - Output not redirected when unnecessary
+  echo "Processing started..."
+  type readme.txt
+  dir
+  
+  # Good - Redirect output when appropriate
+  echo "Processing started..." >nul
+  type readme.txt >output.log
+  dir >nul 2>&1
+  ```
