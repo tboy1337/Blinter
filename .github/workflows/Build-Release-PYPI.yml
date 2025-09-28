@@ -1,4 +1,4 @@
-name: "Build-Release"
+name: "Build-Release-PYPI"
 
 on:
   pull_request:
@@ -9,6 +9,7 @@ on:
       - main
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   build-windows:
@@ -50,8 +51,36 @@ jobs:
           name: windows-build
           path: dist/Blinter-v1.0.${{ github.run_number }}-windows.zip
 
+  build-wheels:
+    name: Build Python wheels
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --upgrade setuptools
+          python -m pip install --upgrade wheel
+          python -m pip install --upgrade build
+
+      - name: Build pure Python wheel and sdist
+        run: |
+          python -m build
+
+      - name: Store artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+
   create-release:
-    needs: build-windows
+    needs: [build-windows, build-wheels]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -60,9 +89,46 @@ jobs:
         with:
           name: windows-build
           path: ./build
+      - name: Download Python distribution
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: ./build
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
           artifacts: ./build/*
           tag: v1.0.${{ github.run_number }}
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-pypi:
+    name: Publish wheels to PyPI
+    needs: build-wheels
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist
+
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Twine
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --upgrade setuptools
+          python -m pip install --upgrade wheel
+          python -m pip install --upgrade twine
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_BLINTER }}
+        run: |
+          twine check dist/*
+          twine upload dist/*

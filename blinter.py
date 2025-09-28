@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.1
+Version: 1.0.2
 License: CRL
 """
 
@@ -32,7 +32,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union
 import warnings
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
