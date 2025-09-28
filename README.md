@@ -36,6 +36,124 @@
 - **Large File Handling**: Efficiently processes files up to 10MB+ with performance warnings
 - **Robust Encoding Detection**: Handles UTF-8, UTF-16, Latin-1 and 6 more encoding formats
 
+## Installation 🛠️
+
+### 🚀 Quick Start (Recommended)
+
+**Option 1: Install via pip**
+```cmd
+pip install Blinter
+```
+
+**Option 2: Download standalone executable**
+- Download the latest `Blinter-v1.0.x-windows.zip` from [GitHub Releases](https://github.com/tboy1337/Blinter/releases)
+- Extract and run `Blinter-v1.0.x-windows.exe`
+
+### 🔧 Manual Installation
+
+1. Clone the repository:
+```cmd
+git clone https://github.com/tboy1337/Blinter.git
+cd Blinter
+```
+
+2. (Optional) Create a virtual environment:
+```cmd
+python -m venv venv
+venv\Scripts\Activate.ps1
+```
+
+3. (Optional but recommended) Install dependencies:
+```cmd
+pip install -r requirements.txt
+```
+
+### Prerequisites
+- **Python 3.9+** (required for pip installation and development)
+- **Windows OS** (required for standalone executable)
+
+## Usage 📟
+
+### Basic Usage
+
+**If installed via pip:**
+```cmd
+# Analyze a single batch file
+python -m blinter script.bat
+
+# Analyze all batch files in a directory (recursive)
+python -m blinter /path/to/batch/files
+
+# Analyze batch files in directory only (non-recursive)
+python -m blinter /path/to/batch/files --no-recursive
+
+# Analyze with summary
+python -m blinter script.bat --summary
+
+# Create configuration file
+python -m blinter --create-config
+
+# Ignore configuration file
+python -m blinter script.bat --no-config
+
+# Get help
+python -m blinter --help
+```
+
+**If using standalone executable:**
+```cmd
+# Analyze a single batch file
+Blinter-v1.0.x-windows.exe script.bat
+
+# Analyze all batch files in a directory (recursive)
+Blinter-v1.0.x-windows.exe /path/to/batch/files
+
+# Analyze batch files in directory only (non-recursive)
+Blinter-v1.0.x-windows.exe /path/to/batch/files --no-recursive
+
+# Analyze with summary
+Blinter-v1.0.x-windows.exe script.bat --summary
+
+# Get help
+Blinter-v1.0.x-windows.exe --help
+```
+
+**If using manual installation:**
+```cmd
+# Analyze a single batch file
+python blinter.py script.bat
+
+# Analyze all batch files in a directory (recursive)
+python blinter.py /path/to/batch/files
+
+# Analyze batch files in directory only (non-recursive)
+python blinter.py /path/to/batch/files --no-recursive
+
+# Analyze with summary
+python blinter.py script.bat --summary
+
+# Create configuration file
+python blinter.py --create-config
+
+# Ignore configuration file
+python blinter.py script.bat --no-config
+
+# Get help
+python blinter.py --help
+```
+
+### Command Line Options
+
+- `<path>`: Path to a batch file (`.bat` or `.cmd`) OR directory containing batch files
+- `--summary`: Display summary statistics of issues found
+- `--severity`: Show detailed severity level breakdown (always included)
+- `--no-recursive`: When processing directories, only analyze files in the specified directory (not subdirectories)
+- `--no-config`: Don't use configuration file (blinter.ini) even if it exists
+- `--create-config`: Create a default blinter.ini configuration file and exit
+- `--help`: Show help menu and rule categories
+
+**Note:** Command line options override configuration file settings. Blinter automatically looks for `blinter.ini` in the current directory.
+
 ## Configuration 📝
 
 Blinter supports configuration files to customize its behavior. Create a `blinter.ini` file in your project directory to set default options.
@@ -75,145 +193,6 @@ python blinter.py myscript.bat --summary
 # Ignore config file completely
 python blinter.py myscript.bat --no-config
 ```
-
-### Example Configurations
-
-**Strict Mode (Errors and Security Only):**
-```ini
-[rules]
-enabled_rules = E001,E002,E003,E004,E005,E006,E007,E008,E009,E010,E011,E012,E013,E014,E015,E016,E017,E018,SEC001,SEC002,SEC003,SEC004,SEC005,SEC006,SEC007,SEC008,SEC009,SEC010,SEC011,SEC012,SEC013
-```
-
-**Style-Free Mode (Disable All Style Rules):**
-```ini
-[rules]
-disabled_rules = S001,S002,S003,S004,S005,S006,S007,S008,S009,S010,S011,S012,S013,S014,S015,S016,S017,S018,S019,S020
-```
-
-**CI/CD Mode (Warnings and Above Only):**
-```ini
-[general]
-min_severity = WARNING
-show_summary = true
-```
-
-## Installation 🛠️
-
-### 🚀 Quick Start (Recommended)
-
-**Option 1: Install via pip**
-```cmd
-pip install Blinter
-```
-
-**Option 2: Download standalone executable**
-- Download the latest `Blinter-v1.0.x-windows.zip` from [GitHub Releases](https://github.com/tboy1337/Blinter/releases)
-- Extract and run
-
-### 🔧 Manual Installation
-
-1. Clone the repository:
-```cmd
-git clone https://github.com/tboy1337/Blinter.git
-cd Blinter
-```
-
-2. (Optional) Create a virtual environment:
-```cmd
-python -m venv venv
-venv\Scripts\activate
-```
-
-3. (Optional but recommended) Install dependencies:
-```cmd
-pip install -r requirements.txt
-```
-
-### Prerequisites
-- **Python 3.9+** (required for pip installation and development)
-- **Windows OS** (required for standalone executable)
-
-## Usage 📟
-
-### Basic Usage
-
-**If installed via pip:**
-```cmd
-# Analyze a single batch file
-blinter script.bat
-
-# Analyze all batch files in a directory (recursive)
-blinter /path/to/batch/files
-
-# Analyze batch files in directory only (non-recursive)
-blinter /path/to/batch/files --no-recursive
-
-# Analyze with summary
-blinter script.bat --summary
-
-# Create configuration file
-blinter --create-config
-
-# Ignore configuration file
-blinter script.bat --no-config
-
-# Get help
-blinter --help
-```
-
-**If using standalone executable:**
-```cmd
-# Analyze a single batch file
-Blinter.exe script.bat
-
-# Analyze all batch files in a directory (recursive)
-Blinter.exe /path/to/batch/files
-
-# Analyze batch files in directory only (non-recursive)
-Blinter.exe /path/to/batch/files --no-recursive
-
-# Analyze with summary
-Blinter.exe script.bat --summary
-
-# Get help
-Blinter.exe --help
-```
-
-**If using manual installation:**
-```cmd
-# Analyze a single batch file
-python blinter.py script.bat
-
-# Analyze all batch files in a directory (recursive)
-python blinter.py /path/to/batch/files
-
-# Analyze batch files in directory only (non-recursive)
-python blinter.py /path/to/batch/files --no-recursive
-
-# Analyze with summary
-python blinter.py script.bat --summary
-
-# Create configuration file
-python blinter.py --create-config
-
-# Ignore configuration file
-python blinter.py script.bat --no-config
-
-# Get help
-python blinter.py --help
-```
-
-### Command Line Options
-
-- `<path>`: Path to a batch file (`.bat` or `.cmd`) OR directory containing batch files
-- `--summary`: Display summary statistics of issues found
-- `--severity`: Show detailed severity level breakdown (always included)
-- `--no-recursive`: When processing directories, only analyze files in the specified directory (not subdirectories)
-- `--no-config`: Don't use configuration file (blinter.ini) even if it exists
-- `--create-config`: Create a default blinter.ini configuration file and exit
-- `--help`: Show help menu and rule categories
-
-**Note:** Command line options override configuration file settings. Blinter automatically looks for `blinter.ini` in the current directory.
 
 ### 🐍 **Programmatic API Usage**
 
