@@ -47,7 +47,6 @@ pip install Blinter
 
 **Option 2: Download standalone executable**
 - Download the latest `Blinter-v1.0.x-windows.zip` from [GitHub Releases](https://github.com/tboy1337/Blinter/releases)
-- Extract and run `Blinter-v1.0.x-windows.exe`
 
 ### 🔧 Manual Installation
 
@@ -185,13 +184,13 @@ Command line options always override configuration file settings:
 
 ```cmd
 # Use config file settings
-python blinter.py myscript.bat
+python -m blinter myscript.bat
 
 # Override config to show summary
-python blinter.py myscript.bat --summary
+python -m blinter myscript.bat --summary
 
 # Ignore config file completely
-python blinter.py myscript.bat --no-config
+python -m blinter myscript.bat --no-config
 ```
 
 ### 🐍 **Programmatic API Usage**
@@ -221,13 +220,6 @@ for issue in issues:
     print(f"  {issue.rule.explanation}")
     print(f"  Fix: {issue.rule.recommendation}")
 
-# Legacy API (still supported for backward compatibility)
-issues = blinter.lint_batch_file(
-    "script.bat",
-    max_line_length=100,           # Custom line length limit  
-    enable_style_rules=False,      # Disable style checks
-    enable_performance_rules=True  # Keep performance checks
-)
 
 # Thread-safe design allows safe concurrent usage
 # You can implement your own concurrent processing if needed
@@ -268,9 +260,9 @@ Blinter can analyze entire directories of batch files with powerful options:
 **Examples:**
 ```cmd
 # Pip installation:
-blinter ./my-batch-scripts                 # Analyze all files recursively
-blinter . --no-recursive                   # Current directory only
-blinter ./scripts --summary               # With summary statistics
+python -m blinter ./my-batch-scripts                 # Analyze all files recursively
+python -m blinter . --no-recursive                   # Current directory only
+python -m blinter ./scripts --summary               # With summary statistics
 
 # Standalone executable:
 Blinter.exe ./my-batch-scripts            # Analyze all files recursively

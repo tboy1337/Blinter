@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.5
+Version: 1.0.6
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union
 import warnings
 
-__version__ = "1.0.5"
+__version__ = "1.0.6"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -3038,9 +3038,7 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
     has_set_commands: bool,
     has_delayed_expansion: bool,
     uses_delayed_vars: bool,
-    max_line_length: int,
-    enable_performance_rules: bool,
-    enable_style_rules: bool,
+    config: BlinterConfig,
 ) -> List[LintIssue]:
     """Process all line-by-line and global checks."""
     issues: List[LintIssue] = []
@@ -3053,26 +3051,24 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
         # Warning level checks
         issues.extend(_check_warning_issues(line, i, set_vars, has_delayed_expansion))
 
-        # Style level checks (if enabled)
-        if enable_style_rules:
-            style_issues = _check_style_issues(line, i, max_line_length)
-            issues.extend(style_issues)
+        # Style level checks
+        style_issues = _check_style_issues(line, i, config.max_line_length)
+        issues.extend(style_issues)
 
         # Security level checks (always enabled for safety)
         issues.extend(_check_security_issues(line, i))
 
-        # Performance level checks (if enabled)
-        if enable_performance_rules:
-            perf_issues = _check_performance_issues(
-                lines,
-                i,
-                line,
-                has_setlocal,
-                has_set_commands,
-                has_delayed_expansion,
-                uses_delayed_vars,
-            )
-            issues.extend(perf_issues)
+        # Performance level checks
+        perf_issues = _check_performance_issues(
+            lines,
+            i,
+            line,
+            has_setlocal,
+            has_set_commands,
+            has_delayed_expansion,
+            uses_delayed_vars,
+        )
+        issues.extend(perf_issues)
 
     # Global checks (across all lines)
     issues.extend(_check_undefined_variables(lines, set_vars))
@@ -3089,16 +3085,14 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
     issues.extend(_check_missing_pause(lines))  # Warning level
     issues.extend(_check_mixed_variable_syntax(lines))  # Warning level
 
-    # Style-level global checks (only if style rules are enabled)
-    if enable_style_rules:
-        issues.extend(_check_inconsistent_indentation(lines))
-        issues.extend(_check_missing_documentation(lines))
-        issues.extend(_check_advanced_style_rules(lines))  # Style level S017-S020
+    # Style-level global checks
+    issues.extend(_check_inconsistent_indentation(lines))
+    issues.extend(_check_missing_documentation(lines))
+    issues.extend(_check_advanced_style_rules(lines))  # Style level S017-S020
 
-    # Performance-level global checks (only if performance rules are enabled)
-    if enable_performance_rules:
-        issues.extend(_check_redundant_assignments(lines))
-        issues.extend(_check_enhanced_performance(lines))  # Performance level P012-P014
+    # Performance-level global checks
+    issues.extend(_check_redundant_assignments(lines))
+    issues.extend(_check_enhanced_performance(lines))  # Performance level P012-P014
 
     return issues
 
@@ -3106,9 +3100,6 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
 def lint_batch_file(  # pylint: disable=too-many-locals
     file_path: str,
     config: Optional[BlinterConfig] = None,
-    max_line_length: int = 120,
-    enable_performance_rules: bool = True,
-    enable_style_rules: bool = True,
 ) -> List[LintIssue]:
     """
     Lint a batch file and return list of issues found.
@@ -3124,12 +3115,6 @@ def lint_batch_file(  # pylint: disable=too-many-locals
         file_path: Path to the batch file (.bat or .cmd) to lint.
                   Can be absolute or relative path.
         config: BlinterConfig object with configuration settings. If None, uses defaults.
-        max_line_length: Maximum allowed line length for S011 rule (default: 120)
-                        Deprecated: Use config.max_line_length instead
-        enable_performance_rules: Whether to enable performance-related rules (default: True)
-                                 Deprecated: Use config rules settings instead
-        enable_style_rules: Whether to enable style-related rules (default: True)
-                           Deprecated: Use config rules settings instead
 
     Returns:
         List of LintIssue objects containing detailed issue information.
@@ -3155,8 +3140,6 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     # Use provided config or create default
     if config is None:
         config = BlinterConfig()
-        # Use legacy parameters for backward compatibility
-        config.max_line_length = max_line_length
 
     # Read and validate file
     lines, _encoding_used = _validate_and_read_file(file_path)
@@ -3184,9 +3167,8 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     # Critical line ending checks (includes ERROR level E018)
     issues.extend(_check_line_ending_rules(lines, file_path))
 
-    # Style rules that apply globally (only if style rules are enabled)
-    if enable_style_rules:
-        issues.extend(_check_global_style_rules(lines, file_path))
+    # Style rules that apply globally
+    issues.extend(_check_global_style_rules(lines, file_path))
 
     # Collect labels and check for duplicates
     labels, label_issues = _collect_labels(lines)
@@ -3205,9 +3187,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
             has_set_commands,
             has_delayed_expansion,
             uses_delayed_vars,
-            config.max_line_length,
-            enable_performance_rules,
-            enable_style_rules,
+            config,
         )
     )
 
