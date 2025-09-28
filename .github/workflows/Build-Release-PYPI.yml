@@ -80,7 +80,7 @@ jobs:
           path: dist/
 
   create-release:
-    needs: [build-windows, build-wheels]
+    needs: [build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -89,15 +89,10 @@ jobs:
         with:
           name: windows-build
           path: ./build
-      - name: Download Python distribution
-        uses: actions/download-artifact@v4
-        with:
-          name: python-dist
-          path: ./build
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: ./build/*
+          artifacts: ./build/Blinter-v1.0.${{ github.run_number }}-windows.zip
           tag: v1.0.${{ github.run_number }}
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true

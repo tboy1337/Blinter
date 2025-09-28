@@ -36,12 +36,39 @@
 - **Large File Handling**: Efficiently processes files up to 10MB+ with performance warnings
 - **Robust Encoding Detection**: Handles UTF-8, UTF-16, Latin-1 and 6 more encoding formats
 
+## 🚀 Quick Start
+
+**Get started in 30 seconds:**
+
+1. **Install Blinter:**
+   ```cmd
+   pip install Blinter
+   ```
+
+2. **Analyze your batch file:**
+   ```cmd
+   blinter script.bat
+   ```
+
+3. **That's it!** Blinter will show you all issues with detailed explanations and fix recommendations.
+
+**Alternative: No Python? No problem!**
+- Download the [standalone executable](https://github.com/tboy1337/Blinter/releases) and run `Blinter.exe script.bat`
+
 ## Installation 🛠️
 
-### Prerequisites
-- **Python 3.9+** (required)
+### 🚀 Quick Start (Recommended)
 
-### Quick Install
+**Option 1: Install via pip (easiest)**
+```cmd
+pip install Blinter
+```
+
+**Option 2: Download standalone executable**
+- Download the latest `Blinter-v1.0.x-windows.zip` from [GitHub Releases](https://github.com/tboy1337/Blinter/releases)
+- Extract and run `Blinter.exe` directly (no Python installation required)
+
+### 🔧 Development Installation
 
 1. Clone the repository:
 ```cmd
@@ -55,15 +82,56 @@ python -m venv venv
 venv\Scripts\activate
 ```
 
-3. (Optional but recommended) Install dependencies:
+3. Install dependencies:
 ```cmd
 pip install -r requirements.txt
 ```
+
+### Prerequisites
+- **Python 3.9+** (required for pip installation and development)
+- **Windows OS** (required for standalone executable)
 
 ## Usage 📟
 
 ### Basic Usage
 
+**If installed via pip:**
+```cmd
+# Analyze a single batch file
+blinter script.bat
+
+# Analyze all batch files in a directory (recursive)
+blinter /path/to/batch/files
+
+# Analyze batch files in directory only (non-recursive)
+blinter /path/to/batch/files --no-recursive
+
+# Analyze with summary
+blinter script.bat --summary
+
+# Get help
+blinter --help
+```
+
+**If using standalone executable:**
+```cmd
+# Analyze a single batch file
+Blinter.exe script.bat
+
+# Analyze all batch files in a directory (recursive)
+Blinter.exe /path/to/batch/files
+
+# Analyze batch files in directory only (non-recursive)
+Blinter.exe /path/to/batch/files --no-recursive
+
+# Analyze with summary
+Blinter.exe script.bat --summary
+
+# Get help
+Blinter.exe --help
+```
+
+**If using development/source installation:**
 ```cmd
 # Analyze a single batch file
 python blinter.py script.bat
@@ -149,14 +217,20 @@ Blinter can analyze entire directories of batch files with powerful options:
 
 **Examples:**
 ```cmd
-# Analyze all batch files in project directory and subdirectories
-python blinter.py ./my-batch-scripts
+# Pip installation:
+blinter ./my-batch-scripts                 # Analyze all files recursively
+blinter . --no-recursive                   # Current directory only
+blinter ./scripts --summary               # With summary statistics
 
-# Analyze only batch files in current directory (no subdirectories)  
-python blinter.py . --no-recursive
+# Standalone executable:
+Blinter.exe ./my-batch-scripts            # Analyze all files recursively
+Blinter.exe . --no-recursive             # Current directory only
+Blinter.exe ./scripts --summary          # With summary statistics
 
-# Get combined summary for entire directory
-python blinter.py ./scripts --summary
+# Development/source installation:
+python blinter.py ./my-batch-scripts      # Analyze all files recursively
+python blinter.py . --no-recursive       # Current directory only  
+python blinter.py ./scripts --summary     # With summary statistics
 ```
 
 ## 🔥 **Integration Example**
@@ -191,4 +265,4 @@ python blinter.py ./scripts --summary
 
 ## License 📄
 
-This project is licensed under the CRL License - see [LICENSE.md](./LICENSE.md) for details.
+This project is licensed under the CRL License - see [LICENSE.md](https://raw.githubusercontent.com/tboy1337/Blinter/main/LICENSE.md) for details.
