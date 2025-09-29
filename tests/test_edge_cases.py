@@ -1039,7 +1039,7 @@ class TestSecurityChecking:
             ("reg add hklm", "reg add hklm"),
             ("reg delete hklm", "reg delete hklm"),
             ("sc config", "sc"),
-            ("net user", "net"),
+            ("net user", "NET command"),
         ]
         for cmd, expected in admin_commands:
             issues = _check_security_issues(f"{cmd} something", 1)

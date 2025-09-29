@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.8
+Version: 1.0.9
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union
 import warnings
 
-__version__ = "1.0.8"
+__version__ = "1.0.9"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2658,12 +2658,9 @@ def _check_style_issues(
     return issues
 
 
-def _check_security_issues(  # pylint: disable=too-many-branches,too-many-locals
-    line: str, line_num: int
-) -> List[LintIssue]:
-    """Check for security level issues."""
+def _check_input_validation_sec(line: str, line_num: int, stripped: str) -> List[LintIssue]:
+    """Check for input validation and command security issues (SEC001-SEC003)."""
     issues: List[LintIssue] = []
-    stripped = line.strip()
 
     # SEC001: Potential command injection vulnerability
     if re.search(r"set\s+/p\s+[^=]+=.*%.*%", stripped, re.IGNORECASE):
@@ -2690,7 +2687,6 @@ def _check_security_issues(  # pylint: disable=too-many-branches,too-many-locals
             )
 
     # SEC003: Dangerous command without confirmation
-    # Only flag if not in a safe context (REM comment or ECHO statement)
     if not _is_command_in_safe_context(line):
         for pattern, rule_code in DANGEROUS_COMMAND_PATTERNS:
             if re.search(pattern, stripped, re.IGNORECASE):
@@ -2703,10 +2699,20 @@ def _check_security_issues(  # pylint: disable=too-many-branches,too-many-locals
                 )
                 break
 
-    # SEC004: Dangerous registry operation (covered by patterns above)
+    return issues
+
+
+def _check_privilege_security(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for privilege escalation security issues (SEC005)."""
+    issues: List[LintIssue] = []
 
     # SEC005: Missing privilege check for admin operations
-    admin_commands = ["reg add hklm", "reg delete hklm", "sc ", "net "]
+    admin_commands = ["reg add hklm", "reg delete hklm", "sc "]
+    net_privilege_check_patterns = [
+        r"net\s+session\s*>",  # net session redirected (used for checking)
+        r"net\s+session\s*$",  # net session at end of line (used for checking)
+    ]
+
     for cmd in admin_commands:
         if cmd in stripped.lower():
             issues.append(
@@ -2717,6 +2723,27 @@ def _check_security_issues(  # pylint: disable=too-many-branches,too-many-locals
                 )
             )
             break
+
+    # Check for net commands that aren't privilege checks
+    if "net " in stripped.lower():
+        is_privilege_check = any(
+            re.search(pattern, stripped.lower()) for pattern in net_privilege_check_patterns
+        )
+        if not is_privilege_check:
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["SEC005"],
+                    context="NET command may require administrator privileges",
+                )
+            )
+
+    return issues
+
+
+def _check_path_security(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for path-related security issues (SEC006-SEC007, SEC014)."""
+    issues: List[LintIssue] = []
 
     # SEC006: Hardcoded absolute path
     hardcoded_paths = [r"C:\\", r"D:\\", r"E:\\", r"/Users/", r"/home/"]
@@ -2743,6 +2770,26 @@ def _check_security_issues(  # pylint: disable=too-many-branches,too-many-locals
                 )
             )
             break
+
+    # SEC014: UNC path without UAC elevation check
+    unc_operations = ["pushd", "copy", "xcopy", "robocopy", "move"]
+    first_word = stripped.split()[0].lower() if stripped.split() else ""
+    if first_word in unc_operations or re.search(r"\\\\[^\\]+\\", stripped):
+        if "\\\\" in stripped:
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["SEC014"],
+                    context="UNC path operation may fail under UAC without elevation check",
+                )
+            )
+
+    return issues
+
+
+def _check_info_disclosure_sec(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for information disclosure security issues (SEC008-SEC010)."""
+    issues: List[LintIssue] = []
 
     # SEC008: Plain text credentials detected
     for pattern in CREDENTIAL_PATTERNS:
@@ -2778,18 +2825,12 @@ def _check_security_issues(  # pylint: disable=too-many-branches,too-many-locals
             )
             break
 
-    # SEC014: UNC path without UAC elevation check
-    unc_operations = ["pushd", "copy", "xcopy", "robocopy", "move"]
-    first_word = stripped.split()[0].lower() if stripped.split() else ""
-    if first_word in unc_operations or re.search(r"\\\\[^\\]+\\", stripped):
-        if "\\\\" in stripped:
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["SEC014"],
-                    context="UNC path operation may fail under UAC without elevation check",
-                )
-            )
+    return issues
+
+
+def _check_malware_security(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for malware-like behavior security issues (SEC015-SEC018)."""
+    issues: List[LintIssue] = []
 
     # SEC015: Fork bomb pattern detected
     if (
@@ -2840,6 +2881,23 @@ def _check_security_issues(  # pylint: disable=too-many-branches,too-many-locals
                 context="Batch file copying itself to other drives - potential virus behavior",
             )
         )
+
+    return issues
+
+
+def _check_security_issues(  # pylint: disable=too-many-branches,too-many-locals
+    line: str, line_num: int
+) -> List[LintIssue]:
+    """Check for security level issues."""
+    issues: List[LintIssue] = []
+    stripped = line.strip()
+
+    # Check different categories of security issues
+    issues.extend(_check_input_validation_sec(line, line_num, stripped))
+    issues.extend(_check_privilege_security(stripped, line_num))
+    issues.extend(_check_path_security(stripped, line_num))
+    issues.extend(_check_info_disclosure_sec(stripped, line_num))
+    issues.extend(_check_malware_security(stripped, line_num))
 
     return issues
 
@@ -4110,21 +4168,44 @@ def _check_unreachable_code(lines: List[str]) -> List[LintIssue]:
     for i, line in enumerate(lines):
         stripped = line.strip().lower()
         if re.match(r"(exit\s|goto\s)", stripped):
-            # Check if there's executable code after this line (not just labels or comments)
-            for j in range(i + 1, len(lines)):
-                next_line = lines[j].strip()
-                if next_line and not next_line.startswith(":") and not next_line.startswith("rem"):
-                    issues.append(
-                        LintIssue(
-                            line_number=j + 1,
-                            rule=RULES["E008"],
-                            context=(
-                                f"Code after {stripped.split()[0].upper()} on "
-                                f"line {i + 1} will never execute"
-                            ),
+            # Check if the EXIT/GOTO is inside a conditional block
+            # by looking for matching parentheses from the beginning up to this line
+            in_conditional_block = False
+            paren_depth = 0
+
+            for k in range(i + 1):
+                check_line = lines[k].strip()
+                # Count opening parens after IF/ELSE statements
+                if re.match(r"(if\s.*\s+\(|else\s+\(|\)\s*else\s+\()", check_line.lower()):
+                    paren_depth += 1
+                # Count standalone closing parens
+                elif check_line == ")":
+                    paren_depth -= 1
+
+            # If paren_depth > 0, we're inside a conditional block
+            in_conditional_block = paren_depth > 0
+
+            # Only check for unreachable code if EXIT/GOTO is at top level (not in conditional)
+            if not in_conditional_block:
+                # Check if there's executable code after this line (not just labels or comments)
+                for j in range(i + 1, len(lines)):
+                    next_line = lines[j].strip()
+                    if (
+                        next_line
+                        and not next_line.startswith(":")
+                        and not next_line.startswith("rem")
+                    ):
+                        issues.append(
+                            LintIssue(
+                                line_number=j + 1,
+                                rule=RULES["E008"],
+                                context=(
+                                    f"Code after {stripped.split()[0].upper()} on "
+                                    f"line {i + 1} will never execute"
+                                ),
+                            )
                         )
-                    )
-                    break
+                        break
 
     return issues
 
@@ -4165,9 +4246,21 @@ def _check_code_duplication(lines: List[str]) -> List[LintIssue]:
     # Simple heuristic: look for repeated command patterns
     command_blocks: Dict[str, List[int]] = defaultdict(list)
 
+    # Commands that are commonly repeated for user interaction and don't need refactoring
+    ui_commands = [
+        r"timeout\s+/t\s+\d+",  # timeout commands
+        r"pause\s*$",  # pause commands
+        r"echo\s+\.?\s*$",  # echo blank lines
+    ]
+
     for i, line in enumerate(lines):
         stripped = line.strip().lower()
         if stripped and not stripped.startswith(":") and not stripped.startswith("rem"):
+            # Skip common user interface commands that are legitimately repeated
+            is_ui_command = any(re.search(pattern, stripped) for pattern in ui_commands)
+            if is_ui_command:
+                continue
+
             # Normalize the command for comparison
             normalized = re.sub(r"\S+\.(txt|log|bat|cmd)", "FILE", stripped)
             normalized = re.sub(r"%\w+%", "VAR", normalized)
@@ -5150,6 +5243,39 @@ def _check_enhanced_security_rules(lines: List[str]) -> List[LintIssue]:
     return issues
 
 
+def _check_unnecessary_output_p014(lines: List[str], i: int, stripped: str) -> Optional[LintIssue]:
+    """Check for unnecessary output in non-interactive context (P014)."""
+    # Only flag TYPE and DIR commands - ECHO is typically intentional user communication
+    noisy_commands = ["type", "dir"]
+
+    for cmd in noisy_commands:
+        if re.match(rf"\s*{cmd}\s+", stripped, re.IGNORECASE):
+            if ">nul" not in stripped.lower() and ">" not in stripped:
+                # Check if nearby lines suggest interactive context
+                nearby_interactive = _has_nearby_interactive_cmds(lines, i)
+
+                if not nearby_interactive:
+                    return LintIssue(
+                        line_number=i,
+                        rule=RULES["P014"],
+                        context=(
+                            f"{cmd.upper()} output may be unnecessary in " "non-interactive context"
+                        ),
+                    )
+    return None
+
+
+def _has_nearby_interactive_cmds(lines: List[str], line_index: int) -> bool:
+    """Check if there are interactive commands near the given line."""
+    interactive_keywords = ["pause", "timeout", "set /p", "choice"]
+
+    for j in range(max(0, line_index - 3), min(len(lines), line_index + 4)):
+        nearby_line = lines[j].lower() if j < len(lines) else ""
+        if any(keyword in nearby_line for keyword in interactive_keywords):
+            return True
+    return False
+
+
 def _check_enhanced_performance(lines: List[str]) -> List[LintIssue]:
     """Check for enhanced performance issues (P012-P014)."""
     issues: List[LintIssue] = []
@@ -5169,19 +5295,9 @@ def _check_enhanced_performance(lines: List[str]) -> List[LintIssue]:
                 )
 
         # Check for unnecessary output (P014)
-        noisy_commands = ["echo", "type", "dir"]
-        for cmd in noisy_commands:
-            if re.match(rf"\s*{cmd}\s+", stripped, re.IGNORECASE):
-                if ">nul" not in stripped.lower() and ">" not in stripped:
-                    # This is a heuristic - may produce false positives
-                    if i < len(lines) - 1 and "pause" not in lines[i].lower():
-                        issues.append(
-                            LintIssue(
-                                line_number=i,
-                                rule=RULES["P014"],
-                                context=f"{cmd.upper()} output may be unnecessary",
-                            )
-                        )
+        p014_issue = _check_unnecessary_output_p014(lines, i, stripped)
+        if p014_issue:
+            issues.append(p014_issue)
 
     return issues
 
