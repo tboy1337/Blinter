@@ -469,8 +469,8 @@ class TestEncodingFallbackScenarios:
             os.unlink(temp_file)
 
 
-class TestAdditionalFileEncodingCoverage:
-    """Additional file encoding tests from coverage completion."""
+class TestAdditionalFileEncodingScenarios:
+    """Additional file encoding tests for comprehensive scenarios."""
 
     def test_chardet_detected_encoding_not_in_list(self) -> None:
         """Test chardet detecting encoding not in our default list."""

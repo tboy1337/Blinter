@@ -328,7 +328,7 @@ def lint_batch_file_from_lines(lines: list[str]) -> List[LintIssue]:
 
 
 class TestAdditionalErrorHandling:
-    """Additional error handling tests from coverage completion."""
+    """Additional error handling tests for comprehensive scenarios."""
 
     def test_file_encoding_error_scenarios(self) -> None:
         """Test file encoding error scenarios."""
@@ -371,7 +371,7 @@ class TestAdditionalErrorHandling:
             os.unlink(temp_file_path)
 
     def test_encoding_specific_scenarios(self) -> None:
-        """Test encoding scenarios to catch remaining coverage."""
+        """Test encoding scenarios for edge cases and error paths."""
 
         # Test file with BOM
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".bat", delete=False) as temp_file:
@@ -403,8 +403,8 @@ class TestAdditionalErrorHandling:
         finally:
             os.unlink(temp_file_path)
 
-    def test_edge_case_functions_coverage(self) -> None:
-        """Test various edge case functions for coverage."""
+    def test_edge_case_functions_behavior(self) -> None:
+        """Test various edge case functions for proper behavior."""
         # Test file finding with edge cases
         with tempfile.TemporaryDirectory() as temp_dir:
             # Test find_batch_files with file that exists but isn't a batch file
@@ -419,8 +419,8 @@ class TestAdditionalErrorHandling:
                 # Expected - non-batch files should raise ValueError
                 pass
 
-    def test_line_943_coverage(self) -> None:
-        """Test coverage for line 943 - specific encoding detection scenario."""
+    def test_specific_encoding_detection_scenario(self) -> None:
+        """Test specific encoding detection scenario for edge cases."""
         # This targets a specific scenario in _detect_line_endings
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".bat", delete=False) as temp_file:
             # Create content that might trigger specific encoding paths
@@ -436,8 +436,8 @@ class TestAdditionalErrorHandling:
         finally:
             os.unlink(temp_file_path)
 
-    def test_missing_branch_coverage(self) -> None:
-        """Test specific branches that are missing coverage."""
+    def test_error_handling_edge_cases(self) -> None:
+        """Test specific error handling edge cases and branches."""
 
         # Test content that might trigger different rule branches
         test_contents = [

@@ -153,21 +153,7 @@ python blinter.py --help
 
 **Note:** Command line options override configuration file settings. Blinter automatically looks for `blinter.ini` in the current directory.
 
-## Configuration 📝
-
-Blinter supports configuration files to customize its behavior. Create a `blinter.ini` file in your project directory to set default options.
-
-### Creating a Configuration File
-
-Generate a default configuration file with all available options:
-
-```cmd
-python blinter.py --create-config
-```
-
-This creates a `blinter.ini` file with default settings.
-
-### Configuration Options
+### Configuration File Options 📝
 
 | Section | Setting | Description | Default |
 |---------|---------|-------------|---------|
@@ -265,9 +251,9 @@ python -m blinter . --no-recursive                   # Current directory only
 python -m blinter ./scripts --summary               # With summary statistics
 
 # Standalone executable:
-Blinter.exe ./my-batch-scripts            # Analyze all files recursively
-Blinter.exe . --no-recursive             # Current directory only
-Blinter.exe ./scripts --summary          # With summary statistics
+Blinter-v1.0.x-windows.exe ./my-batch-scripts            # Analyze all files recursively
+Blinter-v1.0.x-windows.exe . --no-recursive             # Current directory only
+Blinter-v1.0.x-windows.exe ./scripts --summary          # With summary statistics
 
 # Manual installation:
 python blinter.py ./my-batch-scripts      # Analyze all files recursively

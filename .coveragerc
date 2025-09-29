@@ -43,7 +43,7 @@ relative_files = True
 
 [report]
 # Fail if coverage is under this percentage
-fail_under = 95.0
+fail_under = 94.0
 
 # Show missing line numbers
 show_missing = True

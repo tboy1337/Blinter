@@ -1268,7 +1268,7 @@ timeout 5
         finally:
             os.unlink(temp_file)
 
-    def test_comprehensive_enhancement_coverage(self) -> None:
+    def test_comprehensive_enhancement_functionality(self) -> None:
         """Test that all new enhancement rules can be detected."""
         content = """@ECHO OFF
 REM This file tests multiple new enhancement rules
