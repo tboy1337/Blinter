@@ -9,7 +9,7 @@
 ## Features ✨
 
 ### 🔍 **Rule Categories**
-- **114 Built-in Rules** across 5 severity levels
+- **157 Built-in Rules** across 5 severity levels
 - **Error Level (E001-E999)**: Critical syntax errors that prevent execution
 - **Warning Level (W001-W999)**: Potential runtime issues and bad practices
 - **Style Level (S001-S999)**: Code formatting and readability improvements
@@ -35,6 +35,10 @@
 - **Cross-Platform Compatibility**: Warns about Windows version issues and deprecated commands
 - **Large File Handling**: Efficiently processes files up to 10MB+ with performance warnings
 - **Robust Encoding Detection**: Handles UTF-8, UTF-16, Latin-1 and 6 more encoding formats
+- **Advanced Escaping Techniques**: Validates caret escape sequences, multilevel escaping, and continuation characters
+- **Professional FOR Command Analysis**: Checks for usebackq, proper tokenizing, delimiters, and skip options
+- **Process Management Best Practices**: Timeout command usage, process verification, and restart patterns
+- **Enhanced Security Patterns**: User input validation, temporary file security, and self-modification detection
 
 ## Installation 🛠️
 

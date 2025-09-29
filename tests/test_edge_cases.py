@@ -462,9 +462,9 @@ class TestGlobalFunctionChecking:
             "echo content",
             "echo here",
         ]
-        from blinter import _check_missing_documentation
+        from blinter import _check_missing_header_doc
 
-        issues = _check_missing_documentation(lines)
+        issues = _check_missing_header_doc(lines)
         assert len(issues) == 1
         assert "S013" in issues[0].rule.code
 
@@ -477,9 +477,9 @@ class TestGlobalFunctionChecking:
             "echo world",
             "echo content",
         ]
-        from blinter import _check_missing_documentation
+        from blinter import _check_missing_header_doc
 
-        issues = _check_missing_documentation(lines)
+        issues = _check_missing_header_doc(lines)
         assert len(issues) == 0
 
     def test_check_redundant_assignments(self) -> None:

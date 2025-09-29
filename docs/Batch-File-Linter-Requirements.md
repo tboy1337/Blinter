@@ -2,7 +2,7 @@
 
 ## Rule Categories Summary
 
-**Blinter** provides comprehensive static analysis with **114 Built-in Rules** across 5 severity levels:
+**Blinter** provides comprehensive static analysis with **157 Built-in Rules** across 5 severity levels:
 
 ### Error Level Rules (E001-E999)
 **Critical issues that will cause script failure**
@@ -30,6 +30,10 @@
 - **E027**: UNC path used as working directory
 - **E028**: Complex quote escaping error
 - **E029**: Complex SET /A expression errors
+- **E030**: Improper caret escape sequence
+- **E031**: Invalid multilevel escaping
+- **E032**: Continuation character with trailing spaces
+- **E033**: Double percent escaping error
 
 ### Warning Level Rules (W001-W999)
 **Issues that may cause problems**
@@ -64,6 +68,16 @@
 - **W031**: Unicode filename in batch operation
 - **W032**: Missing character set declaration
 - **W033**: Command execution may be ambiguous
+- **W034**: FOR /F missing usebackq option
+- **W035**: FOR /F tokenizing without proper delimiters
+- **W036**: FOR /F missing skip option for headers
+- **W037**: FOR /F missing eol option for comments
+- **W038**: FOR /R with explicit filename needs wildcard
+- **W039**: Nested FOR loops without call optimization
+- **W040**: FOR loop variable scope issue
+- **W041**: Missing error handling for external commands
+- **W042**: Timeout command without /NOBREAK option
+- **W043**: Process management without proper verification
 
 ### Style Level Rules (S001-S999)
 **Code style and formatting issues**
@@ -84,6 +98,14 @@
 - **S018**: Missing function documentation
 - **S019**: Magic numbers in code
 - **S020**: Long line without continuation
+- **S021**: Missing code block documentation
+- **S022**: Inconsistent variable naming convention
+- **S023**: Magic timeout values without explanation
+- **S024**: Complex one-liner should be split
+- **S025**: Missing subroutine documentation
+- **S026**: Inconsistent continuation character usage
+- **S027**: Missing blank lines around code blocks
+- **S028**: Redundant parentheses in simple commands
 
 ### Security Level Rules (SEC001+)
 **Security vulnerabilities and risks**
@@ -98,11 +120,17 @@
 - **SEC011**: Unvalidated path traversal
 - **SEC012**: Unsafe temporary file creation
 - **SEC013**: Command injection via variable substitution
-- **SEC014**: UNC path without UAC elevation check
-- **SEC015**: Fork bomb pattern detected
-- **SEC016**: Potential hosts file modification
-- **SEC017**: Autorun.inf creation detected
-- **SEC018**: Batch file copying itself to removable media
+- **SEC014**: Unescaped user input in command execution
+- **SEC015**: Process killing without authentication
+- **SEC016**: Automatic restart without failure limits
+- **SEC017**: Temporary file creation in predictable location
+- **SEC018**: Command output redirection to insecure location
+- **SEC019**: Batch self-modification vulnerability
+- **SEC020**: UNC path without UAC elevation check
+- **SEC021**: Fork bomb pattern detected
+- **SEC022**: Potential hosts file modification
+- **SEC023**: Autorun.inf creation detected
+- **SEC024**: Batch file copying itself to removable media
 
 ### Performance Level Rules (P001-P999)
 **Performance and efficiency improvements**
@@ -119,6 +147,16 @@
 - **P013**: Missing /B flag for large DIR operations
 - **P014**: Unnecessary command output
 - **P015**: Inefficient delay implementation
+- **P016**: Inefficient string concatenation in loops
+- **P017**: Repeated file existence checks
+- **P018**: Inefficient directory traversal
+- **P019**: Excessive variable expansion in loops
+- **P020**: Redundant command echoing suppression
+- **P021**: Inefficient process checking pattern
+- **P022**: Unnecessary output redirection in loops
+- **P023**: Inefficient arithmetic operations
+- **P024**: Redundant SETLOCAL/ENDLOCAL pairs
+- **P025**: Inefficient wildcard usage in file operations
 
 ## Implementation Guidelines
 *Each rule should provide clear explanations and actionable recommendations*

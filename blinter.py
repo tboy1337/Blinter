@@ -4,7 +4,7 @@ This module provides comprehensive functionality to lint Windows batch files (.b
 for common syntax errors, style issues, security vulnerabilities and performance problems.
 
 Features:
-- 100+ built-in rules across 5 severity levels
+- 150+ built-in rules across 5 severity levels
 - Thread-safe operations for concurrent processing
 - Robust encoding detection and handling
 - Comprehensive error handling for production use
@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.7
+Version: 1.0.8
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union
 import warnings
 
-__version__ = "1.0.7"
+__version__ = "1.0.8"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -849,7 +849,7 @@ RULES: Dict[str, Rule] = {
         name="Deprecated command detected",
         severity=RuleSeverity.WARNING,
         explanation="Command is deprecated in modern Windows versions",
-        recommendation=("Replace with modern equivalent: XCOPY→ROBOCOPY, NET SEND→MSG, etc."),
+        recommendation=("Replace with modern equivalent: XCOPY->ROBOCOPY, NET SEND->MSG, etc."),
     ),
     "W025": Rule(
         code="W025",
@@ -1042,45 +1042,6 @@ RULES: Dict[str, Rule] = {
         "ambiguous execution",
         recommendation="Use explicit file extensions in CALL statements and verify PATHEXT order",
     ),
-    # Enhanced Security Rules (SEC014-SEC018)
-    "SEC014": Rule(
-        code="SEC014",
-        name="UNC path without UAC elevation check",
-        severity=RuleSeverity.SECURITY,
-        explanation="UNC operations may fail under UAC without proper elevation",
-        recommendation="Add privilege checks before UNC operations: NET SESSION >nul 2>&1",
-    ),
-    "SEC015": Rule(
-        code="SEC015",
-        name="Fork bomb pattern detected",
-        severity=RuleSeverity.SECURITY,
-        explanation="Script contains patterns that could create resource exhaustion fork bombs",
-        recommendation='Remove recursive self-execution patterns: :label + start "" %0 + '
-        "goto label",
-    ),
-    "SEC016": Rule(
-        code="SEC016",
-        name="Potential hosts file modification",
-        severity=RuleSeverity.SECURITY,
-        explanation="Script attempts to modify system hosts file, potential DNS poisoning vector",
-        recommendation="Avoid hosts file modifications unless explicitly required for "
-        "legitimate purposes",
-    ),
-    "SEC017": Rule(
-        code="SEC017",
-        name="Autorun.inf creation detected",
-        severity=RuleSeverity.SECURITY,
-        explanation="Script creates autorun.inf files, common malware spreading vector",
-        recommendation="Remove autorun.inf creation unless required for legitimate "
-        "installation media",
-    ),
-    "SEC018": Rule(
-        code="SEC018",
-        name="Batch file copying itself to removable media",
-        severity=RuleSeverity.SECURITY,
-        explanation="Script copies itself to other drives, potential virus behavior",
-        recommendation="Remove self-copying behavior unless required for legitimate deployment",
-    ),
     # Enhanced Performance Rule (P015)
     "P015": Rule(
         code="P015",
@@ -1089,6 +1050,277 @@ RULES: Dict[str, Rule] = {
         explanation="Using ping localhost or choice for delays is inefficient on modern Windows",
         recommendation="Use TIMEOUT command for Vista+ or implement proper delay alternatives "
         "for older systems",
+    ),
+    # Advanced Escaping Rules (E030-E039)
+    "E030": Rule(
+        code="E030",
+        name="Improper caret escape sequence",
+        severity=RuleSeverity.ERROR,
+        explanation="Caret character requires proper escaping when used as literal text",
+        recommendation="Use ^^ to display a single caret, or ^^^ to escape special chars: ^^^&",
+    ),
+    "E031": Rule(
+        code="E031",
+        name="Invalid multilevel escaping",
+        severity=RuleSeverity.ERROR,
+        explanation="Complex multilevel escaping follows formula 2^n-1 carets for n levels",
+        recommendation="Use correct caret count: ^ (1 level), ^^^ (2 levels), ^^^^^^^ (3 levels)",
+    ),
+    "E032": Rule(
+        code="E032",
+        name="Continuation character with trailing spaces",
+        severity=RuleSeverity.ERROR,
+        explanation="Spaces after caret continuation character prevent line wrapping",
+        recommendation="Ensure caret is last character on line with no trailing spaces",
+    ),
+    "E033": Rule(
+        code="E033",
+        name="Double percent escaping error",
+        severity=RuleSeverity.ERROR,
+        explanation="Percent signs in output require double escaping: %% instead of %",
+        recommendation="Use %% in ECHO statements to display single % character",
+    ),
+    # Advanced FOR Command Rules (W034-W043)
+    "W034": Rule(
+        code="W034",
+        name="FOR /F missing usebackq option",
+        severity=RuleSeverity.WARNING,
+        explanation="usebackq option allows quoted filenames and command execution with backticks",
+        recommendation='Use FOR /F "usebackq" when file names contain spaces or executing commands',
+    ),
+    "W035": Rule(
+        code="W035",
+        name="FOR /F tokenizing without proper delimiters",
+        severity=RuleSeverity.WARNING,
+        explanation="Default space/tab delimiters may not match your data format",
+        recommendation='Specify explicit delims= option: FOR /F "delims=," for CSV data',
+    ),
+    "W036": Rule(
+        code="W036",
+        name="FOR /F missing skip option for headers",
+        severity=RuleSeverity.WARNING,
+        explanation="Files with header rows should use skip= option to avoid processing headers",
+        recommendation="Add skip=1 or appropriate number to skip header rows",
+    ),
+    "W037": Rule(
+        code="W037",
+        name="FOR /F missing eol option for comments",
+        severity=RuleSeverity.WARNING,
+        explanation="Files with comment lines should specify end-of-line comment character",
+        recommendation="Use eol=# or appropriate character to ignore comment lines",
+    ),
+    "W038": Rule(
+        code="W038",
+        name="FOR /R with explicit filename needs wildcard",
+        severity=RuleSeverity.WARNING,
+        explanation="FOR /R requires wildcard for explicit filenames to prevent directory listing",
+        recommendation="Add trailing asterisk to explicit filename: filename.txt*",
+    ),
+    "W039": Rule(
+        code="W039",
+        name="Nested FOR loops without call optimization",
+        severity=RuleSeverity.WARNING,
+        explanation="Complex nested FOR loops should use CALL :subroutine for maintainability",
+        recommendation="Move inner loop logic to separate subroutine using CALL :label",
+    ),
+    "W040": Rule(
+        code="W040",
+        name="FOR loop variable scope issue",
+        severity=RuleSeverity.WARNING,
+        explanation="FOR loop variables should use appropriate scope (% vs !) in contexts",
+        recommendation="Use !var! inside FOR loops with delayed expansion, %var% outside",
+    ),
+    "W041": Rule(
+        code="W041",
+        name="Missing error handling for external commands",
+        severity=RuleSeverity.WARNING,
+        explanation="External commands called in scripts should include errorlevel checking",
+        recommendation="Check errorlevel after each external command: IF !ERRORLEVEL! NEQ 0",
+    ),
+    "W042": Rule(
+        code="W042",
+        name="Timeout command without /NOBREAK option",
+        severity=RuleSeverity.WARNING,
+        explanation="TIMEOUT allows user interruption unless /NOBREAK is specified",
+        recommendation="Use TIMEOUT /T seconds /NOBREAK >NUL for uninterruptible delays",
+    ),
+    "W043": Rule(
+        code="W043",
+        name="Process management without proper verification",
+        severity=RuleSeverity.WARNING,
+        explanation="TASKKILL and TASKLIST commands should verify process existence first",
+        recommendation="Use TASKLIST /FI to check process before TASKKILL operations",
+    ),
+    # Advanced Security Rules (SEC014-SEC019)
+    "SEC014": Rule(
+        code="SEC014",
+        name="Unescaped user input in command execution",
+        severity=RuleSeverity.SECURITY,
+        explanation="User input containing special characters can break command execution",
+        recommendation="Escape special characters in user input: ^&, ^|, ^>, ^<, ^^",
+    ),
+    "SEC015": Rule(
+        code="SEC015",
+        name="Process killing without authentication",
+        severity=RuleSeverity.SECURITY,
+        explanation="TASKKILL commands can terminate system processes without proper checks",
+        recommendation="Add process ownership and permission checks before killing processes",
+    ),
+    "SEC016": Rule(
+        code="SEC016",
+        name="Automatic restart without failure limits",
+        severity=RuleSeverity.SECURITY,
+        explanation="Unlimited restart attempts can mask security issues or resource exhaustion",
+        recommendation="Implement maximum restart attempts (3-5) with exponential backoff",
+    ),
+    "SEC017": Rule(
+        code="SEC017",
+        name="Temporary file creation in predictable location",
+        severity=RuleSeverity.SECURITY,
+        explanation="Predictable temp file names are vulnerable to race conditions and hijacking",
+        recommendation="Use %RANDOM% or timestamp in temp file names: temp_%RANDOM%.tmp",
+    ),
+    "SEC018": Rule(
+        code="SEC018",
+        name="Command output redirection to insecure location",
+        severity=RuleSeverity.SECURITY,
+        explanation="Redirecting sensitive output to world-readable locations exposes information",
+        recommendation="Redirect to secure user directories or use appropriate file permissions",
+    ),
+    "SEC019": Rule(
+        code="SEC019",
+        name="Batch self-modification vulnerability",
+        severity=RuleSeverity.SECURITY,
+        explanation="Scripts that modify themselves can be exploited to execute malicious code",
+        recommendation="Avoid self-modifying scripts or validate all modifications carefully",
+    ),
+    # Advanced Style Rules (S021-S030)
+    "S021": Rule(
+        code="S021",
+        name="Missing code block documentation",
+        severity=RuleSeverity.STYLE,
+        explanation="Complex code blocks should have descriptive comments explaining their purpose",
+        recommendation="Add REM comments before complex FOR loops, IF blocks, and subroutines",
+    ),
+    "S022": Rule(
+        code="S022",
+        name="Inconsistent variable naming convention",
+        severity=RuleSeverity.STYLE,
+        explanation="Variables should follow consistent naming conventions",
+        recommendation="Choose one naming convention and apply it consistently throughout script",
+    ),
+    "S023": Rule(
+        code="S023",
+        name="Magic timeout values without explanation",
+        severity=RuleSeverity.STYLE,
+        explanation="Hard-coded timeout values should be documented or made configurable",
+        recommendation="Use variables for timeout values: SET waitTime=30",
+    ),
+    "S024": Rule(
+        code="S024",
+        name="Complex one-liner should be split",
+        severity=RuleSeverity.STYLE,
+        explanation="Complex commands spanning multiple operations should be split for readability",
+        recommendation="Use continuation character ^ or separate commands for complex operations",
+    ),
+    "S025": Rule(
+        code="S025",
+        name="Missing subroutine documentation",
+        severity=RuleSeverity.STYLE,
+        explanation="Subroutines should have REM comments describing parameters and return values",
+        recommendation="Document subroutines: REM Usage: CALL :SubName param1 param2",
+    ),
+    "S026": Rule(
+        code="S026",
+        name="Inconsistent continuation character usage",
+        severity=RuleSeverity.STYLE,
+        explanation="Continuation characters should be used consistently for line wrapping",
+        recommendation="Use ^ consistently for line continuation and align parameters vertically",
+    ),
+    "S027": Rule(
+        code="S027",
+        name="Missing blank lines around code blocks",
+        severity=RuleSeverity.STYLE,
+        explanation="Code blocks should be separated by blank lines for better readability",
+        recommendation="Add blank lines before and after major code sections and subroutines",
+    ),
+    "S028": Rule(
+        code="S028",
+        name="Redundant parentheses in simple commands",
+        severity=RuleSeverity.STYLE,
+        explanation="Simple single commands don't need parentheses for code blocks",
+        recommendation="Remove parentheses for single commands: IF condition command",
+    ),
+    # Advanced Performance Rules (P016-P025)
+    "P016": Rule(
+        code="P016",
+        name="Inefficient string concatenation in loops",
+        severity=RuleSeverity.PERFORMANCE,
+        explanation="String concatenation inside loops creates performance bottlenecks",
+        recommendation="Use arrays or temporary files for large string operations in loops",
+    ),
+    "P017": Rule(
+        code="P017",
+        name="Repeated file existence checks",
+        severity=RuleSeverity.PERFORMANCE,
+        explanation="Multiple IF EXIST checks on the same file waste I/O operations",
+        recommendation="Store file existence result in variable for reuse",
+    ),
+    "P018": Rule(
+        code="P018",
+        name="Inefficient directory traversal",
+        severity=RuleSeverity.PERFORMANCE,
+        explanation="FOR /R without specific file masks processes unnecessary files",
+        recommendation="Use specific file masks in FOR /R to reduce processing overhead",
+    ),
+    "P019": Rule(
+        code="P019",
+        name="Excessive variable expansion in loops",
+        severity=RuleSeverity.PERFORMANCE,
+        explanation="Complex variable expansion inside tight loops impacts performance",
+        recommendation="Pre-calculate complex variables before loop entry",
+    ),
+    "P020": Rule(
+        code="P020",
+        name="Redundant command echoing suppression",
+        severity=RuleSeverity.PERFORMANCE,
+        explanation="Multiple @ECHO OFF commands or redundant @ prefixes waste processing",
+        recommendation="Use single @ECHO OFF at script start, avoid @ on subsequent commands",
+    ),
+    "P021": Rule(
+        code="P021",
+        name="Inefficient process checking pattern",
+        severity=RuleSeverity.PERFORMANCE,
+        explanation="Repeated TASKLIST calls without filters are resource-intensive",
+        recommendation="Use TASKLIST /FI filters to reduce output and processing time",
+    ),
+    "P022": Rule(
+        code="P022",
+        name="Unnecessary output redirection in loops",
+        severity=RuleSeverity.PERFORMANCE,
+        explanation="Redirecting output inside loops creates I/O overhead",
+        recommendation="Collect output in variable and redirect once after loop completion",
+    ),
+    "P023": Rule(
+        code="P023",
+        name="Inefficient arithmetic operations",
+        severity=RuleSeverity.PERFORMANCE,
+        explanation="Complex arithmetic in SET /A can be optimized with intermediate variables",
+        recommendation="Break complex expressions into steps with intermediate variables",
+    ),
+    "P024": Rule(
+        code="P024",
+        name="Redundant SETLOCAL/ENDLOCAL pairs",
+        severity=RuleSeverity.PERFORMANCE,
+        explanation="Multiple SETLOCAL/ENDLOCAL pairs create unnecessary scope overhead",
+        recommendation="Use single SETLOCAL at script start with ENDLOCAL at end",
+    ),
+    "P025": Rule(
+        code="P025",
+        name="Inefficient wildcard usage in file operations",
+        severity=RuleSeverity.PERFORMANCE,
+        explanation="Overly broad wildcards (*.*) process unnecessary files",
+        recommendation="Use specific file extensions: *.txt instead of *.*",
     ),
 }
 
@@ -3048,15 +3280,28 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
         # Error level checks
         issues.extend(_check_syntax_errors(line, i, labels))
 
+        # Advanced escaping rules (E030-E033)
+        issues.extend(_check_advanced_escaping_rules(line, i))
+
         # Warning level checks
         issues.extend(_check_warning_issues(line, i, set_vars, has_delayed_expansion))
+
+        # Advanced FOR command rules (W034-W043)
+        issues.extend(_check_advanced_for_rules(line, i))
+        issues.extend(_check_advanced_process_mgmt(line, i))
 
         # Style level checks
         style_issues = _check_style_issues(line, i, config.max_line_length)
         issues.extend(style_issues)
 
+        # Advanced style patterns (S021-S028)
+        issues.extend(_check_advanced_style_patterns(line, i, lines))
+
         # Security level checks (always enabled for safety)
         issues.extend(_check_security_issues(line, i))
+
+        # Advanced security patterns (SEC014-SEC019)
+        issues.extend(_check_advanced_security(line, i))
 
         # Performance level checks
         perf_issues = _check_performance_issues(
@@ -3069,6 +3314,9 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
             uses_delayed_vars,
         )
         issues.extend(perf_issues)
+
+        # Advanced performance patterns (P016-P025)
+        issues.extend(_check_advanced_performance(lines, i, line))
 
     # Global checks (across all lines)
     issues.extend(_check_undefined_variables(lines, set_vars))
@@ -3087,12 +3335,300 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
 
     # Style-level global checks
     issues.extend(_check_inconsistent_indentation(lines))
-    issues.extend(_check_missing_documentation(lines))
+    issues.extend(_check_missing_header_doc(lines))
     issues.extend(_check_advanced_style_rules(lines))  # Style level S017-S020
 
     # Performance-level global checks
     issues.extend(_check_redundant_assignments(lines))
     issues.extend(_check_enhanced_performance(lines))  # Performance level P012-P014
+
+    return issues
+
+
+# Advanced rule detection functions
+
+
+def _check_advanced_escaping_rules(line: str, line_number: int) -> List[LintIssue]:
+    """Check for advanced escaping technique issues."""
+    issues: List[LintIssue] = []
+    stripped = line.strip()
+
+    # E030: Improper caret escape sequence
+    # Look for single caret attempting to escape special chars
+    if re.search(r"\^[&|><](?!\^)", stripped):
+        issues.append(LintIssue(line_number, RULES["E030"], context=stripped))
+
+    # E031: Invalid multilevel escaping
+    # Check for incorrect caret counts in multilevel escaping
+    caret_sequences: List[str] = re.findall(r"\^+[&|><]", stripped)
+    for seq in caret_sequences:
+        caret_count = len(seq) - 1  # -1 for the target character
+        # Valid counts follow 2^n-1 pattern: 1, 3, 7, 15...
+        valid_counts: List[int] = [1, 3, 7, 15, 31]  # 2^n-1 pattern for n=1 to 5
+        if caret_count > 0 and caret_count not in valid_counts:
+            issues.append(LintIssue(line_number, RULES["E031"], context=seq))
+
+    # E032: Continuation character with trailing spaces
+    if stripped.endswith("^") and line.rstrip() != line.rstrip(" \t"):
+        issues.append(LintIssue(line_number, RULES["E032"], context="Caret with trailing spaces"))
+
+    # E033: Double percent escaping error
+    # Look for single % in echo statements that should be %%
+    if stripped.lower().startswith("echo") and "%" in stripped and "%%" not in stripped:
+        # Check for percentage signs that might need escaping
+        if re.search(r"echo.*\b\d+%\b", stripped.lower()):
+            issues.append(
+                LintIssue(line_number, RULES["E033"], context="Percentage needs double escaping")
+            )
+
+    return issues
+
+
+def _check_advanced_for_rules(line: str, line_number: int) -> List[LintIssue]:
+    """Check for advanced FOR command patterns."""
+    issues: List[LintIssue] = []
+    stripped = line.strip().lower()
+
+    if not stripped.startswith("for"):
+        return issues
+
+    # W034: FOR /F missing usebackq option
+    if "/f" in stripped and " " in stripped and '"' in stripped:
+        if "usebackq" not in stripped and ("(" in stripped.split('"')[0] or "`" in stripped):
+            issues.append(
+                LintIssue(
+                    line_number,
+                    RULES["W034"],
+                    context="FOR /F with spaces in filename needs usebackq",
+                )
+            )
+
+    # W035: FOR /F tokenizing without proper delimiters
+    if "/f" in stripped and "delims=" not in stripped and "tokens=" in stripped:
+        issues.append(
+            LintIssue(
+                line_number, RULES["W035"], context="FOR /F tokenizing should specify delimiters"
+            )
+        )
+
+    # W036: FOR /F missing skip option for headers
+    if (
+        "/f" in stripped
+        and "skip=" not in stripped
+        and ("file" in stripped or ".txt" in stripped or ".csv" in stripped)
+    ):
+        issues.append(
+            LintIssue(
+                line_number,
+                RULES["W036"],
+                context="FOR /F on data files should consider skip= for headers",
+            )
+        )
+
+    # W037: FOR /F missing eol option for comments
+    if "/f" in stripped and "eol=" not in stripped and ".txt" in stripped:
+        issues.append(
+            LintIssue(
+                line_number,
+                RULES["W037"],
+                context="FOR /F should specify eol= for comment handling",
+            )
+        )
+
+    # W038: FOR /R with explicit filename needs wildcard
+    if "/r" in stripped and not ("*" in stripped or "?" in stripped):
+        # Check if there's a specific filename pattern
+        filename_match = re.search(r"\b\w+\.\w+\b", stripped)
+        if filename_match:
+            issues.append(
+                LintIssue(
+                    line_number,
+                    RULES["W038"],
+                    context=f"FOR /R with '{filename_match.group()}' needs wildcard",
+                )
+            )
+
+    return issues
+
+
+def _check_advanced_process_mgmt(line: str, line_number: int) -> List[LintIssue]:
+    """Check for process management best practices."""
+    issues: List[LintIssue] = []
+    stripped = line.strip().lower()
+
+    # W042: Timeout command without /NOBREAK option
+    if stripped.startswith("timeout") and "/nobreak" not in stripped and "/t" in stripped:
+        issues.append(
+            LintIssue(
+                line_number,
+                RULES["W042"],
+                context="TIMEOUT should use /NOBREAK for uninterruptible delays",
+            )
+        )
+
+    # W043: Process management without proper verification
+    if stripped.startswith("taskkill") and "tasklist" not in stripped:
+        issues.append(
+            LintIssue(
+                line_number, RULES["W043"], context="TASKKILL should verify process existence first"
+            )
+        )
+
+    # SEC015: Process killing without authentication
+    if "taskkill" in stripped and "/f" in stripped and "/fi" not in stripped:
+        issues.append(
+            LintIssue(
+                line_number,
+                RULES["SEC015"],
+                context="TASKKILL /F should include filters to avoid system processes",
+            )
+        )
+
+    return issues
+
+
+def _check_advanced_security(line: str, line_number: int) -> List[LintIssue]:
+    """Check for advanced security patterns."""
+    issues: List[LintIssue] = []
+    stripped = line.strip()
+
+    # SEC014: Unescaped user input in command execution
+    if "%1" in stripped or "%2" in stripped or "%*" in stripped:
+        # Check for user parameters used without proper escaping
+        special_chars = ["&", "|", ">", "<", "^"]
+        if any(char in stripped for char in special_chars):
+            if not re.search(r"\^[&|><^]", stripped):
+                issues.append(
+                    LintIssue(
+                        line_number,
+                        RULES["SEC014"],
+                        context="User input parameters should be escaped",
+                    )
+                )
+
+    # SEC017: Temporary file creation in predictable location
+    if "temp" in stripped.lower() and (".tmp" in stripped or ".temp" in stripped):
+        if "%random%" not in stripped.lower() and "%time%" not in stripped.lower():
+            issues.append(
+                LintIssue(
+                    line_number,
+                    RULES["SEC017"],
+                    context="Temp files should use %RANDOM% or timestamp",
+                )
+            )
+
+    # SEC018: Command output redirection to insecure location
+    redirection_patterns = [r">\s*c:\\temp", r">\s*c:\\windows\\temp", r">\s*\\\\.*\\share"]
+    for pattern in redirection_patterns:
+        if re.search(pattern, stripped.lower()):
+            issues.append(
+                LintIssue(
+                    line_number,
+                    RULES["SEC018"],
+                    context="Output redirected to potentially insecure location",
+                )
+            )
+
+    return issues
+
+
+def _check_advanced_performance(lines: List[str], line_number: int, line: str) -> List[LintIssue]:
+    """Check for performance patterns."""
+    issues: List[LintIssue] = []
+    stripped = line.strip().lower()
+
+    # P017: Repeated file existence checks
+    if stripped.startswith("if exist"):
+        filename_match = re.search(r'if exist\s+(["\']?)([^"\'\s]+)\1', stripped)
+        if filename_match:
+            filename = filename_match.group(2)
+            # Count occurrences of the same file check in surrounding lines
+            check_range = max(0, line_number - 5), min(len(lines), line_number + 5)
+            same_checks = 0
+            for i in range(check_range[0], check_range[1]):
+                if i != line_number - 1 and filename in lines[i].lower():
+                    same_checks += 1
+            if same_checks >= 2:
+                issues.append(
+                    LintIssue(
+                        line_number,
+                        RULES["P017"],
+                        context=f"File '{filename}' checked multiple times",
+                    )
+                )
+
+    # P020: Redundant command echoing suppression
+    if stripped.startswith("@echo off") and line_number > 1:
+        issues.append(
+            LintIssue(
+                line_number,
+                RULES["P020"],
+                context="@ECHO OFF should only appear once at script start",
+            )
+        )
+
+    # P021: Inefficient process checking pattern
+    if stripped.startswith("tasklist") and "/fi" not in stripped:
+        issues.append(
+            LintIssue(
+                line_number, RULES["P021"], context="TASKLIST should use /FI filters for efficiency"
+            )
+        )
+
+    return issues
+
+
+def _check_advanced_style_patterns(
+    line: str, line_number: int, lines: List[str]
+) -> List[LintIssue]:
+    """Check for advanced style patterns."""
+    issues: List[LintIssue] = []
+    stripped = line.strip()
+
+    # S023: Magic timeout values without explanation
+    timeout_match = re.search(r"timeout\s+/t\s+(\d+)", stripped.lower())
+    if timeout_match:
+        timeout_value = int(timeout_match.group(1))
+        if timeout_value > 10:  # Arbitrary values > 10 seconds
+            # Check if there's a comment explaining the value
+            has_explanation = False
+            check_lines = [line_number - 2, line_number - 1, line_number]
+            for check_line in check_lines:
+                if 0 <= check_line - 1 < len(lines):
+                    if "rem " in lines[check_line - 1].lower():
+                        has_explanation = True
+                        break
+            if not has_explanation:
+                issues.append(
+                    LintIssue(
+                        line_number,
+                        RULES["S023"],
+                        context=f"Timeout value {timeout_value} needs explanation",
+                    )
+                )
+
+    # S024: Complex one-liner should be split
+    if len(stripped) > 80 and ("&&" in stripped or "||" in stripped):
+        if "^" not in stripped:  # No continuation used
+            issues.append(
+                LintIssue(
+                    line_number,
+                    RULES["S024"],
+                    context="Complex command should be split using continuation character",
+                )
+            )
+
+    # S026: Inconsistent continuation character usage
+    if "^" in stripped and not stripped.endswith("^"):
+        # Check for improper continuation usage
+        if stripped.count("^") == 1 and not re.search(r"\^\s*$", line):
+            issues.append(
+                LintIssue(
+                    line_number,
+                    RULES["S026"],
+                    context="Continuation character should be at line end",
+                )
+            )
 
     return issues
 
@@ -3231,6 +3767,19 @@ def _check_new_global_rules(lines: List[str], file_path: str) -> List[LintIssue]
     """Check for new global rules that require full file context."""
     issues: List[LintIssue] = []
 
+    # Split complex function into smaller focused functions
+    issues.extend(_check_bat_cmd_differences(lines, file_path))
+    issues.extend(_check_advanced_global_patterns(lines, file_path))
+    issues.extend(_check_code_documentation(lines))
+    issues.extend(_check_setlocal_redundancy(lines))
+
+    return issues
+
+
+def _check_bat_cmd_differences(lines: List[str], file_path: str) -> List[LintIssue]:
+    """Check for .bat/.cmd specific issues."""
+    issues: List[LintIssue] = []
+
     # W028: .bat/.cmd errorlevel handling difference
     file_extension = Path(file_path).suffix.lower()
     errorlevel_commands = ["append", "dpath", "ftype", "set", "path", "assoc", "prompt"]
@@ -3254,7 +3803,7 @@ def _check_new_global_rules(lines: List[str], file_path: str) -> List[LintIssue]
     has_non_ascii = False
     has_chcp = False
 
-    for i, line in enumerate(lines, start=1):
+    for line in lines:
         # Check for non-ASCII characters
         if any(ord(char) > 127 for char in line):
             has_non_ascii = True
@@ -3276,6 +3825,284 @@ def _check_new_global_rules(lines: List[str], file_path: str) -> List[LintIssue]
     return issues
 
 
+def _check_advanced_global_patterns(lines: List[str], file_path: str) -> List[LintIssue]:
+    """Check advanced patterns of Batch Scripting."""
+    issues: List[LintIssue] = []
+
+    # W039: Nested FOR loops without call optimization
+    issues.extend(_check_nested_for_loops(lines))
+
+    # W041: Missing error handling for external commands
+    issues.extend(_check_external_error_handling(lines))
+
+    # SEC016: Automatic restart without failure limits
+    issues.extend(_check_restart_limits(lines))
+
+    # SEC019: Batch self-modification vulnerability
+    issues.extend(_check_self_modification(lines, file_path))
+
+    return issues
+
+
+def _check_nested_for_loops(lines: List[str]) -> List[LintIssue]:
+    """Check for nested FOR loops that should use CALL optimization."""
+    issues: List[LintIssue] = []
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip().lower()
+        if not stripped.startswith("for "):
+            continue
+
+        # Found a FOR loop, check for nested FORs
+        nested_for_issue = _find_nested_for_issue(lines, i)
+        if nested_for_issue:
+            issues.append(nested_for_issue)
+
+    return issues
+
+
+def _find_nested_for_issue(lines: List[str], start_line: int) -> Optional[LintIssue]:
+    """Find nested FOR loop issues starting from given line."""
+    brace_count = 0
+    in_for_block = False
+
+    for j in range(start_line, min(start_line + 20, len(lines))):
+        check_line = lines[j].strip()
+        brace_count += check_line.count("(") - check_line.count(")")
+
+        if brace_count > 0:
+            in_for_block = True
+
+        # Check for nested FOR loop
+        if in_for_block and check_line.lower().strip().startswith("for "):
+            if j != start_line - 1:  # Not the same line
+                if "call :" not in check_line.lower():
+                    return LintIssue(
+                        line_number=j + 1,
+                        rule=RULES["W039"],
+                        context="Nested FOR loop should use CALL :subroutine",
+                    )
+                break
+
+        if brace_count <= 0 and in_for_block:
+            break
+
+    return None
+
+
+def _check_external_error_handling(lines: List[str]) -> List[LintIssue]:
+    """Check for missing error handling on external commands."""
+    issues: List[LintIssue] = []
+    external_commands = ["xcopy", "robocopy", "reg", "sc", "net", "wmic", "powershell"]
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip().lower()
+        for cmd in external_commands:
+            if stripped.startswith(cmd):
+                # Check if next few lines have error handling
+                has_error_check = False
+                for j in range(i, min(i + 3, len(lines))):
+                    if "errorlevel" in lines[j].lower() or "if not" in lines[j].lower():
+                        has_error_check = True
+                        break
+                if not has_error_check:
+                    issues.append(
+                        LintIssue(
+                            line_number=i,
+                            rule=RULES["W041"],
+                            context=f"External command '{cmd}' needs error handling",
+                        )
+                    )
+                break
+
+    return issues
+
+
+def _check_restart_limits(lines: List[str]) -> List[LintIssue]:
+    """Check for restart patterns without proper limits."""
+    issues: List[LintIssue] = []
+    restart_patterns = ["goto", ":retry", ":restart", "call :retry"]
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip().lower()
+        for pattern in restart_patterns:
+            if pattern in stripped and ("retry" in stripped or "restart" in stripped):
+                # Look for counter or limit logic
+                has_limit = False
+                check_range = max(0, i - 10), min(len(lines), i + 10)
+                for j in range(check_range[0], check_range[1]):
+                    check_line = lines[j].lower()
+                    limit_words = ["counter", "attempt", "limit", "max", "count"]
+                    if any(word in check_line for word in limit_words):
+                        has_limit = True
+                        break
+                if not has_limit:
+                    issues.append(
+                        LintIssue(
+                            line_number=i,
+                            rule=RULES["SEC016"],
+                            context="Restart logic should have failure attempt limits",
+                        )
+                    )
+                break
+
+    return issues
+
+
+def _check_self_modification(lines: List[str], file_path: str) -> List[LintIssue]:
+    """Check for batch self-modification vulnerabilities."""
+    issues: List[LintIssue] = []
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip().lower()
+        if (
+            "echo" in stripped
+            and (".bat" in stripped or ".cmd" in stripped)
+            and (">" in stripped or ">>" in stripped)
+        ):
+            # Check if writing to same file or generating batch files
+            if any(keyword in stripped for keyword in ["%~f0", "%0", file_path.lower()]):
+                issues.append(
+                    LintIssue(
+                        line_number=i,
+                        rule=RULES["SEC019"],
+                        context="Script appears to modify itself - potential security risk",
+                    )
+                )
+
+    return issues
+
+
+def _check_code_documentation(lines: List[str]) -> List[LintIssue]:
+    """Check for code documentation and style issues."""
+    issues: List[LintIssue] = []
+
+    # S021: Missing code block documentation
+    issues.extend(_check_missing_documentation(lines))
+
+    # S022: Inconsistent variable naming convention
+    issues.extend(_check_var_naming(lines))
+
+    return issues
+
+
+def _check_missing_documentation(lines: List[str]) -> List[LintIssue]:
+    """Check for missing code block documentation."""
+    issues: List[LintIssue] = []
+    in_complex_block = False
+    complex_block_start = 0
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip().lower()
+
+        # Identify complex code blocks
+        is_complex_start = (
+            stripped.startswith("for ")
+            or (stripped.startswith("if ") and "(" in line)
+            or (stripped.startswith(":") and len(stripped) > 5)
+        )
+
+        if is_complex_start and not in_complex_block:
+            in_complex_block = True
+            complex_block_start = i
+
+            # Check for documentation in previous 3 lines
+            has_doc = False
+            for j in range(max(0, i - 3), i):
+                if j < len(lines) and "rem " in lines[j].lower():
+                    has_doc = True
+                    break
+
+            if not has_doc and ":" in stripped:
+                issues.append(
+                    LintIssue(
+                        line_number=i,
+                        rule=RULES["S021"],
+                        context="Complex code block or subroutine needs documentation",
+                    )
+                )
+
+        # End of block detection (simplified)
+        if in_complex_block and (i - complex_block_start > 10 or line.strip() == ""):
+            in_complex_block = False
+
+    return issues
+
+
+def _check_var_naming(lines: List[str]) -> List[LintIssue]:
+    """Check for inconsistent variable naming conventions."""
+    issues: List[LintIssue] = []
+    variable_names = set()
+    naming_styles = {
+        "camelCase": 0,
+        "PascalCase": 0,
+        "snake_case": 0,
+        "lowercase": 0,
+        "UPPERCASE": 0,
+    }
+
+    for line in lines:
+        # Extract variable names from SET commands
+        set_matches: List[str] = re.findall(
+            r"set\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=", line, re.IGNORECASE
+        )
+        for var_name in set_matches:
+            variable_names.add(var_name)
+
+            # Categorize naming style
+            if "_" in var_name and var_name.islower():
+                naming_styles["snake_case"] += 1
+            elif var_name[0].isupper() and any(c.islower() for c in var_name[1:]):
+                naming_styles["PascalCase"] += 1
+            elif var_name[0].islower() and any(c.isupper() for c in var_name[1:]):
+                naming_styles["camelCase"] += 1
+            elif var_name.isupper():
+                naming_styles["UPPERCASE"] += 1
+            elif var_name.islower():
+                naming_styles["lowercase"] += 1
+
+    # Check for mixed styles (only if we have enough variables to analyze)
+    if len(variable_names) >= 3:
+        used_styles = sum(1 for count in naming_styles.values() if count > 0)
+        if used_styles > 1:
+
+            def get_count(style_name: str) -> int:
+                return naming_styles[style_name]
+
+            dominant_style: str = max(naming_styles, key=get_count)
+            issues.append(
+                LintIssue(
+                    line_number=1,
+                    rule=RULES["S022"],
+                    context=f"Mixed variable naming styles detected. "
+                    f"Consider using {dominant_style} consistently",
+                )
+            )
+
+    return issues
+
+
+def _check_setlocal_redundancy(lines: List[str]) -> List[LintIssue]:
+    """Check for redundant SETLOCAL/ENDLOCAL pairs."""
+    issues: List[LintIssue] = []
+    setlocal_count = sum(1 for line in lines if "setlocal" in line.lower())
+    endlocal_count = sum(1 for line in lines if "endlocal" in line.lower())
+
+    if setlocal_count > 1 or endlocal_count > 1:
+        for i, line in enumerate(lines, start=1):
+            if "setlocal" in line.lower() and i > 5:  # Not at beginning
+                issues.append(
+                    LintIssue(
+                        line_number=i,
+                        rule=RULES["P024"],
+                        context="Multiple SETLOCAL commands create unnecessary overhead",
+                    )
+                )
+                break
+
+    return issues
+
+
 def _check_unreachable_code(lines: List[str]) -> List[LintIssue]:
     """Check for unreachable code after EXIT or GOTO statements."""
     issues: List[LintIssue] = []
@@ -3291,8 +4118,10 @@ def _check_unreachable_code(lines: List[str]) -> List[LintIssue]:
                         LintIssue(
                             line_number=j + 1,
                             rule=RULES["E008"],
-                            context=f"Code after {stripped.split()[0].upper()} on "
-                            f"line {i + 1} will never execute",
+                            context=(
+                                f"Code after {stripped.split()[0].upper()} on "
+                                f"line {i + 1} will never execute"
+                            ),
                         )
                     )
                     break
@@ -3508,7 +4337,7 @@ def _check_inconsistent_indentation(  # pylint: disable=too-many-branches
     return issues
 
 
-def _check_missing_documentation(lines: List[str]) -> List[LintIssue]:
+def _check_missing_header_doc(lines: List[str]) -> List[LintIssue]:
     """Check for missing file header documentation (S013)."""
     issues: List[LintIssue] = []
 
