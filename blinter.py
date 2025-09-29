@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.9
+Version: 1.0.10
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union
 import warnings
 
-__version__ = "1.0.9"
+__version__ = "1.0.10"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1913,11 +1913,14 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
     """Collect all variables that are set in the script."""
     set_vars: Set[str] = set()
     for line in lines:
-        # Match different SET patterns
+        # Match different SET patterns, including quoted variable names
         patterns = [
-            r"set\s+([A-Za-z0-9_]+)=",  # Regular set
-            r"set\s+/p\s+([A-Za-z0-9_]+)=",  # Set with prompt
-            r"set\s+/a\s+([A-Za-z0-9_]+)=",  # Arithmetic set
+            r"set\s+([A-Za-z0-9_]+)=",  # Regular set: set VAR=value
+            r'set\s+"([A-Za-z0-9_]+)=',  # Quoted set: set "VAR=value"
+            r"set\s+/p\s+([A-Za-z0-9_]+)=",  # Set with prompt: set /p VAR=
+            r'set\s+/p\s+"([A-Za-z0-9_]+)=',  # Quoted set with prompt: set /p "VAR="
+            r"set\s+/a\s+([A-Za-z0-9_]+)=",  # Arithmetic set: set /a VAR=
+            r'set\s+/a\s+"([A-Za-z0-9_]+)=',  # Quoted arithmetic set: set /a "VAR="
         ]
 
         for pattern in patterns:
@@ -2173,18 +2176,25 @@ def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,t
             )
         )
 
-    # E005: Invalid path syntax (basic check for invalid characters)
-    path_patterns = [r'"([^"]*[<>|*?][^"]*)",', r"'([^']*[<>|*?][^']*)'"]
-    for pattern in path_patterns:
-        if re.search(pattern, stripped):
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["E005"],
-                    context="Path contains invalid characters",
-                )
-            )
-            break
+    # E005: Invalid path syntax - but exclude FOR loop command strings
+    # Don't flag FOR loops as they contain command strings, not file paths
+    if not re.match(r"for\s+.*", stripped, re.IGNORECASE):
+        path_patterns = [r'"([^"]*[<>|*?][^"]*)",', r"'([^']*[<>|*?][^']*)'"]
+        for pattern in path_patterns:
+            match = re.search(pattern, stripped)
+            if match:
+                path_content = match.group(1)
+                # Allow escaped redirections like ^> ^| ^< in command strings
+                escaped_content = re.sub(r"\^[<>|]", "", path_content)
+                if re.search(r"[<>|*?]", escaped_content):
+                    issues.append(
+                        LintIssue(
+                            line_number=line_num,
+                            rule=RULES["E005"],
+                            context="Path contains invalid characters",
+                        )
+                    )
+                    break
 
     # E009: Mismatched quotes
     if line.count('"') % 2 != 0:
@@ -2672,7 +2682,7 @@ def _check_input_validation_sec(line: str, line_num: int, stripped: str) -> List
             )
         )
 
-    # SEC002: Unsafe SET command usage
+    # SEC002: Unsafe SET command usage - only flag unquoted SET commands
     set_match = re.match(r"set\s+([A-Za-z0-9_]+)=(.+)", stripped, re.IGNORECASE)
     if set_match:
         var_val_text: str = set_match.group(2)
@@ -2702,7 +2712,18 @@ def _check_input_validation_sec(line: str, line_num: int, stripped: str) -> List
     return issues
 
 
-def _check_privilege_security(stripped: str, line_num: int) -> List[LintIssue]:
+def _has_priv_check_before(lines: List[str], target_line_num: int) -> bool:
+    """Check if there's a privilege check (net session) before the target line."""
+    for _, line in enumerate(lines[: target_line_num - 1], start=1):
+        stripped = line.strip().lower()
+        if re.search(r"net\s+session\s*(>|$)", stripped):
+            return True
+    return False
+
+
+def _check_privilege_security(
+    stripped: str, line_num: int, lines: Optional[List[str]] = None
+) -> List[LintIssue]:
     """Check for privilege escalation security issues (SEC005)."""
     issues: List[LintIssue] = []
 
@@ -2715,13 +2736,18 @@ def _check_privilege_security(stripped: str, line_num: int) -> List[LintIssue]:
 
     for cmd in admin_commands:
         if cmd in stripped.lower():
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["SEC005"],
-                    context=f"Command '{cmd.strip()}' may require administrator privileges",
+            # Check if there's already a privilege check earlier in the script
+            if lines and _has_priv_check_before(lines, line_num):
+                # Privilege check already performed, skip this check
+                pass
+            else:
+                issues.append(
+                    LintIssue(
+                        line_number=line_num,
+                        rule=RULES["SEC005"],
+                        context=f"Command '{cmd.strip()}' may require administrator privileges",
+                    )
                 )
-            )
             break
 
     # Check for net commands that aren't privilege checks
@@ -2730,13 +2756,18 @@ def _check_privilege_security(stripped: str, line_num: int) -> List[LintIssue]:
             re.search(pattern, stripped.lower()) for pattern in net_privilege_check_patterns
         )
         if not is_privilege_check:
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["SEC005"],
-                    context="NET command may require administrator privileges",
+            # Check if there's already a privilege check earlier in the script
+            if lines and _has_priv_check_before(lines, line_num):
+                # Privilege check already performed, skip this check
+                pass
+            else:
+                issues.append(
+                    LintIssue(
+                        line_number=line_num,
+                        rule=RULES["SEC005"],
+                        context="NET command may require administrator privileges",
+                    )
                 )
-            )
 
     return issues
 
@@ -2894,6 +2925,7 @@ def _check_security_issues(  # pylint: disable=too-many-branches,too-many-locals
 
     # Check different categories of security issues
     issues.extend(_check_input_validation_sec(line, line_num, stripped))
+    # Include line-by-line privilege checks for backward compatibility with tests
     issues.extend(_check_privilege_security(stripped, line_num))
     issues.extend(_check_path_security(stripped, line_num))
     issues.extend(_check_info_disclosure_sec(stripped, line_num))
@@ -3067,14 +3099,25 @@ def _validate_and_read_file(file_path: str) -> Tuple[List[str], str]:
 
     lines, encoding_used = read_file_with_encoding(file_path)
 
-    # Issue a warning if we had to fall back from UTF-8
-    if encoding_used.lower() not in ["utf-8", "utf-8-sig"]:
+    # Issue a warning if we had to fall back from UTF-8, but not for pure ASCII files
+    if encoding_used.lower() not in ["utf-8", "utf-8-sig", "ascii"]:
         warnings.warn(
             f"File '{file_path}' was read using '{encoding_used}' encoding instead of UTF-8. "
             f"Consider converting the file to UTF-8 for better compatibility.",
             UserWarning,
             stacklevel=3,
         )
+    elif encoding_used.lower() == "ascii":
+        # Check if file contains non-ASCII characters (shouldn't happen with ASCII encoding)
+        # Only warn if the file actually needs UTF-8 features
+        file_content = "".join(lines)
+        if any(ord(char) > 127 for char in file_content):
+            warnings.warn(
+                f"File '{file_path}' contains non-ASCII characters but was read as ASCII. "
+                f"Consider converting the file to UTF-8 for proper character support.",
+                UserWarning,
+                stacklevel=3,
+            )
 
     return lines, encoding_used
 
@@ -3413,8 +3456,15 @@ def _check_advanced_escaping_rules(line: str, line_number: int) -> List[LintIssu
 
     # E030: Improper caret escape sequence
     # Look for single caret attempting to escape special chars
+    # But exclude FOR loop command strings where single caret escape is correct
     if re.search(r"\^[&|><](?!\^)", stripped):
-        issues.append(LintIssue(line_number, RULES["E030"], context=stripped))
+        # Check if this is within a FOR loop command string (within single quotes)
+        # In FOR loops, command strings like 'command 2^>nul ^| filter' use single caret correctly
+        if re.match(r"for\s+.*", stripped, re.IGNORECASE):
+            # This is a FOR loop, single caret escaping in command strings is correct
+            pass
+        else:
+            issues.append(LintIssue(line_number, RULES["E030"], context=stripped))
 
     # E031: Invalid multilevel escaping
     # Check for incorrect caret counts in multilevel escaping
@@ -3821,6 +3871,57 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     return filtered_issues
 
 
+def _check_global_priv_security(lines: List[str]) -> List[LintIssue]:
+    """Check for SEC005 privilege issues globally across the entire script."""
+    issues: List[LintIssue] = []
+
+    # Check if there's a privilege check (net session) in the script
+    has_privilege_check = False
+    for line in lines:
+        stripped = line.strip().lower()
+        if re.search(r"net\s+session\s*(>|$)", stripped):
+            has_privilege_check = True
+            break
+
+    # If no privilege check found, flag all commands that need privileges
+    if not has_privilege_check:
+        for i, line in enumerate(lines, start=1):
+            stripped = line.strip().lower()
+
+            # Check for admin commands
+            admin_commands = ["reg add hklm", "reg delete hklm", "sc "]
+            for cmd in admin_commands:
+                if cmd in stripped:
+                    issues.append(
+                        LintIssue(
+                            line_number=i,
+                            rule=RULES["SEC005"],
+                            context=f"Command '{cmd.strip()}' may require administrator privileges",
+                        )
+                    )
+                    break
+
+            # Check for net commands that aren't privilege checks
+            if "net " in stripped:
+                net_privilege_check_patterns = [
+                    r"net\s+session\s*>",  # net session redirected (used for checking)
+                    r"net\s+session\s*$",  # net session at end of line (used for checking)
+                ]
+                is_privilege_check = any(
+                    re.search(pattern, stripped) for pattern in net_privilege_check_patterns
+                )
+                if not is_privilege_check:
+                    issues.append(
+                        LintIssue(
+                            line_number=i,
+                            rule=RULES["SEC005"],
+                            context="NET command may require administrator privileges",
+                        )
+                    )
+
+    return issues
+
+
 def _check_new_global_rules(lines: List[str], file_path: str) -> List[LintIssue]:
     """Check for new global rules that require full file context."""
     issues: List[LintIssue] = []
@@ -3830,6 +3931,9 @@ def _check_new_global_rules(lines: List[str], file_path: str) -> List[LintIssue]
     issues.extend(_check_advanced_global_patterns(lines, file_path))
     issues.extend(_check_code_documentation(lines))
     issues.extend(_check_setlocal_redundancy(lines))
+
+    # Global security checks
+    issues.extend(_check_global_priv_security(lines))
 
     return issues
 
@@ -4100,10 +4204,15 @@ def _check_var_naming(lines: List[str]) -> List[LintIssue]:
     }
 
     for line in lines:
-        # Extract variable names from SET commands
-        set_matches: List[str] = re.findall(
-            r"set\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=", line, re.IGNORECASE
-        )
+        # Extract variable names from SET commands - handle quoted and unquoted
+        set_matches: List[str] = []
+        set_patterns = [
+            r"set\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=",  # Regular set: set VAR=value
+            r'set\s+"([a-zA-Z_][a-zA-Z0-9_]*)\s*=',  # Quoted set: set "VAR=value"
+        ]
+        for pattern in set_patterns:
+            matches: List[str] = re.findall(pattern, line, re.IGNORECASE)
+            set_matches.extend(matches)
         for var_name in set_matches:
             variable_names.add(var_name)
 
@@ -4476,11 +4585,17 @@ def _collect_variable_data(lines: List[str]) -> Tuple[Dict[str, List[int]], Dict
     for i, line in enumerate(lines, start=1):
         stripped = line.strip()
 
-        # Track assignments
-        set_match = re.match(r"set\s+([A-Za-z0-9_]+)\s*=", stripped, re.IGNORECASE)
-        if set_match:
-            var_name: str = set_match.group(1).upper()
-            var_assignments[var_name].append(i)
+        # Track assignments - handle both quoted and unquoted SET commands
+        set_patterns = [
+            r"set\s+([A-Za-z0-9_]+)\s*=",  # Regular set: set VAR=value
+            r'set\s+"([A-Za-z0-9_]+)\s*=',  # Quoted set: set "VAR=value"
+        ]
+        for pattern in set_patterns:
+            set_match = re.match(pattern, stripped, re.IGNORECASE)
+            if set_match:
+                var_name: str = set_match.group(1).upper()
+                var_assignments[var_name].append(i)
+                break
 
         # Track usage
         for var_match in re.finditer(
@@ -5101,7 +5216,15 @@ def _check_variable_naming(
 ) -> List[LintIssue]:
     """Check variable naming consistency (S017)."""
     issues: List[LintIssue] = []
-    var_matches = re.finditer(r"set\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=", line, re.IGNORECASE)
+    # Find SET commands with both quoted and unquoted variable names
+    var_matches: List[re.Match[str]] = []
+    set_patterns = [
+        r"set\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=",  # Regular set: set VAR=value
+        r'set\s+"([a-zA-Z_][a-zA-Z0-9_]*)\s*=',  # Quoted set: set "VAR=value"
+    ]
+    for pattern in set_patterns:
+        matches = list(re.finditer(pattern, line, re.IGNORECASE))
+        var_matches.extend(matches)
 
     for match in var_matches:
         var_name = str(match.group(1))
