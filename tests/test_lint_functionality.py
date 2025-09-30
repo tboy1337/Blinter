@@ -208,7 +208,7 @@ echo !var!
         """Test detection of unescaped special characters outside quotes."""
         content = """@echo off
 echo This has an unescaped & character
-echo "This & character is properly quoted"
+ECHO "This & character is properly quoted"
 echo This has unescaped | pipe
 echo This has unescaped > redirect
 echo This has properly escaped ^& character
@@ -220,7 +220,8 @@ echo This has properly escaped ^& character
             # Special character escaping is not currently implemented as a specific rule
             # Just ensure the linter runs without errors
             assert isinstance(issues, list)
-            # Should detect style issues like missing capitalization
+            # Should detect style issues like inconsistent command capitalization
+            # (we now have mixed case: "echo" and "ECHO")
             rule_codes = [issue.rule.code for issue in issues]
             assert "S003" in rule_codes  # Inconsistent command capitalization
         finally:

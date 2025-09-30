@@ -278,9 +278,24 @@ class TestStyleIssueChecking:
 
     def test_command_casing_inconsistency(self) -> None:
         """Test command casing inconsistency detection."""
-        issues = _check_style_issues("echo hello", 1)
-        assert len(issues) == 1
-        assert "S003" in issues[0].rule.code
+        # The new S003 rule only flags inconsistencies within the same file
+        # So we need to create content with mixed casing for the same command
+        test_lines = [
+            "echo hello",  # lowercase
+            "ECHO world",  # uppercase - this should trigger S003
+        ]
+        all_issues = []
+        for line_num, line in enumerate(test_lines, 1):
+            issues = _check_style_issues(line, line_num)
+            all_issues.extend(issues)
+
+        # Now check using the global function that detects inconsistencies
+        from blinter import _check_cmd_case_consistency
+
+        consistency_issues = _check_cmd_case_consistency(test_lines)
+
+        assert len(consistency_issues) >= 1
+        assert "S003" in consistency_issues[0].rule.code
 
 
 class TestSecurityIssueChecking:
@@ -1006,10 +1021,20 @@ class TestStyleChecking:
         """Test command casing consistency detection."""
         keywords = ["echo", "set", "if", "for", "goto", "call"]
         for keyword in keywords:
-            issues = _check_style_issues(f"{keyword} test", 1)
-            casing_issues = [i for i in issues if i.rule.code == "S003"]
-            assert len(casing_issues) == 1
-            assert keyword in casing_issues[0].context
+            # Create inconsistent casing for the same command within a file
+            test_lines = [
+                f"{keyword} test",  # lowercase
+                f"{keyword.upper()} test2",  # uppercase - should trigger S003
+            ]
+
+            from blinter import _check_cmd_case_consistency
+
+            consistency_issues = _check_cmd_case_consistency(test_lines)
+            casing_issues = [i for i in consistency_issues if i.rule.code == "S003"]
+            assert len(casing_issues) >= 1
+            # Check that the keyword appears in one of the contexts
+            contexts = [issue.context for issue in casing_issues]
+            assert any(keyword in context.lower() for context in contexts)
 
 
 class TestSecurityChecking:

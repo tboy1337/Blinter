@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.10
+Version: 1.0.11
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union
 import warnings
 
-__version__ = "1.0.10"
+__version__ = "1.0.11"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -469,8 +469,10 @@ RULES: Dict[str, Rule] = {
         code="S003",
         name="Inconsistent command capitalization",
         severity=RuleSeverity.STYLE,
-        explanation="Batch commands should follow consistent casing conventions for readability",
-        recommendation="Use consistent UPPERCASE for all batch commands",
+        explanation="Batch commands should follow consistent casing conventions "
+        "within the same file for readability",
+        recommendation="Use consistent casing for batch commands throughout "
+        "the file (either uppercase or lowercase)",
     ),
     "S004": Rule(
         code="S004",
@@ -2176,9 +2178,9 @@ def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,t
             )
         )
 
-    # E005: Invalid path syntax - but exclude FOR loop command strings
-    # Don't flag FOR loops as they contain command strings, not file paths
-    if not re.match(r"for\s+.*", stripped, re.IGNORECASE):
+    # E005: Invalid path syntax - but exclude command strings
+    # Don't flag FOR loops or PowerShell commands as they contain command strings, not file paths
+    if not re.match(r"(for\s+.*|.*call\s+powershell\s+.*)", stripped, re.IGNORECASE):
         path_patterns = [r'"([^"]*[<>|*?][^"]*)",', r"'([^']*[<>|*?][^']*)'"]
         for pattern in path_patterns:
             match = re.search(pattern, stripped)
@@ -2599,20 +2601,7 @@ def _check_style_issues(
     issues: List[LintIssue] = []
     stripped = line.strip()
 
-    # S003: Inconsistent command capitalization
-    for keyword in COMMAND_CASING_KEYWORDS:
-        pattern = rf"\b{keyword}\b"
-        if re.search(pattern, stripped, re.IGNORECASE):
-            # Check if it's not uppercase
-            if not re.search(rf"\b{keyword.upper()}\b", stripped):
-                issues.append(
-                    LintIssue(
-                        line_number=line_num,
-                        rule=RULES["S003"],
-                        context=f"Command '{keyword}' should be uppercase for consistency",
-                    )
-                )
-            break
+    # S003: Command capitalization consistency is now checked at file level
 
     # S004: Trailing whitespace
     if line.rstrip("\n") != line.rstrip():
@@ -3437,6 +3426,7 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
     # Style-level global checks
     issues.extend(_check_inconsistent_indentation(lines))
     issues.extend(_check_missing_header_doc(lines))
+    issues.extend(_check_cmd_case_consistency(lines))  # S003
     issues.extend(_check_advanced_style_rules(lines))  # Style level S017-S020
 
     # Performance-level global checks
@@ -4566,6 +4556,78 @@ def _check_missing_header_doc(lines: List[str]) -> List[LintIssue]:
                 context="Script lacks header documentation (purpose, author, date)",
             )
         )
+
+    return issues
+
+
+def _collect_cmd_cases(lines: List[str]) -> Dict[str, List[Tuple[int, str]]]:
+    """Collect command casing patterns from file lines."""
+    command_cases: Dict[str, List[Tuple[int, str]]] = {}
+
+    for line_num, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("rem "):
+            continue
+
+        # Find commands in this line
+        for keyword in COMMAND_CASING_KEYWORDS:
+            pattern = rf"\b{keyword}\b"
+            matches = re.finditer(pattern, stripped, re.IGNORECASE)
+
+            for match in matches:
+                actual_case = match.group()
+                if keyword not in command_cases:
+                    command_cases[keyword] = []
+                command_cases[keyword].append((line_num, actual_case))
+
+    return command_cases
+
+
+def _find_most_common_case(occurrences: List[Tuple[int, str]]) -> Tuple[str, Dict[str, List[int]]]:
+    """Find the most common case variant and return case counts."""
+    case_counts: Dict[str, List[int]] = {}
+    for line_num, actual_case in occurrences:
+        if actual_case not in case_counts:
+            case_counts[actual_case] = []
+        case_counts[actual_case].append(line_num)
+
+    def _get_count(case_variant: str) -> int:
+        return len(case_counts[case_variant])
+
+    most_common_case = max(case_counts.keys(), key=_get_count)
+    return most_common_case, case_counts
+
+
+def _check_cmd_case_consistency(lines: List[str]) -> List[LintIssue]:
+    """Check for consistent command capitalization within the file (S003)."""
+    issues: List[LintIssue] = []
+
+    if len(lines) < 2:  # Skip very short files
+        return issues
+
+    command_cases = _collect_cmd_cases(lines)
+
+    # Check for inconsistency within each command
+    for _, occurrences in command_cases.items():
+        if len(occurrences) < 2:  # Need at least 2 occurrences to check consistency
+            continue
+
+        most_common_case, case_counts = _find_most_common_case(occurrences)
+
+        if len(case_counts) > 1:  # Inconsistent casing found
+            # Report inconsistencies
+            for case_variant, line_numbers in case_counts.items():
+                if case_variant != most_common_case:
+                    for line_num in line_numbers:
+                        issues.append(
+                            LintIssue(
+                                line_number=line_num,
+                                rule=RULES["S003"],
+                                context=f"Command '{case_variant}' should be "
+                                f"'{most_common_case}' for consistency "
+                                f"(most common in this file)",
+                            )
+                        )
 
     return issues
 
