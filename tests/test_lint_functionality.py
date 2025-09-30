@@ -207,8 +207,10 @@ echo !var!
     def test_unescaped_special_characters(self) -> None:
         """Test detection of unescaped special characters outside quotes."""
         content = """@echo off
+set var1=test
+SET var2=test2
 echo This has an unescaped & character
-ECHO "This & character is properly quoted"
+echo "This & character is properly quoted"
 echo This has unescaped | pipe
 echo This has unescaped > redirect
 echo This has properly escaped ^& character
@@ -221,7 +223,7 @@ echo This has properly escaped ^& character
             # Just ensure the linter runs without errors
             assert isinstance(issues, list)
             # Should detect style issues like inconsistent command capitalization
-            # (we now have mixed case: "echo" and "ECHO")
+            # (we now have mixed case: "set" and "SET")
             rule_codes = [issue.rule.code for issue in issues]
             assert "S003" in rule_codes  # Inconsistent command capitalization
         finally:

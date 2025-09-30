@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.13
+Version: 1.0.14
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union
 import warnings
 
-__version__ = "1.0.13"
+__version__ = "1.0.14"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2367,6 +2367,75 @@ def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,t
     return issues
 
 
+def _check_unicode_handling_issue(stripped: str, line_num: int) -> Optional[LintIssue]:
+    """Check for Unicode handling issues in commands (W011)."""
+    for cmd in UNICODE_PROBLEMATIC_COMMANDS:
+        if re.match(rf"{cmd}\s", stripped, re.IGNORECASE):
+            has_unicode_risk = False
+
+            # For echo command, only flag if it contains potentially problematic content
+            if cmd == "echo":
+                has_unicode_risk = _check_echo_unicode_risk(stripped)
+            elif cmd in ["findstr", "find"]:
+                has_unicode_risk = _check_search_unicode_risk(stripped)
+            else:
+                has_unicode_risk = _check_general_unicode_risk(stripped)
+
+            if has_unicode_risk:
+                return LintIssue(
+                    line_number=line_num,
+                    rule=RULES["W011"],
+                    context=f"Command '{cmd}' may have Unicode handling issues",
+                )
+            break
+    return None
+
+
+def _check_echo_unicode_risk(stripped: str) -> bool:
+    """Check for Unicode risks in echo commands."""
+    # Extract the actual echo content (text after the command)
+    echo_content = ""
+    match = re.match(r"echo\s+(.*)", stripped, re.IGNORECASE)
+    if match:
+        echo_content = match.group(1)
+
+    # Check for complex variable expansions within individual variables
+    complex_vars: List[str] = []
+    variables: List[str] = re.findall(r"%[^%]+%", echo_content)
+    for var in variables:
+        # Check if variable contains non-standard characters (complex expansion)
+        var_content = var[1:-1]  # Remove % signs
+        if re.search(r"[^A-Z0-9_~]", var_content, re.IGNORECASE):
+            # Allow common parameter expansions like %~n1, %~dp0
+            if not re.match(r"~[a-z]*\d*$", var_content, re.IGNORECASE):
+                complex_vars.append(var)
+
+    # Only flag echo if it has real Unicode issues
+    return (
+        not all(ord(c) < 128 for c in echo_content)  # Contains non-ASCII in actual content
+        or bool(re.search(r"[<>]", stripped))  # Has file redirection
+        or len(complex_vars) > 0  # Has truly complex variable expansion
+        or bool(re.search(r"[\x00-\x1f\x7f-\xff]", echo_content))  # Control chars in content
+    )
+
+
+def _check_search_unicode_risk(stripped: str) -> bool:
+    """Check for Unicode risks in findstr/find commands."""
+    return (
+        not all(ord(c) < 128 for c in stripped)  # Contains non-ASCII
+        or bool(re.search(r"/[a-z]", stripped, re.IGNORECASE))  # Uses flags affecting Unicode
+        or ">" in stripped
+        or "<" in stripped  # File redirection
+    )
+
+
+def _check_general_unicode_risk(stripped: str) -> bool:
+    """Check for general Unicode risks in other commands."""
+    return not all(ord(c) < 128 for c in stripped) or bool(
+        re.search(r"[\x00-\x1f\x7f-\xff]", stripped)  # Contains non-ASCII
+    )
+
+
 def _check_compatibility_warnings(  # pylint: disable=unused-argument
     line: str, line_num: int, stripped: str
 ) -> List[LintIssue]:
@@ -2398,51 +2467,9 @@ def _check_compatibility_warnings(  # pylint: disable=unused-argument
             break
 
     # W011: Unicode handling issue - only flag when actually problematic
-    for cmd in UNICODE_PROBLEMATIC_COMMANDS:
-        if re.match(rf"{cmd}\s", stripped, re.IGNORECASE):
-            has_unicode_risk = False
-
-            # For echo command, only flag if it contains potentially problematic content
-            if cmd == "echo":
-                # Only flag echo if it has non-ASCII characters, file redirection,
-                # or complex variable expansion that could cause Unicode issues
-                has_unicode_risk = (
-                    not all(ord(c) < 128 for c in stripped)  # Contains non-ASCII
-                    or bool(re.search(r"[<>]", stripped))  # Has file redirection
-                    or bool(
-                        re.search(r"%[^%]*[^A-Z0-9_][^%]*%", stripped, re.IGNORECASE)
-                    )  # Complex variable expansion
-                    or bool(
-                        re.search(r"[\x00-\x1f\x7f-\xff]", stripped)
-                    )  # Control or extended ASCII chars
-                )
-            # For other commands, check if they're actually dealing with files or Unicode content
-            elif cmd in ["findstr", "find"]:
-                # Only flag if searching in files or using regex patterns
-                # that might have Unicode issues
-                has_unicode_risk = (
-                    not all(ord(c) < 128 for c in stripped)  # Contains non-ASCII
-                    or bool(
-                        re.search(r"/[a-z]", stripped, re.IGNORECASE)
-                    )  # Uses flags that might affect Unicode
-                    or ">" in stripped
-                    or "<" in stripped  # File redirection
-                )
-            else:
-                # For other commands, be more conservative - only flag if there's clear Unicode risk
-                has_unicode_risk = not all(ord(c) < 128 for c in stripped) or bool(
-                    re.search(r"[\x00-\x1f\x7f-\xff]", stripped)  # Contains non-ASCII
-                )  # Control or extended ASCII chars
-
-            if has_unicode_risk:
-                issues.append(
-                    LintIssue(
-                        line_number=line_num,
-                        rule=RULES["W011"],
-                        context=f"Command '{cmd}' may have Unicode handling issues",
-                    )
-                )
-            break
+    unicode_issue = _check_unicode_handling_issue(stripped, line_num)
+    if unicode_issue:
+        issues.append(unicode_issue)
 
     # W027: Command behavior differs between interpreters
     interpreter_diff_commands = ["append", "dpath", "ftype", "assoc", "path"]
@@ -4299,11 +4326,22 @@ def _check_var_naming(lines: List[str]) -> List[LintIssue]:
     }
 
     for line in lines:
+        # Skip lines that are clearly not batch SET commands
+        stripped = line.strip()
+        if (
+            stripped.startswith("echo ")
+            or stripped.startswith("rem ")
+            or stripped.startswith("::")
+            or ">" in stripped
+            or ">>" in stripped
+        ):
+            continue
+
         # Extract variable names from SET commands - handle quoted and unquoted
         set_matches: List[str] = []
         set_patterns = [
-            r"set\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=",  # Regular set: set VAR=value
-            r'set\s+"([a-zA-Z_][a-zA-Z0-9_]*)\s*=',  # Quoted set: set "VAR=value"
+            r"^\s*set\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=",  # Regular set: set VAR=value (line start)
+            r'^\s*set\s+"([a-zA-Z_][a-zA-Z0-9_]*)\s*=',  # Quoted set: set "VAR=value" (line start)
         ]
         for pattern in set_patterns:
             matches: List[str] = re.findall(pattern, line, re.IGNORECASE)
@@ -4741,16 +4779,26 @@ def _collect_cmd_cases(lines: List[str]) -> Dict[str, List[Tuple[int, str]]]:
 
     for line_num, line in enumerate(lines, 1):
         stripped = line.strip()
-        if not stripped or stripped.startswith("rem "):
+        if not stripped or stripped.startswith("rem ") or stripped.startswith("::"):
             continue
 
-        # Find commands in this line
+        # Skip lines where commands appear in contexts that aren't actual batch commands
+        # (e.g., within echo statements, comments, or file output)
+        if (
+            stripped.lower().startswith("echo ")
+            or ">" in stripped  # File redirection (content being written to file)
+            or ">>" in stripped
+        ):
+            continue
+
+        # Find commands in this line - only at the start or after common batch separators
         for keyword in COMMAND_CASING_KEYWORDS:
-            pattern = rf"\b{keyword}\b"
+            # Only match commands at line start or after certain separators
+            pattern = rf"(^|\s+|&|\||\()\s*({keyword})\b"
             matches = re.finditer(pattern, stripped, re.IGNORECASE)
 
             for match in matches:
-                actual_case = match.group()
+                actual_case = match.group(2)  # Group 2 is the keyword itself
                 if keyword not in command_cases:
                     command_cases[keyword] = []
                 command_cases[keyword].append((line_num, actual_case))
@@ -5515,10 +5563,64 @@ def _check_magic_numbers(line: str, line_number: int) -> List[LintIssue]:
     """Check for magic numbers (S019)."""
     issues: List[LintIssue] = []
     number_pattern = r"\b(?<!%)\d{2,}\b(?!%)"
-    common_exceptions = {"0", "1", "10", "100", "256", "60", "24", "365"}
+
+    # Common exceptions: standard values, conversion factors, and system constants
+    common_exceptions = {
+        # Basic numbers
+        "0",
+        "1",
+        "10",
+        "100",
+        "256",
+        "60",
+        "24",
+        "365",
+        # Conversion factors
+        "1024",  # Bytes to KB
+        "1000",  # Bytes to MB (decimal), Hz to kHz
+        "1000000",  # Bytes to MB, Hz to MHz
+        "1073741824",  # GB in bytes (1024^3)
+        # Common system values
+        "65536",  # 64KB, 16-bit limit
+        "32768",  # 32KB, signed 16-bit limit
+        "255",  # Byte limit, RGB values
+        "127",  # Signed byte limit
+        "255.255.255.255",  # IP address limit (partial match will work)
+        # Time constants
+        "3600",  # Seconds in hour
+        "86400",  # Seconds in day
+        "604800",  # Seconds in week
+        # File size constants
+        "512",  # Common block size
+        "4096",  # Common page size
+        # HTTP/networking
+        "80",
+        "443",
+        "8080",
+        "3389",  # Common ports
+        # Windows-specific
+        "260",  # MAX_PATH in Windows
+        "32767",  # MAX_SHORT
+    }
 
     for match in re.finditer(number_pattern, line.strip()):
         number = match.group(0)
+
+        # Don't flag numbers that are clearly part of identifiers, GUIDs, or registry paths
+        context_before = line[: match.start()]
+        context_after = line[match.end() :]
+
+        # Skip if it looks like part of a GUID, file path, or identifier
+        if (
+            any(c in context_before[-10:] for c in ["-", "\\", "/", "{"])
+            or any(c in context_after[:10] for c in ["-", "\\", "/", "}"])
+            or
+            # Skip if it's in a PowerShell math expression context
+            ("round(" in context_before.lower() and ")" in context_after)
+            or ("[math]::" in context_before.lower())
+        ):
+            continue
+
         if number not in common_exceptions:
             issues.append(
                 LintIssue(
@@ -5598,12 +5700,51 @@ def _check_enhanced_security_rules(lines: List[str]) -> List[LintIssue]:
                 r"echo\s+.*>\s*nul",  # Output redirection to nul
                 r'echo\s+.*>>\s*"[^"]*"',  # Safe file append
                 r'echo\s+.*>\s*"[^"]*"',  # Safe file write
-                r"%[a-zA-Z_][a-zA-Z0-9_]*%\s*>",  # Variable followed immediately by redirection
+                # Variable in quotes followed by redirection
+                r'%[a-zA-Z_][a-zA-Z0-9_]*%"\s*>[^&|]*$',
+                # Safe file operations with variables (no command chaining)
+                (
+                    r"^[^&|]*\b(del|copy|move|type|xcopy)\s+[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*"
+                    r">[^&|]*$"
+                ),
+                (
+                    r"^[^&|]*\b(rd|md|mkdir|rmdir)\s+[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*"
+                    r">[^&|]*$"
+                ),
+                # Safe operations with multiple variables but no chaining
+                (
+                    r"^[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*"
+                    r">[^&|]*$"
+                ),
             ]
 
             is_safe_pattern = any(
                 re.search(pattern, stripped, re.IGNORECASE) for pattern in safe_patterns
             )
+
+            # Additional safety check: if the line only contains redirection
+            # (not pipes or command chaining)
+            # and uses standard file operations, it's likely safe
+            if not is_safe_pattern:
+                # Check for actual command chaining (& or |) but exclude error redirection (2>&1)
+                potential_chaining: List[str] = re.findall(r"[&|]", stripped)
+                has_command_chaining = False
+                for match in potential_chaining:
+                    # Find the context around each & or | to see if it's part of 2>&1 or similar
+                    match_pos = stripped.find(match)
+                    context = stripped[max(0, match_pos - 3) : match_pos + 3]
+                    if "2>&1" not in context and ">&1" not in context:
+                        has_command_chaining = True
+                        break
+                is_file_operation = bool(
+                    re.search(
+                        r"\b(del|copy|move|type|xcopy|rd|md|mkdir|rmdir)\b", stripped, re.IGNORECASE
+                    )
+                )
+                has_only_redirection = bool(re.search(r">.*$", stripped))  # Has redirection
+
+                if is_file_operation and has_only_redirection and not has_command_chaining:
+                    is_safe_pattern = True
 
             if not is_safe_pattern:
                 issues.append(
