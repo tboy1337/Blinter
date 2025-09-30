@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.11
+Version: 1.0.12
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union
 import warnings
 
-__version__ = "1.0.11"
+__version__ = "1.0.12"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1608,7 +1608,7 @@ COMMAND_CASING_KEYWORDS = {
     "enabledelayedexpansion",
 }
 
-OLDER_WINDOWS_COMMANDS = {"choice", "forfiles", "where", "robocopy", "timeout", "icacls"}
+OLDER_WINDOWS_COMMANDS = {"choice", "forfiles", "where", "robocopy", "icacls"}
 
 ARCHITECTURE_SPECIFIC_PATTERNS = [
     r"Wow6432Node",  # 32-bit registry redirect
@@ -2395,6 +2395,20 @@ def _check_compatibility_warnings(  # pylint: disable=unused-argument
     # W011: Unicode handling issue
     for cmd in UNICODE_PROBLEMATIC_COMMANDS:
         if re.match(rf"{cmd}\s", stripped, re.IGNORECASE):
+            # For echo command, only flag if it contains potentially problematic content
+            if cmd == "echo":
+                # Only flag echo if it has non-ASCII characters, file redirection,
+                # or complex variable expansion
+                has_unicode_risk = (
+                    not all(ord(c) < 128 for c in stripped)  # Contains non-ASCII
+                    or re.search(r"[<>]", stripped)  # Has file redirection
+                    or re.search(
+                        r"%[^%]*[^A-Z0-9_][^%]*%", stripped, re.IGNORECASE
+                    )  # Complex variable expansion
+                )
+                if not has_unicode_risk:
+                    continue
+
             issues.append(
                 LintIssue(
                     line_number=line_num,
@@ -2482,13 +2496,28 @@ def _check_warning_issues(  # pylint: disable=unused-argument,too-many-locals,to
     if re.search(unquoted_var_pattern, stripped, re.IGNORECASE):
         # Check if it's in a context where spaces could be problematic
         if any(cmd in stripped.lower() for cmd in ["if", "echo", "set", "call"]):
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["W005"],
-                    context="Variable may contain spaces and should be quoted",
+            # Don't flag safe system variables that are commonly used unquoted
+            safe_variables = [
+                "errorlevel",
+                "random",
+                "cd",
+                "date",
+                "time",
+                "processor_architecture",
+            ]
+
+            # Extract variable names from the line
+            var_matches: List[str] = re.findall(r"%([A-Z0-9_]+)%", stripped, re.IGNORECASE)
+
+            # Only flag if none of the variables are in the safe list
+            if not any(var.lower() in safe_variables for var in var_matches):
+                issues.append(
+                    LintIssue(
+                        line_number=line_num,
+                        rule=RULES["W005"],
+                        context="Variable may contain spaces and should be quoted",
+                    )
                 )
-            )
 
     # W012: Non-ASCII characters detected
     if not all(ord(c) < 128 for c in stripped):
@@ -4286,14 +4315,23 @@ def _check_unreachable_code(lines: List[str]) -> List[LintIssue]:
 
             # Only check for unreachable code if EXIT/GOTO is at top level (not in conditional)
             if not in_conditional_block:
-                # Check if there's executable code after this line (not just labels or comments)
+                # Look for executable code after this line, but stop at labels
+                # since they make code reachable again
+                found_label = False
                 for j in range(i + 1, len(lines)):
                     next_line = lines[j].strip()
-                    if (
-                        next_line
-                        and not next_line.startswith(":")
-                        and not next_line.startswith("rem")
-                    ):
+
+                    # Skip empty lines and comments
+                    if not next_line or next_line.startswith("rem"):
+                        continue
+
+                    # If we find a label, code after it is reachable again
+                    if next_line.startswith(":"):
+                        found_label = True
+                        continue
+
+                    # If we find executable code before any label, it's unreachable
+                    if not found_label:
                         issues.append(
                             LintIssue(
                                 line_number=j + 1,
@@ -4304,7 +4342,7 @@ def _check_unreachable_code(lines: List[str]) -> List[LintIssue]:
                                 ),
                             )
                         )
-                        break
+                    break
 
     return issues
 
@@ -5417,13 +5455,27 @@ def _check_enhanced_security_rules(lines: List[str]) -> List[LintIssue]:
 
         # Check for command injection via variables (SEC013)
         if re.search(r"%[a-zA-Z_][a-zA-Z0-9_]*%.*[&|<>]", stripped):
-            issues.append(
-                LintIssue(
-                    line_number=i,
-                    rule=RULES["SEC013"],
-                    context="Variable used with shell operators may allow injection",
-                )
+            # Don't flag safe system operations and common patterns
+            safe_patterns = [
+                r'cd\s+/d\s+"%SystemDrive%"',  # Standard drive change
+                r"echo\s+.*>\s*nul",  # Output redirection to nul
+                r'echo\s+.*>>\s*"[^"]*"',  # Safe file append
+                r'echo\s+.*>\s*"[^"]*"',  # Safe file write
+                r"%[a-zA-Z_][a-zA-Z0-9_]*%\s*>",  # Variable followed immediately by redirection
+            ]
+
+            is_safe_pattern = any(
+                re.search(pattern, stripped, re.IGNORECASE) for pattern in safe_patterns
             )
+
+            if not is_safe_pattern:
+                issues.append(
+                    LintIssue(
+                        line_number=i,
+                        rule=RULES["SEC013"],
+                        context="Variable used with shell operators may allow injection",
+                    )
+                )
 
     return issues
 

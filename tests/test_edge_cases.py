@@ -950,7 +950,8 @@ class TestWarningChecking:
     def test_older_windows_commands(self) -> None:
         """Test detection of older Windows commands."""
         set_vars: set[str] = set()
-        for cmd in ["choice", "forfiles", "where", "robocopy", "timeout", "icacls"]:
+        # Removed "timeout" as it's been available since Windows Vista
+        for cmd in ["choice", "forfiles", "where", "robocopy", "icacls"]:
             issues = _check_warning_issues(f"{cmd} /param", 1, set_vars, False)
             warning_issues = [i for i in issues if i.rule.code == "W009"]
             assert len(warning_issues) == 1
@@ -980,11 +981,27 @@ class TestWarningChecking:
     def test_unicode_problematic_commands(self) -> None:
         """Test detection of Unicode problematic commands."""
         set_vars: set[str] = set()
-        for cmd in ["type", "echo", "find", "findstr"]:
+        # Test non-echo commands - should always be flagged
+        for cmd in ["type", "find", "findstr"]:
             issues = _check_warning_issues(f"{cmd} filename", 1, set_vars, False)
             warning_issues = [i for i in issues if i.rule.code == "W011"]
             assert len(warning_issues) == 1
             assert cmd in warning_issues[0].context
+
+        # Test echo with non-ASCII - should be flagged
+        issues = _check_warning_issues("echo héllo", 1, set_vars, False)
+        warning_issues = [i for i in issues if i.rule.code == "W011"]
+        assert len(warning_issues) == 1
+
+        # Test echo with redirection - should be flagged
+        issues = _check_warning_issues("echo test > file", 1, set_vars, False)
+        warning_issues = [i for i in issues if i.rule.code == "W011"]
+        assert len(warning_issues) == 1
+
+        # Test simple echo - should NOT be flagged
+        issues = _check_warning_issues("echo simple text", 1, set_vars, False)
+        warning_issues = [i for i in issues if i.rule.code == "W011"]
+        assert len(warning_issues) == 0
 
     def test_non_ascii_character_detection(self) -> None:
         """Test detection of non-ASCII characters."""
