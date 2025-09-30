@@ -238,11 +238,14 @@ class TestWarningIssueChecking:
         assert "W010" in issues[0].rule.code
 
     def test_unicode_problematic_command(self) -> None:
-        """Test Unicode problematic command."""
+        """Test Unicode problematic command with actual Unicode content."""
         set_vars: Set[str] = set()
-        issues = _check_warning_issues("type unicode_file.txt", 1, set_vars, False)
-        assert len(issues) == 1
-        assert "W011" in issues[0].rule.code
+        # Test with actual Unicode content that should trigger the warning
+        issues = _check_warning_issues("type unicode_filé.txt", 1, set_vars, False)
+        # Multiple Unicode-related warnings may be triggered
+        w011_issues = [i for i in issues if i.rule.code == "W011"]
+        assert len(w011_issues) == 1
+        assert "type" in w011_issues[0].context
 
     def test_non_ascii_characters(self) -> None:
         """Test non-ASCII character detection."""
@@ -979,14 +982,18 @@ class TestWarningChecking:
         assert len(warning_issues) == 0  # Won't match because pattern expects \\(x86\\)
 
     def test_unicode_problematic_commands(self) -> None:
-        """Test detection of Unicode problematic commands."""
+        """Test detection of Unicode problematic commands with actual Unicode risks."""
         set_vars: set[str] = set()
-        # Test non-echo commands - should always be flagged
-        for cmd in ["type", "find", "findstr"]:
-            issues = _check_warning_issues(f"{cmd} filename", 1, set_vars, False)
-            warning_issues = [i for i in issues if i.rule.code == "W011"]
-            assert len(warning_issues) == 1
-            assert cmd in warning_issues[0].context
+        # Test commands with actual Unicode content that should be flagged
+        issues = _check_warning_issues("type unicode_filé.txt", 1, set_vars, False)
+        warning_issues = [i for i in issues if i.rule.code == "W011"]
+        assert len(warning_issues) == 1
+        assert "type" in warning_issues[0].context
+
+        # Test find/findstr with Unicode content
+        issues = _check_warning_issues("findstr /i pattérn file.txt", 1, set_vars, False)
+        warning_issues = [i for i in issues if i.rule.code == "W011"]
+        assert len(warning_issues) == 1
 
         # Test echo with non-ASCII - should be flagged
         issues = _check_warning_issues("echo héllo", 1, set_vars, False)

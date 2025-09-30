@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.12
+Version: 1.0.13
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union
 import warnings
 
-__version__ = "1.0.12"
+__version__ = "1.0.13"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1887,8 +1887,13 @@ def _collect_labels(lines: List[str]) -> Tuple[Dict[str, int], List[LintIssue]]:
     issues: List[LintIssue] = []
 
     for i, line in enumerate(lines, start=1):
-        if line.strip().startswith(":"):
-            label = line.strip().lower()
+        stripped_line = line.strip()
+        if stripped_line.startswith(":"):
+            # Skip comment-style lines that start with :: (double colon)
+            if stripped_line.startswith("::"):
+                continue
+
+            label = stripped_line.lower()
 
             # Skip comment-style labels (like :::) that contain no alphanumeric characters
             # These are commonly used as decorative comments and should not be flagged as duplicates
@@ -2392,30 +2397,51 @@ def _check_compatibility_warnings(  # pylint: disable=unused-argument
             )
             break
 
-    # W011: Unicode handling issue
+    # W011: Unicode handling issue - only flag when actually problematic
     for cmd in UNICODE_PROBLEMATIC_COMMANDS:
         if re.match(rf"{cmd}\s", stripped, re.IGNORECASE):
+            has_unicode_risk = False
+
             # For echo command, only flag if it contains potentially problematic content
             if cmd == "echo":
                 # Only flag echo if it has non-ASCII characters, file redirection,
-                # or complex variable expansion
+                # or complex variable expansion that could cause Unicode issues
                 has_unicode_risk = (
                     not all(ord(c) < 128 for c in stripped)  # Contains non-ASCII
-                    or re.search(r"[<>]", stripped)  # Has file redirection
-                    or re.search(
-                        r"%[^%]*[^A-Z0-9_][^%]*%", stripped, re.IGNORECASE
+                    or bool(re.search(r"[<>]", stripped))  # Has file redirection
+                    or bool(
+                        re.search(r"%[^%]*[^A-Z0-9_][^%]*%", stripped, re.IGNORECASE)
                     )  # Complex variable expansion
+                    or bool(
+                        re.search(r"[\x00-\x1f\x7f-\xff]", stripped)
+                    )  # Control or extended ASCII chars
                 )
-                if not has_unicode_risk:
-                    continue
+            # For other commands, check if they're actually dealing with files or Unicode content
+            elif cmd in ["findstr", "find"]:
+                # Only flag if searching in files or using regex patterns
+                # that might have Unicode issues
+                has_unicode_risk = (
+                    not all(ord(c) < 128 for c in stripped)  # Contains non-ASCII
+                    or bool(
+                        re.search(r"/[a-z]", stripped, re.IGNORECASE)
+                    )  # Uses flags that might affect Unicode
+                    or ">" in stripped
+                    or "<" in stripped  # File redirection
+                )
+            else:
+                # For other commands, be more conservative - only flag if there's clear Unicode risk
+                has_unicode_risk = not all(ord(c) < 128 for c in stripped) or bool(
+                    re.search(r"[\x00-\x1f\x7f-\xff]", stripped)  # Contains non-ASCII
+                )  # Control or extended ASCII chars
 
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["W011"],
-                    context=f"Command '{cmd}' may have Unicode handling issues",
+            if has_unicode_risk:
+                issues.append(
+                    LintIssue(
+                        line_number=line_num,
+                        rule=RULES["W011"],
+                        context=f"Command '{cmd}' may have Unicode handling issues",
+                    )
                 )
-            )
             break
 
     # W027: Command behavior differs between interpreters
@@ -3073,13 +3099,63 @@ def _check_performance_issues(  # pylint: disable=too-many-arguments,too-many-po
 def _check_undefined_variables(lines: List[str], set_vars: Set[str]) -> List[LintIssue]:
     """Check for usage of undefined variables."""
     issues: List[LintIssue] = []
-    var_usage_pattern = re.compile(r"%([A-Z0-9_]+)%|!([A-Z0-9_]+)!", re.IGNORECASE)
+    # Improved pattern to match only valid variable names, excluding string
+    # operations and builtin variables
+    var_usage_pattern = re.compile(r"%([A-Z][A-Z0-9_]*)%|!([A-Z][A-Z0-9_]*)!", re.IGNORECASE)
+
+    # Built-in variables that don't need to be SET
+    builtin_vars = {
+        "DATE",
+        "TIME",
+        "CD",
+        "ERRORLEVEL",
+        "RANDOM",
+        "CMDCMDLINE",
+        "CMDEXTVERSION",
+        "COMPUTERNAME",
+        "COMSPEC",
+        "HOMEDRIVE",
+        "HOMEPATH",
+        "LOGONSERVER",
+        "NUMBER_OF_PROCESSORS",
+        "OS",
+        "PATH",
+        "PATHEXT",
+        "PROCESSOR_ARCHITECTURE",
+        "PROCESSOR_IDENTIFIER",
+        "PROCESSOR_LEVEL",
+        "PROCESSOR_REVISION",
+        "PROMPT",
+        "SYSTEMDRIVE",
+        "SYSTEMROOT",
+        "TEMP",
+        "TMP",
+        "USERDOMAIN",
+        "USERNAME",
+        "USERPROFILE",
+        "WINDIR",
+        "PROGRAMFILES",
+        "PROGRAMFILES(X86)",
+        "COMMONPROGRAMFILES",
+        "ALLUSERSPROFILE",
+        "APPDATA",
+        "LOCALAPPDATA",
+    }
 
     for i, line in enumerate(lines, start=1):
+        # Skip lines with string operations like %DATE:/=-%
+        if re.search(r"%[A-Z]+:[^%]*%", line, re.IGNORECASE):
+            continue
+
         for match in var_usage_pattern.finditer(line):
             var_match_1: Optional[str] = match.group(1)
             var_match_2: Optional[str] = match.group(2)
             var_name: str = (var_match_1 or var_match_2 or "").upper()
+
+            # Skip built-in variables and single character variables (usually loop variables)
+            if var_name in builtin_vars or len(var_name) <= 1:
+                continue
+
             if var_name not in set_vars:
                 issues.append(
                     LintIssue(
@@ -4296,55 +4372,116 @@ def _check_unreachable_code(lines: List[str]) -> List[LintIssue]:
     for i, line in enumerate(lines):
         stripped = line.strip().lower()
         if re.match(r"(exit\s|goto\s)", stripped):
-            # Check if the EXIT/GOTO is inside a conditional block
-            # by looking for matching parentheses from the beginning up to this line
-            in_conditional_block = False
-            paren_depth = 0
-
-            for k in range(i + 1):
-                check_line = lines[k].strip()
-                # Count opening parens after IF/ELSE statements
-                if re.match(r"(if\s.*\s+\(|else\s+\(|\)\s*else\s+\()", check_line.lower()):
-                    paren_depth += 1
-                # Count standalone closing parens
-                elif check_line == ")":
-                    paren_depth -= 1
-
-            # If paren_depth > 0, we're inside a conditional block
-            in_conditional_block = paren_depth > 0
-
-            # Only check for unreachable code if EXIT/GOTO is at top level (not in conditional)
-            if not in_conditional_block:
-                # Look for executable code after this line, but stop at labels
-                # since they make code reachable again
-                found_label = False
-                for j in range(i + 1, len(lines)):
-                    next_line = lines[j].strip()
-
-                    # Skip empty lines and comments
-                    if not next_line or next_line.startswith("rem"):
-                        continue
-
-                    # If we find a label, code after it is reachable again
-                    if next_line.startswith(":"):
-                        found_label = True
-                        continue
-
-                    # If we find executable code before any label, it's unreachable
-                    if not found_label:
-                        issues.append(
-                            LintIssue(
-                                line_number=j + 1,
-                                rule=RULES["E008"],
-                                context=(
-                                    f"Code after {stripped.split()[0].upper()} on "
-                                    f"line {i + 1} will never execute"
-                                ),
-                            )
-                        )
-                    break
+            # Find unreachable code after this EXIT/GOTO
+            unreachable_line = _find_truly_unreachable_code(lines, i)
+            if unreachable_line is not None:
+                command = stripped.split()[0].upper()
+                issues.append(
+                    LintIssue(
+                        line_number=unreachable_line + 1,
+                        rule=RULES["E008"],
+                        context=(f"Code after {command} on line {i + 1} will never execute"),
+                    )
+                )
 
     return issues
+
+
+def _find_truly_unreachable_code(lines: List[str], exit_line_index: int) -> Optional[int]:
+    """Find truly unreachable code, considering batch file control flow properly."""
+    exit_paren_depth = _calculate_exit_paren_depth(lines, exit_line_index)
+    return _scan_for_unreachable_code(lines, exit_line_index, exit_paren_depth)
+
+
+def _calculate_exit_paren_depth(lines: List[str], exit_line_index: int) -> int:
+    """Calculate the parentheses depth at the EXIT statement."""
+    current_paren_depth = 0
+
+    for i in range(exit_line_index + 1):
+        line = lines[i].strip().lower()
+        current_paren_depth = _update_paren_depth(line, current_paren_depth)
+
+    return current_paren_depth
+
+
+def _scan_for_unreachable_code(
+    lines: List[str], exit_line_index: int, exit_paren_depth: int
+) -> Optional[int]:
+    """Scan forward from EXIT to find unreachable code."""
+    current_paren_depth = exit_paren_depth
+
+    for j in range(exit_line_index + 1, len(lines)):
+        line = lines[j].strip().lower()
+
+        # Skip empty lines and comments
+        if not line or line.startswith("rem") or line.startswith("::"):
+            continue
+
+        # Check if this line makes code reachable again
+        if _line_makes_code_reachable(line):
+            return None
+
+        # Update parentheses depth
+        current_paren_depth = _update_paren_depth(line, current_paren_depth)
+
+        # Handle closing parentheses specially
+        if line == ")":
+            if current_paren_depth < exit_paren_depth:
+                return None
+            continue
+
+        # Skip certain structural elements
+        if line in {"endlocal", "setlocal"}:
+            continue
+
+        # Check for executable code
+        if _is_truly_executable_command(line):
+            if exit_paren_depth == 0 or current_paren_depth >= exit_paren_depth:
+                return j
+            return None
+
+    return None
+
+
+def _update_paren_depth(line: str, current_depth: int) -> int:
+    """Update parentheses depth based on the line content."""
+    if re.search(r"\bif\b.*\(", line):
+        return current_depth + 1
+    if line == ")":
+        return current_depth - 1
+    return current_depth
+
+
+def _line_makes_code_reachable(line: str) -> bool:
+    """Check if a line makes code reachable again."""
+    # Labels make code reachable
+    if line.startswith(":") and not line.startswith("::"):
+        return True
+
+    # ') else' creates a new reachable path
+    if re.match(r"^\)\s*else\b", line):
+        return True
+
+    return False
+
+
+def _is_truly_executable_command(line: str) -> bool:
+    """Check if a line is truly executable code (not structural)."""
+    line = line.strip().lower()
+
+    # Skip empty, comments, labels
+    if not line or line.startswith("rem") or line.startswith("::") or line.startswith(":"):
+        return False
+
+    # Skip pure structural elements
+    if line in {")", "endlocal", "setlocal"}:
+        return False
+
+    # Skip ') else' patterns
+    if re.match(r"^\)\s*(else\b.*)?$", line):
+        return False
+
+    return True
 
 
 def _check_redundant_operations(lines: List[str]) -> List[LintIssue]:
