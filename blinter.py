@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.14
+Version: 1.0.15
 License: CRL
 """
 
@@ -30,10 +30,10 @@ import logging
 from pathlib import Path
 import re
 import sys
-from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union
+from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.14"
+__version__ = "1.0.15"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -99,7 +99,7 @@ class BlinterConfig:
     # General settings
     recursive: bool = True
     show_summary: bool = False
-    max_line_length: int = 120
+    max_line_length: int = 150
 
     # Rule enablement - all rules enabled by default
     enabled_rules: Optional[Set[str]] = None
@@ -550,7 +550,7 @@ RULES: Dict[str, Rule] = {
         code="S011",
         name="Line exceeds maximum length",
         severity=RuleSeverity.STYLE,
-        explanation="Lines longer than 120 characters are hard to read and maintain",
+        explanation="Lines longer than 150 characters are hard to read and maintain",
         recommendation="Break long lines into multiple shorter lines for better readability",
     ),
     "S012": Rule(
@@ -1663,7 +1663,7 @@ def _load_general_settings(config: BlinterConfig, parser: configparser.ConfigPar
 
     config.recursive = general.getboolean("recursive", fallback=True)
     config.show_summary = general.getboolean("show_summary", fallback=False)
-    config.max_line_length = general.getint("max_line_length", fallback=120)
+    config.max_line_length = general.getint("max_line_length", fallback=150)
 
     severity_str = general.get("min_severity", "").strip()
     if severity_str:
@@ -1766,8 +1766,8 @@ recursive = true
 # Whether to show summary statistics at the end (default: false)  
 show_summary = false
 
-# Maximum line length before triggering S011 rule (default: 120)
-max_line_length = 120
+# Maximum line length before triggering S011 rule (default: 150)
+max_line_length = 150
 
 # Minimum severity level to report (default: none - show all)
 # Valid values: ERROR, SECURITY, WARNING, PERFORMANCE, STYLE
@@ -2410,10 +2410,19 @@ def _check_echo_unicode_risk(stripped: str) -> bool:
             if not re.match(r"~[a-z]*\d*$", var_content, re.IGNORECASE):
                 complex_vars.append(var)
 
+    # Check if this is safe file redirection (output to files, not complex shell operations)
+    has_safe_redirection = bool(
+        re.search(r">\s*(nul|\"[^\"]*\"|[^\s&|<>]+)(\s*2>&1)?\s*$", stripped, re.IGNORECASE)
+    )
+
     # Only flag echo if it has real Unicode issues
     return (
-        not all(ord(c) < 128 for c in echo_content)  # Contains non-ASCII in actual content
-        or bool(re.search(r"[<>]", stripped))  # Has file redirection
+        not all(
+            ord(c) < 128 for c in echo_content if c.strip()
+        )  # Contains non-ASCII in actual content
+        or (
+            bool(re.search(r"[<>]", stripped)) and not has_safe_redirection
+        )  # Has unsafe redirection
         or len(complex_vars) > 0  # Has truly complex variable expansion
         or bool(re.search(r"[\x00-\x1f\x7f-\xff]", echo_content))  # Control chars in content
     )
@@ -2677,7 +2686,7 @@ def _check_warning_issues(  # pylint: disable=unused-argument,too-many-locals,to
 def _check_style_issues(
     line: str,
     line_num: int,
-    max_line_length: int = 120,
+    max_line_length: int = 150,
 ) -> List[LintIssue]:
     """Check for style level issues."""
     issues: List[LintIssue] = []
@@ -3915,12 +3924,12 @@ def lint_batch_file(  # pylint: disable=too-many-locals
 
     # Store original max_line_length for S011 rule
     original_s011_rule = RULES["S011"]
-    if config.max_line_length != 120:
+    if config.max_line_length != 150:
         RULES["S011"] = Rule(
             code="S011",
             name=original_s011_rule.name,
             severity=original_s011_rule.severity,
-            explanation=original_s011_rule.explanation.replace("120", str(config.max_line_length)),
+            explanation=original_s011_rule.explanation.replace("150", str(config.max_line_length)),
             recommendation=original_s011_rule.recommendation,
         )
 
@@ -3961,7 +3970,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     issues.extend(_check_new_global_rules(lines, file_path))
 
     # Restore original S011 rule if modified
-    if config.max_line_length != 120:
+    if config.max_line_length != 150:
         RULES["S011"] = original_s011_rule
 
     # Filter issues based on configuration
@@ -4746,22 +4755,52 @@ def _check_missing_header_doc(lines: List[str]) -> List[LintIssue]:
     """Check for missing file header documentation (S013)."""
     issues: List[LintIssue] = []
 
-    if len(lines) < 5:  # Skip very short files
+    # Skip very short files (under 15 lines) - likely simple utilities
+    if len(lines) < 15:
         return issues
 
-    # Check first 5 lines for meaningful comments
+    # Check first 10 lines for meaningful comments (expanded from 5)
     meaningful_comments = 0
-    for line in lines[:5]:
+    general_comments = 0
+
+    for line in lines[:10]:
         stripped = line.strip().lower()
-        if stripped.startswith("rem ") and len(stripped) > 10:
-            # Look for documentation indicators
+        if stripped.startswith("rem ") and len(stripped) > 6:
+            general_comments += 1
+            # Look for formal documentation indicators (strict)
             if any(
                 keyword in stripped
-                for keyword in ["script:", "purpose:", "author:", "date:", "description:"]
+                for keyword in [
+                    "script:",
+                    "purpose:",
+                    "author:",
+                    "date:",
+                    "description:",
+                    "usage:",
+                    "function:",
+                    "does:",
+                ]
+            ):
+                meaningful_comments += 1
+            # Also accept descriptive comments about what the script does
+            elif any(
+                keyword in stripped
+                for keyword in [
+                    "this script",
+                    "this batch",
+                    "repairs",
+                    "fixes",
+                    "cleans",
+                    "updates",
+                    "installs",
+                    "configures",
+                ]
             ):
                 meaningful_comments += 1
 
-    if meaningful_comments == 0:
+    # Only flag if there are NO meaningful comments AND very few general comments
+    # This allows simple scripts with basic comments to pass
+    if meaningful_comments == 0 and general_comments < 2:
         issues.append(
             LintIssue(
                 line_number=1,
@@ -5333,7 +5372,7 @@ def main() -> (
             )
             sys.exit(0)
         else:
-            print("\n🎉 No issues found! Your batch file looks great!")
+            print("\nNo issues found! Your batch file looks great!")
             sys.exit(0)
 
 
@@ -5637,12 +5676,12 @@ def _check_line_length(line: str, line_number: int) -> List[LintIssue]:
     """Check for long lines (S020)."""
     issues: List[LintIssue] = []
 
-    if len(line) > 120 and "^" not in line:
+    if len(line) > 150 and "^" not in line:
         issues.append(
             LintIssue(
                 line_number=line_number,
                 rule=RULES["S020"],
-                context=f"Line length {len(line)} exceeds 120 characters",
+                context=f"Line length {len(line)} exceeds 150 characters",
             )
         )
 
@@ -5661,6 +5700,92 @@ def _check_advanced_style_rules(lines: List[str]) -> List[LintIssue]:
         issues.extend(_check_line_length(line, i))
 
     return issues
+
+
+def _get_safe_system_variables() -> List[str]:
+    """Return list of safe system variables that don't pose injection risks."""
+    return [
+        "SystemDrive",
+        "SystemRoot",
+        "Windows",
+        "WinDir",
+        "ProgramFiles",
+        "ProgramData",
+        "CommonProgramFiles",
+        "UserProfile",
+        "AppData",
+        "LocalAppData",
+        "Temp",
+        "TMP",
+        "ComSpec",
+        "Path",
+        "PathExt",
+        "Processor_Architecture",
+        "Number_Of_Processors",
+        "OS",
+        "HomeDrive",
+        "HomePath",
+        "Public",
+        "AllUsersProfile",
+        "CommonProgramW6432",
+        "ProgramFiles(x86)",
+        "CommonProgramFiles(x86)",
+    ]
+
+
+def _get_safe_command_patterns() -> List[str]:
+    """Return list of safe command patterns for SEC013 rule."""
+    return [
+        r'cd\s+/d\s+"%[a-zA-Z_][a-zA-Z0-9_]*%"',  # Standard drive change
+        r"echo\s+.*>\s*nul",  # Output redirection to nul
+        r'echo\s+.*>>\s*"[^"]*"',  # Safe file append
+        r'echo\s+.*>\s*"[^"]*"',  # Safe file write
+        r'%[a-zA-Z_][a-zA-Z0-9_]*%"\s*>[^&|]*$',  # Variable in quotes followed by redirection
+        # Safe file operations with variables (no command chaining)
+        r"^[^&|]*\b(del|copy|move|type|xcopy)\s+[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*>[^&|]*$",
+        r"^[^&|]*\b(rd|md|mkdir|rmdir)\s+[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*>[^&|]*$",
+        # Safe operations with multiple variables but no chaining
+        r"^[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*>[^&|]*$",
+    ]
+
+
+def _is_safe_command_injection(stripped: str) -> bool:
+    """Check if a command with variables is safe from injection attacks."""
+    system_variables = _get_safe_system_variables()
+
+    # Check if only system variables are used
+    variables_in_line: List[str] = cast(
+        List[str], re.findall(r"%([a-zA-Z_][a-zA-Z0-9_()]*)%", stripped)
+    )
+    uses_only_system_vars = all(
+        var in system_variables or var.startswith("~") or var.isdigit() for var in variables_in_line
+    )
+
+    # If only system variables are used, be more lenient
+    if uses_only_system_vars:
+        return True
+
+    # Check against safe patterns
+    safe_patterns = _get_safe_command_patterns()
+    if any(re.search(pattern, stripped, re.IGNORECASE) for pattern in safe_patterns):
+        return True
+
+    # Additional safety check for file operations with only redirection
+    potential_chaining: List[str] = cast(List[str], re.findall(r"[&|]", stripped))
+    has_command_chaining = False
+    for match in potential_chaining:
+        match_pos = stripped.find(match)
+        context = stripped[max(0, match_pos - 3) : match_pos + 3]
+        if "2>&1" not in context and ">&1" not in context:
+            has_command_chaining = True
+            break
+
+    is_file_operation = bool(
+        re.search(r"\b(del|copy|move|type|xcopy|rd|md|mkdir|rmdir)\b", stripped, re.IGNORECASE)
+    )
+    has_only_redirection = bool(re.search(r">.*$", stripped))
+
+    return is_file_operation and has_only_redirection and not has_command_chaining
 
 
 def _check_enhanced_security_rules(lines: List[str]) -> List[LintIssue]:
@@ -5694,59 +5819,7 @@ def _check_enhanced_security_rules(lines: List[str]) -> List[LintIssue]:
 
         # Check for command injection via variables (SEC013)
         if re.search(r"%[a-zA-Z_][a-zA-Z0-9_]*%.*[&|<>]", stripped):
-            # Don't flag safe system operations and common patterns
-            safe_patterns = [
-                r'cd\s+/d\s+"%SystemDrive%"',  # Standard drive change
-                r"echo\s+.*>\s*nul",  # Output redirection to nul
-                r'echo\s+.*>>\s*"[^"]*"',  # Safe file append
-                r'echo\s+.*>\s*"[^"]*"',  # Safe file write
-                # Variable in quotes followed by redirection
-                r'%[a-zA-Z_][a-zA-Z0-9_]*%"\s*>[^&|]*$',
-                # Safe file operations with variables (no command chaining)
-                (
-                    r"^[^&|]*\b(del|copy|move|type|xcopy)\s+[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*"
-                    r">[^&|]*$"
-                ),
-                (
-                    r"^[^&|]*\b(rd|md|mkdir|rmdir)\s+[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*"
-                    r">[^&|]*$"
-                ),
-                # Safe operations with multiple variables but no chaining
-                (
-                    r"^[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*"
-                    r">[^&|]*$"
-                ),
-            ]
-
-            is_safe_pattern = any(
-                re.search(pattern, stripped, re.IGNORECASE) for pattern in safe_patterns
-            )
-
-            # Additional safety check: if the line only contains redirection
-            # (not pipes or command chaining)
-            # and uses standard file operations, it's likely safe
-            if not is_safe_pattern:
-                # Check for actual command chaining (& or |) but exclude error redirection (2>&1)
-                potential_chaining: List[str] = re.findall(r"[&|]", stripped)
-                has_command_chaining = False
-                for match in potential_chaining:
-                    # Find the context around each & or | to see if it's part of 2>&1 or similar
-                    match_pos = stripped.find(match)
-                    context = stripped[max(0, match_pos - 3) : match_pos + 3]
-                    if "2>&1" not in context and ">&1" not in context:
-                        has_command_chaining = True
-                        break
-                is_file_operation = bool(
-                    re.search(
-                        r"\b(del|copy|move|type|xcopy|rd|md|mkdir|rmdir)\b", stripped, re.IGNORECASE
-                    )
-                )
-                has_only_redirection = bool(re.search(r">.*$", stripped))  # Has redirection
-
-                if is_file_operation and has_only_redirection and not has_command_chaining:
-                    is_safe_pattern = True
-
-            if not is_safe_pattern:
+            if not _is_safe_command_injection(stripped):
                 issues.append(
                     LintIssue(
                         line_number=i,

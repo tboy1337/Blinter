@@ -157,8 +157,8 @@ rmdir /s /q C:\\temp
             os.unlink(temp_file)
 
     def test_long_lines(self) -> None:
-        """Test detection of lines exceeding 120 characters."""
-        long_line = "echo " + "x" * 120
+        """Test detection of lines exceeding 150 characters."""
+        long_line = "echo " + "x" * 155  # Exceed 150 character limit
         content = f"""@echo off
 {long_line}
 echo Normal line

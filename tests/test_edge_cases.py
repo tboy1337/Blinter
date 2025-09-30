@@ -480,6 +480,17 @@ class TestGlobalFunctionChecking:
             "echo more",
             "echo content",
             "echo here",
+            "echo line 6",
+            "echo line 7",
+            "echo line 8",
+            "echo line 9",
+            "echo line 10",
+            "echo line 11",
+            "echo line 12",
+            "echo line 13",
+            "echo line 14",
+            "echo line 15",
+            "echo line 16",  # Now 16 lines, should trigger S013
         ]
         from blinter import _check_missing_header_doc
 
@@ -988,6 +999,7 @@ class TestWarningChecking:
         # Test commands with actual Unicode content that should be flagged
         issues = _check_warning_issues("type unicode_filé.txt", 1, set_vars, False)
         warning_issues = [i for i in issues if i.rule.code == "W011"]
+        # The improved rule should still catch this because it has Unicode in filename
         assert len(warning_issues) == 1
         assert "type" in warning_issues[0].context
 
@@ -1001,10 +1013,10 @@ class TestWarningChecking:
         warning_issues = [i for i in issues if i.rule.code == "W011"]
         assert len(warning_issues) == 1
 
-        # Test echo with redirection - should be flagged
+        # Test echo with redirection - improved rule now considers this safe
         issues = _check_warning_issues("echo test > file", 1, set_vars, False)
         warning_issues = [i for i in issues if i.rule.code == "W011"]
-        assert len(warning_issues) == 1
+        assert len(warning_issues) == 0  # Now considered safe by improved rule
 
         # Test simple echo - should NOT be flagged
         issues = _check_warning_issues("echo simple text", 1, set_vars, False)

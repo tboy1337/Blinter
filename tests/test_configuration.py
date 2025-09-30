@@ -24,7 +24,7 @@ class TestBlinterConfig:
 
         assert config.recursive is True
         assert config.show_summary is False
-        assert config.max_line_length == 120
+        assert config.max_line_length == 150
         assert config.enabled_rules == set()
         assert config.disabled_rules == set()
         assert config.min_severity is None
@@ -125,7 +125,7 @@ class TestConfigurationLoading:
             # Should return default config
             assert config.recursive is True
             assert config.show_summary is False
-            assert config.max_line_length == 120
+            assert config.max_line_length == 150
             assert config.enabled_rules == set()
             assert config.disabled_rules == set()
             assert config.min_severity is None
@@ -137,7 +137,7 @@ class TestConfigurationLoading:
         # Should return default config regardless of file existence
         assert config.recursive is True
         assert config.show_summary is False
-        assert config.max_line_length == 120
+        assert config.max_line_length == 150
 
     def test_load_config_with_general_settings(self) -> None:
         """Test loading configuration with general settings."""
@@ -311,7 +311,7 @@ disabled_rules = S001
 
             # Unspecified settings should use defaults
             assert config.recursive is True
-            assert config.max_line_length == 120
+            assert config.max_line_length == 150
             assert config.enabled_rules == set()
         finally:
             try:
