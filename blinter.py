@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.24
+Version: 1.0.25
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.24"
+__version__ = "1.0.25"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1861,6 +1861,20 @@ If no <path> is specified or '--help' is passed, this help menu will be displaye
     print(help_text.strip())
 
 
+def _is_comment_line(line: str) -> bool:
+    """
+    Check if a line is a comment (REM or ::).
+
+    Args:
+        line: The line to check
+
+    Returns:
+        True if the line is a comment
+    """
+    stripped = line.strip().lower()
+    return stripped.startswith("rem ") or stripped.startswith("rem\t") or stripped.startswith("::")
+
+
 def _is_command_in_safe_context(line: str) -> bool:
     """
     Check if a potentially dangerous command is in a safe context (REM comment or ECHO statement).
@@ -1873,8 +1887,8 @@ def _is_command_in_safe_context(line: str) -> bool:
     """
     stripped = line.strip().lower()
 
-    # Check if line starts with REM (comment)
-    if stripped.startswith("rem ") or stripped.startswith("rem\t"):
+    # Check if line is a comment (REM or ::)
+    if _is_comment_line(line):
         return True
 
     # Check if line starts with ECHO (output statement)
@@ -4132,7 +4146,7 @@ def _check_advanced_style_patterns(
             check_lines = [line_number - 2, line_number - 1, line_number]
             for check_line in check_lines:
                 if 0 <= check_line - 1 < len(lines):
-                    if "rem " in lines[check_line - 1].lower():
+                    if _is_comment_line(lines[check_line - 1]):
                         has_explanation = True
                         break
             if not has_explanation:
@@ -4601,7 +4615,7 @@ def _check_missing_documentation(lines: List[str]) -> List[LintIssue]:
             # Check for documentation in previous 3 lines
             has_doc = False
             for j in range(max(0, i - 3), i):
-                if j < len(lines) and "rem " in lines[j].lower():
+                if j < len(lines) and _is_comment_line(lines[j]):
                     has_doc = True
                     break
 
@@ -5103,7 +5117,7 @@ def _check_missing_header_doc(lines: List[str]) -> List[LintIssue]:
 
     for line in lines[:10]:
         stripped = line.strip().lower()
-        if stripped.startswith("rem ") and len(stripped) > 6:
+        if _is_comment_line(line) and len(stripped) > 6:
             general_comments += 1
             # Look for formal documentation indicators (strict)
             if any(
