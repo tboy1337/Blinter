@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.21
+Version: 1.0.22
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.21"
+__version__ = "1.0.22"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2003,316 +2003,333 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
     return set_vars
 
 
-def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-    line: str, line_num: int, labels: Dict[str, int]
-) -> List[LintIssue]:
-    """Check for syntax error level issues."""
+def _check_goto_labels(stripped: str, line_num: int, labels: Dict[str, int]) -> List[LintIssue]:
+    """Check for GOTO label issues (E002, E015)."""
     issues: List[LintIssue] = []
-    stripped = line.strip()
-
-    # E002: Missing label for GOTO statement
-    # E015: Missing colon in GOTO :EOF statement
     goto_match = re.match(r"goto\s+(:?\S+)", stripped, re.IGNORECASE)
-    if goto_match:
-        label_text: str = goto_match.group(1)
-        target_label: str = label_text.lower()
+    if not goto_match:
+        return issues
 
-        # E015: GOTO EOF must use colon (GOTO :EOF is required, GOTO EOF is invalid)
-        if target_label == "eof":
+    label_text: str = goto_match.group(1)
+    target_label: str = label_text.lower()
+
+    # E015: GOTO EOF must use colon (GOTO :EOF is required, GOTO EOF is invalid)
+    if target_label == "eof":
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E015"],
+                context="GOTO EOF should be GOTO :EOF (colon is mandatory for EOF)",
+            )
+        )
+    elif target_label == ":eof":
+        # :eof is a built-in construct, always valid with colon
+        pass
+    # Check for dynamic labels (containing variables)
+    elif re.search(r"%[^%]+%|!\w+!", label_text):
+        # Dynamic labels like "label.%errorlevel%" or "label[%variable%]" can't be
+        # statically validated
+        pass
+    else:
+        # Static label - check if it exists
+        if not target_label.startswith(":"):
+            target_label = ":" + target_label
+        if target_label not in labels:
             issues.append(
                 LintIssue(
                     line_number=line_num,
-                    rule=RULES["E015"],
-                    context="GOTO EOF should be GOTO :EOF (colon is mandatory for EOF)",
+                    rule=RULES["E002"],
+                    context=f"GOTO points to non-existent label '{label_text}'",
                 )
             )
-        elif target_label == ":eof":
-            # :eof is a built-in construct, always valid with colon
-            pass
-        # Check for dynamic labels (containing variables)
-        elif re.search(r"%[^%]+%|!\w+!", label_text):
-            # Dynamic labels like "label.%errorlevel%" or "label[%variable%]" can't be
-            # statically validated
-            pass
-        else:
-            # Static label - check if it exists
-            if not target_label.startswith(":"):
-                target_label = ":" + target_label
-            if target_label not in labels:
-                issues.append(
-                    LintIssue(
-                        line_number=line_num,
-                        rule=RULES["E002"],
-                        context=f"GOTO points to non-existent label '{label_text}'",
-                    )
-                )
+    return issues
 
-    # E014: Missing colon in CALL statement
+
+def _check_call_labels(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for CALL label issues (E014)."""
+    issues: List[LintIssue] = []
     call_match = re.match(r"call\s+([^:\s]\S*)", stripped, re.IGNORECASE)
-    if call_match:
-        call_label_text: str = call_match.group(1)
-        # Check if this looks like a label call (not an external program)
-        # Skip if it contains path separators, extensions, or is a known command
-        builtin_commands = {
-            # Windows builtin commands
-            "dir",
-            "echo",
-            "copy",
-            "move",
-            "del",
-            "type",
-            "find",
-            "findstr",
-            "sort",
-            "more",
-            "cls",
-            "cd",
-            "pushd",
-            "popd",
-            "mkdir",
-            "rmdir",
-            "attrib",
-            "xcopy",
-            "robocopy",
-            "ping",
-            "ipconfig",
-            "netstat",
-            "tasklist",
-            "taskkill",
-            "sc",
-            "net",
-            "reg",
-            "wmic",
-            "powershell",
-            "timeout",
-            "choice",
-            "ver",
-            "vol",
-            "date",
-            "time",
-            "help",
-            # Common external commands and package managers
-            "npm",
-            "node",
-            "npx",
-            "yarn",
-            "pnpm",
-            "git",
-            "gh",
-            "svn",
-            "hg",
-            "python",
-            "python3",
-            "py",
-            "pip",
-            "pip3",
-            "pipenv",
-            "poetry",
-            "ruby",
-            "gem",
-            "bundle",
-            "php",
-            "composer",
-            "java",
-            "javac",
-            "maven",
-            "mvn",
-            "gradle",
-            "dotnet",
-            "nuget",
-            "msbuild",
-            "cargo",
-            "rustc",
-            "rustup",
-            "go",
-            "gofmt",
-            "docker",
-            "docker-compose",
-            "kubectl",
-            "helm",
-            "aws",
-            "az",
-            "gcloud",
-            "terraform",
-            "make",
-            "cmake",
-            "ninja",
-            "wget",
-            "curl",
-            "aria2c",
-            "7z",
-            "zip",
-            "unzip",
-            "tar",
-            "gzip",
-            "choco",
-            "scoop",
-            "winget",
-            "code",
-            "vim",
-            "nano",
-            "notepad",
-            "ssh",
-            "scp",
-            "ftp",
-            "telnet",
-            "cscript",
-            "wscript",
-            "msiexec",
-        }
-        if (
-            not re.search(r"[\\/.:]|\.(?:bat|cmd|exe|com)$", call_label_text.lower())
-            and call_label_text.lower() not in builtin_commands
-        ):
-            # This appears to be a label call without colon
+    if not call_match:
+        return issues
+
+    call_label_text: str = call_match.group(1)
+    # Check if this looks like a label call (not an external program)
+    # Skip if it contains path separators, extensions, or is a known command
+    builtin_commands = {
+        # Windows builtin commands
+        "dir",
+        "echo",
+        "copy",
+        "move",
+        "del",
+        "type",
+        "find",
+        "findstr",
+        "sort",
+        "more",
+        "cls",
+        "cd",
+        "pushd",
+        "popd",
+        "mkdir",
+        "rmdir",
+        "attrib",
+        "xcopy",
+        "robocopy",
+        "ping",
+        "ipconfig",
+        "netstat",
+        "tasklist",
+        "taskkill",
+        "sc",
+        "net",
+        "reg",
+        "wmic",
+        "powershell",
+        "timeout",
+        "choice",
+        "ver",
+        "vol",
+        "date",
+        "time",
+        "help",
+        # Common external commands and package managers
+        "npm",
+        "node",
+        "npx",
+        "yarn",
+        "pnpm",
+        "git",
+        "gh",
+        "svn",
+        "hg",
+        "python",
+        "python3",
+        "py",
+        "pip",
+        "pip3",
+        "pipenv",
+        "poetry",
+        "ruby",
+        "gem",
+        "bundle",
+        "php",
+        "composer",
+        "java",
+        "javac",
+        "maven",
+        "mvn",
+        "gradle",
+        "dotnet",
+        "nuget",
+        "msbuild",
+        "cargo",
+        "rustc",
+        "rustup",
+        "go",
+        "gofmt",
+        "docker",
+        "docker-compose",
+        "kubectl",
+        "helm",
+        "aws",
+        "az",
+        "gcloud",
+        "terraform",
+        "make",
+        "cmake",
+        "ninja",
+        "wget",
+        "curl",
+        "aria2c",
+        "7z",
+        "zip",
+        "unzip",
+        "tar",
+        "gzip",
+        "choco",
+        "scoop",
+        "winget",
+        "code",
+        "vim",
+        "nano",
+        "notepad",
+        "ssh",
+        "scp",
+        "ftp",
+        "telnet",
+        "cscript",
+        "wscript",
+        "msiexec",
+    }
+    if (
+        not re.search(r"[\\/.:]|\.(?:bat|cmd|exe|com)$", call_label_text.lower())
+        and call_label_text.lower() not in builtin_commands
+    ):
+        # This appears to be a label call without colon
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E014"],
+                context=(
+                    f"CALL to label '{call_label_text}' should use colon: "
+                    f"CALL :{call_label_text}"
+                ),
+            )
+        )
+    return issues
+
+
+def _check_if_statement_formatting(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for IF statement formatting issues (E003)."""
+    issues: List[LintIssue] = []
+    if_match = re.match(r"if\s+(.+)", stripped, re.IGNORECASE)
+    if not if_match:
+        return issues
+
+    if_group_result = if_match.group(1)
+    if if_group_result is None:
+        return issues
+
+    if_content: str = if_group_result.strip()
+
+    # Valid IF patterns to check for:
+    valid_if_patterns = [
+        r"exist\s+",  # IF EXIST
+        r"defined\s+",  # IF DEFINED
+        r"errorlevel\s+\d+",  # IF ERRORLEVEL n
+        r"/i\s+",  # IF /I (case insensitive)
+        r"not\s+",  # IF NOT
+        r".*\s*(==|equ|neq|lss|leq|gtr|geq)\s*",  # Comparison operators
+    ]
+
+    # Check if this IF statement matches any valid pattern
+    is_valid_if = any(
+        re.search(pattern, if_content, re.IGNORECASE) for pattern in valid_if_patterns
+    )
+
+    # If it doesn't match any valid pattern and seems incomplete, flag it
+    if not is_valid_if and not re.search(r"[&|()]", if_content):  # Not a complex conditional
+        # Only flag if it looks like an incomplete comparison (has words but no operators)
+        if re.match(r"[\"']?%?\w+%?[\"']?\s*$", if_content):
             issues.append(
                 LintIssue(
                     line_number=line_num,
-                    rule=RULES["E014"],
+                    rule=RULES["E003"],
                     context=(
-                        f"CALL to label '{call_label_text}' should use colon: "
-                        f"CALL :{call_label_text}"
+                        "IF statement appears to be missing comparison operator " "or condition"
                     ),
                 )
             )
+    return issues
 
-    # E003: IF statement improper formatting
-    # Check for IF statements that may have improper syntax
-    if_match = re.match(r"if\s+(.+)", stripped, re.IGNORECASE)
-    if if_match:
-        if_group_result = if_match.group(1)
-        if if_group_result is not None:
-            if_content: str = if_group_result.strip()
 
-            # Valid IF patterns to check for:
-            # 1. IF EXIST filename
-            # 2. IF DEFINED variable
-            # 3. IF ERRORLEVEL number
-            # 4. IF /I for case insensitive
-            # 5. IF NOT for negation
-            # 6. Comparison operators: ==, EQU, NEQ, LSS, LEQ, GTR, GEQ
-            valid_if_patterns = [
-                r"exist\s+",  # IF EXIST
-                r"defined\s+",  # IF DEFINED
-                r"errorlevel\s+\d+",  # IF ERRORLEVEL n
-                r"/i\s+",  # IF /I (case insensitive)
-                r"not\s+",  # IF NOT
-                r".*\s*(==|equ|neq|lss|leq|gtr|geq)\s*",  # Comparison operators
-            ]
-
-            # Check if this IF statement matches any valid pattern
-            is_valid_if = any(
-                re.search(pattern, if_content, re.IGNORECASE) for pattern in valid_if_patterns
-            )
-
-            # If it doesn't match any valid pattern and seems incomplete, flag it
-            if not is_valid_if and not re.search(
-                r"[&|()]", if_content
-            ):  # Not a complex conditional
-                # Only flag if it looks like an incomplete comparison (has words but no operators)
-                if re.match(r"[\"']?%?\w+%?[\"']?\s*$", if_content):
-                    issues.append(
-                        LintIssue(
-                            line_number=line_num,
-                            rule=RULES["E003"],
-                            context=(
-                                "IF statement appears to be missing comparison operator "
-                                "or condition"
-                            ),
-                        )
-                    )
-
-    # E016: Invalid errorlevel comparison syntax
-    # Check for invalid errorlevel syntax patterns like "if not %errorlevel% 1"
+def _check_errorlevel_syntax(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for invalid errorlevel comparison syntax (E016)."""
+    issues: List[LintIssue] = []
     errorlevel_if_match = re.match(r"if\s+(.+)", stripped, re.IGNORECASE)
-    if errorlevel_if_match:
-        errorlevel_group_result = errorlevel_if_match.group(1)
-        if errorlevel_group_result is not None:
-            errorlevel_content: str = errorlevel_group_result.strip()
+    if not errorlevel_if_match:
+        return issues
 
-            # Check for invalid "if not %errorlevel% number" pattern (missing operator)
-            if re.match(r"not\s+%errorlevel%\s+\d+", errorlevel_content, re.IGNORECASE):
-                issues.append(
-                    LintIssue(
-                        line_number=line_num,
-                        rule=RULES["E016"],
-                        context=(
-                            "Invalid 'IF NOT %ERRORLEVEL% number' syntax - "
-                            "missing comparison operator"
-                        ),
-                    )
+    errorlevel_group_result = errorlevel_if_match.group(1)
+    if errorlevel_group_result is None:
+        return issues
+
+    errorlevel_content: str = errorlevel_group_result.strip()
+
+    # Check for invalid "if not %errorlevel% number" pattern (missing operator)
+    if re.match(r"not\s+%errorlevel%\s+\d+", errorlevel_content, re.IGNORECASE):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E016"],
+                context=(
+                    "Invalid 'IF NOT %ERRORLEVEL% number' syntax - " "missing comparison operator"
+                ),
+            )
+        )
+    # Check for other invalid errorlevel patterns
+    elif re.match(r"not\s+%errorlevel%\s+[^\s]+(?:\s|$)", errorlevel_content, re.IGNORECASE):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E016"],
+                context=(
+                    "Invalid 'IF NOT %ERRORLEVEL%' syntax - use 'IF NOT ERRORLEVEL n' "
+                    "or add comparison operator"
+                ),
+            )
+        )
+    return issues
+
+
+def _check_if_exist_mixing(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for IF EXIST syntax mixing (E004)."""
+    issues: List[LintIssue] = []
+    if not re.match(r"if\s+exist\s+\S+\s+==", stripped, re.IGNORECASE):
+        return issues
+
+    # Check if there's another "if" between "exist" and "=="
+    exist_to_equals = re.search(r"if\s+exist\s+(.*?)==", stripped, re.IGNORECASE)
+    if exist_to_equals:
+        between_text = exist_to_equals.group(1)
+        # If there's no "if" keyword between exist and ==, then it's mixing
+        if not re.search(r"\bif\b", between_text, re.IGNORECASE):
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["E004"],
+                    context="Mixing IF EXIST with comparison operators",
                 )
+            )
+    return issues
 
-            # Check for other invalid errorlevel patterns
-            elif re.match(
-                r"not\s+%errorlevel%\s+[^\s]+(?:\s|$)", errorlevel_content, re.IGNORECASE
-            ):
-                issues.append(
-                    LintIssue(
-                        line_number=line_num,
-                        rule=RULES["E016"],
-                        context=(
-                            "Invalid 'IF NOT %ERRORLEVEL%' syntax - use 'IF NOT ERRORLEVEL n' "
-                            "or add comparison operator"
-                        ),
-                    )
-                )
 
-    # E004: IF EXIST syntax mixing
-    # Only flag if == appears in the same IF statement, not in chained IF statements
-    # Valid: "if exist file.txt if %var%==value ..." (chained IFs)
-    # Invalid: "if exist file.txt == something" (mixing in same IF)
-    if re.match(r"if\s+exist\s+\S+\s+==", stripped, re.IGNORECASE):
-        # Check if there's another "if" between "exist" and "=="
-        # If so, it's chained IFs, not mixing
-        exist_to_equals = re.search(r"if\s+exist\s+(.*?)==", stripped, re.IGNORECASE)
-        if exist_to_equals:
-            between_text = exist_to_equals.group(1)
-            # If there's no "if" keyword between exist and ==, then it's mixing
-            if not re.search(r"\bif\b", between_text, re.IGNORECASE):
-                issues.append(
-                    LintIssue(
-                        line_number=line_num,
-                        rule=RULES["E004"],
-                        context="Mixing IF EXIST with comparison operators",
-                    )
-                )
-
-    # E005: Invalid path syntax - but exclude command strings
-    # Don't flag FOR loops, PowerShell commands, or other script commands
-    # as they contain command strings, not file paths
+def _check_path_syntax(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for invalid path syntax (E005)."""
+    issues: List[LintIssue] = []
     # Check if line contains PowerShell, VBScript, or other scripting commands
     has_script_command = re.search(
         r"(for\s+|powershell\s+|cscript\s+|wscript\s+|msiexec\s+)", stripped, re.IGNORECASE
     )
 
-    if not has_script_command:
-        path_patterns = [r'"([^"]*[<>|*?][^"]*)",', r"'([^']*[<>|*?][^']*)'"]
-        for pattern in path_patterns:
-            match = re.search(pattern, stripped)
-            if match:
-                path_content = match.group(1)
-                # Allow escaped redirections like ^> ^| ^< in command strings
-                escaped_content = re.sub(r"\^[<>|]", "", path_content)
-                if re.search(r"[<>|*?]", escaped_content):
-                    issues.append(
-                        LintIssue(
-                            line_number=line_num,
-                            rule=RULES["E005"],
-                            context="Path contains invalid characters",
-                        )
-                    )
-                    break
+    if has_script_command:
+        return issues
 
-    # E009: Mismatched quotes
+    path_patterns = [r'"([^"]*[<>|*?][^"]*)",', r"'([^']*[<>|*?][^']*)'"]
+    for pattern in path_patterns:
+        match = re.search(pattern, stripped)
+        if match:
+            path_content = match.group(1)
+            # Allow escaped redirections like ^> ^| ^< in command strings
+            escaped_content = re.sub(r"\^[<>|]", "", path_content)
+            if re.search(r"[<>|*?]", escaped_content):
+                issues.append(
+                    LintIssue(
+                        line_number=line_num,
+                        rule=RULES["E005"],
+                        context="Path contains invalid characters",
+                    )
+                )
+                break
+    return issues
+
+
+def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
+    """Check for mismatched quotes (E009)."""
+    issues: List[LintIssue] = []
     if line.count('"') % 2 != 0:
         issues.append(
             LintIssue(
                 line_number=line_num, rule=RULES["E009"], context="Unmatched double quotes detected"
             )
         )
+    return issues
 
-    # E010: Malformed FOR loop missing DO
+
+def _check_for_loop_syntax(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for malformed FOR loop (E010)."""
+    issues: List[LintIssue] = []
     if re.match(r"for\s+.*", stripped, re.IGNORECASE) and " do " not in stripped.lower():
         issues.append(
             LintIssue(
@@ -2321,13 +2338,14 @@ def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,t
                 context="FOR loop is missing required DO keyword",
             )
         )
+    return issues
 
-    # E011: Invalid variable expansion syntax
-    # Look for unmatched % or ! delimiters in variable references
-    # This is a more conservative check that only flags obvious syntax errors
+
+def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for invalid variable expansion syntax (E011)."""
+    issues: List[LintIssue] = []
 
     # Check for indirect variable expansion patterns like !%1!, !%var%!, or !%~n1!
-    # These are valid in batch files with delayed expansion
     has_indirect_expansion = re.search(
         r"!([^!]*%[^%!]+%?[^!]*|%~?[a-z0-9]+)!", stripped, re.IGNORECASE
     )
@@ -2336,58 +2354,53 @@ def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,t
     has_dynamic_assignment = re.search(r'set\s+"[^"]*%\d[^"]*=', stripped, re.IGNORECASE)
 
     # Only check for mismatched delimiters if not using indirect expansion or dynamic assignment
-    if not has_indirect_expansion and not has_dynamic_assignment:
-        # Look for actual incomplete variable references, not just count delimiters
-        # This avoids false positives from text like "Great!" or "100%"
+    if has_indirect_expansion or has_dynamic_assignment:
+        return issues
 
-        # Remove FOR loop variables (%%x) first, as they have different syntax
-        temp_stripped = re.sub(r"%%[a-zA-Z]", "", stripped)
+    # Remove FOR loop variables (%%x) first, as they have different syntax
+    temp_stripped = re.sub(r"%%[a-zA-Z]", "", stripped)
 
-        # Remove command-line parameters (which don't have closing %)
-        # - %0 through %9 (single digit parameters)
-        # - %* (all parameters)
-        # - %~modifiers0 through %~modifiers9 (with modifiers like %~1, %~n1, %~dp1)
-        temp_stripped = re.sub(
-            r"%~?[fdpnxsatz]*[0-9*](?![0-9])", "", temp_stripped, flags=re.IGNORECASE
-        )
+    # Remove command-line parameters
+    temp_stripped = re.sub(
+        r"%~?[fdpnxsatz]*[0-9*](?![0-9])", "", temp_stripped, flags=re.IGNORECASE
+    )
 
-        # Remove all valid variable expansion patterns:
-        # 1. Basic: %VAR% or !VAR!
-        # 2. With substring operations: %VAR:search=replace% or !VAR:search=replace!
-        # 3. With substrings: %VAR:~0,5% or !VAR:~0,5!
-        temp_no_percent_vars = re.sub(r"%[A-Z0-9_~]+[^%]*%", "", temp_stripped, flags=re.IGNORECASE)
-        temp_no_exclaim_vars = re.sub(r"![A-Z0-9_]+[^!]*!", "", temp_stripped, flags=re.IGNORECASE)
+    # Remove all valid variable expansion patterns
+    temp_no_percent_vars = re.sub(r"%[A-Z0-9_~]+[^%]*%", "", temp_stripped, flags=re.IGNORECASE)
+    temp_no_exclaim_vars = re.sub(r"![A-Z0-9_]+[^!]*!", "", temp_stripped, flags=re.IGNORECASE)
 
-        # Now look for incomplete variable patterns that suggest mismatched delimiters
-        # Pattern: % or ! followed by variable-like text but no closing delimiter
-        has_incomplete_percent = re.search(
-            r"%[A-Z0-9_]+(?:[^%]|$)", temp_no_percent_vars, re.IGNORECASE
-        )
-        has_incomplete_exclaim = re.search(
-            r"![A-Z0-9_]+(?:[^!]|$)", temp_no_exclaim_vars, re.IGNORECASE
-        )
+    # Now look for incomplete variable patterns that suggest mismatched delimiters
+    has_incomplete_percent = re.search(
+        r"%[A-Z0-9_]+(?:[^%]|$)", temp_no_percent_vars, re.IGNORECASE
+    )
+    has_incomplete_exclaim = re.search(
+        r"![A-Z0-9_]+(?:[^!]|$)", temp_no_exclaim_vars, re.IGNORECASE
+    )
 
-        # Only flag if we found incomplete variable patterns
-        if has_incomplete_percent:
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["E011"],
-                    context="Variable reference may have mismatched % delimiters",
-                )
+    # Only flag if we found incomplete variable patterns
+    if has_incomplete_percent:
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E011"],
+                context="Variable reference may have mismatched % delimiters",
             )
+        )
 
-        if has_incomplete_exclaim:
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["E011"],
-                    context="Delayed expansion variable may have mismatched ! delimiters",
-                )
+    if has_incomplete_exclaim:
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E011"],
+                context="Delayed expansion variable may have mismatched ! delimiters",
             )
+        )
+    return issues
 
-    # E012: Missing CALL for subroutine invocation
-    # Check for potential subroutine calls without CALL (label followed by parameters)
+
+def _check_subroutine_call(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for missing CALL for subroutine invocation (E012)."""
+    issues: List[LintIssue] = []
     if re.match(r":[A-Z0-9_]+\s+\S+", stripped, re.IGNORECASE):
         issues.append(
             LintIssue(
@@ -2396,8 +2409,12 @@ def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,t
                 context="Potential subroutine call without CALL keyword",
             )
         )
+    return issues
 
-    # E013: Invalid command syntax detected
+
+def _check_command_typos(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for invalid command syntax / typos (E013)."""
+    issues: List[LintIssue] = []
     first_word = stripped.split()[0].lower() if stripped.split() else ""
     if first_word in COMMON_COMMAND_TYPOS:
         correct_command = COMMON_COMMAND_TYPOS[first_word]
@@ -2411,6 +2428,12 @@ def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,t
                 ),
             )
         )
+    return issues
+
+
+def _check_parameter_modifiers(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for invalid parameter modifier combinations (E024, E025)."""
+    issues: List[LintIssue] = []
 
     # E024: Invalid parameter modifier combination
     param_modifier_match: List[Tuple[str, str]] = re.findall(
@@ -2443,8 +2466,12 @@ def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,t
                 "(%1, %2, etc.) or FOR variables (%%i)",
             )
         )
+    return issues
 
-    # E027: UNC path used as working directory
+
+def _check_unc_path(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for UNC path used as working directory (E027)."""
+    issues: List[LintIssue] = []
     if re.match(r"cd\s+\\\\[^\\]+\\", stripped, re.IGNORECASE):
         issues.append(
             LintIssue(
@@ -2453,53 +2480,88 @@ def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,t
                 context="CD command cannot use UNC paths as working directory",
             )
         )
+    return issues
 
-    # E028: Complex quote escaping error
-    # Check for problematic quote patterns
-    if '"""' in stripped or re.search(r'["\s]""[^"]', stripped):
-        # Look for potentially problematic triple quote or embedded quote patterns
-        quote_context = ""
-        if '"""' in stripped:
-            quote_context = "Triple quote pattern found"
-        elif re.search(r'["\s]""[^"]', stripped):
-            quote_context = "Complex quote escaping detected"
 
-        # Only flag if it looks problematic (not the recommended """text""" pattern)
-        if not re.match(r'.*"""[^"]*""".*', stripped):
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["E028"],
-                    context=quote_context,
-                )
+def _check_quote_escaping(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for complex quote escaping errors (E028)."""
+    issues: List[LintIssue] = []
+    if '"""' not in stripped and not re.search(r'["\s]""[^"]', stripped):
+        return issues
+
+    # Look for potentially problematic quote patterns
+    quote_context = ""
+    if '"""' in stripped:
+        quote_context = "Triple quote pattern found"
+    elif re.search(r'["\s]""[^"]', stripped):
+        quote_context = "Complex quote escaping detected"
+
+    # Only flag if it looks problematic (not the recommended """text""" pattern)
+    if not re.match(r'.*"""[^"]*""".*', stripped):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E028"],
+                context=quote_context,
             )
+        )
+    return issues
 
-    # E029: Complex SET /A expression errors
+
+def _check_set_a_expression(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for complex SET /A expression errors (E029)."""
+    issues: List[LintIssue] = []
     seta_match = re.match(r"set\s+/a\s+(.+)", stripped, re.IGNORECASE)
-    if seta_match:
-        expression: str = seta_match.group(1)
+    if not seta_match:
+        return issues
 
-        # Check for unbalanced parentheses in arithmetic expressions
-        paren_count: int = expression.count("(") - expression.count(")")
-        if paren_count != 0:
+    expression: str = seta_match.group(1)
+
+    # Check for unbalanced parentheses in arithmetic expressions
+    paren_count: int = expression.count("(") - expression.count(")")
+    if paren_count != 0:
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E029"],
+                context=f"Unbalanced parentheses in SET /A expression: {paren_count} unclosed",
+            )
+        )
+
+    # Check for unquoted expressions with special characters that might cause issues
+    if not (expression.startswith('"') and expression.endswith('"')):
+        if re.search(r"[&|<>^]", expression):
             issues.append(
                 LintIssue(
                     line_number=line_num,
                     rule=RULES["E029"],
-                    context=f"Unbalanced parentheses in SET /A expression: {paren_count} unclosed",
+                    context="SET /A expression with special characters should be quoted",
                 )
             )
+    return issues
 
-        # Check for unquoted expressions with special characters that might cause issues
-        if not (expression.startswith('"') and expression.endswith('"')):
-            if re.search(r"[&|<>^]", expression):
-                issues.append(
-                    LintIssue(
-                        line_number=line_num,
-                        rule=RULES["E029"],
-                        context="SET /A expression with special characters should be quoted",
-                    )
-                )
+
+def _check_syntax_errors(line: str, line_num: int, labels: Dict[str, int]) -> List[LintIssue]:
+    """Check for syntax error level issues."""
+    issues: List[LintIssue] = []
+    stripped = line.strip()
+
+    # Use helper functions to check for various syntax errors
+    issues.extend(_check_goto_labels(stripped, line_num, labels))
+    issues.extend(_check_call_labels(stripped, line_num))
+    issues.extend(_check_if_statement_formatting(stripped, line_num))
+    issues.extend(_check_errorlevel_syntax(stripped, line_num))
+    issues.extend(_check_if_exist_mixing(stripped, line_num))
+    issues.extend(_check_path_syntax(stripped, line_num))
+    issues.extend(_check_quotes(line, line_num))
+    issues.extend(_check_for_loop_syntax(stripped, line_num))
+    issues.extend(_check_variable_expansion(stripped, line_num))
+    issues.extend(_check_subroutine_call(stripped, line_num))
+    issues.extend(_check_command_typos(stripped, line_num))
+    issues.extend(_check_parameter_modifiers(stripped, line_num))
+    issues.extend(_check_unc_path(stripped, line_num))
+    issues.extend(_check_quote_escaping(stripped, line_num))
+    issues.extend(_check_set_a_expression(stripped, line_num))
 
     return issues
 
@@ -2686,49 +2748,52 @@ def _check_command_warnings(  # pylint: disable=unused-argument
     return issues
 
 
-def _check_warning_issues(  # pylint: disable=unused-argument,too-many-locals,too-many-branches
-    line: str, line_num: int, set_vars: Set[str], delayed_expansion_enabled: bool
-) -> List[LintIssue]:
-    """Check for warning level issues."""
+def _check_unquoted_variables(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for unquoted variables with spaces (W005)."""
     issues: List[LintIssue] = []
-    stripped = line.strip()
-
-    # W005: Unquoted variable with spaces
     unquoted_var_pattern = r'(?<!["\'])%[A-Z0-9_]+%|(?<!["\'])![A-Z0-9_]+!'
-    if re.search(unquoted_var_pattern, stripped, re.IGNORECASE):
-        # Check if it's in a context where spaces could be problematic
-        if any(cmd in stripped.lower() for cmd in ["if", "echo", "set", "call"]):
-            # Don't flag variables inside quoted SET commands like: set "VAR=%PATH%\test"
-            # Match SET commands with quoted values
-            is_quoted_set = re.match(r'set\s+"[^"]+"', stripped, re.IGNORECASE) or re.match(
-                r"set\s+'[^']+'", stripped, re.IGNORECASE
+    if not re.search(unquoted_var_pattern, stripped, re.IGNORECASE):
+        return issues
+
+    # Check if it's in a context where spaces could be problematic
+    if not any(cmd in stripped.lower() for cmd in ["if", "echo", "set", "call"]):
+        return issues
+
+    # Don't flag variables inside quoted SET commands like: set "VAR=%PATH%\test"
+    is_quoted_set = re.match(r'set\s+"[^"]+"', stripped, re.IGNORECASE) or re.match(
+        r"set\s+'[^']+'", stripped, re.IGNORECASE
+    )
+    if is_quoted_set:
+        return issues
+
+    # Don't flag safe system variables that are commonly used unquoted
+    safe_variables = [
+        "errorlevel",
+        "random",
+        "cd",
+        "date",
+        "time",
+        "processor_architecture",
+    ]
+
+    # Extract variable names from the line
+    var_matches: List[str] = re.findall(r"%([A-Z0-9_]+)%", stripped, re.IGNORECASE)
+
+    # Only flag if none of the variables are in the safe list
+    if not any(var.lower() in safe_variables for var in var_matches):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W005"],
+                context="Variable may contain spaces and should be quoted",
             )
+        )
+    return issues
 
-            if not is_quoted_set:
-                # Don't flag safe system variables that are commonly used unquoted
-                safe_variables = [
-                    "errorlevel",
-                    "random",
-                    "cd",
-                    "date",
-                    "time",
-                    "processor_architecture",
-                ]
 
-                # Extract variable names from the line
-                var_matches: List[str] = re.findall(r"%([A-Z0-9_]+)%", stripped, re.IGNORECASE)
-
-                # Only flag if none of the variables are in the safe list
-                if not any(var.lower() in safe_variables for var in var_matches):
-                    issues.append(
-                        LintIssue(
-                            line_number=line_num,
-                            rule=RULES["W005"],
-                            context="Variable may contain spaces and should be quoted",
-                        )
-                    )
-
-    # W012: Non-ASCII characters detected
+def _check_non_ascii_chars(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for non-ASCII characters (W012)."""
+    issues: List[LintIssue] = []
     if not all(ord(c) < 128 for c in stripped):
         issues.append(
             LintIssue(
@@ -2737,29 +2802,40 @@ def _check_warning_issues(  # pylint: disable=unused-argument,too-many-locals,to
                 context="Line contains non-ASCII characters",
             )
         )
+    return issues
 
-    # W017: Errorlevel comparison semantic difference
+
+def _check_errorlevel_comparison(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for errorlevel comparison semantic difference (W017)."""
+    issues: List[LintIssue] = []
     w017_if_match = re.match(r"if\s+(.+)", stripped, re.IGNORECASE)
-    if w017_if_match:
-        w017_group_result = w017_if_match.group(1)
-        if w017_group_result is not None:
-            w017_if_content: str = w017_group_result.strip()
-            # Only warn about the specific problematic pattern: %ERRORLEVEL% NEQ 1
-            if re.search(r"%errorlevel%\s+neq\s+1\b", w017_if_content, re.IGNORECASE):
-                # Don't warn if it's in a complex condition with && or ||
-                if not re.search(r"&&|\|\|", w017_if_content):
-                    issues.append(
-                        LintIssue(
-                            line_number=line_num,
-                            rule=RULES["W017"],
-                            context=(
-                                "IF %ERRORLEVEL% NEQ 1 behaves differently than "
-                                "IF NOT ERRORLEVEL 1"
-                            ),
-                        )
-                    )
+    if not w017_if_match:
+        return issues
 
-    # W026: Inefficient parameter modifier usage
+    w017_group_result = w017_if_match.group(1)
+    if w017_group_result is None:
+        return issues
+
+    w017_if_content: str = w017_group_result.strip()
+    # Only warn about the specific problematic pattern: %ERRORLEVEL% NEQ 1
+    if re.search(r"%errorlevel%\s+neq\s+1\b", w017_if_content, re.IGNORECASE):
+        # Don't warn if it's in a complex condition with && or ||
+        if not re.search(r"&&|\|\|", w017_if_content):
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["W017"],
+                    context=(
+                        "IF %ERRORLEVEL% NEQ 1 behaves differently than " "IF NOT ERRORLEVEL 1"
+                    ),
+                )
+            )
+    return issues
+
+
+def _check_inefficient_modifiers(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for inefficient parameter modifier usage (W026)."""
+    issues: List[LintIssue] = []
     inefficient_param_match: List[Tuple[str, str]] = re.findall(
         r"(%~[fdpnx][0-9]+%)\s*(%~[fdpnx][0-9]+%)", stripped, re.IGNORECASE
     )
@@ -2771,11 +2847,12 @@ def _check_warning_issues(  # pylint: disable=unused-argument,too-many-locals,to
                 context="Multiple parameter modifiers can be combined for efficiency",
             )
         )
+    return issues
 
-    # W028: .bat/.cmd errorlevel difference (check based on file extension)
-    # This will be handled at file level in global checks since we need file extension context
 
-    # W030: Non-ASCII characters
+def _check_extended_non_ascii(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for extended non-ASCII characters (W030)."""
+    issues: List[LintIssue] = []
     if any(ord(char) > 127 for char in stripped):
         # Check if it's not just typical CP437 characters
         non_ascii_chars = [char for char in stripped if ord(char) > 127]
@@ -2787,8 +2864,12 @@ def _check_warning_issues(  # pylint: disable=unused-argument,too-many-locals,to
                     context=f"Non-ASCII characters detected: {''.join(set(non_ascii_chars))}",
                 )
             )
+    return issues
 
-    # W031: Unicode filename in batch operation
+
+def _check_unicode_filenames(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for Unicode filename in batch operation (W031)."""
+    issues: List[LintIssue] = []
     unicode_file_ops = ["copy", "move", "del", "type", "ren", "rename"]
     first_word = stripped.split()[0].lower() if stripped.split() else ""
     if first_word in unicode_file_ops:
@@ -2801,15 +2882,12 @@ def _check_warning_issues(  # pylint: disable=unused-argument,too-many-locals,to
                     context="File operation with Unicode filename may cause issues",
                 )
             )
+    return issues
 
-    # W032: Missing character set declaration
-    if any(ord(char) > 127 for char in stripped) and not re.match(
-        r"@?chcp\s", stripped, re.IGNORECASE
-    ):
-        # Only flag if we haven't seen a CHCP command yet (this would need global context)
-        pass  # Will be handled in global checks
 
-    # W033: Command execution ambiguity
+def _check_call_ambiguity(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for command execution ambiguity (W033)."""
+    issues: List[LintIssue] = []
     call_match = re.match(r"call\s+([^:\s]+)", stripped, re.IGNORECASE)
     if call_match:
         call_target: str = call_match.group(1)
@@ -2822,8 +2900,24 @@ def _check_warning_issues(  # pylint: disable=unused-argument,too-many-locals,to
                     context=f"CALL '{call_target}' without extension may be ambiguous with PATHEXT",
                 )
             )
+    return issues
 
-    # Add compatibility and command warnings
+
+def _check_warning_issues(  # pylint: disable=unused-argument
+    line: str, line_num: int, set_vars: Set[str], delayed_expansion_enabled: bool
+) -> List[LintIssue]:
+    """Check for warning level issues."""
+    issues: List[LintIssue] = []
+    stripped = line.strip()
+
+    # Use helper functions to check for various warning issues
+    issues.extend(_check_unquoted_variables(stripped, line_num))
+    issues.extend(_check_non_ascii_chars(stripped, line_num))
+    issues.extend(_check_errorlevel_comparison(stripped, line_num))
+    issues.extend(_check_inefficient_modifiers(stripped, line_num))
+    issues.extend(_check_extended_non_ascii(stripped, line_num))
+    issues.extend(_check_unicode_filenames(stripped, line_num))
+    issues.extend(_check_call_ambiguity(stripped, line_num))
     issues.extend(_check_compatibility_warnings(line, line_num, stripped))
     issues.extend(_check_command_warnings(line, line_num, stripped))
 
@@ -3144,9 +3238,7 @@ def _check_malware_security(stripped: str, line_num: int) -> List[LintIssue]:
     return issues
 
 
-def _check_security_issues(  # pylint: disable=too-many-branches,too-many-locals
-    line: str, line_num: int
-) -> List[LintIssue]:
+def _check_security_issues(line: str, line_num: int) -> List[LintIssue]:
     """Check for security level issues."""
     issues: List[LintIssue] = []
     stripped = line.strip()
@@ -4864,13 +4956,8 @@ def _check_mixed_variable_syntax(lines: List[str]) -> List[LintIssue]:
     return issues
 
 
-def _check_inconsistent_indentation(  # pylint: disable=too-many-branches
-    lines: List[str],
-) -> List[LintIssue]:
-    """Check for inconsistent indentation patterns across the file (S012)."""
-    issues: List[LintIssue] = []
-
-    # Track indentation patterns
+def _collect_indented_lines(lines: List[str]) -> List[Tuple[int, str]]:
+    """Collect all indented lines with their leading whitespace."""
     indented_lines = []
     for i, line in enumerate(lines, start=1):
         if line.startswith(("\t", " ")):
@@ -4881,11 +4968,26 @@ def _check_inconsistent_indentation(  # pylint: disable=too-many-branches
                 else:
                     break
             indented_lines.append((i, leading_whitespace))
+    return indented_lines
 
-    if len(indented_lines) < 2:
-        return issues
 
-    # Check for mixed patterns
+def _find_single_line_mixed_indent(indented_lines: List[Tuple[int, str]]) -> List[LintIssue]:
+    """Check for mixed tabs and spaces within single lines."""
+    issues: List[LintIssue] = []
+    for line_num, whitespace in indented_lines:
+        if "\t" in whitespace and " " in whitespace:
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["S012"],
+                    context="Line mixes tabs and spaces for indentation",
+                )
+            )
+    return issues
+
+
+def _find_file_mixed_indent(indented_lines: List[Tuple[int, str]]) -> Optional[LintIssue]:
+    """Check for inconsistent indentation across the entire file."""
     uses_tabs = False
     uses_spaces = False
     first_tab_line = 0
@@ -4901,19 +5003,7 @@ def _check_inconsistent_indentation(  # pylint: disable=too-many-branches
             if first_space_line == 0:
                 first_space_line = line_num
 
-        # Also check for mixed within single line
-        if "\t" in whitespace and " " in whitespace:
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["S012"],
-                    context="Line mixes tabs and spaces for indentation",
-                )
-            )
-
-    # Check for inconsistent indentation across file
-    # Only if no single-line mixing found
-    if uses_tabs and uses_spaces and not issues:
+    if uses_tabs and uses_spaces:
         later_line = max(first_tab_line, first_space_line)
         if first_tab_line < first_space_line:
             context = (
@@ -4925,14 +5015,33 @@ def _check_inconsistent_indentation(  # pylint: disable=too-many-branches
                 f"File mixes spaces (line {first_space_line}) and tabs "
                 f"(line {first_tab_line}) for indentation"
             )
-
-        issues.append(
-            LintIssue(
-                line_number=later_line,
-                rule=RULES["S012"],
-                context=context,
-            )
+        return LintIssue(
+            line_number=later_line,
+            rule=RULES["S012"],
+            context=context,
         )
+    return None
+
+
+def _check_inconsistent_indentation(
+    lines: List[str],
+) -> List[LintIssue]:
+    """Check for inconsistent indentation patterns across the file (S012)."""
+    issues: List[LintIssue] = []
+
+    indented_lines = _collect_indented_lines(lines)
+    if len(indented_lines) < 2:
+        return issues
+
+    # Check for mixed patterns within single lines first
+    single_line_issues = _find_single_line_mixed_indent(indented_lines)
+    issues.extend(single_line_issues)
+
+    # Check for inconsistent indentation across file only if no single-line mixing found
+    if not single_line_issues:
+        file_issue = _find_file_mixed_indent(indented_lines)
+        if file_issue:
+            issues.append(file_issue)
 
     return issues
 
@@ -5385,18 +5494,26 @@ def find_batch_files(path: Union[str, Path], recursive: bool = True) -> List[Pat
     raise ValueError(f"Path '{path}' is neither a file nor a directory")
 
 
-def main() -> (
-    None
-):  # pylint: disable=too-many-branches,too-many-statements,too-many-locals,too-many-return-statements
-    """Main entry point for the blinter application."""
+@dataclass
+class CliArguments:
+    """Parsed CLI arguments."""
+
+    target_path: str
+    use_config: bool
+    cli_show_summary: Optional[bool]
+    cli_recursive: Optional[bool]
+
+
+def _parse_cli_arguments() -> Optional[CliArguments]:
+    """Parse command line arguments."""
     if len(sys.argv) < 2 or "--help" in sys.argv:
         print_help()
-        return
+        return None
 
     # Handle special commands first
     if "--create-config" in sys.argv:
         create_default_config_file()
-        return
+        return None
 
     target_path: Optional[str] = None
     use_config = True
@@ -5420,35 +5537,25 @@ def main() -> (
     if not target_path:
         print("Error: No batch file or directory provided.\n")
         print_help()
-        return
+        return None
 
-    # Load configuration
-    config = load_config(use_config=use_config)
+    return CliArguments(target_path, use_config, cli_show_summary, cli_recursive)
 
-    # Override config with CLI arguments
-    if cli_show_summary is not None:
-        config.show_summary = cli_show_summary
-    if cli_recursive is not None:
-        config.recursive = cli_recursive
 
-    # Find all batch files to process
-    try:
-        batch_files = find_batch_files(target_path, recursive=config.recursive)
-    except FileNotFoundError:
-        print(f"Error: Path '{target_path}' not found.")
-        return
-    except ValueError as value_error:
-        print(f"Error: {value_error}")
-        return
-    except (OSError, PermissionError) as path_error:
-        print(f"Error: Cannot access '{target_path}': {path_error}")
-        return
+@dataclass
+class ProcessingResults:
+    """Results from processing batch files."""
 
-    if not batch_files:
-        print(f"No batch files (.bat or .cmd) found in: {target_path}")
-        return
+    all_issues: List[LintIssue]
+    file_results: Dict[str, List[LintIssue]]
+    total_files_processed: int
+    files_with_errors: int
 
-    # Process each batch file
+
+def _process_batch_files(
+    batch_files: List[Path], config: BlinterConfig
+) -> Optional[ProcessingResults]:
+    """Process all batch files and collect results."""
     all_issues: List[LintIssue] = []
     file_results: Dict[str, List[LintIssue]] = {}
     total_files_processed = 0
@@ -5473,21 +5580,29 @@ def main() -> (
 
     if total_files_processed == 0:
         print("Error: No batch files could be processed.")
-        return
+        return None
 
-    # Display results
+    return ProcessingResults(all_issues, file_results, total_files_processed, files_with_errors)
+
+
+def _display_results(
+    results: ProcessingResults,
+    target_path: str,
+    config: BlinterConfig,
+) -> None:
+    """Display lint results to the user."""
     is_directory = Path(target_path).is_dir()
 
     if is_directory:
         print(f"\n Batch Files Analysis: {target_path}")
         print("=" * (26 + len(target_path)))
-        file_count_text = "s" if total_files_processed != 1 else ""
-        print(f"Processed {total_files_processed} batch file{file_count_text}")
+        file_count_text = "s" if results.total_files_processed != 1 else ""
+        print(f"Processed {results.total_files_processed} batch file{file_count_text}")
         print()
 
         # Show results for each file if there are multiple files
-        if len(file_results) > 1:
-            for file_path, issues in file_results.items():
+        if len(results.file_results) > 1:
+            for file_path, issues in results.file_results.items():
                 relative_path = Path(file_path).relative_to(Path(target_path))
                 print(f"\n File: {relative_path}")
                 print("-" * (8 + len(str(relative_path))))
@@ -5499,48 +5614,54 @@ def main() -> (
                 print()
         else:
             # Single file in directory
-            print_detailed(all_issues)
+            print_detailed(results.all_issues)
     else:
         # Single file processing
         print(f"\n Batch File Analysis: {target_path}")
         print("=" * (25 + len(target_path)))
-        print_detailed(all_issues)
+        print_detailed(results.all_issues)
 
     # Show combined summary if processing multiple files
-    if is_directory and len(file_results) > 1:
+    if is_directory and len(results.file_results) > 1:
         print("\n COMBINED RESULTS:")
         print("===================")
 
     if config.show_summary:
-        print_summary(all_issues)
+        print_summary(results.all_issues)
 
-    print_severity_info(all_issues)
+    print_severity_info(results.all_issues)
 
-    # Exit with appropriate code
-    error_count = sum(1 for issue in all_issues if issue.rule.severity == RuleSeverity.ERROR)
+
+def _exit_with_results(results: ProcessingResults, target_path: str) -> None:
+    """Exit with appropriate code based on results."""
+    is_directory = Path(target_path).is_dir()
+    error_count = sum(
+        1 for issue in results.all_issues if issue.rule.severity == RuleSeverity.ERROR
+    )
 
     if is_directory:
         if error_count > 0:
             error_text = "s" if error_count != 1 else ""
-            file_text = "s" if files_with_errors != 1 else ""
+            file_text = "s" if results.files_with_errors != 1 else ""
             print(
                 f"\nWARNING  Found {error_count} critical error{error_text} "
-                f"across {files_with_errors} file{file_text} that must be fixed."
+                f"across {results.files_with_errors} file{file_text} that must be fixed."
             )
             sys.exit(1)
-        elif all_issues:
-            issue_text = "s" if len(all_issues) != 1 else ""
-            file_text = "s" if total_files_processed != 1 else ""
+        elif results.all_issues:
+            issue_text = "s" if len(results.all_issues) != 1 else ""
+            file_text = "s" if results.total_files_processed != 1 else ""
             print(
-                f"\nOK No critical errors found, but {len(all_issues)} total "
-                f"issue{issue_text} detected across {total_files_processed} file{file_text}."
+                f"\nOK No critical errors found, but {len(results.all_issues)} "
+                f"total issue{issue_text} detected across "
+                f"{results.total_files_processed} file{file_text}."
             )
             sys.exit(0)
         else:
-            file_text = "s" if total_files_processed != 1 else ""
-            look_text = "s" if total_files_processed == 1 else ""
+            file_text = "s" if results.total_files_processed != 1 else ""
+            look_text = "s" if results.total_files_processed == 1 else ""
             print(
-                f"\n🎉 No issues found! All {total_files_processed} "
+                f"\n🎉 No issues found! All {results.total_files_processed} "
                 f"batch file{file_text} look{look_text} great!"
             )
             sys.exit(0)
@@ -5551,15 +5672,60 @@ def main() -> (
                 f"error{'s' if error_count != 1 else ''} that must be fixed."
             )
             sys.exit(1)
-        elif all_issues:
+        elif results.all_issues:
             print(
-                f"\nOK No critical errors found, but {len(all_issues)} "
-                f"issue{'s' if len(all_issues) != 1 else ''} detected."
+                f"\nOK No critical errors found, but {len(results.all_issues)} "
+                f"issue{'s' if len(results.all_issues) != 1 else ''} detected."
             )
             sys.exit(0)
         else:
             print("\nNo issues found! Your batch file looks great!")
             sys.exit(0)
+
+
+def main() -> None:
+    """Main entry point for the blinter application."""
+    # Parse CLI arguments
+    cli_args = _parse_cli_arguments()
+    if cli_args is None:
+        return
+
+    # Load configuration
+    config = load_config(use_config=cli_args.use_config)
+
+    # Override config with CLI arguments
+    if cli_args.cli_show_summary is not None:
+        config.show_summary = cli_args.cli_show_summary
+    if cli_args.cli_recursive is not None:
+        config.recursive = cli_args.cli_recursive
+
+    # Find all batch files to process
+    try:
+        batch_files = find_batch_files(cli_args.target_path, recursive=config.recursive)
+    except FileNotFoundError:
+        print(f"Error: Path '{cli_args.target_path}' not found.")
+        return
+    except ValueError as value_error:
+        print(f"Error: {value_error}")
+        return
+    except (OSError, PermissionError) as path_error:
+        print(f"Error: Cannot access '{cli_args.target_path}': {path_error}")
+        return
+
+    if not batch_files:
+        print(f"No batch files (.bat or .cmd) found in: {cli_args.target_path}")
+        return
+
+    # Process batch files
+    results = _process_batch_files(batch_files, config)
+    if results is None:
+        return
+
+    # Display results
+    _display_results(results, cli_args.target_path, config)
+
+    # Exit with appropriate code
+    _exit_with_results(results, cli_args.target_path)
 
 
 def _check_advanced_vars(lines: List[str]) -> List[LintIssue]:
