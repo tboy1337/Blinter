@@ -1,1 +1,1 @@
-﻿"""Test package for blinter module."""
+"""Test package for blinter module."""

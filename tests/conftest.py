@@ -1,4 +1,4 @@
-﻿"""pytest configuration and shared fixtures for blinter tests."""
+"""pytest configuration and shared fixtures for blinter tests."""
 
 from typing import Generator
 import warnings

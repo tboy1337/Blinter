@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.16
+Version: 1.0.17
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.16"
+__version__ = "1.0.17"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2498,7 +2498,10 @@ def _check_compatibility_warnings(  # pylint: disable=unused-argument
         )
 
     # W029: 16-bit command in 64-bit context
-    if re.search(r"\.com\b", stripped, re.IGNORECASE):
+    # Only match .COM files being executed as commands, not domain names
+    # Match patterns like: command.com, call something.com, start program.com
+    # But not: ping google.com, http://site.com, etc.
+    if re.search(r"^\s*(?:call\s+|start\s+)?[\w-]+\.com(?:\s|$)", stripped, re.IGNORECASE):
         issues.append(
             LintIssue(
                 line_number=line_num,
@@ -2836,7 +2839,8 @@ def _check_privilege_security(
             break
 
     # Check for net commands that aren't privilege checks
-    if "net " in stripped.lower():
+    # Use word boundary to match "net" as a command, not as part of words like "internet"
+    if re.search(r"\bnet\s+", stripped.lower()):
         is_privilege_check = any(
             re.search(pattern, stripped.lower()) for pattern in net_privilege_check_patterns
         )
@@ -4041,7 +4045,8 @@ def _check_global_priv_security(lines: List[str]) -> List[LintIssue]:
                     break
 
             # Check for net commands that aren't privilege checks
-            if "net " in stripped:
+            # Use word boundary to match "net" as a command, not as part of words like "internet"
+            if re.search(r"\bnet\s+", stripped):
                 net_privilege_check_patterns = [
                     r"net\s+session\s*>",  # net session redirected (used for checking)
                     r"net\s+session\s*$",  # net session at end of line (used for checking)
