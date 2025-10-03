@@ -1446,6 +1446,7 @@ IF EXIST myfile.txt == "yes" ECHO Found
 
         from blinter import lint_batch_file
 
+        # Test truly invalid characters (< > |) are still caught
         content = """@echo off
 COPY "file<test>.txt", "dest>folder",
 """
@@ -1456,6 +1457,19 @@ COPY "file<test>.txt", "dest>folder",
             assert len(e005_issues) >= 1  # Should detect invalid path characters
         finally:
             os.unlink(temp_file)
+
+        # Test that wildcards (* and ?) are NOT flagged as invalid
+        content2 = """@echo off
+COPY "*.txt", "dest",
+DEL "file?.bat",
+"""
+        temp_file2 = self.create_temp_batch_file(content2)
+        try:
+            issues2 = lint_batch_file(temp_file2)
+            e005_issues2 = [i for i in issues2 if i.rule.code == "E005"]
+            assert len(e005_issues2) == 0  # Wildcards should NOT be flagged
+        finally:
+            os.unlink(temp_file2)
 
     def test_for_loop_missing_do_e010(self) -> None:
         """Test E010 rule for FOR loop missing DO keyword."""

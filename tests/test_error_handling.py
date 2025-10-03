@@ -270,12 +270,11 @@ class TestMainFunctionEdgeCases:
         labels: dict[str, int] = {}
 
         # Test various invalid path patterns
+        # Note: * and ? are valid wildcards in Windows batch files, so they're not flagged
         invalid_paths = [
             'copy "file<name.txt", dest',  # < character
             'copy "file>name.txt", dest',  # > character
             'copy "file|name.txt", dest',  # | character
-            'copy "file*name.txt", dest',  # * character
-            'copy "file?name.txt", dest',  # ? character
             "copy 'path<with>invalid', dest",  # Single quotes
         ]
 
@@ -283,6 +282,18 @@ class TestMainFunctionEdgeCases:
             issues = _check_syntax_errors(command, 1, labels)
             path_issues = [i for i in issues if i.rule.code == "E005"]
             assert len(path_issues) >= 1, f"Should detect invalid path in: {command}"
+
+        # Test that wildcards are NOT flagged (they're valid in Windows batch files)
+        valid_wildcard_paths = [
+            'copy "file*name.txt", dest',  # * wildcard (valid)
+            'copy "file?name.txt", dest',  # ? wildcard (valid)
+            'copy "*.txt", dest',  # Common wildcard pattern
+        ]
+
+        for command in valid_wildcard_paths:
+            issues = _check_syntax_errors(command, 1, labels)
+            path_issues = [i for i in issues if i.rule.code == "E005"]
+            assert len(path_issues) == 0, f"Should NOT flag wildcards in: {command}"
 
 
 class TestPerformanceAndScalability:

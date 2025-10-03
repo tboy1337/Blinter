@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.22
+Version: 1.0.23
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.22"
+__version__ = "1.0.23"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2289,11 +2289,41 @@ def _check_path_syntax(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for invalid path syntax (E005)."""
     issues: List[LintIssue] = []
     # Check if line contains PowerShell, VBScript, or other scripting commands
+    # Now also checks for common PowerShell variable patterns (%psc%, %ps%, etc.)
     has_script_command = re.search(
-        r"(for\s+|powershell\s+|cscript\s+|wscript\s+|msiexec\s+)", stripped, re.IGNORECASE
+        r"(for\s+|powershell\s+|cscript\s+|wscript\s+|msiexec\s+|%ps[c]?%|%powershell%)",
+        stripped,
+        re.IGNORECASE,
     )
 
     if has_script_command:
+        return issues
+
+    # Skip lines that look like they're part of PowerShell/C#/VBScript code
+    # or output commands (echo, Write-Output, etc.)
+    script_indicators = [
+        r"\$\w+\s*=",  # PowerShell variable assignment
+        r"-match\s+",  # PowerShell match operator
+        r"\.Matches\(",  # Regex.Matches
+        r"IndexOf\(",  # Array.IndexOf
+        r"foreach\s*\(",  # foreach loops
+        r"\[regex\]::",  # PowerShell [regex]::
+        r"\[System\.",  # .NET class references
+        r"Get-Content",  # PowerShell cmdlets
+        r"ToArray\(\)",  # .ToArray() method calls
+        r"Write-Output\s+",  # PowerShell Write-Output
+        r"Write-Host\s+",  # PowerShell Write-Host
+        r"^echo\s+",  # echo command at line start
+        r"^\s*\$\w+",  # PowerShell variable at line start
+    ]
+
+    for indicator in script_indicators:
+        if re.search(indicator, stripped, re.IGNORECASE):
+            return issues
+
+    # Check for XML/HTML content - must be at start of string or after whitespace/quote
+    # to avoid false positives with paths like "file<test>"
+    if re.search(r"<\?xml|^\s*<\w+[\s>]|['\"]<\w+\s", stripped, re.IGNORECASE):
         return issues
 
     path_patterns = [r'"([^"]*[<>|*?][^"]*)",', r"'([^']*[<>|*?][^']*)'"]
@@ -2303,7 +2333,13 @@ def _check_path_syntax(stripped: str, line_num: int) -> List[LintIssue]:
             path_content = match.group(1)
             # Allow escaped redirections like ^> ^| ^< in command strings
             escaped_content = re.sub(r"\^[<>|]", "", path_content)
-            if re.search(r"[<>|*?]", escaped_content):
+            # Skip if this looks like a PowerShell or script command string
+            # (contains :: for regex, scriptblock syntax, etc.)
+            if re.search(r"(::|scriptblock|split\s|regex)", escaped_content, re.IGNORECASE):
+                continue
+            # Wildcards (* and ?) are VALID in file paths for pattern matching
+            # Only flag < > | as truly invalid
+            if re.search(r"[<>|]", escaped_content):
                 issues.append(
                     LintIssue(
                         line_number=line_num,
