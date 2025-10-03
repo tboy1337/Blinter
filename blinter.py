@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.15
+Version: 1.0.16
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.15"
+__version__ = "1.0.16"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1921,17 +1921,19 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
     set_vars: Set[str] = set()
     for line in lines:
         # Match different SET patterns, including quoted variable names
+        # Use re.search instead of re.match to find SET commands anywhere in the line
+        # This handles cases like: if not defined VAR set "VAR=value"
         patterns = [
-            r"set\s+([A-Za-z0-9_]+)=",  # Regular set: set VAR=value
-            r'set\s+"([A-Za-z0-9_]+)=',  # Quoted set: set "VAR=value"
-            r"set\s+/p\s+([A-Za-z0-9_]+)=",  # Set with prompt: set /p VAR=
-            r'set\s+/p\s+"([A-Za-z0-9_]+)=',  # Quoted set with prompt: set /p "VAR="
-            r"set\s+/a\s+([A-Za-z0-9_]+)=",  # Arithmetic set: set /a VAR=
-            r'set\s+/a\s+"([A-Za-z0-9_]+)=',  # Quoted arithmetic set: set /a "VAR="
+            r"\bset\s+([A-Za-z0-9_]+)=",  # Regular set: set VAR=value
+            r'\bset\s+"([A-Za-z0-9_]+)=',  # Quoted set: set "VAR=value"
+            r"\bset\s+/p\s+([A-Za-z0-9_]+)=",  # Set with prompt: set /p VAR=
+            r'\bset\s+/p\s+"([A-Za-z0-9_]+)=',  # Quoted set with prompt: set /p "VAR="
+            r"\bset\s+/a\s+([A-Za-z0-9_]+)=",  # Arithmetic set: set /a VAR=
+            r'\bset\s+/a\s+"([A-Za-z0-9_]+)=',  # Quoted arithmetic set: set /a "VAR="
         ]
 
         for pattern in patterns:
-            set_match = re.match(pattern, line.strip(), re.IGNORECASE)
+            set_match = re.search(pattern, line.strip(), re.IGNORECASE)
             if set_match:
                 var_name_text: str = set_match.group(1)
                 set_vars.add(var_name_text.upper())
@@ -1981,6 +1983,9 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
         "CommonProgramFiles",
         "CommonProgramFiles(x86)",
         "ProgramFiles(x86)",
+        # Optional environment variables that may or may not be set
+        "SUDO_USER",  # Set by newer Windows sudo command
+        "ORIGINAL_USER",  # Sometimes set by scripts for elevation tracking
     }
     set_vars.update(common_env_vars)
 
@@ -3176,6 +3181,9 @@ def _check_undefined_variables(lines: List[str], set_vars: Set[str]) -> List[Lin
         "ALLUSERSPROFILE",
         "APPDATA",
         "LOCALAPPDATA",
+        # Optional environment variables that may or may not be set
+        "SUDO_USER",  # Set by newer Windows sudo command
+        "ORIGINAL_USER",  # Sometimes set by scripts for elevation tracking
     }
 
     for i, line in enumerate(lines, start=1):
@@ -4572,6 +4580,12 @@ def _check_code_duplication(lines: List[str]) -> List[LintIssue]:
         r"timeout\s+/t\s+\d+",  # timeout commands
         r"pause\s*$",  # pause commands
         r"echo\s+\.?\s*$",  # echo blank lines
+        r"^\s*echo\s+",  # echo commands in general
+        r"^\s*if\s+",  # if statements
+        r"^\s*set\s+",  # set commands
+        r"^\s*call\s+",  # call commands
+        r"^\s*goto\s+",  # goto commands
+        r"^\s*for\s+",  # for loops
     ]
 
     for i, line in enumerate(lines):
@@ -4586,20 +4600,36 @@ def _check_code_duplication(lines: List[str]) -> List[LintIssue]:
             normalized = re.sub(r"\S+\.(txt|log|bat|cmd)", "FILE", stripped)
             normalized = re.sub(r"%\w+%", "VAR", normalized)
 
-            if len(normalized) > 20:  # Only consider substantial commands
+            if len(normalized) > 40:  # Only consider substantial commands (increased from 20)
                 command_blocks[normalized].append(i + 1)
 
+    # Calculate appropriate threshold based on script size
+    # For larger scripts, allow more repetition before flagging
+    script_size = len(lines)
+    if script_size < 100:
+        threshold = 3  # Small scripts: flag 3+ occurrences
+    elif script_size < 500:
+        threshold = 5  # Medium scripts: flag 5+ occurrences
+    elif script_size < 2000:
+        threshold = 10  # Large scripts: flag 10+ occurrences
+    else:
+        threshold = 20  # Very large scripts: flag 20+ occurrences
+
     for _normalized_cmd, line_numbers in command_blocks.items():
-        if len(line_numbers) > 2:  # Found 3+ similar commands
-            for line_num in line_numbers[1:]:  # Flag all but the first
-                issues.append(
-                    LintIssue(
-                        line_number=line_num,
-                        rule=RULES["P002"],
-                        context=f"Similar command pattern repeated "
-                        f"(also on lines {line_numbers[0]})",
+        if len(line_numbers) >= threshold:  # Found threshold+ similar commands
+            # Only flag if occurrences are close together (within 100 lines)
+            # This catches actual duplication that should be refactored
+            for i in range(len(line_numbers) - 1):
+                if line_numbers[i + 1] - line_numbers[i] < 100:
+                    # Found close duplicates, flag this group
+                    issues.append(
+                        LintIssue(
+                            line_number=line_numbers[i + 1],
+                            rule=RULES["P002"],
+                            context=f"Similar command pattern repeated "
+                            f"(also on lines {line_numbers[i]})",
+                        )
                     )
-                )
 
     return issues
 

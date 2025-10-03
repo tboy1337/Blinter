@@ -1267,14 +1267,20 @@ class TestGlobalChecks:
     def test_check_code_duplication(self) -> None:
         """Test code duplication detection."""
         # Code duplication needs 3+ similar commands AND normalized length > 20
-        # "copy FILE FILE" is only 14 chars, so need longer normalized commands
+        # Note: The new implementation requires normalized commands > 40 chars and uses
+        # adaptive thresholds based on script size. For very small scripts (< 100 lines),
+        # the threshold is 3+ occurrences within 100 lines of each other.
         lines = [
-            "copy longfile.txt to backup\\longfile.txt with extra text here",
-            "copy longfile2.txt to backup\\longfile2.txt with extra text here",
-            "copy longfile3.txt to backup\\longfile3.txt with extra text here",
-            "copy longfile4.txt to backup\\longfile4.txt with extra text here",
+            "robocopy %SOURCE% %DEST% /MIR /COPYALL /R:3 /W:10 "
+            "/LOG:backup.log with some extra text",
+            "robocopy %SOURCE% %DEST% /MIR /COPYALL /R:3 /W:10 "
+            "/LOG:backup2.log with some extra text",
+            "robocopy %SOURCE% %DEST% /MIR /COPYALL /R:3 /W:10 "
+            "/LOG:backup3.log with some extra text",
+            "robocopy %SOURCE% %DEST% /MIR /COPYALL /R:3 /W:10 "
+            "/LOG:backup4.log with some extra text",
         ]
-        # This should normalize to "copy FILE to FILE with extra text here" which is > 20 chars
+        # This normalizes variables to VAR and files to FILE, all should be identical
         issues = _check_code_duplication(lines)
         duplication_issues = [i for i in issues if i.rule.code == "P002"]
         assert len(duplication_issues) == 3  # Lines 2, 3 and 4 should be flagged
