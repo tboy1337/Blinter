@@ -495,6 +495,30 @@ echo Done
         finally:
             os.unlink(temp_file)
 
+    def test_quoted_set_with_variables_no_w005(self) -> None:
+        """Test that variables inside quoted SET commands don't trigger W005."""
+        content = """@echo off
+set "VAR1=%ProgramFiles%\\Test"
+set "VAR2=%SystemDrive%\\Path"
+set "VAR3=%LOCALAPPDATA%\\App"
+echo Done
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+
+            # Filter for W005 unquoted variable warnings
+            w005_issues = [issue for issue in issues if issue.rule.code == "W005"]
+
+            # Should NOT have W005 issues for variables inside quoted SET commands
+            assert len(w005_issues) == 0, (
+                f"Expected no W005 issues for quoted SET commands, "
+                f"but found {len(w005_issues)}: {[i.line_number for i in w005_issues]}"
+            )
+
+        finally:
+            os.unlink(temp_file)
+
     def test_module_level_constants_validation(self) -> None:
         """Test that module-level constants are properly structured."""
         # Test DANGEROUS_COMMAND_PATTERNS structure

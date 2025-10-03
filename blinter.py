@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.18
+Version: 1.0.19
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.18"
+__version__ = "1.0.19"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2684,28 +2684,35 @@ def _check_warning_issues(  # pylint: disable=unused-argument,too-many-locals,to
     if re.search(unquoted_var_pattern, stripped, re.IGNORECASE):
         # Check if it's in a context where spaces could be problematic
         if any(cmd in stripped.lower() for cmd in ["if", "echo", "set", "call"]):
-            # Don't flag safe system variables that are commonly used unquoted
-            safe_variables = [
-                "errorlevel",
-                "random",
-                "cd",
-                "date",
-                "time",
-                "processor_architecture",
-            ]
+            # Don't flag variables inside quoted SET commands like: set "VAR=%PATH%\test"
+            # Match SET commands with quoted values
+            is_quoted_set = re.match(r'set\s+"[^"]+"', stripped, re.IGNORECASE) or re.match(
+                r"set\s+'[^']+'", stripped, re.IGNORECASE
+            )
 
-            # Extract variable names from the line
-            var_matches: List[str] = re.findall(r"%([A-Z0-9_]+)%", stripped, re.IGNORECASE)
+            if not is_quoted_set:
+                # Don't flag safe system variables that are commonly used unquoted
+                safe_variables = [
+                    "errorlevel",
+                    "random",
+                    "cd",
+                    "date",
+                    "time",
+                    "processor_architecture",
+                ]
 
-            # Only flag if none of the variables are in the safe list
-            if not any(var.lower() in safe_variables for var in var_matches):
-                issues.append(
-                    LintIssue(
-                        line_number=line_num,
-                        rule=RULES["W005"],
-                        context="Variable may contain spaces and should be quoted",
+                # Extract variable names from the line
+                var_matches: List[str] = re.findall(r"%([A-Z0-9_]+)%", stripped, re.IGNORECASE)
+
+                # Only flag if none of the variables are in the safe list
+                if not any(var.lower() in safe_variables for var in var_matches):
+                    issues.append(
+                        LintIssue(
+                            line_number=line_num,
+                            rule=RULES["W005"],
+                            context="Variable may contain spaces and should be quoted",
+                        )
                     )
-                )
 
     # W012: Non-ASCII characters detected
     if not all(ord(c) < 128 for c in stripped):
