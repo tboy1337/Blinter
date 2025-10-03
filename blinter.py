@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.17
+Version: 1.0.18
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.17"
+__version__ = "1.0.18"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -193,11 +193,12 @@ RULES: Dict[str, Rule] = {
     "E006": Rule(
         code="E006",
         name="Undefined variable reference",
-        severity=RuleSeverity.ERROR,
-        explanation="Script references variables that were never set, "
-        "which may cause runtime errors",
+        # Changed from ERROR to WARNING - many false positives from system vars
+        severity=RuleSeverity.WARNING,
+        explanation="Script references variables that were never set in this script, "
+        "which may cause runtime errors if not set by parent process or system",
         recommendation="Define the variable using SET before referencing it, "
-        "or add existence checks",
+        "or add existence checks, or verify it's set by system/parent process",
     ),
     "E007": Rule(
         code="E007",
@@ -1948,6 +1949,7 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
         "USERNAME",
         "COMPUTERNAME",
         "PROCESSOR_ARCHITECTURE",
+        "PROCESSOR_ARCHITEW6432",  # WOW64 - native architecture on 64-bit when running 32-bit
         "PROCESSOR_IDENTIFIER",
         "ERRORLEVEL",
         "CD",
@@ -1964,6 +1966,7 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
         "PATHEXT",
         "PROGRAMFILES",
         "PROGRAMFILES(X86)",  # 32-bit program files on 64-bit systems
+        "PROGRAMW6432",  # 64-bit program files folder on 64-bit systems
         "SYSTEMDRIVE",
         "SYSTEMROOT",
         "WINDIR",
@@ -1979,13 +1982,15 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
         "USERDNSDOMAIN",
         "SESSIONNAME",
         "CLIENTNAME",
-        "ProgramW6432",  # 64-bit program files folder on 64-bit systems
-        "CommonProgramFiles",
-        "CommonProgramFiles(x86)",
-        "ProgramFiles(x86)",
+        "COMMONPROGRAMFILES",
+        "COMMONPROGRAMFILES(X86)",
         # Optional environment variables that may or may not be set
         "SUDO_USER",  # Set by newer Windows sudo command
         "ORIGINAL_USER",  # Sometimes set by scripts for elevation tracking
+        "DRIVERDATA",  # Driver data directory (Windows 10+)
+        "ONEDRIVE",  # OneDrive directory if configured
+        "ONEDRIVECONSUMER",  # Consumer OneDrive
+        "ONEDRIVECOMMERCIAL",  # Business OneDrive
     }
     set_vars.update(common_env_vars)
 
@@ -2043,6 +2048,7 @@ def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,t
         # Check if this looks like a label call (not an external program)
         # Skip if it contains path separators, extensions, or is a known command
         builtin_commands = {
+            # Windows builtin commands
             "dir",
             "echo",
             "copy",
@@ -2079,6 +2085,74 @@ def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,t
             "date",
             "time",
             "help",
+            # Common external commands and package managers
+            "npm",
+            "node",
+            "npx",
+            "yarn",
+            "pnpm",
+            "git",
+            "gh",
+            "svn",
+            "hg",
+            "python",
+            "python3",
+            "py",
+            "pip",
+            "pip3",
+            "pipenv",
+            "poetry",
+            "ruby",
+            "gem",
+            "bundle",
+            "php",
+            "composer",
+            "java",
+            "javac",
+            "maven",
+            "mvn",
+            "gradle",
+            "dotnet",
+            "nuget",
+            "msbuild",
+            "cargo",
+            "rustc",
+            "rustup",
+            "go",
+            "gofmt",
+            "docker",
+            "docker-compose",
+            "kubectl",
+            "helm",
+            "aws",
+            "az",
+            "gcloud",
+            "terraform",
+            "make",
+            "cmake",
+            "ninja",
+            "wget",
+            "curl",
+            "aria2c",
+            "7z",
+            "zip",
+            "unzip",
+            "tar",
+            "gzip",
+            "choco",
+            "scoop",
+            "winget",
+            "code",
+            "vim",
+            "nano",
+            "notepad",
+            "ssh",
+            "scp",
+            "ftp",
+            "telnet",
+            "cscript",
+            "wscript",
+            "msiexec",
         }
         if (
             not re.search(r"[\\/.:]|\.(?:bat|cmd|exe|com)$", call_label_text.lower())
@@ -2179,18 +2253,34 @@ def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,t
                 )
 
     # E004: IF EXIST syntax mixing
-    if re.match(r"if\s+exist\s+.*==.*", stripped, re.IGNORECASE):
-        issues.append(
-            LintIssue(
-                line_number=line_num,
-                rule=RULES["E004"],
-                context="Mixing IF EXIST with comparison operators",
-            )
-        )
+    # Only flag if == appears in the same IF statement, not in chained IF statements
+    # Valid: "if exist file.txt if %var%==value ..." (chained IFs)
+    # Invalid: "if exist file.txt == something" (mixing in same IF)
+    if re.match(r"if\s+exist\s+\S+\s+==", stripped, re.IGNORECASE):
+        # Check if there's another "if" between "exist" and "=="
+        # If so, it's chained IFs, not mixing
+        exist_to_equals = re.search(r"if\s+exist\s+(.*?)==", stripped, re.IGNORECASE)
+        if exist_to_equals:
+            between_text = exist_to_equals.group(1)
+            # If there's no "if" keyword between exist and ==, then it's mixing
+            if not re.search(r"\bif\b", between_text, re.IGNORECASE):
+                issues.append(
+                    LintIssue(
+                        line_number=line_num,
+                        rule=RULES["E004"],
+                        context="Mixing IF EXIST with comparison operators",
+                    )
+                )
 
     # E005: Invalid path syntax - but exclude command strings
-    # Don't flag FOR loops or PowerShell commands as they contain command strings, not file paths
-    if not re.match(r"(for\s+.*|.*call\s+powershell\s+.*)", stripped, re.IGNORECASE):
+    # Don't flag FOR loops, PowerShell commands, or other script commands
+    # as they contain command strings, not file paths
+    # Check if line contains PowerShell, VBScript, or other scripting commands
+    has_script_command = re.search(
+        r"(for\s+|powershell\s+|cscript\s+|wscript\s+|msiexec\s+)", stripped, re.IGNORECASE
+    )
+
+    if not has_script_command:
         path_patterns = [r'"([^"]*[<>|*?][^"]*)",', r"'([^']*[<>|*?][^']*)'"]
         for pattern in path_patterns:
             match = re.search(pattern, stripped)
@@ -2230,29 +2320,57 @@ def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,t
     # Look for unmatched % or ! delimiters in variable references
     # This is a more conservative check that only flags obvious syntax errors
 
-    # Count % characters - if odd number, might have unmatched delimiter
-    percent_count = stripped.count("%")
-    exclamation_count = stripped.count("!")
+    # Check for indirect variable expansion patterns like !%1!, !%var%!, or !%~n1!
+    # These are valid in batch files with delayed expansion
+    has_indirect_expansion = re.search(
+        r"!([^!]*%[^%!]+%?[^!]*|%~?[a-z0-9]+)!", stripped, re.IGNORECASE
+    )
 
-    # Only flag if there's an obvious mismatch (odd number of delimiters)
-    # and there appear to be variable-like patterns
-    if percent_count % 2 == 1 and re.search(r"%[A-Z0-9_]+", stripped, re.IGNORECASE):
-        issues.append(
-            LintIssue(
-                line_number=line_num,
-                rule=RULES["E011"],
-                context="Variable reference may have mismatched % delimiters",
-            )
+    # Check for dynamic variable assignment like set "%1=value"
+    has_dynamic_assignment = re.search(r'set\s+"[^"]*%\d[^"]*=', stripped, re.IGNORECASE)
+
+    # Only check for mismatched delimiters if not using indirect expansion or dynamic assignment
+    if not has_indirect_expansion and not has_dynamic_assignment:
+        # Look for actual incomplete variable references, not just count delimiters
+        # This avoids false positives from text like "Great!" or "100%"
+
+        # Remove FOR loop variables (%%x) first, as they have different syntax
+        temp_stripped = re.sub(r"%%[a-zA-Z]", "", stripped)
+
+        # Remove all valid variable expansion patterns:
+        # 1. Basic: %VAR% or !VAR!
+        # 2. With substring operations: %VAR:search=replace% or !VAR:search=replace!
+        # 3. With substrings: %VAR:~0,5% or !VAR:~0,5!
+        temp_no_percent_vars = re.sub(r"%[A-Z0-9_~]+[^%]*%", "", temp_stripped, flags=re.IGNORECASE)
+        temp_no_exclaim_vars = re.sub(r"![A-Z0-9_]+[^!]*!", "", temp_stripped, flags=re.IGNORECASE)
+
+        # Now look for incomplete variable patterns that suggest mismatched delimiters
+        # Pattern: % or ! followed by variable-like text but no closing delimiter
+        has_incomplete_percent = re.search(
+            r"%[A-Z0-9_]+(?:[^%]|$)", temp_no_percent_vars, re.IGNORECASE
+        )
+        has_incomplete_exclaim = re.search(
+            r"![A-Z0-9_]+(?:[^!]|$)", temp_no_exclaim_vars, re.IGNORECASE
         )
 
-    if exclamation_count % 2 == 1 and re.search(r"![A-Z0-9_]+", stripped, re.IGNORECASE):
-        issues.append(
-            LintIssue(
-                line_number=line_num,
-                rule=RULES["E011"],
-                context="Delayed expansion variable may have mismatched ! delimiters",
+        # Only flag if we found incomplete variable patterns
+        if has_incomplete_percent:
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["E011"],
+                    context="Variable reference may have mismatched % delimiters",
+                )
             )
-        )
+
+        if has_incomplete_exclaim:
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["E011"],
+                    context="Delayed expansion variable may have mismatched ! delimiters",
+                )
+            )
 
     # E012: Missing CALL for subroutine invocation
     # Check for potential subroutine calls without CALL (label followed by parameters)
@@ -3167,6 +3285,7 @@ def _check_undefined_variables(lines: List[str], set_vars: Set[str]) -> List[Lin
         "PATH",
         "PATHEXT",
         "PROCESSOR_ARCHITECTURE",
+        "PROCESSOR_ARCHITEW6432",  # WOW64 - native architecture on 64-bit when running 32-bit
         "PROCESSOR_IDENTIFIER",
         "PROCESSOR_LEVEL",
         "PROCESSOR_REVISION",
@@ -3176,18 +3295,29 @@ def _check_undefined_variables(lines: List[str], set_vars: Set[str]) -> List[Lin
         "TEMP",
         "TMP",
         "USERDOMAIN",
+        "USERDNSDOMAIN",
         "USERNAME",
         "USERPROFILE",
         "WINDIR",
         "PROGRAMFILES",
         "PROGRAMFILES(X86)",
+        "PROGRAMW6432",  # 64-bit program files folder
         "COMMONPROGRAMFILES",
+        "COMMONPROGRAMFILES(X86)",
         "ALLUSERSPROFILE",
         "APPDATA",
         "LOCALAPPDATA",
+        "PROGRAMDATA",
+        "PUBLIC",
+        "SESSIONNAME",
+        "CLIENTNAME",
         # Optional environment variables that may or may not be set
         "SUDO_USER",  # Set by newer Windows sudo command
         "ORIGINAL_USER",  # Sometimes set by scripts for elevation tracking
+        "DRIVERDATA",  # Driver data directory (Windows 10+)
+        "ONEDRIVE",  # OneDrive directory if configured
+        "ONEDRIVECONSUMER",  # Consumer OneDrive
+        "ONEDRIVECOMMERCIAL",  # Business OneDrive
     }
 
     for i, line in enumerate(lines, start=1):

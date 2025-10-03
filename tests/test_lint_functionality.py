@@ -439,10 +439,16 @@ class TestRuleSystem:
         performance_codes = [code for code in RULES if code.startswith("P")]
 
         # Check that Error codes have Error severity
+        # Exception: E006 was downgraded to WARNING to reduce false positives from system variables
         for code in error_codes:
-            assert (
-                RULES[code].severity == RuleSeverity.ERROR
-            ), f"Rule {code} should have Error severity"
+            if code == "E006":
+                assert (
+                    RULES[code].severity == RuleSeverity.WARNING
+                ), f"Rule {code} should have Warning severity (downgraded from Error)"
+            else:
+                assert (
+                    RULES[code].severity == RuleSeverity.ERROR
+                ), f"Rule {code} should have Error severity"
 
         # Check that Warning codes have Warning severity
         for code in warning_codes:
