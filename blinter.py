@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.23
+Version: 1.0.24
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.23"
+__version__ = "1.0.24"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2801,6 +2801,13 @@ def _check_unquoted_variables(stripped: str, line_num: int) -> List[LintIssue]:
     )
     if is_quoted_set:
         return issues
+
+    # Don't flag variables in IF statements with numeric comparison operators
+    # Numeric operators (equ, neq, lss, leq, gtr, geq) don't need quotes
+    if re.search(r"\bif\s+", stripped, re.IGNORECASE):
+        # Check if using numeric comparison operators
+        if re.search(r"\s+(equ|neq|lss|leq|gtr|geq)\s+", stripped, re.IGNORECASE):
+            return issues
 
     # Don't flag safe system variables that are commonly used unquoted
     safe_variables = [

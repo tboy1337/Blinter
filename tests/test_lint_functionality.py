@@ -74,6 +74,26 @@ if %var%==test echo Variable matches
         finally:
             os.unlink(temp_file)
 
+    def test_unquoted_variables_with_numeric_operators(self) -> None:
+        """Test that unquoted variables with numeric comparison operators don't trigger W005."""
+        content = """@echo off
+set errorcode=0
+if %errorcode% equ 0 echo Success
+if %errorcode% neq 1 echo Not one
+if %errorcode% lss 5 echo Less than five
+if %errorcode% leq 10 echo Less or equal ten
+if %errorcode% gtr -1 echo Greater than negative one
+if %errorcode% geq 0 echo Greater or equal zero
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            # W005 should NOT be triggered for numeric operators
+            assert "W005" not in rule_codes
+        finally:
+            os.unlink(temp_file)
+
     def test_goto_without_label(self) -> None:
         """Test detection of goto without matching label."""
         content = """@echo off
