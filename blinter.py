@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.20
+Version: 1.0.21
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.20"
+__version__ = "1.0.21"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1555,10 +1555,16 @@ def read_file_with_encoding(file_path: str) -> Tuple[List[str], str]:
 
 # Pattern definitions for rule matching
 DANGEROUS_COMMAND_PATTERNS: List[Tuple[str, str]] = [
-    (r"del\s+[\"']?\*\.\*[\"']?(\s|$)", "SEC003"),  # del *.* (more specific)
-    (r"del\s+[\"']?\*/\*[\"']?(\s|$)", "SEC003"),  # del */* pattern
-    (r"del\s+[\"']?[a-z]:\\\*[\"']?(\s|$)", "SEC003"),  # del c:\* type commands
-    (r"format\s+[a-z]:", "SEC003"),  # format c: type commands
+    (r"del\s+(?:[/-]\w+\s+)*[\"']?\*\.\*[\"']?(\s|$)", "SEC003"),  # del *.* with optional flags
+    (
+        r"del\s+(?:[/-]\w+\s+)*[\"']?\*/\*[\"']?(\s|$)",
+        "SEC003",
+    ),  # del */* pattern with optional flags
+    (
+        r"del\s+(?:[/-]\w+\s+)*[\"']?[a-z]:\\\*[\"']?(\s|$)",
+        "SEC003",
+    ),  # del c:\* type commands with optional flags
+    (r"format\s+(?:[/-]\w+\s+)*[a-z]:", "SEC003"),  # format c: type commands with optional flags
     (r"shutdown", "SEC003"),  # shutdown commands
     (r"rmdir\s+/s\s+/q\s+", "SEC003"),  # rmdir /s /q commands
     (r"reg\s+delete\s+.*\s+/f", "SEC004"),  # forced registry deletions
