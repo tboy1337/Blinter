@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.19
+Version: 1.0.20
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.19"
+__version__ = "1.0.20"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2336,6 +2336,14 @@ def _check_syntax_errors(  # pylint: disable=too-many-locals,too-many-branches,t
 
         # Remove FOR loop variables (%%x) first, as they have different syntax
         temp_stripped = re.sub(r"%%[a-zA-Z]", "", stripped)
+
+        # Remove command-line parameters (which don't have closing %)
+        # - %0 through %9 (single digit parameters)
+        # - %* (all parameters)
+        # - %~modifiers0 through %~modifiers9 (with modifiers like %~1, %~n1, %~dp1)
+        temp_stripped = re.sub(
+            r"%~?[fdpnxsatz]*[0-9*](?![0-9])", "", temp_stripped, flags=re.IGNORECASE
+        )
 
         # Remove all valid variable expansion patterns:
         # 1. Basic: %VAR% or !VAR!
