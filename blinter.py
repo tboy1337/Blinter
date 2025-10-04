@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.25
+Version: 1.0.26
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.25"
+__version__ = "1.0.26"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1615,7 +1615,7 @@ COMMAND_CASING_KEYWORDS = {
     "enabledelayedexpansion",
 }
 
-OLDER_WINDOWS_COMMANDS = {"choice", "forfiles", "where", "robocopy", "icacls"}
+OLDER_WINDOWS_COMMANDS = {"choice", "forfiles", "where", "icacls"}
 
 ARCHITECTURE_SPECIFIC_PATTERNS = [
     r"Wow6432Node",  # 32-bit registry redirect

@@ -966,7 +966,8 @@ class TestWarningChecking:
         """Test detection of older Windows commands."""
         set_vars: set[str] = set()
         # Removed "timeout" as it's been available since Windows Vista
-        for cmd in ["choice", "forfiles", "where", "robocopy", "icacls"]:
+        # Removed "robocopy" as it's been available since Windows Vista/Server 2008 (2007-2008)
+        for cmd in ["choice", "forfiles", "where", "icacls"]:
             issues = _check_warning_issues(f"{cmd} /param", 1, set_vars, False)
             warning_issues = [i for i in issues if i.rule.code == "W009"]
             assert len(warning_issues) == 1
