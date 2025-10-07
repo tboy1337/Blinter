@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.34
+Version: 1.0.35
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.34"
+__version__ = "1.0.35"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -3723,6 +3723,7 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals,too-many-
     in_powershell_block = False
     in_vbscript_block = False
     in_csharp_block = False
+    in_powershell_heredoc = False  # Track PowerShell heredoc blocks (<# ... #>)
     block_start_line = 0
 
     # Track the last label line to detect blocks after labels
@@ -3733,6 +3734,26 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals,too-many-
 
         # Skip empty lines and batch comments
         if not stripped or stripped.startswith("::") or stripped.upper().startswith("REM "):
+            continue
+
+        # Check for PowerShell heredoc block start (<#)
+        if re.search(r"<#", stripped):
+            in_powershell_heredoc = True
+            block_start_line = i
+            skip_lines.add(i)
+            logger.debug("Detected PowerShell heredoc block starting at line %d", i)
+            continue
+
+        # Check for PowerShell heredoc block end (#>)
+        if in_powershell_heredoc:
+            skip_lines.add(i)
+            if re.search(r"#>", stripped):
+                logger.debug(
+                    "PowerShell heredoc block ended at line %d (lasted %d lines)",
+                    i,
+                    i - block_start_line + 1,
+                )
+                in_powershell_heredoc = False
             continue
 
         # Track labels (potential start of embedded script block)
