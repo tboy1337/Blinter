@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.27
+Version: 1.0.28
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.27"
+__version__ = "1.0.28"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1960,6 +1960,17 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
                 set_vars.add(var_name_text.upper())
                 break
 
+        # Handle dynamic variable assignments in FOR loops: set "%%~b=value"
+        # This pattern is commonly used to dynamically create variables based on loop iteration
+        # Example: for %%a in (list) do (set "%%~a=value")
+        dynamic_set_match = re.search(r'\bset\s+"%%~[a-zA-Z]=', line.strip(), re.IGNORECASE)
+        if dynamic_set_match:
+            # When we see dynamic variable assignment, we need to look for what values
+            # the FOR loop might iterate over to determine variable names
+            # For now, mark this as a script that uses dynamic variables
+            # and be more lenient with undefined variable warnings
+            set_vars.add("__DYNAMIC_VARS__")
+
     # Add common environment variables that are typically available
     common_env_vars = {
         "PATH",
@@ -2371,7 +2382,33 @@ def _check_path_syntax(stripped: str, line_num: int) -> List[LintIssue]:
 def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
     """Check for mismatched quotes (E009)."""
     issues: List[LintIssue] = []
-    if line.count('"') % 2 != 0:
+
+    # Skip REM comments - they can contain any characters
+    stripped = line.strip()
+    if stripped.lower().startswith("rem ") or stripped.lower().startswith("rem\t"):
+        return issues
+
+    # Skip echo statements - they often contain ASCII art with quotes
+    # that aren't meant to be string delimiters
+    if re.match(r"\s*echo\s+%", stripped, re.IGNORECASE):
+        # This is likely ASCII art using variables, be lenient
+        return issues
+
+    # Count quotes, ignoring escaped quotes ("")
+    # This is a simplified check - batch file quoting is complex
+    quote_count = 0
+    i = 0
+    while i < len(line):
+        if line[i] == '"':
+            # Check if this is an escaped quote ("")
+            if i + 1 < len(line) and line[i + 1] == '"':
+                # Skip both quotes in the pair
+                i += 2
+                continue
+            quote_count += 1
+        i += 1
+
+    if quote_count % 2 != 0:
         issues.append(
             LintIssue(
                 line_number=line_num, rule=RULES["E009"], context="Unmatched double quotes detected"
@@ -2403,17 +2440,18 @@ def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
         r"!([^!]*%[^%!]+%?[^!]*|%~?[a-z0-9]+)!", stripped, re.IGNORECASE
     )
 
-    # Check for dynamic variable assignment like set "%1=value"
-    has_dynamic_assignment = re.search(r'set\s+"[^"]*%\d[^"]*=', stripped, re.IGNORECASE)
+    # Check for dynamic variable assignment like set "%1=value" or set "%%~a=value"
+    has_dynamic_assignment = re.search(r'set\s+"[^"]*%%?~?[a-z0-9][^"]*=', stripped, re.IGNORECASE)
 
     # Only check for mismatched delimiters if not using indirect expansion or dynamic assignment
     if has_indirect_expansion or has_dynamic_assignment:
         return issues
 
-    # Remove FOR loop variables (%%x) first, as they have different syntax
-    temp_stripped = re.sub(r"%%[a-zA-Z]", "", stripped)
+    # Remove FOR loop variables with modifiers (%%~a, %%~nx1, etc.) first
+    temp_stripped = re.sub(r"%%~[a-zA-Z]+", "", stripped)
+    temp_stripped = re.sub(r"%%[a-zA-Z]", "", temp_stripped)
 
-    # Remove command-line parameters
+    # Remove command-line parameters with modifiers (%~nx1, %~dp0, etc.)
     temp_stripped = re.sub(
         r"%~?[fdpnxsatz]*[0-9*](?![0-9])", "", temp_stripped, flags=re.IGNORECASE
     )
@@ -2507,8 +2545,12 @@ def _check_parameter_modifiers(stripped: str, line_num: int) -> List[LintIssue]:
                 )
 
     # E025: Parameter modifier on wrong context
+    # First, remove FOR loop variables with modifiers (%%~a) - these are VALID
+    temp_stripped = re.sub(r"%%~[a-zA-Z]", "", stripped)
+
+    # Now check for parameter modifiers used in wrong context (single % only)
     wrong_context_match: List[str] = re.findall(
-        r"%~[a-zA-Z]+([^0-9%\s][^%\s]*|[A-Z_][A-Z0-9_]*)%", stripped
+        r"%~[a-zA-Z]+([^0-9%\s][^%\s]*|[A-Z_][A-Z0-9_]*)%", temp_stripped
     )
     if wrong_context_match:
         issues.append(
@@ -3435,6 +3477,10 @@ def _check_performance_issues(  # pylint: disable=too-many-arguments,too-many-po
 def _check_undefined_variables(lines: List[str], set_vars: Set[str]) -> List[LintIssue]:
     """Check for usage of undefined variables."""
     issues: List[LintIssue] = []
+
+    # If script uses dynamic variable assignment, be lenient about undefined vars
+    uses_dynamic_vars = "__DYNAMIC_VARS__" in set_vars
+
     # Improved pattern to match only valid variable names, excluding string
     # operations and builtin variables
     var_usage_pattern = re.compile(r"%([A-Z][A-Z0-9_]*)%|!([A-Z][A-Z0-9_]*)!", re.IGNORECASE)
@@ -3505,6 +3551,11 @@ def _check_undefined_variables(lines: List[str], set_vars: Set[str]) -> List[Lin
 
             # Skip built-in variables and single character variables (usually loop variables)
             if var_name in builtin_vars or len(var_name) <= 1:
+                continue
+
+            # If dynamic vars are used, skip undefined variable warnings
+            # (too many false positives when variables are created dynamically)
+            if uses_dynamic_vars:
                 continue
 
             if var_name not in set_vars:
@@ -3902,12 +3953,16 @@ def _check_advanced_escaping_rules(line: str, line_number: int) -> List[LintIssu
 
     # E030: Improper caret escape sequence
     # Look for single caret attempting to escape special chars
-    # But exclude FOR loop command strings where single caret escape is correct
+    # But exclude FOR loop command strings and ECHO statements (ASCII art)
     if re.search(r"\^[&|><](?!\^)", stripped):
         # Check if this is within a FOR loop command string (within single quotes)
         # In FOR loops, command strings like 'command 2^>nul ^| filter' use single caret correctly
         if re.match(r"for\s+.*", stripped, re.IGNORECASE):
             # This is a FOR loop, single caret escaping in command strings is correct
+            pass
+        # Check if this is an ECHO statement (likely ASCII art)
+        elif re.match(r"echo\s+", stripped, re.IGNORECASE):
+            # ECHO statements often contain ASCII art with carets - don't flag these
             pass
         else:
             issues.append(LintIssue(line_number, RULES["E030"], context=stripped))
@@ -3928,9 +3983,13 @@ def _check_advanced_escaping_rules(line: str, line_number: int) -> List[LintIssu
 
     # E033: Double percent escaping error
     # Look for single % in echo statements that should be %%
-    if stripped.lower().startswith("echo") and "%" in stripped and "%%" not in stripped:
-        # Check for percentage signs that might need escaping
-        if re.search(r"echo.*\b\d+%\b", stripped.lower()):
+    if stripped.lower().startswith("echo") and "%" in stripped:
+        # Only flag if there's a literal percentage (like "50%") not a variable reference
+        # Variable references like %var% are fine
+        # Check for percentage signs that might need escaping (number followed by %)
+        # But exclude variable references %VAR%
+        line_without_vars = re.sub(r"%[A-Za-z_][A-Za-z0-9_]*%", "", stripped)
+        if re.search(r"\b\d+%(?!%)\b", line_without_vars):
             issues.append(
                 LintIssue(line_number, RULES["E033"], context="Percentage needs double escaping")
             )
