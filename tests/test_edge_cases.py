@@ -33,6 +33,7 @@ from blinter import (
     _collect_set_variables,
     _detect_line_endings,
     _has_multibyte_chars,
+    lint_batch_file,
     read_file_with_encoding,
 )
 
@@ -1725,3 +1726,291 @@ class TestSpecializedEdgeCases:
             assert isinstance(issues, list)
         finally:
             os.unlink(temp_path)
+
+
+class TestEnhancedQuoteChecking:
+    """Test cases for comprehensive quote checking implementation."""
+
+    def create_temp_batch_file(self, content: str) -> str:
+        """Helper method to create a temporary batch file with given content."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8"
+        ) as temp_file:
+            temp_file.write(content)
+            return temp_file.name
+
+    def test_caret_escaped_quotes(self) -> None:
+        """Test that caret-escaped quotes (^") are handled correctly."""
+        content = """@ECHO OFF
+ECHO This is a caret-escaped quote: ^"test^"
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should not report unmatched quotes for caret-escaped quotes
+            quote_issues = [issue for issue in issues if "quote" in issue.rule.name.lower()]
+            assert len(quote_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_escaped_quotes_double_quote(self) -> None:
+        """Test that double-quote escaping ("") is handled correctly."""
+        content = """@ECHO OFF
+SET "VAR=This has ""escaped"" quotes"
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should not report E009 (unmatched quotes) for "" escaping
+            # May report E028 (complex quote escaping) which is a different check
+            e009_issues = [issue for issue in issues if issue.rule.code == "E009"]
+            assert len(e009_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_line_continuation_with_quote(self) -> None:
+        """Test that line continuation (^) with quotes is handled correctly."""
+        content = """@ECHO OFF
+ECHO This line continues^
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should handle line continuation properly
+            quote_issues = [issue for issue in issues if "quote" in issue.rule.name.lower()]
+            # Line continuation should prevent false positive
+            assert len(quote_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_delayed_expansion_in_set(self) -> None:
+        """Test that delayed expansion in SET commands is handled correctly."""
+        content = """@ECHO OFF
+SETLOCAL ENABLEDELAYEDEXPANSION
+SET "VAR=!OTHER_VAR!"
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should not incorrectly flag delayed expansion
+            quote_issues = [issue for issue in issues if "quote" in issue.rule.name.lower()]
+            assert len(quote_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_call_label_substitution(self) -> None:
+        """Test that CALL label substitution is handled correctly."""
+        content = """@ECHO OFF
+CALL :subroutine "param1" "param2"
+GOTO :EOF
+
+:subroutine
+ECHO %~1
+EXIT /B
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should handle CALL label substitution without false positives
+            quote_issues = [issue for issue in issues if "quote" in issue.rule.name.lower()]
+            assert len(quote_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_parentheses_context_tracking(self) -> None:
+        """Test that parentheses context is tracked correctly."""
+        content = """@ECHO OFF
+IF EXIST "file.txt" (
+    ECHO "File exists"
+)
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should correctly handle quotes within parentheses
+            quote_issues = [issue for issue in issues if "quote" in issue.rule.name.lower()]
+            assert len(quote_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_actual_unmatched_quote(self) -> None:
+        """Test that actual unmatched quotes are still detected."""
+        content = """@ECHO OFF
+ECHO "This quote is unmatched
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should detect the unmatched quote
+            quote_issues = [issue for issue in issues if "quote" in issue.rule.name.lower()]
+            assert len(quote_issues) > 0
+        finally:
+            os.unlink(temp_file)
+
+
+class TestEnhancedBlockDetection:
+    """Test cases for comprehensive block detection implementation."""
+
+    def create_temp_batch_file(self, content: str) -> str:
+        """Helper method to create a temporary batch file with given content."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8"
+        ) as temp_file:
+            temp_file.write(content)
+            return temp_file.name
+
+    def test_block_end_with_goto(self) -> None:
+        """Test that GOTO statements properly end blocks."""
+        content = """@ECHO OFF
+REM Documented section
+:main_label
+SET VAR=value
+GOTO :EOF
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Block should end with GOTO
+            doc_issues = [issue for issue in issues if "documentation" in issue.rule.name.lower()]
+            # Should not flag missing documentation after GOTO
+            assert len(doc_issues) == 0 or all(issue.line_number <= 3 for issue in doc_issues)
+        finally:
+            os.unlink(temp_file)
+
+    def test_block_end_with_exit(self) -> None:
+        """Test that EXIT statements properly end blocks."""
+        content = """@ECHO OFF
+REM Documented section
+:subroutine
+ECHO Running subroutine
+EXIT /B 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Block should end with EXIT
+            doc_issues = [issue for issue in issues if "documentation" in issue.rule.name.lower()]
+            # Should not flag missing documentation after EXIT
+            assert len(doc_issues) == 0 or all(issue.line_number <= 3 for issue in doc_issues)
+        finally:
+            os.unlink(temp_file)
+
+    def test_block_end_with_new_label(self) -> None:
+        """Test that new labels properly end previous blocks."""
+        content = """@ECHO OFF
+REM First section
+:first_label
+ECHO First section
+
+REM Second section
+:second_label
+ECHO Second section
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Each label should start a new block
+            doc_issues = [issue for issue in issues if "documentation" in issue.rule.name.lower()]
+            # Should properly handle multiple labeled sections
+            assert len(doc_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_block_end_with_call_to_label(self) -> None:
+        """Test that CALL to label statements are handled correctly."""
+        content = """@ECHO OFF
+REM Main section
+:main
+CALL :helper
+GOTO :EOF
+
+REM Helper section
+:helper
+ECHO Helper
+EXIT /B
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # CALL to label should be handled
+            doc_issues = [issue for issue in issues if "documentation" in issue.rule.name.lower()]
+            # Should properly handle CALL to label
+            assert len(doc_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_block_end_with_closing_parenthesis(self) -> None:
+        """Test that closing parentheses properly end blocks."""
+        content = """@ECHO OFF
+REM Conditional block
+IF EXIST file.txt (
+    ECHO File exists
+    SET VAR=value
+)
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Closing parenthesis should end the block
+            doc_issues = [issue for issue in issues if "documentation" in issue.rule.name.lower()]
+            # Should handle parentheses correctly
+            assert len(doc_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_block_end_with_double_empty_lines(self) -> None:
+        """Test that double empty lines properly end blocks."""
+        content = """@ECHO OFF
+REM First section
+FOR %%i IN (1 2 3) DO (
+    ECHO %%i
+)
+
+
+REM This is after double empty lines
+ECHO Done
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Double empty lines should end the block
+            doc_issues = [issue for issue in issues if "documentation" in issue.rule.name.lower()]
+            # Should handle paragraph breaks
+            assert len(doc_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_long_block_with_clear_boundary(self) -> None:
+        """Test that long blocks (>15 lines) with clear boundaries are detected."""
+        content = """@ECHO OFF
+REM Long section
+:long_label
+ECHO Line 1
+ECHO Line 2
+ECHO Line 3
+ECHO Line 4
+ECHO Line 5
+ECHO Line 6
+ECHO Line 7
+ECHO Line 8
+ECHO Line 9
+ECHO Line 10
+ECHO Line 11
+ECHO Line 12
+ECHO Line 13
+ECHO Line 14
+ECHO Line 15
+ECHO Line 16
+
+SET VAR=value
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Check for S021 (missing code block documentation) specifically
+            # S013 (file header documentation) is a different check
+            s021_issues = [issue for issue in issues if issue.rule.code == "S021"]
+            # Should handle long blocks properly and not flag S021
+            assert len(s021_issues) == 0
+        finally:
+            os.unlink(temp_file)

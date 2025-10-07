@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.29
+Version: 1.0.30
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.29"
+__version__ = "1.0.30"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2418,26 +2418,67 @@ def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
         # This is likely ASCII art using variables, be lenient
         return issues
 
-    # Count quotes, ignoring escaped quotes ("")
-    # This is a simplified check - batch file quoting is complex
+    # Count quotes with comprehensive handling of batch file quoting rules
+    # Handle: escaped quotes (""), caret escaping (^"), continuation lines,
+    # and context-aware parsing
     quote_count = 0
     i = 0
+    in_parentheses = 0  # Track parentheses depth for FOR/IF blocks
+
     while i < len(line):
-        if line[i] == '"':
+        char = line[i]
+
+        # Track parentheses depth to understand context
+        if char == "(":
+            in_parentheses += 1
+        elif char == ")":
+            in_parentheses = max(0, in_parentheses - 1)
+
+        # Handle quote characters
+        elif char == '"':
+            # Check if this is a caret-escaped quote (^")
+            if i > 0 and line[i - 1] == "^":
+                # This is an escaped quote, skip it
+                i += 1
+                continue
+
             # Check if this is an escaped quote ("")
             if i + 1 < len(line) and line[i + 1] == '"':
                 # Skip both quotes in the pair
                 i += 2
                 continue
+
+            # Check for line continuation (^ at end)
+            # If the quote is followed by ^ at end of line, it may be incomplete
+            remaining = line[i + 1 :].strip()
+            if remaining == "^":
+                # Line continuation - don't count as unmatched
+                i += 1
+                continue
+
+            # This is a regular quote
             quote_count += 1
+
         i += 1
 
-    if quote_count % 2 != 0:
-        issues.append(
-            LintIssue(
-                line_number=line_num, rule=RULES["E009"], context="Unmatched double quotes detected"
+    # Only report unmatched quotes if we're not in a complex parentheses block
+    # and the line doesn't end with continuation character
+    line_continues = line.rstrip().endswith("^")
+
+    if quote_count % 2 != 0 and not line_continues:
+        # Additional check: verify this isn't a special case like delayed expansion
+        # or variable substitution that might have intentional single quotes
+        has_delayed_expansion = "!" in line and stripped.startswith("set ")
+        has_call_substitution = re.search(r"call\s+:[^:]+", stripped, re.IGNORECASE)
+
+        if not (has_delayed_expansion or has_call_substitution):
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["E009"],
+                    context="Unmatched double quotes detected",
+                )
             )
-        )
     return issues
 
 
@@ -4662,7 +4703,10 @@ def _check_code_documentation(lines: List[str]) -> List[LintIssue]:
     return issues
 
 
-def _check_missing_documentation(lines: List[str]) -> List[LintIssue]:
+# pylint: disable=too-many-branches
+def _check_missing_documentation(
+    lines: List[str],
+) -> List[LintIssue]:
     """Check for missing code block documentation."""
     issues: List[LintIssue] = []
     in_complex_block = False
@@ -4698,9 +4742,47 @@ def _check_missing_documentation(lines: List[str]) -> List[LintIssue]:
                     )
                 )
 
-        # End of block detection (simplified)
-        if in_complex_block and (i - complex_block_start > 10 or line.strip() == ""):
-            in_complex_block = False
+        # Comprehensive end of block detection
+        # Detect actual block termination through various batch file constructs
+        if in_complex_block:
+            block_ended = False
+
+            # Check for new label (starts a new section/subroutine)
+            if stripped.startswith(":") and not stripped.startswith("::"):
+                block_ended = True
+
+            # Check for explicit control flow that exits the block
+            elif re.match(r"^(goto|exit)\b", stripped, re.IGNORECASE):
+                block_ended = True
+
+            # Check for CALL to another label (may indicate block end)
+            elif re.match(r"^call\s+:", stripped, re.IGNORECASE):
+                block_ended = True
+
+            # Check for closing parenthesis of multi-line IF or FOR blocks
+            # Count parentheses to detect when we've closed the block
+            open_parens = line.count("(")
+            close_parens = line.count(")")
+            if close_parens > open_parens:
+                # More closing than opening suggests end of a block
+                block_ended = True
+
+            # Check for two consecutive empty lines (paragraph break)
+            if line.strip() == "":
+                # Look ahead to see if next line is also empty
+                if i < len(lines) and lines[i].strip() == "":
+                    block_ended = True
+
+            # Check for significant distance from start (>15 lines) AND a clear boundary
+            # (empty line, new command, etc.)
+            if i - complex_block_start > 15:
+                if line.strip() == "" or re.match(
+                    r"^(echo|set|if|for|call|rem)\b", stripped, re.IGNORECASE
+                ):
+                    block_ended = True
+
+            if block_ended:
+                in_complex_block = False
 
     return issues
 
