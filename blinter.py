@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.32
+Version: 1.0.33
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.32"
+__version__ = "1.0.33"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -3639,6 +3639,230 @@ def _check_undefined_variables(lines: List[str], set_vars: Set[str]) -> List[Lin
     return issues
 
 
+def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+    lines: List[str],
+) -> Set[int]:
+    """
+    Detect embedded PowerShell, VBScript, C#, or other script blocks within batch files.
+
+    These embedded scripts are common in advanced batch files and should be skipped
+    during batch-specific linting to avoid false positives.
+
+    Detection strategies:
+    1. PowerShell blocks: Lines with $variable syntax, PowerShell cmdlets, operators
+    2. VBScript blocks: Lines with VBScript syntax (Dim, Set, WScript, etc.)
+    3. C# blocks: Lines with C# syntax (foreach with types, int/uint, using statements)
+    4. Context-based: Script blocks typically appear after labels
+
+    Args:
+        lines: List of lines from the batch file
+
+    Returns:
+        Set of line numbers (1-indexed) that should be skipped during linting
+    """
+    skip_lines: Set[int] = set()
+
+    # PowerShell indicators (strong signals)
+    powershell_patterns = [
+        r"\$\w+\s*=",  # PowerShell variable assignment: $var =
+        r"\$\w+\.\w+",  # PowerShell member access: $var.property
+        r"\[.*::\w+\]",  # PowerShell static method/type: [Type::Method]
+        r"-match\s+",  # PowerShell -match operator
+        r"-eq\s+",  # PowerShell -eq operator
+        r"-ne\s+",  # PowerShell -ne operator
+        r"-ge\s+",  # PowerShell -ge operator
+        r"-le\s+",  # PowerShell -le operator
+        r"-gt\s+",  # PowerShell -gt operator
+        r"-lt\s+",  # PowerShell -lt operator
+        r"Get-\w+",  # PowerShell cmdlets (Get-*)
+        r"Set-\w+",  # PowerShell cmdlets (Set-*)
+        r"Write-\w+",  # PowerShell cmdlets (Write-*)
+        r"New-\w+",  # PowerShell cmdlets (New-*)
+        r"foreach\s*\(",  # PowerShell foreach loop (lowercase)
+        r"ForEach-Object",  # PowerShell ForEach-Object cmdlet
+        r"\|\s*%\s*{",  # PowerShell pipe to % (ForEach-Object alias)
+        r"\.Get\(\)",  # PowerShell method call pattern
+        r"\.OpenSubKey\(",  # Registry access pattern
+        r"\.GetSubKeyNames\(\)",  # Registry enumeration
+        r"\[Microsoft\.Win32\.",  # .NET type usage
+        r"\[System\.",  # .NET System namespace
+        r"\[Convert\]::\w+",  # .NET Convert class
+        r"\[Math\]::\w+",  # .NET Math class
+    ]
+
+    # VBScript indicators
+    vbscript_patterns = [
+        r"^\s*Dim\s+",  # VBScript Dim statement
+        r"^\s*Set\s+\w+\s*=\s*CreateObject",  # VBScript CreateObject
+        r"WScript\.",  # WScript object
+        r"^\s*On\s+Error\s+Resume\s+Next",  # VBScript error handling
+        r"^\s*Function\s+\w+\(",  # VBScript function definition
+        r"^\s*Sub\s+\w+\(",  # VBScript subroutine definition
+        r"^\s*End\s+Function",  # VBScript end function
+        r"^\s*End\s+Sub",  # VBScript end sub
+        r"^\s*'",  # VBScript comment (line starting with ')
+    ]
+
+    # C# indicators (often embedded in advanced scripts)
+    csharp_patterns = [
+        r"^\s*using\s+System",  # C# using statement
+        # C# access modifiers
+        r"^\s*(public|private|protected|internal)\s+(class|static|void|string|int|bool)",
+        r"^\s*namespace\s+",  # C# namespace
+        r"\bforeach\s*\(\s*\w+\s+\w+\s+in\s+",  # C# foreach (type var in collection)
+        r"\bfor\s*\(\s*int\s+\w+\s*=",  # C# for loop with int declaration
+        r"\bfor\s*\(\s*uint\s+\w+\s*=",  # C# for loop with uint declaration
+        r"\bfor\s*\(\s*long\s+\w+\s*=",  # C# for loop with long declaration
+        r"byte\s+\w+\s+in\s+",  # C# byte iteration
+        r"^\s*{\s*$",  # C# opening brace on its own line (common in C#)
+        r"0x[0-9A-Fa-f]+",  # Hexadecimal literals (common in C#/C++)
+        r"\b(uint|byte|long|ushort|ulong)\s+",  # C# primitive types
+    ]
+
+    # Track if we're in an embedded script block
+    in_powershell_block = False
+    in_vbscript_block = False
+    in_csharp_block = False
+    block_start_line = 0
+
+    # Track the last label line to detect blocks after labels
+    last_label_line = 0
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip()
+
+        # Skip empty lines and batch comments
+        if not stripped or stripped.startswith("::") or stripped.upper().startswith("REM "):
+            continue
+
+        # Track labels (potential start of embedded script block)
+        if re.match(r"^:[a-zA-Z_][\w]*:", stripped):
+            last_label_line = i
+            in_powershell_block = False
+            in_vbscript_block = False
+            in_csharp_block = False
+            continue
+
+        # Check for PowerShell patterns
+        is_powershell_line = False
+        for pattern in powershell_patterns:
+            if re.search(pattern, line, re.IGNORECASE):
+                is_powershell_line = True
+                break
+
+        # Check for VBScript patterns
+        is_vbscript_line = False
+        for pattern in vbscript_patterns:
+            if re.search(pattern, line):
+                is_vbscript_line = True
+                break
+
+        # Check for C# patterns
+        is_csharp_line = False
+        for pattern in csharp_patterns:
+            if re.search(pattern, line):
+                is_csharp_line = True
+                break
+
+        # If we detect embedded script syntax, start a block
+        if is_powershell_line and not in_vbscript_block and not in_csharp_block:
+            if not in_powershell_block:
+                in_powershell_block = True
+                block_start_line = i
+                logger.debug(
+                    "Detected PowerShell block starting at line %d (after label on line %d)",
+                    i,
+                    last_label_line,
+                )
+            skip_lines.add(i)
+            continue
+
+        if is_vbscript_line and not in_powershell_block and not in_csharp_block:
+            if not in_vbscript_block:
+                in_vbscript_block = True
+                block_start_line = i
+                logger.debug(
+                    "Detected VBScript block starting at line %d (after label on line %d)",
+                    i,
+                    last_label_line,
+                )
+            skip_lines.add(i)
+            continue
+
+        if is_csharp_line and not in_powershell_block and not in_vbscript_block:
+            if not in_csharp_block:
+                in_csharp_block = True
+                block_start_line = i
+                logger.debug(
+                    "Detected C# block starting at line %d (after label on line %d)",
+                    i,
+                    last_label_line,
+                )
+            skip_lines.add(i)
+            continue
+
+        # Continue skipping if we're in a block
+        if in_powershell_block or in_vbscript_block or in_csharp_block:
+            # Check if this looks like batch code (might be end of embedded block)
+            # Batch indicators: @echo, set, if, for (uppercase), goto, call, exit
+            batch_indicators = [
+                r"^@?echo\s+",
+                r"^setlocal\b",
+                r"^endlocal\b",
+                r"^set\s+[A-Z_]+=",  # Batch SET with uppercase var
+                r"^if\s+",
+                r"^FOR\s+",  # FOR in uppercase is batch
+                r"^goto\s+",
+                r"^call\s+",
+                r"^exit\s+",
+                r"^pause\s*$",
+                r"^timeout\s+",
+            ]
+
+            is_batch_line = False
+            for pattern in batch_indicators:
+                if re.match(pattern, stripped, re.IGNORECASE):
+                    # Additional check: make sure it's not PowerShell
+                    if not any(re.search(p, line, re.IGNORECASE) for p in powershell_patterns):
+                        is_batch_line = True
+                        break
+
+            if is_batch_line:
+                # Looks like we're back to batch code
+                if in_powershell_block:
+                    logger.debug(
+                        "PowerShell block ended at line %d (lasted %d lines)",
+                        i - 1,
+                        i - block_start_line,
+                    )
+                    in_powershell_block = False
+                if in_vbscript_block:
+                    logger.debug(
+                        "VBScript block ended at line %d (lasted %d lines)",
+                        i - 1,
+                        i - block_start_line,
+                    )
+                    in_vbscript_block = False
+                if in_csharp_block:
+                    logger.debug(
+                        "C# block ended at line %d (lasted %d lines)",
+                        i - 1,
+                        i - block_start_line,
+                    )
+                    in_csharp_block = False
+            else:
+                # Still in embedded script, skip this line
+                skip_lines.add(i)
+
+    if skip_lines:
+        logger.info(
+            "Detected and skipping %d lines of embedded PowerShell/VBScript/C# code",
+            len(skip_lines),
+        )
+
+    return skip_lines
+
+
 def _validate_and_read_file(file_path: str) -> Tuple[List[str], str]:
     """Validate file and read its contents.
 
@@ -3937,12 +4161,24 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
     has_delayed_expansion: bool,
     uses_delayed_vars: bool,
     config: BlinterConfig,
+    skip_lines: Optional[Set[int]] = None,
 ) -> List[LintIssue]:
-    """Process all line-by-line and global checks."""
+    """Process all line-by-line and global checks.
+
+    Args:
+        skip_lines: Optional set of line numbers to skip (e.g., embedded script blocks)
+    """
     issues: List[LintIssue] = []
+
+    if skip_lines is None:
+        skip_lines = set()
 
     # Check each line with all rule categories
     for i, line in enumerate(lines, start=1):
+        # Skip lines that are part of embedded scripts
+        if i in skip_lines:
+            continue
+
         # Error level checks
         issues.extend(_check_syntax_errors(line, i, labels))
 
@@ -4371,6 +4607,9 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     if not lines:
         return []  # Empty file, no issues
 
+    # Detect embedded PowerShell/VBScript blocks to avoid false positives
+    skip_lines = _detect_embedded_script_blocks(lines)
+
     # Store original max_line_length for S011 rule
     original_s011_rule = RULES["S011"]
     if config.max_line_length != 150:
@@ -4412,6 +4651,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
             has_delayed_expansion,
             uses_delayed_vars,
             config,
+            skip_lines,
         )
     )
 
