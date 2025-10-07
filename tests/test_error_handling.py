@@ -165,10 +165,11 @@ class TestSpecificEdgeCases:
         set_vars = {"DEFINED_VAR", "PATH", "TEMP"}
 
         # Test unquoted variables in different contexts
+        # W005 now only checks IF string comparisons, not echo or set
         test_cases = [
             ("if %UNDEFINED_VAR%==value echo test", True),  # Should trigger W005
-            ("echo %PATH%", True),  # Should trigger W005 (could contain spaces)
-            ("set NEWVAR=%PATH%", True),  # Should trigger W005
+            ("echo %PATH%", False),  # Should NOT trigger W005 (echo is safe)
+            ("set NEWVAR=%PATH%", False),  # Should NOT trigger W005 (set is safe)
             ('if "%UNDEFINED_VAR%"=="value" echo test', False),  # Quoted, should not trigger
         ]
 
@@ -177,7 +178,8 @@ class TestSpecificEdgeCases:
             w005_issues = [i for i in issues if i.rule.code == "W005"]
             if should_trigger:
                 assert len(w005_issues) >= 1, f"Should trigger W005 for: {command}"
-            # Note: We can't assert == 0 because other rules might trigger
+            else:
+                assert len(w005_issues) == 0, f"Should NOT trigger W005 for: {command}"
 
     def test_security_issue_comprehensive(self) -> None:
         """Test comprehensive security issue detection."""

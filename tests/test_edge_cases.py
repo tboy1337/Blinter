@@ -199,12 +199,12 @@ class TestWarningIssueChecking:
         assert "W015" in issues[0].rule.code
 
     def test_unquoted_variable_in_echo(self) -> None:
-        """Test unquoted variable detection in ECHO command."""
+        """Test unquoted variable in ECHO - should NOT trigger W005 (only IF comparisons do)."""
         set_vars: Set[str] = set()
         issues = _check_warning_issues("echo %VARIABLE%", 1, set_vars, False)
-        # May also trigger W011 (Unicode handling issue for echo command)
+        # W005 is now more conservative - only checks IF string comparisons
         w005_issues = [i for i in issues if i.rule.code == "W005"]
-        assert len(w005_issues) == 1
+        assert len(w005_issues) == 0, "W005 should not flag echo commands"
 
     def test_ping_without_timeout(self) -> None:
         """Test PING without timeout parameter."""
@@ -432,18 +432,6 @@ class TestGlobalFunctionChecking:
         issues = _check_missing_pause(lines)
         assert len(issues) == 0
 
-    def test_check_mixed_variable_syntax(self) -> None:
-        """Test mixed variable syntax detection."""
-        lines = [
-            "echo %STANDARD_VAR%",
-            "echo !DELAYED_VAR!",
-        ]
-        from blinter import _check_mixed_variable_syntax
-
-        issues = _check_mixed_variable_syntax(lines)
-        assert len(issues) == 1
-        assert "W016" in issues[0].rule.code
-
     def test_check_inconsistent_indentation_mixed(self) -> None:
         """Test mixed tabs and spaces in same line."""
         lines = [
@@ -510,32 +498,6 @@ class TestGlobalFunctionChecking:
         from blinter import _check_missing_header_doc
 
         issues = _check_missing_header_doc(lines)
-        assert len(issues) == 0
-
-    def test_check_redundant_assignments(self) -> None:
-        """Test redundant variable assignments detection."""
-        lines = [
-            "set VAR=value1",
-            "set VAR=value2",  # Redundant - no usage between
-            "echo %VAR%",
-        ]
-        from blinter import _check_redundant_assignments
-
-        issues = _check_redundant_assignments(lines)
-        assert len(issues) == 1
-        assert "P011" in issues[0].rule.code
-
-    def test_check_redundant_assignments_with_usage(self) -> None:
-        """Test no warning when variable is used between assignments."""
-        lines = [
-            "set VAR=value1",
-            "echo %VAR%",  # Used here
-            "set VAR=value2",  # Not redundant
-            "echo %VAR%",
-        ]
-        from blinter import _check_redundant_assignments
-
-        issues = _check_redundant_assignments(lines)
         assert len(issues) == 0
 
 
@@ -696,19 +658,6 @@ class TestAdditionalEdgeCaseScenarios:
         issues = _check_missing_pause(lines)
         assert len(issues) == 0
 
-    def test_mixed_variable_syntax_edge_case(self) -> None:
-        """Test _check_mixed_variable_syntax with delayed variables first."""
-        from blinter import _check_mixed_variable_syntax
-
-        lines = [
-            "echo !DELAYED_VAR!",  # Delayed expansion first
-            "echo %STANDARD_VAR%",  # Standard expansion second
-        ]
-        issues = _check_mixed_variable_syntax(lines)
-        assert len(issues) == 1
-        assert "W016" in issues[0].rule.code
-        # Should flag the standard variable since delayed came first
-
     def test_find_batch_files_not_file_or_directory(self) -> None:
         """Test find_batch_files with invalid path type."""
         import os
@@ -745,20 +694,6 @@ class TestAdditionalEdgeCaseScenarios:
 
         # Test non-safe context
         assert _is_command_in_safe_context("del *.* /q") is False
-
-    def test_redundant_assignments_edge_case(self) -> None:
-        """Test _check_redundant_assignments with complex patterns."""
-        from blinter import _check_redundant_assignments
-
-        # Test assignment with delayed variable usage
-        lines = [
-            "set VAR=value1",
-            "set VAR=value2",
-            "set VAR=value3",  # Multiple redundant assignments
-            "echo !VAR!",  # Usage with delayed expansion
-        ]
-        issues = _check_redundant_assignments(lines)
-        assert len(issues) == 2  # Two redundant assignments
 
     def test_chardet_detected_encoding_not_in_list(self) -> None:
         """Test chardet detecting encoding not in our default list."""
@@ -840,21 +775,6 @@ class TestAdditionalEdgeCaseScenarios:
         ]
         issues = _check_inconsistent_indentation(lines)
         assert len(issues) == 0  # Should not flag with only one indented line
-
-    def test_redundant_assignments_between_check(self) -> None:
-        """Test redundant assignments checking logic between assignments."""
-        from blinter import _check_redundant_assignments
-
-        # Test the specific branch where assignments have no usage between them
-        lines = [
-            "set VAR1=first",
-            "set VAR2=other",
-            "set VAR1=second",  # Should be flagged - no usage of VAR1 between assignments
-            "set VAR1=third",  # Should also be flagged
-            "echo %VAR1%",  # Finally used
-        ]
-        issues = _check_redundant_assignments(lines)
-        assert len(issues) == 2  # Two redundant assignments for VAR1
 
     def test_main_function_no_path_provided(self) -> None:
         """Test main function when no path is provided."""

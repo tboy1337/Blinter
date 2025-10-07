@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.28
+Version: 1.0.29
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.28"
+__version__ = "1.0.29"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -192,13 +192,16 @@ RULES: Dict[str, Rule] = {
     ),
     "E006": Rule(
         code="E006",
-        name="Undefined variable reference",
-        # Changed from ERROR to WARNING - many false positives from system vars
+        name="Potentially undefined variable reference",
+        # Note: Despite "E" prefix, this is WARNING severity due to common use of
+        # environment variables set by system or parent processes (false positive risk)
         severity=RuleSeverity.WARNING,
-        explanation="Script references variables that were never set in this script, "
-        "which may cause runtime errors if not set by parent process or system",
-        recommendation="Define the variable using SET before referencing it, "
-        "or add existence checks, or verify it's set by system/parent process",
+        explanation="Script references variables that were never set in this script. "
+        "This may be intentional if using environment variables, but could cause "
+        "runtime errors if the variable is not set by parent process or system",
+        recommendation="If this is an environment variable, this warning can be ignored. "
+        "Otherwise, define the variable using SET before referencing it, "
+        "or add IF DEFINED checks to handle undefined cases",
     ),
     "E007": Rule(
         code="E007",
@@ -354,8 +357,16 @@ RULES: Dict[str, Rule] = {
         code="W011",
         name="Unicode handling issue",
         severity=RuleSeverity.WARNING,
-        explanation="File operation may not handle Unicode characters properly",
-        recommendation="Consider using commands with better Unicode support",
+        explanation=(
+            "Command contains non-ASCII characters or complex operations "
+            "that may not handle Unicode properly. "
+            "Note: Only flags lines with actual Unicode content or unsafe operations, "
+            "not all echo/type/find commands"
+        ),
+        recommendation=(
+            "Consider using commands with better Unicode support, "
+            "or ensure proper code page (chcp 65001 for UTF-8)"
+        ),
     ),
     "W012": Rule(
         code="W012",
@@ -396,16 +407,6 @@ RULES: Dict[str, Rule] = {
             "Use proper errorlevel syntax: 'IF ERRORLEVEL n', 'IF NOT ERRORLEVEL n', "
             "or 'IF %ERRORLEVEL% operator value'"
         ),
-    ),
-    "W016": Rule(
-        code="W016",
-        name="Mixed variable syntax within script",
-        severity=RuleSeverity.WARNING,
-        explanation=(
-            "Inconsistent use of %VAR% and !VAR! syntax within the same script "
-            "reduces readability"
-        ),
-        recommendation="Use consistent variable expansion syntax throughout the script",
     ),
     "W017": Rule(
         code="W017",
@@ -644,9 +645,18 @@ RULES: Dict[str, Rule] = {
     "SEC006": Rule(
         code="SEC006",
         name="Hardcoded absolute path",
-        severity=RuleSeverity.SECURITY,
-        explanation="Absolute paths may not exist on other systems and could be security risks",
-        recommendation="Use environment variables like %%USERPROFILE%% instead of hardcoded paths",
+        # Note: This is a STYLE/portability issue, not a security issue
+        # Keeping SEC prefix for backward compatibility but severity is STYLE
+        severity=RuleSeverity.STYLE,
+        explanation=(
+            "Hardcoded absolute paths may not exist on other systems, "
+            "reducing script portability. "
+            "This is a portability concern, not a security issue"
+        ),
+        recommendation=(
+            "Use environment variables like %%USERPROFILE%%, %%PROGRAMFILES%%, etc. "
+            "instead of hardcoded paths for better portability across different systems"
+        ),
     ),
     "SEC007": Rule(
         code="SEC007",
@@ -749,13 +759,6 @@ RULES: Dict[str, Rule] = {
         explanation="Directory operations can be faster with appropriate flags",
         recommendation="Use /F flag for large directory operations: DIR /F",
     ),
-    "P011": Rule(
-        code="P011",
-        name="Redundant variable assignments",
-        severity=RuleSeverity.PERFORMANCE,
-        explanation="Multiple assignments to the same variable without usage is inefficient",
-        recommendation="Remove intermediate assignments or combine operations",
-    ),
     # Advanced Variable Expansion Rules (E017-E030)
     "E017": Rule(
         code="E017",
@@ -851,15 +854,21 @@ RULES: Dict[str, Rule] = {
         code="W024",
         name="Deprecated command detected",
         severity=RuleSeverity.WARNING,
-        explanation="Command is deprecated in modern Windows versions",
-        recommendation=("Replace with modern equivalent: XCOPY->ROBOCOPY, NET SEND->MSG, etc."),
+        explanation="Command is deprecated in modern Windows versions and may not be available",
+        recommendation=(
+            "Replace with modern equivalent: "
+            "NET SEND->MSG, AT->SCHTASKS, CACLS->ICACLS, etc. "
+            "Note: XCOPY is NOT deprecated despite ROBOCOPY being recommended "
+            "for advanced scenarios"
+        ),
     ),
     "W025": Rule(
         code="W025",
-        name="Missing error redirection",
+        name="Missing error handling",
         severity=RuleSeverity.WARNING,
-        explanation=("Command may produce error output that should be redirected"),
-        recommendation=("Add error redirection: 2>nul to suppress errors or 2>&1 to capture them"),
+        explanation="Command may produce errors that should be checked",
+        recommendation="Add error checking: IF ERRORLEVEL 1 to handle failures. "
+        "Only use 2>nul if you genuinely want to ignore expected errors",
     ),
     # Advanced Style and Best Practice Rules (S017-S025)
     "S017": Rule(
@@ -873,11 +882,11 @@ RULES: Dict[str, Rule] = {
     ),
     "S018": Rule(
         code="S018",
-        name="Missing function documentation",
+        name="Missing subroutine documentation",
         severity=RuleSeverity.STYLE,
-        explanation="Functions and subroutines should have documentation comments",
+        explanation="Subroutines (callable labels) should have documentation comments",
         recommendation=(
-            "Add REM comments describing function purpose, parameters, and return values"
+            "Add REM comments describing subroutine purpose, parameters, and return values"
         ),
     ),
     "S019": Rule(
@@ -1123,7 +1132,7 @@ RULES: Dict[str, Rule] = {
         code="W039",
         name="Nested FOR loops without call optimization",
         severity=RuleSeverity.WARNING,
-        explanation="Complex nested FOR loops should use CALL :subroutine for maintainability",
+        explanation=("Complex nested FOR loops should use CALL :subroutine for maintainability"),
         recommendation="Move inner loop logic to separate subroutine using CALL :label",
     ),
     "W040": Rule(
@@ -1137,8 +1146,14 @@ RULES: Dict[str, Rule] = {
         code="W041",
         name="Missing error handling for external commands",
         severity=RuleSeverity.WARNING,
-        explanation="External commands called in scripts should include errorlevel checking",
-        recommendation="Check errorlevel after each external command: IF !ERRORLEVEL! NEQ 0",
+        explanation=(
+            "External commands should have errorlevel checking to handle failures properly"
+        ),
+        recommendation=(
+            "Add error checking: IF ERRORLEVEL 1 (handle error) "
+            "or IF %ERRORLEVEL% NEQ 0 (handle error). "
+            "Don't just hide errors with 2>nul unless you have a specific reason"
+        ),
     ),
     "W042": Rule(
         code="W042",
@@ -1187,8 +1202,10 @@ RULES: Dict[str, Rule] = {
         code="SEC018",
         name="Command output redirection to insecure location",
         severity=RuleSeverity.SECURITY,
-        explanation="Redirecting sensitive output to world-readable locations exposes information",
-        recommendation="Redirect to secure user directories or use appropriate file permissions",
+        explanation=(
+            "Redirecting sensitive output to world-readable locations exposes information"
+        ),
+        recommendation=("Redirect to secure user directories or use appropriate file permissions"),
     ),
     "SEC019": Rule(
         code="SEC019",
@@ -1200,10 +1217,16 @@ RULES: Dict[str, Rule] = {
     # Advanced Style Rules (S021-S030)
     "S021": Rule(
         code="S021",
-        name="Missing code block documentation",
+        name="Missing subroutine documentation",
         severity=RuleSeverity.STYLE,
-        explanation="Complex code blocks should have descriptive comments explaining their purpose",
-        recommendation="Add REM comments before complex FOR loops, IF blocks, and subroutines",
+        explanation=(
+            "Subroutines (callable labels) should have descriptive comments "
+            "explaining their purpose"
+        ),
+        recommendation=(
+            "Add REM comments before subroutines describing what they do, "
+            "parameters, and return behavior"
+        ),
     ),
     "S022": Rule(
         code="S022",
@@ -1626,6 +1649,7 @@ ARCHITECTURE_SPECIFIC_PATTERNS = [
 UNICODE_PROBLEMATIC_COMMANDS = {"type", "echo", "find", "findstr"}
 
 # Additional patterns for new rules
+# Note: xcopy is NOT deprecated despite robocopy being recommended for advanced scenarios
 DEPRECATED_COMMANDS = {"assign", "backup", "comp", "edlin", "join", "subst"}
 
 COMMON_COMMAND_TYPOS = {
@@ -2844,52 +2868,30 @@ def _check_command_warnings(  # pylint: disable=unused-argument
 
 
 def _check_unquoted_variables(stripped: str, line_num: int) -> List[LintIssue]:
-    """Check for unquoted variables with spaces (W005)."""
+    """Check for unquoted variables with spaces (W005).
+
+    Only flags genuinely problematic cases:
+    - IF string comparisons (==) with unquoted variables
+    """
     issues: List[LintIssue] = []
-    unquoted_var_pattern = r'(?<!["\'])%[A-Z0-9_]+%|(?<!["\'])![A-Z0-9_]+!'
-    if not re.search(unquoted_var_pattern, stripped, re.IGNORECASE):
-        return issues
 
-    # Check if it's in a context where spaces could be problematic
-    if not any(cmd in stripped.lower() for cmd in ["if", "echo", "set", "call"]):
-        return issues
-
-    # Don't flag variables inside quoted SET commands like: set "VAR=%PATH%\test"
-    is_quoted_set = re.match(r'set\s+"[^"]+"', stripped, re.IGNORECASE) or re.match(
-        r"set\s+'[^']+'", stripped, re.IGNORECASE
-    )
-    if is_quoted_set:
-        return issues
-
-    # Don't flag variables in IF statements with numeric comparison operators
-    # Numeric operators (equ, neq, lss, leq, gtr, geq) don't need quotes
-    if re.search(r"\bif\s+", stripped, re.IGNORECASE):
-        # Check if using numeric comparison operators
-        if re.search(r"\s+(equ|neq|lss|leq|gtr|geq)\s+", stripped, re.IGNORECASE):
-            return issues
-
-    # Don't flag safe system variables that are commonly used unquoted
-    safe_variables = [
-        "errorlevel",
-        "random",
-        "cd",
-        "date",
-        "time",
-        "processor_architecture",
-    ]
-
-    # Extract variable names from the line
-    var_matches: List[str] = re.findall(r"%([A-Z0-9_]+)%", stripped, re.IGNORECASE)
-
-    # Only flag if none of the variables are in the safe list
-    if not any(var.lower() in safe_variables for var in var_matches):
-        issues.append(
-            LintIssue(
-                line_number=line_num,
-                rule=RULES["W005"],
-                context="Variable may contain spaces and should be quoted",
+    # Only check IF string comparisons with == operator
+    # These are the most common source of issues with unquoted variables
+    if_string_comp = re.search(r"\bif\s+(?:not\s+)?%[A-Z0-9_]+%\s*==\s*", stripped, re.IGNORECASE)
+    if if_string_comp:
+        # Don't flag if already quoted properly elsewhere in the comparison
+        if not re.search(r'\bif\s+(?:not\s+)?"[^"]*%[A-Z0-9_]+%[^"]*"', stripped, re.IGNORECASE):
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["W005"],
+                    context=(
+                        "IF string comparison with unquoted variable "
+                        "may fail if variable contains spaces"
+                    ),
+                )
             )
-        )
+
     return issues
 
 
@@ -3928,7 +3930,6 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
 
     # Global checks that depend on configuration flags
     issues.extend(_check_missing_pause(lines))  # Warning level
-    issues.extend(_check_mixed_variable_syntax(lines))  # Warning level
 
     # Style-level global checks
     issues.extend(_check_inconsistent_indentation(lines))
@@ -3937,7 +3938,6 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
     issues.extend(_check_advanced_style_rules(lines))  # Style level S017-S020
 
     # Performance-level global checks
-    issues.extend(_check_redundant_assignments(lines))
     issues.extend(_check_enhanced_performance(lines))  # Performance level P012-P014
 
     return issues
@@ -3978,8 +3978,16 @@ def _check_advanced_escaping_rules(line: str, line_number: int) -> List[LintIssu
             issues.append(LintIssue(line_number, RULES["E031"], context=seq))
 
     # E032: Continuation character with trailing spaces
-    if stripped.endswith("^") and line.rstrip() != line.rstrip(" \t"):
-        issues.append(LintIssue(line_number, RULES["E032"], context="Caret with trailing spaces"))
+    # Check if line ends with ^ followed by spaces/tabs (before the line ending)
+    if stripped.endswith("^"):
+        # Get the line without line endings
+        line_no_newline = line.rstrip("\r\n")
+        # If the line doesn't end with ^ after removing spaces,
+        # then there are trailing spaces after ^
+        if not line_no_newline.endswith("^"):
+            issues.append(
+                LintIssue(line_number, RULES["E032"], context="Caret with trailing spaces")
+            )
 
     # E033: Double percent escaping error
     # Look for single % in echo statements that should be %%
@@ -5029,52 +5037,6 @@ def _check_missing_pause(lines: List[str]) -> List[LintIssue]:
     return issues
 
 
-def _check_mixed_variable_syntax(lines: List[str]) -> List[LintIssue]:
-    """Check for mixed variable syntax within the same script (W016)."""
-    issues: List[LintIssue] = []
-
-    has_percent_vars = False
-    has_exclamation_vars = False
-    first_percent_line = 0
-    first_exclamation_line = 0
-
-    for i, line in enumerate(lines, start=1):
-        if not has_percent_vars and re.search(r"%[A-Z0-9_]+%", line, re.IGNORECASE):
-            has_percent_vars = True
-            first_percent_line = i
-
-        if not has_exclamation_vars and re.search(r"![A-Z0-9_]+!", line, re.IGNORECASE):
-            has_exclamation_vars = True
-            first_exclamation_line = i
-
-    if has_percent_vars and has_exclamation_vars:
-        # Flag the second occurrence
-        if first_exclamation_line > first_percent_line:
-            issues.append(
-                LintIssue(
-                    line_number=first_exclamation_line,
-                    rule=RULES["W016"],
-                    context=(
-                        f"Mixed variable syntax detected "
-                        f"(standard %VAR% used on line {first_percent_line})"
-                    ),
-                )
-            )
-        else:
-            issues.append(
-                LintIssue(
-                    line_number=first_percent_line,
-                    rule=RULES["W016"],
-                    context=(
-                        f"Mixed variable syntax detected "
-                        f"(delayed !VAR! used on line {first_exclamation_line})"
-                    ),
-                )
-            )
-
-    return issues
-
-
 def _collect_indented_lines(lines: List[str]) -> List[Tuple[int, str]]:
     """Collect all indented lines with their leading whitespace."""
     indented_lines = []
@@ -5306,95 +5268,6 @@ def _check_cmd_case_consistency(lines: List[str]) -> List[LintIssue]:
                         )
 
     return issues
-
-
-def _collect_variable_data(lines: List[str]) -> Tuple[Dict[str, List[int]], Dict[str, List[int]]]:
-    """Collect variable assignments and usage data from lines.
-
-    Args:
-        lines: List of batch file lines
-
-    Returns:
-        Tuple containing (assignments dict, usage dict)
-    """
-    var_assignments: Dict[str, List[int]] = defaultdict(list)
-    var_usage: Dict[str, List[int]] = defaultdict(list)
-
-    for i, line in enumerate(lines, start=1):
-        stripped = line.strip()
-
-        # Track assignments - handle both quoted and unquoted SET commands
-        set_patterns = [
-            r"set\s+([A-Za-z0-9_]+)\s*=",  # Regular set: set VAR=value
-            r'set\s+"([A-Za-z0-9_]+)\s*=',  # Quoted set: set "VAR=value"
-        ]
-        for pattern in set_patterns:
-            set_match = re.match(pattern, stripped, re.IGNORECASE)
-            if set_match:
-                var_name: str = set_match.group(1).upper()
-                var_assignments[var_name].append(i)
-                break
-
-        # Track usage
-        for var_match in re.finditer(
-            r"%([A-Za-z0-9_]+)%|!([A-Za-z0-9_]+)!", stripped, re.IGNORECASE
-        ):
-            var_name_part1: Optional[str] = var_match.group(1)
-            var_name_part2: Optional[str] = var_match.group(2)
-            used_var_name: str = (var_name_part1 or var_name_part2 or "").upper()
-            if used_var_name:
-                var_usage[used_var_name].append(i)
-
-    return var_assignments, var_usage
-
-
-def _find_redundant_assignments(
-    var_assignments: Dict[str, List[int]], var_usage: Dict[str, List[int]]
-) -> List[LintIssue]:
-    """Find redundant variable assignments.
-
-    Args:
-        var_assignments: Dictionary mapping variable names to assignment line numbers
-        var_usage: Dictionary mapping variable names to usage line numbers
-
-    Returns:
-        List of lint issues for redundant assignments
-    """
-    issues: List[LintIssue] = []
-
-    # Find redundant assignments (multiple assignments without usage in between)
-    for var_name, assignment_lines in var_assignments.items():
-        if len(assignment_lines) > 1:
-            usage_lines = var_usage.get(var_name, [])
-
-            for i in range(len(assignment_lines) - 1):
-                current_assignment = assignment_lines[i]
-                next_assignment = assignment_lines[i + 1]
-
-                # Check if there's any usage between assignments
-                usage_between = any(
-                    current_assignment < usage_line < next_assignment for usage_line in usage_lines
-                )
-
-                if not usage_between:
-                    issues.append(
-                        LintIssue(
-                            line_number=current_assignment,
-                            rule=RULES["P011"],
-                            context=(
-                                f"Variable '{var_name}' reassigned on line {next_assignment} "
-                                f"without intermediate usage"
-                            ),
-                        )
-                    )
-
-    return issues
-
-
-def _check_redundant_assignments(lines: List[str]) -> List[LintIssue]:
-    """Check for redundant variable assignments (P011)."""
-    var_assignments, var_usage = _collect_variable_data(lines)
-    return _find_redundant_assignments(var_assignments, var_usage)
 
 
 def group_issues(issues: List[LintIssue]) -> DefaultDict[RuleSeverity, List[LintIssue]]:
@@ -5847,85 +5720,181 @@ def main() -> None:
     _exit_with_results(results, cli_args.target_path)
 
 
+def _check_percent_tilde_syntax(stripped: str, line_number: int) -> List[LintIssue]:
+    """Check for percent-tilde syntax issues (E017, E019)."""
+    issues: List[LintIssue] = []
+    tilde_pattern = r"%~([a-zA-Z]+)([0-9]+|[a-zA-Z])%"
+    valid_modifiers = set("nxfpdstaz")
+
+    for match in re.finditer(tilde_pattern, stripped):
+        modifiers = str(match.group(1)).lower()
+        parameter = str(match.group(2))
+
+        # Check for invalid modifiers
+        if not all(m in valid_modifiers for m in modifiers):
+            issues.append(
+                LintIssue(
+                    line_number=line_number,
+                    rule=RULES["E017"],
+                    context=f"Invalid modifier in %~{modifiers}{parameter}%",
+                )
+            )
+
+        # Check if used on non-parameter variable (not 0-9 or FOR variable)
+        if not (parameter.isdigit() or (len(parameter) == 1 and parameter.isalpha())):
+            issues.append(
+                LintIssue(
+                    line_number=line_number,
+                    rule=RULES["E019"],
+                    context=f"Percent-tilde syntax used on invalid parameter: {parameter}",
+                )
+            )
+
+    return issues
+
+
+def _check_for_loop_var_syntax(stripped: str, line_number: int) -> List[LintIssue]:
+    """Check FOR loop variable syntax (E020)."""
+    issues: List[LintIssue] = []
+    for_pattern = r"for\s+%%?([a-zA-Z])\s+in\s*\("
+
+    for match in re.finditer(for_pattern, stripped, re.IGNORECASE):
+        # In batch files, should use %%i, on command line %i
+        var_syntax = match.group(0)
+        if "%%" not in var_syntax:
+            issues.append(
+                LintIssue(
+                    line_number=line_number,
+                    rule=RULES["E020"],
+                    context="FOR loop variable should use %% in batch files",
+                )
+            )
+
+    return issues
+
+
+def _check_string_operation_syntax(stripped: str, line_number: int) -> List[LintIssue]:
+    """Check string operations syntax (E021)."""
+    issues: List[LintIssue] = []
+    string_ops = [
+        r"%[a-zA-Z_][a-zA-Z0-9_]*:~[^%]*%",  # Substring
+        r"%[a-zA-Z_][a-zA-Z0-9_]*:[^=]*=[^%]*%",  # Replacement
+    ]
+
+    for pattern in string_ops:
+        for match in re.finditer(pattern, stripped):
+            # Basic validation - more complex validation would need parsing
+            if match.group(0).count("%") != 2:
+                issues.append(
+                    LintIssue(
+                        line_number=line_number,
+                        rule=RULES["E021"],
+                        context=f"Malformed string operation: {match.group(0)}",
+                    )
+                )
+
+    return issues
+
+
+def _check_set_a_quoting(stripped: str, line_number: int) -> List[LintIssue]:
+    """Check SET /A syntax (E023)."""
+    issues: List[LintIssue] = []
+
+    if re.match(r"\s*set\s+/a\s+", stripped, re.IGNORECASE):
+        # Check for special characters that need quoting
+        if any(char in stripped for char in "^&|<>()"):
+            if not ('"' in stripped or "'" in stripped):
+                issues.append(
+                    LintIssue(
+                        line_number=line_number,
+                        rule=RULES["E023"],
+                        context="SET /A with special characters should be quoted",
+                    )
+                )
+
+    return issues
+
+
 def _check_advanced_vars(lines: List[str]) -> List[LintIssue]:
     """Check for advanced variable expansion syntax issues (E017-E022)."""
     issues: List[LintIssue] = []
 
     for i, line in enumerate(lines, start=1):
         stripped = line.strip()
-
-        # Check for percent-tilde syntax (E017, E018)
-        tilde_pattern = r"%~([a-zA-Z]+)([0-9]+|[a-zA-Z])%"
-        for match in re.finditer(tilde_pattern, stripped):
-            modifiers = str(match.group(1)).lower()
-            parameter = str(match.group(2))
-
-            # Check for invalid modifiers
-            valid_modifiers = set("nxfpdstaz")
-            if not all(m in valid_modifiers for m in modifiers):
-                issues.append(
-                    LintIssue(
-                        line_number=i,
-                        rule=RULES["E017"],
-                        context=f"Invalid modifier in %~{modifiers}{parameter}%",
-                    )
-                )
-
-            # Check if used on non-parameter variable (not 0-9 or FOR variable)
-            if not (parameter.isdigit() or (len(parameter) == 1 and parameter.isalpha())):
-                issues.append(
-                    LintIssue(
-                        line_number=i,
-                        rule=RULES["E019"],
-                        context=f"Percent-tilde syntax used on invalid parameter: {parameter}",
-                    )
-                )
-
-        # Check FOR loop variable syntax (E020)
-        for_pattern = r"for\s+%%?([a-zA-Z])\s+in\s*\("
-        for match in re.finditer(for_pattern, stripped, re.IGNORECASE):
-            # In batch files, should use %%i, on command line %i
-            var_syntax = match.group(0)
-            if "%%" not in var_syntax:
-                issues.append(
-                    LintIssue(
-                        line_number=i,
-                        rule=RULES["E020"],
-                        context="FOR loop variable should use %% in batch files",
-                    )
-                )
-
-        # Check string operations syntax (E021)
-        string_ops = [
-            r"%[a-zA-Z_][a-zA-Z0-9_]*:~[^%]*%",  # Substring
-            r"%[a-zA-Z_][a-zA-Z0-9_]*:[^=]*=[^%]*%",  # Replacement
-        ]
-        for pattern in string_ops:
-            for match in re.finditer(pattern, stripped):
-                # Basic validation - more complex validation would need parsing
-                if match.group(0).count("%") != 2:
-                    issues.append(
-                        LintIssue(
-                            line_number=i,
-                            rule=RULES["E021"],
-                            context=f"Malformed string operation: {match.group(0)}",
-                        )
-                    )
-
-        # Check SET /A syntax (E022, E023)
-        if re.match(r"\s*set\s+/a\s+", stripped, re.IGNORECASE):
-            # Check for special characters that need quoting
-            if any(char in stripped for char in "^&|<>()"):
-                if not ('"' in stripped or "'" in stripped):
-                    issues.append(
-                        LintIssue(
-                            line_number=i,
-                            rule=RULES["E023"],
-                            context="SET /A with special characters should be quoted",
-                        )
-                    )
+        issues.extend(_check_percent_tilde_syntax(stripped, i))
+        issues.extend(_check_for_loop_var_syntax(stripped, i))
+        issues.extend(_check_string_operation_syntax(stripped, i))
+        issues.extend(_check_set_a_quoting(stripped, i))
 
     return issues
+
+
+def _check_for_f_options(stripped: str, line_number: int) -> Optional[LintIssue]:
+    """Check FOR /F without proper options (W020)."""
+    if re.match(r'\s*for\s+/f\s+(?!.*"[^"]*tokens[^"]*")[^(]*\(', stripped, re.IGNORECASE):
+        return LintIssue(
+            line_number=line_number,
+            rule=RULES["W020"],
+            context="FOR /F without explicit tokens/delims options",
+        )
+    return None
+
+
+def _check_if_comparison_quotes(stripped: str, line_number: int) -> Optional[LintIssue]:
+    """Check IF comparisons without quotes (W021)."""
+    if_pattern = r'\s*if\s+(?:not\s+)?%\w+%\s*==\s*[^"\']\w+'
+    if re.search(if_pattern, stripped, re.IGNORECASE):
+        return LintIssue(
+            line_number=line_number, rule=RULES["W021"], context="IF comparison should be quoted"
+        )
+    return None
+
+
+def _check_deprecated_commands(stripped: str, line_number: int) -> List[LintIssue]:
+    """Check for deprecated commands (W024)."""
+    issues: List[LintIssue] = []
+    # Note: xcopy is NOT deprecated, so it's not included here
+    deprecated_commands = {
+        "net send": "msg",
+        "at ": "schtasks",
+        "cacls": "icacls",
+    }
+
+    for deprecated, modern in deprecated_commands.items():
+        if re.search(rf"\b{re.escape(deprecated)}\b", stripped, re.IGNORECASE):
+            issues.append(
+                LintIssue(
+                    line_number=line_number,
+                    rule=RULES["W024"],
+                    context=f"Use {modern} instead of {deprecated}",
+                )
+            )
+
+    return issues
+
+
+def _check_cmd_error_handling(
+    stripped: str, line_number: int, lines: List[str]
+) -> Optional[LintIssue]:
+    """Check for missing error handling (W025)."""
+    commands_needing_handling = ["del", "copy", "move", "mkdir", "rmdir"]
+
+    for cmd in commands_needing_handling:
+        if re.match(rf"\s*{cmd}\s+", stripped, re.IGNORECASE):
+            # Check if next 3 lines have error handling
+            for j in range(line_number, min(line_number + 3, len(lines) + 1)):
+                if j <= len(lines) and (
+                    "errorlevel" in lines[j - 1].lower() or "if " in lines[j - 1].lower()
+                ):
+                    return None
+
+            return LintIssue(
+                line_number=line_number,
+                rule=RULES["W025"],
+                context=f"{cmd.upper()} command without error checking",
+            )
+
+    return None
 
 
 def _check_enhanced_commands(lines: List[str]) -> List[LintIssue]:
@@ -5940,54 +5909,20 @@ def _check_enhanced_commands(lines: List[str]) -> List[LintIssue]:
         if re.search(r"!\w+!", stripped):
             uses_delayed_expansion = True
 
-        # Check FOR /F without proper options (W020)
-        if re.match(r'\s*for\s+/f\s+(?!.*"[^"]*tokens[^"]*")[^(]*\(', stripped, re.IGNORECASE):
-            issues.append(
-                LintIssue(
-                    line_number=i,
-                    rule=RULES["W020"],
-                    context="FOR /F without explicit tokens/delims options",
-                )
-            )
+        # Run all line-level checks
+        issue = _check_for_f_options(stripped, i)
+        if issue:
+            issues.append(issue)
 
-        # Check IF comparisons without quotes (W021)
-        if_pattern = r'\s*if\s+(?:not\s+)?%\w+%\s*==\s*[^"\']\w+'
-        if re.search(if_pattern, stripped, re.IGNORECASE):
-            issues.append(
-                LintIssue(
-                    line_number=i, rule=RULES["W021"], context="IF comparison should be quoted"
-                )
-            )
+        issue = _check_if_comparison_quotes(stripped, i)
+        if issue:
+            issues.append(issue)
 
-        # Check for deprecated commands (W024)
-        deprecated_commands = {
-            "xcopy": "robocopy",
-            "net send": "msg",
-            "at ": "schtasks",
-            "cacls": "icacls",
-        }
-        for deprecated, modern in deprecated_commands.items():
-            if re.search(rf"\b{re.escape(deprecated)}\b", stripped, re.IGNORECASE):
-                issues.append(
-                    LintIssue(
-                        line_number=i,
-                        rule=RULES["W024"],
-                        context=f"Use {modern} instead of {deprecated}",
-                    )
-                )
+        issues.extend(_check_deprecated_commands(stripped, i))
 
-        # Check for missing error redirection (W025)
-        commands_needing_redirect = ["del", "copy", "move", "mkdir", "rmdir"]
-        for cmd in commands_needing_redirect:
-            if re.match(rf"\s*{cmd}\s+", stripped, re.IGNORECASE):
-                if "2>" not in stripped and ">nul" not in stripped:
-                    issues.append(
-                        LintIssue(
-                            line_number=i,
-                            rule=RULES["W025"],
-                            context=f"{cmd.upper()} command without error redirection",
-                        )
-                    )
+        issue = _check_cmd_error_handling(stripped, i, lines)
+        if issue:
+            issues.append(issue)
 
     # Check for missing SETLOCAL EnableDelayedExpansion (W022)
     if uses_delayed_expansion:

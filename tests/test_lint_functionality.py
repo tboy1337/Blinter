@@ -483,10 +483,16 @@ class TestRuleSystem:
             ), f"Rule {code} should have Style severity"
 
         # Check that Security codes have Security severity
+        # Note: SEC006 is an exception - it's STYLE severity (portability issue, not security)
         for code in security_codes:
-            assert (
-                RULES[code].severity == RuleSeverity.SECURITY
-            ), f"Rule {code} should have Security severity"
+            if code == "SEC006":
+                assert (
+                    RULES[code].severity == RuleSeverity.STYLE
+                ), "SEC006 should be STYLE (portability, not security)"
+            else:
+                assert (
+                    RULES[code].severity == RuleSeverity.SECURITY
+                ), f"Rule {code} should have Security severity"
 
         # Check that Performance codes have Performance severity
         for code in performance_codes:
@@ -611,6 +617,8 @@ set /a numeric_var=5
 echo %numeric_var%
 set /p input_var=Enter value:
 echo %input_var%
+REM W005 now only checks IF string comparisons, so add one
+if %var1%==value1 echo match
 """
         temp_file = self.create_temp_batch_file(content)
         try:
@@ -620,8 +628,8 @@ echo %input_var%
             # Should detect undefined variable usage (E006)
             assert "E006" in rule_codes
 
-            # Should detect unquoted variable usage (W005)
-            assert "W005" in rule_codes
+            # Should detect unquoted variable usage in IF comparison (W005)
+            assert "W005" in rule_codes, "W005 should trigger for unquoted IF string comparison"
         finally:
             os.unlink(temp_file)
 
