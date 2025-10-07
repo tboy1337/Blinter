@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.26
+Version: 1.0.27
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.26"
+__version__ = "1.0.27"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2107,6 +2107,9 @@ def _check_call_labels(stripped: str, line_num: int) -> List[LintIssue]:
         "date",
         "time",
         "help",
+        "set",
+        "setlocal",
+        "endlocal",
         # Common external commands and package managers
         "npm",
         "node",

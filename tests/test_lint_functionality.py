@@ -802,6 +802,23 @@ CALL dir
         finally:
             os.unlink(temp_file)
 
+    def test_call_builtin_commands(self) -> None:
+        """Test CALL to built-in commands like SET (should not trigger E014)."""
+        content = """@echo off
+CALL SET _result=%%%_var%%%
+CALL SET "VAR=value"
+CALL SETLOCAL
+CALL ENDLOCAL
+CALL ECHO Test
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            assert "E014" not in rule_codes  # Should not trigger for built-in commands
+        finally:
+            os.unlink(temp_file)
+
     def test_goto_eof_without_colon(self) -> None:
         """Test E015: Missing colon in GOTO EOF statement."""
         content = """@echo off
