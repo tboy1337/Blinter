@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.35
+Version: 1.0.36
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.35"
+__version__ = "1.0.36"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2774,14 +2774,20 @@ def _check_echo_unicode_risk(stripped: str) -> bool:
 
     # Check for complex variable expansions within individual variables
     complex_vars: List[str] = []
-    variables: List[str] = re.findall(r"%[^%]+%", echo_content)
-    for var in variables:
-        # Check if variable contains non-standard characters (complex expansion)
-        var_content = var[1:-1]  # Remove % signs
+    # Match %VARNAME% patterns and extract variable names
+    # This will match: %red%, %under%, etc., and also false positives like %a % from %%a %%b
+    variables: List[str] = re.findall(r"%([^%]+)%", echo_content)
+    for var_content in variables:
+        # Filter out false positives from FOR loop variables (%%a %%b matches as %a %)
+        # These will contain spaces or be very short with spaces
+        if " " in var_content or "\t" in var_content:
+            continue  # Skip false matches across FOR loop variables
+
+        # var_content is the variable name without % signs
         if re.search(r"[^A-Z0-9_~]", var_content, re.IGNORECASE):
             # Allow common parameter expansions like %~n1, %~dp0
             if not re.match(r"~[a-z]*\d*$", var_content, re.IGNORECASE):
-                complex_vars.append(var)
+                complex_vars.append(var_content)
 
     # Check if this is safe file redirection (output to files, not complex shell operations)
     has_safe_redirection = bool(

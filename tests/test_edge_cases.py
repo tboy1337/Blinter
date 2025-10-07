@@ -967,6 +967,31 @@ class TestWarningChecking:
         warning_issues = [i for i in issues if i.rule.code == "W012"]
         assert len(warning_issues) == 1
 
+    def test_for_loop_variables_no_false_positive(self) -> None:
+        """Test that FOR loop variables (%%a %%b) don't trigger Unicode warnings."""
+        set_vars: set[str] = set()
+        # FOR loop variables should NOT trigger W011 Unicode warning
+        issues = _check_warning_issues("echo %%a %%b", 1, set_vars, False)
+        w011_issues = [i for i in issues if i.rule.code == "W011"]
+        assert len(w011_issues) == 0, "FOR loop variables should not trigger Unicode warnings"
+
+    def test_consecutive_variables_no_false_positive(self) -> None:
+        """Test that consecutive variables like %red%%under% don't trigger false
+        Unicode warnings."""
+        set_vars: set[str] = {"red", "under", "def"}
+        # Consecutive variables should NOT trigger W011 Unicode warning
+        issues = _check_warning_issues("echo %red%%under%text%def%", 1, set_vars, False)
+        w011_issues = [i for i in issues if i.rule.code == "W011"]
+        assert len(w011_issues) == 0, "Consecutive variables should not trigger Unicode warnings"
+
+    def test_echo_with_actual_unicode_still_flagged(self) -> None:
+        """Test that actual Unicode content in echo still triggers warnings."""
+        set_vars: set[str] = set()
+        # Real Unicode content should still trigger W011
+        issues = _check_warning_issues("echo Ñandú birds", 1, set_vars, False)
+        w011_issues = [i for i in issues if i.rule.code == "W011"]
+        assert len(w011_issues) == 1, "Actual Unicode content should still trigger warnings"
+
 
 class TestStyleChecking:
     """Test style level checking edge cases."""
