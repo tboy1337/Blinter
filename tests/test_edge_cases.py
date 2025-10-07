@@ -479,7 +479,22 @@ class TestGlobalFunctionChecking:
             "echo line 13",
             "echo line 14",
             "echo line 15",
-            "echo line 16",  # Now 16 lines, should trigger S013
+            "echo line 16",
+            "echo line 17",
+            "echo line 18",
+            "echo line 19",
+            "echo line 20",
+            "echo line 21",
+            "echo line 22",
+            "echo line 23",
+            "echo line 24",
+            "echo line 25",
+            "echo line 26",
+            "echo line 27",
+            "echo line 28",
+            "echo line 29",
+            "echo line 30",
+            "echo line 31",  # Now 31 lines, should trigger S013 with new threshold of 30
         ]
         from blinter import _check_missing_header_doc
 

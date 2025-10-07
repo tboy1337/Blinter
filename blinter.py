@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.30
+Version: 1.0.31
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.30"
+__version__ = "1.0.31"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -3149,11 +3149,23 @@ def _check_input_validation_sec(line: str, line_num: int, stripped: str) -> List
         )
 
     # SEC002: Unsafe SET command usage - only flag unquoted SET commands
+    # Skip ANSI escape sequences, color definitions, and constant declarations
     set_match = re.match(r"set\s+([A-Za-z0-9_]+)=(.+)", stripped, re.IGNORECASE)
     if set_match:
+        var_name: str = set_match.group(1)
         var_val_text: str = set_match.group(2)
         var_val: str = var_val_text.strip()
-        if not (var_val.startswith('"') and var_val.endswith('"')):
+
+        # Skip if it's an ANSI escape sequence or color definition
+        is_ansi_or_color = (
+            "ESC" in var_name.upper()
+            or "COLOR" in var_name.upper()
+            or "%ESC%" in var_val
+            or var_val.startswith("(")  # Skip tuple/list definitions like colors=(...)
+            or re.match(r"^[\w.]+$", var_val)  # Skip simple constants like filename.ext, VARNAME
+        )
+
+        if not is_ansi_or_color and not (var_val.startswith('"') and var_val.endswith('"')):
             issues.append(
                 LintIssue(
                     line_number=line_num,
@@ -5213,15 +5225,16 @@ def _check_missing_header_doc(lines: List[str]) -> List[LintIssue]:
     """Check for missing file header documentation (S013)."""
     issues: List[LintIssue] = []
 
-    # Skip very short files (under 15 lines) - likely simple utilities
-    if len(lines) < 15:
+    # Skip short files (under 30 lines) - likely simple utilities
+    # Increased threshold to be less aggressive
+    if len(lines) < 30:
         return issues
 
-    # Check first 10 lines for meaningful comments (expanded from 5)
+    # Check first 15 lines for meaningful comments (expanded from 10)
     meaningful_comments = 0
     general_comments = 0
 
-    for line in lines[:10]:
+    for line in lines[:15]:
         stripped = line.strip().lower()
         if _is_comment_line(line) and len(stripped) > 6:
             general_comments += 1
@@ -5237,6 +5250,9 @@ def _check_missing_header_doc(lines: List[str]) -> List[LintIssue]:
                     "usage:",
                     "function:",
                     "does:",
+                    "created:",
+                    "modified:",
+                    "version:",
                 ]
             ):
                 meaningful_comments += 1
@@ -5246,19 +5262,30 @@ def _check_missing_header_doc(lines: List[str]) -> List[LintIssue]:
                 for keyword in [
                     "this script",
                     "this batch",
+                    "this file",
                     "repairs",
                     "fixes",
                     "cleans",
                     "updates",
                     "installs",
                     "configures",
+                    "enables",
+                    "disables",
+                    "resets",
+                    "restores",
+                    "optimizes",
+                    "removes",
+                    "deletes",
+                    "creates",
+                    "sets up",
+                    "flushes",
                 ]
             ):
                 meaningful_comments += 1
 
     # Only flag if there are NO meaningful comments AND very few general comments
-    # This allows simple scripts with basic comments to pass
-    if meaningful_comments == 0 and general_comments < 2:
+    # Increased threshold to 3 to be even more lenient
+    if meaningful_comments == 0 and general_comments < 3:
         issues.append(
             LintIssue(
                 line_number=1,
@@ -6128,6 +6155,87 @@ def _check_magic_numbers(line: str, line_number: int) -> List[LintIssue]:
         # Windows-specific
         "260",  # MAX_PATH in Windows
         "32767",  # MAX_SHORT
+        # ANSI color codes (foreground)
+        *[str(i) for i in range(30, 38)],
+        # ANSI color codes (background)
+        *[str(i) for i in range(40, 48)],
+        # ANSI bright color codes (foreground)
+        *[str(i) for i in range(90, 98)],
+        # ANSI bright color codes (background)
+        *[str(i) for i in range(100, 108)],
+        # Common exit codes and small numbers
+        *[str(i) for i in range(11, 26)],
+        # Single and double digit numbers commonly used in scripts
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "22",
+        "23",
+        "25",
+        "26",
+        "27",
+        "28",
+        "29",
+        "38",
+        "39",  # Additional ANSI codes
+        "48",
+        "49",  # Additional ANSI codes
+        "50",
+        "51",
+        "52",
+        "53",
+        "54",
+        "55",
+        "56",
+        "57",
+        "58",
+        "59",
+        "61",
+        "62",
+        "63",
+        "64",
+        "65",
+        "66",
+        "67",
+        "68",
+        "69",
+        "70",
+        "71",
+        "72",
+        "73",
+        "74",
+        "75",
+        "76",
+        "77",
+        "78",
+        "79",
+        "81",
+        "82",
+        "83",
+        "84",
+        "85",
+        "86",
+        "87",
+        "88",
+        "89",
+        "99",
     }
 
     for match in re.finditer(number_pattern, line.strip()):
@@ -6306,15 +6414,18 @@ def _check_enhanced_security_rules(lines: List[str]) -> List[LintIssue]:
                 )
 
         # Check for command injection via variables (SEC013)
+        # Exclude echo statements as they are generally safe for output
         if re.search(r"%[a-zA-Z_][a-zA-Z0-9_]*%.*[&|<>]", stripped):
-            if not _is_safe_command_injection(stripped):
-                issues.append(
-                    LintIssue(
-                        line_number=i,
-                        rule=RULES["SEC013"],
-                        context="Variable used with shell operators may allow injection",
+            # Skip echo statements - they are safe for variable expansion
+            if not re.match(r"\s*echo\s+", stripped, re.IGNORECASE):
+                if not _is_safe_command_injection(stripped):
+                    issues.append(
+                        LintIssue(
+                            line_number=i,
+                            rule=RULES["SEC013"],
+                            context="Variable used with shell operators may allow injection",
+                        )
                     )
-                )
 
     return issues
 
