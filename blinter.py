@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.31
+Version: 1.0.32
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.31"
+__version__ = "1.0.32"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2486,13 +2486,16 @@ def _check_for_loop_syntax(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for malformed FOR loop (E010)."""
     issues: List[LintIssue] = []
     if re.match(r"for\s+.*", stripped, re.IGNORECASE) and " do " not in stripped.lower():
-        issues.append(
-            LintIssue(
-                line_number=line_num,
-                rule=RULES["E010"],
-                context="FOR loop is missing required DO keyword",
+        # Don't flag multiline FOR loops (those ending with opening parenthesis)
+        # or those that appear to continue on next line
+        if not re.search(r"\(\s*$", stripped):
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["E010"],
+                    context="FOR loop is missing required DO keyword",
+                )
             )
-        )
     return issues
 
 
@@ -2649,6 +2652,19 @@ def _check_quote_escaping(stripped: str, line_num: int) -> List[LintIssue]:
     if '"""' not in stripped and not re.search(r'["\s]""[^"]', stripped):
         return issues
 
+    # Exclude legitimate patterns:
+    # 1. Comparisons with empty string: neq "", equ "", == "", != ""
+    if re.search(r'\b(neq|equ|==|!=|lss|leq|gtr|geq)\s+""', stripped, re.IGNORECASE):
+        return issues
+
+    # 2. START command with triple-quote escaping: start ... /c ""!var!" ...
+    if re.search(r'\bstart\b.*\s+/c\s+""[^"]+!"', stripped, re.IGNORECASE):
+        return issues
+
+    # 3. Properly formatted triple-quote patterns: """text"""
+    if re.match(r'.*"""[^"]*""".*', stripped):
+        return issues
+
     # Look for potentially problematic quote patterns
     quote_context = ""
     if '"""' in stripped:
@@ -2656,15 +2672,13 @@ def _check_quote_escaping(stripped: str, line_num: int) -> List[LintIssue]:
     elif re.search(r'["\s]""[^"]', stripped):
         quote_context = "Complex quote escaping detected"
 
-    # Only flag if it looks problematic (not the recommended """text""" pattern)
-    if not re.match(r'.*"""[^"]*""".*', stripped):
-        issues.append(
-            LintIssue(
-                line_number=line_num,
-                rule=RULES["E028"],
-                context=quote_context,
-            )
+    issues.append(
+        LintIssue(
+            line_number=line_num,
+            rule=RULES["E028"],
+            context=quote_context,
         )
+    )
     return issues
 
 
@@ -5885,20 +5899,24 @@ def _check_for_loop_var_syntax(stripped: str, line_number: int) -> List[LintIssu
 def _check_string_operation_syntax(stripped: str, line_number: int) -> List[LintIssue]:
     """Check string operations syntax (E021)."""
     issues: List[LintIssue] = []
+    # Use non-greedy matching and more specific patterns to avoid false positives
+    # Match valid substring operations: %var:~start,length% or %var:~start%
+    # Match valid replacement operations: %var:old=new%
     string_ops = [
-        r"%[a-zA-Z_][a-zA-Z0-9_]*:~[^%]*%",  # Substring
-        r"%[a-zA-Z_][a-zA-Z0-9_]*:[^=]*=[^%]*%",  # Replacement
+        r"%[a-zA-Z_][a-zA-Z0-9_]*:~-?[0-9]+(?:,-?[0-9]+)?%",  # Substring with numbers
+        r"%[a-zA-Z_][a-zA-Z0-9_]*:(?!~)[^=]+=[^%]*?%",  # Replacement (not substring)
     ]
 
     for pattern in string_ops:
         for match in re.finditer(pattern, stripped):
-            # Basic validation - more complex validation would need parsing
-            if match.group(0).count("%") != 2:
+            matched_text = match.group(0)
+            # Basic validation - should have exactly 2 percent signs
+            if matched_text.count("%") != 2:
                 issues.append(
                     LintIssue(
                         line_number=line_number,
                         rule=RULES["E021"],
-                        context=f"Malformed string operation: {match.group(0)}",
+                        context=f"Malformed string operation: {matched_text}",
                     )
                 )
 
