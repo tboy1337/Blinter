@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.33
+Version: 1.0.34
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.33"
+__version__ = "1.0.34"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -4544,15 +4544,20 @@ def _check_advanced_style_patterns(
 
     # S026: Inconsistent continuation character usage
     if "^" in stripped and not stripped.endswith("^"):
-        # Check for improper continuation usage
+        # Check for improper continuation usage (exclude escape sequences)
+        # In batch files, ^ is used for both line continuation AND escaping special chars
+        # Only flag if it appears to be a continuation character, not an escape character
         if stripped.count("^") == 1 and not re.search(r"\^\s*$", line):
-            issues.append(
-                LintIssue(
-                    line_number,
-                    RULES["S026"],
-                    context="Continuation character should be at line end",
+            # Check if ^ is used as escape character (followed by special char)
+            # Special chars that can be escaped: & | ( ) < > ^ " space tab
+            if not re.search(r"\^[&|()<>^\"\s]", stripped):
+                issues.append(
+                    LintIssue(
+                        line_number,
+                        RULES["S026"],
+                        context="Continuation character should be at line end",
+                    )
                 )
-            )
 
     return issues
 
