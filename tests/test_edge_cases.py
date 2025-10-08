@@ -1218,6 +1218,73 @@ class TestGlobalChecks:
         unreachable_issues = [i for i in issues if i.rule.code == "E008"]
         assert len(unreachable_issues) == 0
 
+    def test_block_redirection_not_unreachable(self) -> None:
+        """Test that block redirection operators are not flagged as unreachable code."""
+        # This tests the GitHub issue where redirection after a block is incorrectly
+        # flagged as unreachable code
+        lines = [
+            " rem -- Print Count of Discovered Systems by OS",
+            ' IF "%~1"=="----" (',
+            "\t ECHO:",
+            '\t FOR /F "TOKENS=2-3 DELIMS==#" %%F IN (\'SET "#COUNT#" 2^>NUL\') DO (',
+            "\t\t CALL :ChangeCase #NAME#%%F -U",
+            "\t\t SET @THISOS=%%F",
+            "\t\t SET @THISOS=!@THISOS:_=,!",
+            "\t\t ECHO \t%%G \t!@THISOS:–= !",
+            "\t\t ECHO \t\t -- !#NAME#%%F!",
+            "\t\t ECHO:",
+            "\t )",
+            "\t EXIT /B",
+            " ) >>%@LOGFILE% 2>&1",  # This line should NOT be flagged as unreachable
+        ]
+        issues = _check_unreachable_code(lines)
+        unreachable_issues = [i for i in issues if i.rule.code == "E008"]
+        # The redirection operator line should NOT be flagged
+        assert len(unreachable_issues) == 0
+
+    def test_various_redirection_patterns_not_unreachable(self) -> None:
+        """Test various redirection operator patterns after EXIT."""
+        # Test different redirection patterns
+        test_cases = [
+            # Standard output redirection
+            ["IF true (", "  EXIT /B", ") >output.txt"],
+            # Append redirection
+            ["IF true (", "  EXIT /B", ") >>output.log"],
+            # Input redirection
+            ["IF true (", "  EXIT /B", ") <input.txt"],
+            # Error redirection
+            ["IF true (", "  EXIT /B", ") 2>error.log"],
+            # Combined output and error
+            ["IF true (", "  EXIT /B", ") >output.txt 2>&1"],
+            # Suppress output
+            ["IF true (", "  EXIT /B", ") >nul 2>&1"],
+            # Error to null
+            ["IF true (", "  EXIT /B", ") 2>nul"],
+        ]
+
+        for lines in test_cases:
+            issues = _check_unreachable_code(lines)
+            unreachable_issues = [i for i in issues if i.rule.code == "E008"]
+            assert (
+                len(unreachable_issues) == 0
+            ), f"Redirection should not be flagged as unreachable: {lines[-1]}"
+
+    def test_truly_unreachable_code_still_detected(self) -> None:
+        """Test that truly unreachable code is still detected after block with redirection."""
+        # Redirection should not prevent detection of actual unreachable code
+        lines = [
+            "IF true (",
+            "  ECHO inside block",
+            "  EXIT /B",
+            ") >output.txt 2>&1",
+            "ECHO this is truly unreachable",  # This IS unreachable
+        ]
+        issues = _check_unreachable_code(lines)
+        unreachable_issues = [i for i in issues if i.rule.code == "E008"]
+        # Should detect the ECHO command after the block as unreachable
+        assert len(unreachable_issues) == 1
+        assert unreachable_issues[0].line_number == 5
+
     def test_check_redundant_operations(self) -> None:
         """Test redundant operations detection."""
         lines = ["if exist file.txt echo found", "echo something", "if exist file.txt del file.txt"]

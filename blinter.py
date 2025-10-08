@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.38
+Version: 1.0.39
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.38"
+__version__ = "1.0.39"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -5380,6 +5380,12 @@ def _is_truly_executable_command(line: str) -> bool:
 
     # Skip ') else' patterns
     if re.match(r"^\)\s*(else\b.*)?$", line):
+        return False
+
+    # Skip closing parenthesis with redirection operators
+    # These are part of block I/O redirection, not executable code
+    # Examples: ) >>file.txt 2>&1, ) >output.log, ) 2>nul
+    if re.match(r"^\)\s*(?:>>?|<|[12]>&?[12]?)", line):
         return False
 
     return True
