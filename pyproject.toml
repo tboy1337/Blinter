@@ -9,10 +9,10 @@ description = "Blinter is a linter for Windows batch files. It provides comprehe
 readme = "README.md"
 license = {text = "CRL"}
 authors = [
-    {name = "tboy1337", email = "check@my-website.com"}
+    {name = "tboy1337", email = "tboy1337@proton.me"}
 ]
 maintainers = [
-    {name = "tboy1337", email = "check@my-website.com"}
+    {name = "tboy1337", email = "tboy1337@proton.me"}
 ]
 keywords = ["lint", "python", "windows", "analysis", "script", "linting", "linter", "static-analysis", "static", "batch", "batch-file", "cmd", "batch-script", "batchfile", "bat", "script-analysis"]
 classifiers = [
