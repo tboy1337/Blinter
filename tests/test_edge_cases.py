@@ -1371,6 +1371,30 @@ GOTO :EOF
         finally:
             os.unlink(temp_file)
 
+    def test_s014_call_with_chained_command(self) -> None:
+        """Test that chained commands after CALL are not counted as parameters."""
+        import os
+
+        from blinter import lint_batch_file
+
+        content = """@echo off
+CALL :GetParams "D" @THISDAY & IF NOT DEFINED @THISDAY (SET @THISDAY=%@TODAY_EXP%)
+CALL :myfunc p1 p2 && ECHO Success
+CALL :myfunc p1 p2 || ECHO Failure
+CALL :myfunc p1 p2 | findstr "test"
+:GetParams
+:myfunc
+GOTO :EOF
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            s014_issues = [i for i in issues if i.rule.code == "S014"]
+            # None of these should trigger S014 as they all have <=5 parameters before chaining
+            assert len(s014_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
 
 class TestSpecificRuleEdgeCases:
     """Test specific rule edge cases that are hard to trigger."""
