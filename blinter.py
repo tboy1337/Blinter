@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.37
+Version: 1.0.38
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.37"
+__version__ = "1.0.38"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1959,6 +1959,44 @@ def _collect_labels(lines: List[str]) -> Tuple[Dict[str, int], List[LintIssue]]:
                 labels[label] = i
 
     return labels, issues
+
+
+def _is_in_subroutine_context(  # pylint: disable=unused-argument
+    lines: List[str], line_number: int, labels: Dict[str, int]
+) -> bool:
+    """
+    Determine if a line is within a subroutine context.
+
+    A line is considered to be in a subroutine if:
+    1. There is a label defined before it (indicating start of a subroutine)
+    2. The line comes after the first label in the file (main script is before any labels)
+
+    Args:
+        lines: All lines in the batch file (reserved for future enhancement)
+        line_number: The current line number (1-indexed)
+        labels: Dictionary mapping label names to line numbers
+
+    Returns:
+        True if the line is within a subroutine context
+    """
+    if not labels:
+        return False
+
+    # Find the minimum label line number (first subroutine starts after this)
+    min_label_line = min(labels.values())
+
+    # If we're before the first label, we're in the main script
+    if line_number < min_label_line:
+        return False
+
+    # Check if there's a label defined before the current line
+    # This indicates we're inside a subroutine
+    for label_line in labels.values():
+        if label_line < line_number:
+            # Found a label before this line, so we're in a subroutine
+            return True
+
+    return False
 
 
 def _collect_set_variables(lines: List[str]) -> Set[str]:
@@ -4277,7 +4315,7 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
         issues.extend(_check_security_issues(line, i))
 
         # Advanced security patterns (SEC014-SEC019)
-        issues.extend(_check_advanced_security(line, i))
+        issues.extend(_check_advanced_security(line, i, lines, labels))
 
         # Performance level checks
         perf_issues = _check_performance_issues(
@@ -4485,24 +4523,30 @@ def _check_advanced_process_mgmt(line: str, line_number: int) -> List[LintIssue]
     return issues
 
 
-def _check_advanced_security(line: str, line_number: int) -> List[LintIssue]:
+def _check_advanced_security(
+    line: str, line_number: int, lines: List[str], labels: Dict[str, int]
+) -> List[LintIssue]:
     """Check for advanced security patterns."""
     issues: List[LintIssue] = []
     stripped = line.strip()
 
     # SEC014: Unescaped user input in command execution
+    # Only check if we're NOT in a subroutine context
+    # In subroutines, %1, %2, etc. refer to subroutine parameters, not user input
     if "%1" in stripped or "%2" in stripped or "%*" in stripped:
-        # Check for user parameters used without proper escaping
-        special_chars = ["&", "|", ">", "<", "^"]
-        if any(char in stripped for char in special_chars):
-            if not re.search(r"\^[&|><^]", stripped):
-                issues.append(
-                    LintIssue(
-                        line_number,
-                        RULES["SEC014"],
-                        context="User input parameters should be escaped",
+        # Skip this check if we're inside a subroutine
+        if not _is_in_subroutine_context(lines, line_number, labels):
+            # Check for user parameters used without proper escaping
+            special_chars = ["&", "|", ">", "<", "^"]
+            if any(char in stripped for char in special_chars):
+                if not re.search(r"\^[&|><^]", stripped):
+                    issues.append(
+                        LintIssue(
+                            line_number,
+                            RULES["SEC014"],
+                            context="User input parameters should be escaped",
+                        )
                     )
-                )
 
     # SEC017: Temporary file creation in predictable location
     if "temp" in stripped.lower() and (".tmp" in stripped or ".temp" in stripped):

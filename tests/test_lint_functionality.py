@@ -1398,3 +1398,52 @@ ping -n 5 localhost >nul
 
         finally:
             os.unlink(temp_file)
+
+    def test_sec014_subroutine_parameters_no_false_positive(self) -> None:
+        """Test SEC014: Parameters in subroutines should not be flagged as unescaped user input."""
+        # Reproduce the issue reported on GitHub:
+        # The command "SET @V1=%2& IF DEFINED @V1 SET @V1=!@V1:"=!" is part of a subroutine
+        # and should NOT trigger SEC014 because %2 refers to a subroutine parameter, not user input
+        content = """@ECHO OFF
+SETLOCAL ENABLEDELAYEDEXPANSION
+
+REM Main script
+CALL :MySubroutine arg1 arg2
+GOTO :EOF
+
+:MySubroutine
+REM This line should NOT trigger SEC014 because we're in a subroutine
+SET @V1=%2& IF DEFINED @V1 SET @V1=!@V1:"=!
+ECHO Subroutine parameter: !@V1!
+GOTO :EOF
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            # SEC014 should NOT be triggered for parameters used in subroutines
+            assert "SEC014" not in rule_codes, (
+                "SEC014 should not be triggered for subroutine parameters. "
+                f"Found issues: {[i for i in issues if i.rule.code == 'SEC014']}"
+            )
+        finally:
+            os.unlink(temp_file)
+
+    def test_sec014_main_script_parameters_should_trigger(self) -> None:
+        """Test SEC014: Parameters in main script SHOULD be flagged as potential user input."""
+        # Parameters used in the main script (before any labels) should still trigger SEC014
+        content = """@ECHO OFF
+REM Main script - parameters here are direct user input
+SET VAR=%1& ECHO %VAR%
+GOTO :EOF
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            # SEC014 SHOULD be triggered for parameters in main script
+            assert (
+                "SEC014" in rule_codes
+            ), "SEC014 should be triggered for parameters in main script"
+        finally:
+            os.unlink(temp_file)
