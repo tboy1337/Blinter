@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.41
+Version: 1.0.42
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.41"
+__version__ = "1.0.42"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -4381,23 +4381,38 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
 
 def _check_advanced_escaping_rules(line: str, line_number: int) -> List[LintIssue]:
     """Check for advanced escaping technique issues."""
+    # pylint: disable=too-many-locals
+    # Multiple escaping rules (E030-E033) require checking various patterns
     issues: List[LintIssue] = []
     stripped = line.strip()
 
     # E030: Improper caret escape sequence
     # Look for single caret attempting to escape special chars
     # But exclude FOR loop command strings and ECHO statements (ASCII art)
-    if re.search(r"\^[&|><](?!\^)", stripped):
+    caret_matches = re.finditer(r"\^[&|><](?!\^)", stripped)
+    for match in caret_matches:
+        caret_pos = match.start()
+        should_flag = True
+
         # Check if this is within a FOR loop command string (within single quotes)
         # In FOR loops, command strings like 'command 2^>nul ^| filter' use single caret correctly
-        if re.match(r"for\s+.*", stripped, re.IGNORECASE):
-            # This is a FOR loop, single caret escaping in command strings is correct
-            pass
+        if re.search(r"\bfor\s+", stripped, re.IGNORECASE):
+            # Find all single-quoted strings in FOR commands
+            # Look for patterns like FOR ... IN ('...') where carets inside quotes are valid
+            for_match = re.search(r"\bin\s*\('([^']*)'\)", stripped, re.IGNORECASE)
+            if for_match:
+                # Check if the caret is within the quoted string
+                quote_start = for_match.start(1)
+                quote_end = for_match.end(1)
+                if quote_start <= caret_pos < quote_end:
+                    should_flag = False
+
         # Check if this is an ECHO statement (likely ASCII art)
-        elif re.match(r"echo\s+", stripped, re.IGNORECASE):
+        if re.match(r"echo\s+", stripped, re.IGNORECASE):
             # ECHO statements often contain ASCII art with carets - don't flag these
-            pass
-        else:
+            should_flag = False
+
+        if should_flag:
             issues.append(LintIssue(line_number, RULES["E030"], context=stripped))
 
     # E031: Invalid multilevel escaping

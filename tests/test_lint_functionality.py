@@ -1447,3 +1447,37 @@ GOTO :EOF
             ), "SEC014 should be triggered for parameters in main script"
         finally:
             os.unlink(temp_file)
+
+    def test_e030_for_command_string_no_false_positive(self) -> None:
+        """Test E030: Carets in FOR command strings should NOT be flagged as improper escaping."""
+        # Reproduces the issue found in real batch files where FOR /F IN ('command 2^>NUL')
+        # was incorrectly flagged as E030
+        content = """@ECHO OFF
+REM Test valid caret usage in FOR command strings
+FOR /F "tokens=*" %%a IN ('dir /b 2^>NUL') DO echo %%a
+SET X=1& FOR /F "DELIMS=" %%d IN ('DATEINFO -t START -n END -q 2^>NUL') DO SET Y=%%d
+
+REM Test ECHO with ASCII art (also should not trigger E030)
+ECHO Test^|Test
+
+REM Test invalid usage that SHOULD trigger E030
+IF EXIST file.txt^>NUL (
+    echo Found
+)
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e030_issues = [issue for issue in issues if issue.rule.code == "E030"]
+            # Should only have 1 E030 issue on line 10 (the IF statement)
+            assert len(e030_issues) == 1, (
+                f"Expected 1 E030 issue, but found {len(e030_issues)}. "
+                f"Issues: {[(i.line_number, i.context) for i in e030_issues]}"
+            )
+            # Verify it's on the correct line (the IF statement with improper caret)
+            assert e030_issues[0].line_number == 10, (
+                f"E030 should be on line 10 (IF statement), "
+                f"but was on line {e030_issues[0].line_number}"
+            )
+        finally:
+            os.unlink(temp_file)

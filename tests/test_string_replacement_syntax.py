@@ -58,7 +58,10 @@ class TestStringReplacementSyntax:
         """Test %VAR:"=% syntax (old-style remove quotes)."""
         test_file = tmp_path / "test.cmd"
         test_file.write_text(
-            "@echo off\n" 'SET @TARGET="C:\\temp"\n' 'SET @TARGET=%@TARGET:"=%\n' "echo %@TARGET%\n"
+            "@echo off\n"
+            + 'SET @TARGET="C:\\temp"\n'
+            + 'SET @TARGET=%@TARGET:"=%\n'
+            + "echo %@TARGET%\n"
         )
 
         issues: List[LintIssue] = lint_batch_file(str(test_file))
