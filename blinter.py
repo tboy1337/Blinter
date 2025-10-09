@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.40
+Version: 1.0.41
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.40"
+__version__ = "1.0.41"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2445,9 +2445,13 @@ def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
     """Check for mismatched quotes (E009)."""
     issues: List[LintIssue] = []
 
-    # Skip REM comments - they can contain any characters
+    # Skip REM comments and :: documentation comments - they can contain any characters
     stripped = line.strip()
-    if stripped.lower().startswith("rem ") or stripped.lower().startswith("rem\t"):
+    if (
+        stripped.lower().startswith("rem ")
+        or stripped.lower().startswith("rem\t")
+        or stripped.startswith("::")
+    ):
         return issues
 
     # Skip echo statements - they often contain ASCII art with quotes
@@ -2506,10 +2510,24 @@ def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
     if quote_count % 2 != 0 and not line_continues:
         # Additional check: verify this isn't a special case like delayed expansion
         # or variable substitution that might have intentional single quotes
-        has_delayed_expansion = "!" in line and stripped.startswith("set ")
+        has_delayed_expansion = "!" in line and re.search(r"\bset\s", stripped, re.IGNORECASE)
         has_call_substitution = re.search(r"call\s+:[^:]+", stripped, re.IGNORECASE)
+        # Check for string replacement syntax like !VAR:"=! or %VAR:"=%
+        # Delayed expansion: !VAR:"=! or !VAR:searchString=replaceString!
+        has_delayed_string_replacement = re.search(
+            r"![^!]+:[^=]*\"[^=]*=[^!]*!", line
+        ) or re.search(r"![^!]+:[^=]*=[^!]*\"[^!]*!", line)
+        # Old-style expansion: %VAR:"=% or %VAR:searchString=replaceString%
+        has_percent_string_replacement = re.search(
+            r"%[^%]+:[^=]*\"[^=]*=[^%]*%", line
+        ) or re.search(r"%[^%]+:[^=]*=[^%]*\"[^%]*%", line)
 
-        if not (has_delayed_expansion or has_call_substitution):
+        if not (
+            has_delayed_expansion
+            or has_call_substitution
+            or has_delayed_string_replacement
+            or has_percent_string_replacement
+        ):
             issues.append(
                 LintIssue(
                     line_number=line_num,
