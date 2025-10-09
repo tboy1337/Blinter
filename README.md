@@ -183,6 +183,46 @@ python -m blinter myscript.bat --summary
 python -m blinter myscript.bat --no-config
 ```
 
+### 🔕 Inline Suppression Comments
+
+You can suppress specific linter warnings directly in your batch files using special comments:
+
+#### Suppress Next Line
+```batch
+REM LINT:IGNORE E009
+ECHO '' .... Represents a " character
+```
+
+#### Suppress Current Line
+```batch
+REM LINT:IGNORE-LINE S013
+```
+
+#### Suppress Multiple Rules
+```batch
+REM LINT:IGNORE E009, W011, S004
+ECHO Unmatched quotes "
+```
+
+#### Suppress All Rules on Line
+```batch
+REM LINT:IGNORE
+REM This line and the next will be ignored for all rules
+```
+
+**Supported formats:**
+- `REM LINT:IGNORE <code>` - Suppress specific rule(s) on the **next line**
+- `REM LINT:IGNORE` - Suppress all rules on the **next line**
+- `REM LINT:IGNORE-LINE <code>` - Suppress specific rule(s) on the **same line**
+- `REM LINT:IGNORE-LINE` - Suppress all rules on the **same line**
+- `:: LINT:IGNORE <code>` - Alternative comment syntax (also supported)
+
+**Use cases:**
+- Suppress false positives that can't be fixed
+- Ignore intentional deviations from best practices
+- Handle edge cases in documentation or help text
+- Temporarily ignore issues during development
+
 ### 🐍 **Programmatic API Usage**
 
 Blinter provides a powerful Python API for integration into your applications:

@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.42
+Version: 1.0.43
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.42"
+__version__ = "1.0.43"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2672,7 +2672,12 @@ def _check_parameter_modifiers(stripped: str, line_num: int) -> List[LintIssue]:
     # First, remove FOR loop variables with modifiers (%%~a) - these are VALID
     temp_stripped = re.sub(r"%%~[a-zA-Z]", "", stripped)
 
+    # Also remove batch file parameter modifiers like %~dp0, %~f1, etc. - these are VALID
+    # %0 refers to the batch file itself, %1-%9 are command line arguments
+    temp_stripped = re.sub(r"%~[a-zA-Z]+[0-9]", "", temp_stripped)
+
     # Now check for parameter modifiers used in wrong context (single % only)
+    # This catches things like %~dVARIABLE% which are invalid
     wrong_context_match: List[str] = re.findall(
         r"%~[a-zA-Z]+([^0-9%\s][^%\s]*|[A-Z_][A-Z0-9_]*)%", temp_stripped
     )
@@ -3993,6 +3998,64 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals,too-many-
     return skip_lines
 
 
+def _parse_suppression_comments(lines: List[str]) -> Dict[int, Set[str]]:
+    """
+    Parse inline suppression comments from batch file lines.
+
+    Supports formats:
+    - REM LINT:IGNORE <code> - Suppress code on the next line
+    - REM LINT:IGNORE - Suppress all issues on the next line
+    - REM LINT:IGNORE-LINE <code> - Suppress code on the same line
+    - REM LINT:IGNORE-LINE - Suppress all issues on the same line
+
+    Args:
+        lines: List of lines from the batch file
+
+    Returns:
+        Dictionary mapping line numbers to set of rule codes to suppress.
+        An empty set means suppress all rules for that line.
+
+    Example:
+        REM LINT:IGNORE E009
+        ECHO '' .... Represents a " character
+    """
+    suppressions: Dict[int, Set[str]] = {}
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip().upper()
+
+        # Check for IGNORE comment (affects next line)
+        if stripped.startswith("REM ") or stripped.startswith("::"):
+            # Remove REM or :: prefix
+            comment_text = (
+                stripped[3:].strip() if stripped.startswith("REM") else stripped[2:].strip()
+            )
+
+            # Check for LINT:IGNORE-LINE (same line suppression)
+            if comment_text.startswith("LINT:IGNORE-LINE"):
+                rest = comment_text[16:].strip()
+                if rest:
+                    # Specific rules to suppress
+                    codes = {code.strip() for code in rest.split(",") if code.strip()}
+                    suppressions.setdefault(i, set()).update(codes)
+                else:
+                    # Suppress all rules on this line
+                    suppressions[i] = set()
+
+            # Check for LINT:IGNORE (next line suppression)
+            elif comment_text.startswith("LINT:IGNORE"):
+                rest = comment_text[11:].strip()
+                if rest:
+                    # Specific rules to suppress on next line
+                    codes = {code.strip() for code in rest.split(",") if code.strip()}
+                    suppressions.setdefault(i + 1, set()).update(codes)
+                else:
+                    # Suppress all rules on next line
+                    suppressions[i + 1] = set()
+
+    return suppressions
+
+
 def _validate_and_read_file(file_path: str) -> Tuple[List[str], str]:
     """Validate file and read its contents.
 
@@ -4379,43 +4442,53 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
 # Advanced rule detection functions
 
 
-def _check_advanced_escaping_rules(line: str, line_number: int) -> List[LintIssue]:
-    """Check for advanced escaping technique issues."""
-    # pylint: disable=too-many-locals
-    # Multiple escaping rules (E030-E033) require checking various patterns
-    issues: List[LintIssue] = []
-    stripped = line.strip()
+def _should_flag_caret_escape(stripped: str, caret_pos: int) -> bool:
+    """Check if a caret escape sequence should be flagged as improper."""
+    # Check if this is within a FOR loop command string (within single quotes)
+    # In FOR loops, command strings like 'command 2^>nul ^| filter' use single caret correctly
+    if re.search(r"\bfor\s+", stripped, re.IGNORECASE):
+        # Find all single-quoted strings in FOR commands
+        # Look for patterns like FOR ... IN ('...') where carets inside quotes are valid
+        for_match = re.search(r"\bin\s*\('([^']*)'\)", stripped, re.IGNORECASE)
+        if for_match:
+            # Check if the caret is within the quoted string
+            quote_start = for_match.start(1)
+            quote_end = for_match.end(1)
+            if quote_start <= caret_pos < quote_end:
+                return False
 
-    # E030: Improper caret escape sequence
+    # Check if this is an ECHO statement (likely ASCII art)
+    if re.match(r"echo\s+", stripped, re.IGNORECASE):
+        # ECHO statements often contain ASCII art with carets - don't flag these
+        return False
+
+    # Check if this is a SET statement (storing escaped commands)
+    # SET commands often store command strings with escaped special characters
+    # Example: SET @PRINT_IF_DEBUG=ECHO:^& SET @^& ECHO:^& TIMEOUT 5
+    # Also check for SET inside IF statements: IF ... (SET VAR=value^&...)
+    if re.search(r"\bset\s+", stripped, re.IGNORECASE):
+        # SET statements commonly use single carets to store command strings - don't flag these
+        return False
+
+    return True
+
+
+def _check_improper_caret_escape(stripped: str, line_number: int) -> List[LintIssue]:
+    """Check for E030: Improper caret escape sequence."""
+    issues: List[LintIssue] = []
     # Look for single caret attempting to escape special chars
-    # But exclude FOR loop command strings and ECHO statements (ASCII art)
+    # But exclude FOR loop command strings, ECHO statements (ASCII art), and SET commands
     caret_matches = re.finditer(r"\^[&|><](?!\^)", stripped)
     for match in caret_matches:
         caret_pos = match.start()
-        should_flag = True
-
-        # Check if this is within a FOR loop command string (within single quotes)
-        # In FOR loops, command strings like 'command 2^>nul ^| filter' use single caret correctly
-        if re.search(r"\bfor\s+", stripped, re.IGNORECASE):
-            # Find all single-quoted strings in FOR commands
-            # Look for patterns like FOR ... IN ('...') where carets inside quotes are valid
-            for_match = re.search(r"\bin\s*\('([^']*)'\)", stripped, re.IGNORECASE)
-            if for_match:
-                # Check if the caret is within the quoted string
-                quote_start = for_match.start(1)
-                quote_end = for_match.end(1)
-                if quote_start <= caret_pos < quote_end:
-                    should_flag = False
-
-        # Check if this is an ECHO statement (likely ASCII art)
-        if re.match(r"echo\s+", stripped, re.IGNORECASE):
-            # ECHO statements often contain ASCII art with carets - don't flag these
-            should_flag = False
-
-        if should_flag:
+        if _should_flag_caret_escape(stripped, caret_pos):
             issues.append(LintIssue(line_number, RULES["E030"], context=stripped))
+    return issues
 
-    # E031: Invalid multilevel escaping
+
+def _check_multilevel_escaping(stripped: str, line_number: int) -> List[LintIssue]:
+    """Check for E031: Invalid multilevel escaping."""
+    issues: List[LintIssue] = []
     # Check for incorrect caret counts in multilevel escaping
     caret_sequences: List[str] = re.findall(r"\^+[&|><]", stripped)
     for seq in caret_sequences:
@@ -4424,8 +4497,12 @@ def _check_advanced_escaping_rules(line: str, line_number: int) -> List[LintIssu
         valid_counts: List[int] = [1, 3, 7, 15, 31]  # 2^n-1 pattern for n=1 to 5
         if caret_count > 0 and caret_count not in valid_counts:
             issues.append(LintIssue(line_number, RULES["E031"], context=seq))
+    return issues
 
-    # E032: Continuation character with trailing spaces
+
+def _check_continuation_spaces(line: str, stripped: str, line_number: int) -> List[LintIssue]:
+    """Check for E032: Continuation character with trailing spaces."""
+    issues: List[LintIssue] = []
     # Check if line ends with ^ followed by spaces/tabs (before the line ending)
     if stripped.endswith("^"):
         # Get the line without line endings
@@ -4436,8 +4513,12 @@ def _check_advanced_escaping_rules(line: str, line_number: int) -> List[LintIssu
             issues.append(
                 LintIssue(line_number, RULES["E032"], context="Caret with trailing spaces")
             )
+    return issues
 
-    # E033: Double percent escaping error
+
+def _check_double_percent_escaping(stripped: str, line_number: int) -> List[LintIssue]:
+    """Check for E033: Double percent escaping error."""
+    issues: List[LintIssue] = []
     # Look for single % in echo statements that should be %%
     if stripped.lower().startswith("echo") and "%" in stripped:
         # Only flag if there's a literal percentage (like "50%") not a variable reference
@@ -4449,6 +4530,26 @@ def _check_advanced_escaping_rules(line: str, line_number: int) -> List[LintIssu
             issues.append(
                 LintIssue(line_number, RULES["E033"], context="Percentage needs double escaping")
             )
+    return issues
+
+
+def _check_advanced_escaping_rules(line: str, line_number: int) -> List[LintIssue]:
+    """Check for advanced escaping technique issues."""
+    # Multiple escaping rules (E030-E033) require checking various patterns
+    issues: List[LintIssue] = []
+    stripped = line.strip()
+
+    # E030: Improper caret escape sequence
+    issues.extend(_check_improper_caret_escape(stripped, line_number))
+
+    # E031: Invalid multilevel escaping
+    issues.extend(_check_multilevel_escaping(stripped, line_number))
+
+    # E032: Continuation character with trailing spaces
+    issues.extend(_check_continuation_spaces(line, stripped, line_number))
+
+    # E033: Double percent escaping error
+    issues.extend(_check_double_percent_escaping(stripped, line_number))
 
     return issues
 
@@ -4818,7 +4919,10 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     if config.max_line_length != 150:
         RULES["S011"] = original_s011_rule
 
-    # Filter issues based on configuration
+    # Parse inline suppression comments
+    suppressions = _parse_suppression_comments(lines)
+
+    # Filter issues based on configuration and inline suppressions
     filtered_issues = []
     for issue in issues:
         # Check if rule is enabled
@@ -4828,6 +4932,13 @@ def lint_batch_file(  # pylint: disable=too-many-locals
         # Check if severity should be included
         if not config.should_include_severity(issue.rule.severity):
             continue
+
+        # Check if issue is suppressed by inline comment
+        if issue.line_number in suppressions:
+            suppressed_codes = suppressions[issue.line_number]
+            # Empty set means suppress all rules on this line
+            if not suppressed_codes or issue.rule.code in suppressed_codes:
+                continue
 
         filtered_issues.append(issue)
 
