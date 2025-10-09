@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.43
+Version: 1.0.44
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.43"
+__version__ = "1.0.44"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2454,10 +2454,13 @@ def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
     ):
         return issues
 
-    # Skip echo statements - they often contain ASCII art with quotes
-    # that aren't meant to be string delimiters
-    if re.match(r"\s*echo\s+%", stripped, re.IGNORECASE):
-        # This is likely ASCII art using variables, be lenient
+    # Skip echo statements that are displaying documentation/help text
+    # about special characters. These often contain unmatched quotes as examples.
+    # Pattern: ECHO followed by spaces and text containing "Represents" or "...."
+    if re.match(r"\s*echo\s+.*\.\.\.\.", stripped, re.IGNORECASE) or re.match(
+        r"\s*echo\s+.*represents", stripped, re.IGNORECASE
+    ):
+        # This is documentation text explaining special characters
         return issues
 
     # Count quotes with comprehensive handling of batch file quoting rules
@@ -2711,6 +2714,14 @@ def _check_quote_escaping(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for complex quote escaping errors (E028)."""
     issues: List[LintIssue] = []
     if '"""' not in stripped and not re.search(r'["\s]""[^"]', stripped):
+        return issues
+
+    # Skip ECHO statements that are displaying documentation/help text
+    # Pattern: ECHO followed by spaces and text containing "Represents" or "...."
+    if re.match(r"\s*echo\s+.*\.\.\.\.", stripped, re.IGNORECASE) or re.match(
+        r"\s*echo\s+.*represents", stripped, re.IGNORECASE
+    ):
+        # This is documentation text explaining special characters
         return issues
 
     # Exclude legitimate patterns:
