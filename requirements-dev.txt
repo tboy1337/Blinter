@@ -9,7 +9,6 @@ pytest-xdist
 pytest-mock
 pytest-cov
 hypothesis
-mutmut
 
 # Additional Testing Packages
 pytest-html

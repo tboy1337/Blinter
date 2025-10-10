@@ -45,7 +45,6 @@ dev = [
     "pytest-mock",
     "pytest-cov",
     "hypothesis",
-    "mutmut",
     # Additional Testing Packages
     "pytest-html",
     "pytest-json-report",
