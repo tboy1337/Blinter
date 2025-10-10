@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.46
+Version: 1.0.47
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.46"
+__version__ = "1.0.47"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -854,12 +854,23 @@ RULES: Dict[str, Rule] = {
         code="W024",
         name="Deprecated command detected",
         severity=RuleSeverity.WARNING,
-        explanation="Command is deprecated in modern Windows versions and may not be available",
+        explanation=(
+            "Command is deprecated in modern Windows versions and may not be available "
+            "in future releases or may have reduced functionality"
+        ),
         recommendation=(
             "Replace with modern equivalent: "
-            "NET SEND->MSG, AT->SCHTASKS, CACLS->ICACLS, etc. "
-            "Note: XCOPY is NOT deprecated despite ROBOCOPY being recommended "
-            "for advanced scenarios"
+            "WMIC->PowerShell WMI cmdlets (Get-WmiObject/Get-CimInstance), "
+            "CACLS->ICACLS, "
+            "WINRM->PowerShell Remoting (Enter-PSSession/Invoke-Command), "
+            "BITSADMIN->PowerShell BitsTransfer module, "
+            "NBTSTAT->Get-NetAdapter PowerShell cmdlets, "
+            "DPATH->modify PATH environment variable, "
+            "KEYS->use CHOICE or SET /P, "
+            "NET SEND->MSG, "
+            "AT->SCHTASKS. "
+            "Note: XCOPY itself is NOT deprecated, but ROBOCOPY is recommended "
+            "for advanced scenarios with better features"
         ),
     ),
     "W025": Rule(
@@ -1091,6 +1102,27 @@ RULES: Dict[str, Rule] = {
         severity=RuleSeverity.ERROR,
         explanation="Percent signs in output require double escaping: %% instead of %",
         recommendation="Use %% in ECHO statements to display single % character",
+    ),
+    "E034": Rule(
+        code="E034",
+        name="Removed Windows command detected",
+        severity=RuleSeverity.ERROR,
+        explanation=(
+            "Command has been completely removed from Windows and will not execute. "
+            "These commands are no longer available in modern Windows versions and "
+            "will cause script failures"
+        ),
+        recommendation=(
+            "Replace removed commands with modern alternatives: "
+            "CASPOL (removed - use Code Access Security Policy Tool from SDK), "
+            "DISKCOMP (removed - use FC for file comparison), "
+            "APPEND (removed - modify PATH or use full paths), "
+            "BROWSTAT (removed - use NET VIEW or PowerShell), "
+            "INUSE (removed - use HANDLE.EXE from Sysinternals), "
+            "NET PRINT (removed - use PowerShell Print cmdlets), "
+            "DISKCOPY (removed - use ROBOCOPY or XCOPY), "
+            "STREAMS (removed - use Get-Item -Stream in PowerShell)"
+        ),
     ),
     # Advanced FOR Command Rules (W034-W043)
     "W034": Rule(
@@ -1650,7 +1682,33 @@ UNICODE_PROBLEMATIC_COMMANDS = {"type", "echo", "find", "findstr"}
 
 # Additional patterns for new rules
 # Note: xcopy is NOT deprecated despite robocopy being recommended for advanced scenarios
-DEPRECATED_COMMANDS = {"assign", "backup", "comp", "edlin", "join", "subst"}
+# Deprecated commands (W024) - these may not be available in future Windows versions
+DEPRECATED_COMMANDS = {
+    "wmic",  # Use PowerShell WMI cmdlets instead
+    "cacls",  # Use icacls instead
+    "winrm",  # Use PowerShell Remoting instead
+    "bitsadmin",  # Use PowerShell BitsTransfer module instead
+    "nbtstat",  # Use PowerShell Get-NetAdapter cmdlets instead
+    "dpath",  # Modify PATH environment variable instead
+    "keys",  # Use CHOICE or SET /P instead
+    "assign",  # Legacy command
+    "backup",  # Legacy command
+    "comp",  # Use FC instead
+    "edlin",  # Legacy line editor
+    "join",  # Legacy command
+    "subst",  # Use persistent drive mappings or UNC paths instead
+}
+
+# Removed commands (E034) - these have been completely removed from Windows
+REMOVED_COMMANDS = {
+    "caspol",  # Removed - use Code Access Security Policy Tool from SDK
+    "diskcomp",  # Removed - use FC for file comparison
+    "append",  # Removed - modify PATH or use full paths
+    "browstat",  # Removed - use NET VIEW or PowerShell
+    "inuse",  # Removed - use HANDLE.EXE from Sysinternals
+    "diskcopy",  # Removed - use ROBOCOPY or XCOPY
+    "streams",  # Removed - use Get-Item -Stream in PowerShell
+}
 
 COMMON_COMMAND_TYPOS = {
     "iff": "if",
@@ -2983,19 +3041,8 @@ def _check_command_warnings(  # pylint: disable=unused-argument
             )
         )
 
-    # W015: Deprecated command usage
-    first_word = stripped.split()[0].lower() if stripped.split() else ""
-    if first_word in DEPRECATED_COMMANDS:
-        issues.append(
-            LintIssue(
-                line_number=line_num,
-                rule=RULES["W015"],
-                context=(
-                    f"Command '{first_word}' is deprecated and may not work "
-                    f"in newer Windows versions"
-                ),
-            )
-        )
+    # W015: Deprecated command usage - Now handled by W024 in _check_deprecated_commands()
+    # (Removed duplicate check - W024 provides more comprehensive deprecated command detection)
 
     return issues
 
@@ -6502,24 +6549,95 @@ def _check_if_comparison_quotes(stripped: str, line_number: int) -> Optional[Lin
 
 
 def _check_deprecated_commands(stripped: str, line_number: int) -> List[LintIssue]:
-    """Check for deprecated commands (W024)."""
+    """Check for deprecated commands (W024) and removed commands (E034)."""
     issues: List[LintIssue] = []
-    # Note: xcopy is NOT deprecated, so it's not included here
-    deprecated_commands = {
-        "net send": "msg",
-        "at ": "schtasks",
-        "cacls": "icacls",
-    }
 
-    for deprecated, modern in deprecated_commands.items():
-        if re.search(rf"\b{re.escape(deprecated)}\b", stripped, re.IGNORECASE):
-            issues.append(
-                LintIssue(
-                    line_number=line_number,
-                    rule=RULES["W024"],
-                    context=f"Use {modern} instead of {deprecated}",
-                )
+    # Skip comment lines (REM or ::)
+    if stripped.lower().startswith("rem ") or stripped.startswith("::"):
+        return issues
+
+    # First check for removed commands (more severe - Error level)
+    # Special handling for "NET PRINT" (just NET PRINT is removed, not NET itself)
+    if re.search(r"\bnet\s+print\b", stripped, re.IGNORECASE):
+        issues.append(
+            LintIssue(
+                line_number=line_number,
+                rule=RULES["E034"],
+                context="NET PRINT has been removed - use PowerShell Print cmdlets instead",
             )
+        )
+
+    # Check other removed commands
+    first_word = stripped.split()[0].lower() if stripped.split() else ""
+    if first_word in REMOVED_COMMANDS:
+        replacement_map = {
+            "caspol": "Code Access Security Policy Tool from SDK",
+            "diskcomp": "FC (file comparison)",
+            "append": "modify PATH or use full paths",
+            "browstat": "NET VIEW or PowerShell",
+            "inuse": "HANDLE.EXE from Sysinternals",
+            "diskcopy": "ROBOCOPY or XCOPY",
+            "streams": "PowerShell Get-Item -Stream",
+        }
+        replacement = replacement_map.get(first_word, "a modern alternative")
+        issues.append(
+            LintIssue(
+                line_number=line_number,
+                rule=RULES["E034"],
+                context=(
+                    f"Command '{first_word.upper()}' has been removed "
+                    f"from Windows - use {replacement}"
+                ),
+            )
+        )
+
+    # Check for deprecated commands (Warning level)
+    # Special case for NET SEND
+    if re.search(r"\bnet\s+send\b", stripped, re.IGNORECASE):
+        issues.append(
+            LintIssue(
+                line_number=line_number,
+                rule=RULES["W024"],
+                context="Use MSG command instead of deprecated 'NET SEND'",
+            )
+        )
+
+    # Special case for AT command (needs special handling because AT is a common word)
+    # Only flag if it looks like the scheduling command (e.g., "at 14:00" or "at \\computer")
+    if re.search(r"\bat\s+(\d|\\\\)", stripped, re.IGNORECASE):
+        issues.append(
+            LintIssue(
+                line_number=line_number,
+                rule=RULES["W024"],
+                context="Use SCHTASKS command instead of deprecated 'AT'",
+            )
+        )
+
+    # Check single-word deprecated commands
+    if first_word in DEPRECATED_COMMANDS:
+        replacement_map = {
+            "wmic": "PowerShell WMI cmdlets (Get-WmiObject/Get-CimInstance)",
+            "cacls": "ICACLS command",
+            "winrm": "PowerShell Remoting (Enter-PSSession/Invoke-Command)",
+            "bitsadmin": "PowerShell BitsTransfer module",
+            "nbtstat": "PowerShell Get-NetAdapter cmdlets",
+            "dpath": "PATH environment variable modification",
+            "keys": "CHOICE or SET /P commands",
+            "assign": "drive mounting with modern tools",
+            "backup": "modern backup tools",
+            "comp": "FC command",
+            "edlin": "modern text editors",
+            "join": "drive mounting with modern tools",
+            "subst": "persistent drive mappings or UNC paths",
+        }
+        replacement = replacement_map.get(first_word, "a modern alternative")
+        issues.append(
+            LintIssue(
+                line_number=line_number,
+                rule=RULES["W024"],
+                context=f"Command '{first_word.upper()}' is deprecated - use {replacement}",
+            )
+        )
 
     return issues
 

@@ -2,7 +2,7 @@
 
 ## Rule Categories Summary
 
-**Blinter** provides comprehensive static analysis with **157 Built-in Rules** across 5 severity levels:
+**Blinter** provides comprehensive static analysis with **158 Built-in Rules** across 5 severity levels:
 
 ### Error Level Rules (E001-E999)
 **Critical issues that will cause script failure**
@@ -34,6 +34,7 @@
 - **E031**: Invalid multilevel escaping
 - **E032**: Continuation character with trailing spaces
 - **E033**: Double percent escaping error
+- **E034**: Removed Windows command detected
 
 ### Warning Level Rules (W001-W999)
 **Issues that may cause problems**
@@ -350,6 +351,36 @@ Line 5: Missing '@ECHO OFF' at top of file (S001)
   EXIT /b 0
   ```
 
+### Removed Commands
+- **E034: Removed Windows command detected**: Commands completely removed from Windows
+  ```batch
+  # Bad - These commands have been removed from Windows
+  CASPOL -m -ag 1 -url file://c:\temp\* FullTrust
+  DISKCOMP A: B:
+  APPEND C:\DATA
+  BROWSTAT status
+  INUSE file.dll /Y
+  NET PRINT \\server\printer file.txt
+  DISKCOPY A: B:
+  STREAMS -s file.txt
+  
+  # Good - Use modern alternatives
+  # Instead of CASPOL: Use Code Access Security Policy Tool from SDK
+  # Instead of DISKCOMP: Use FC for file comparison
+  FC /B file1.txt file2.txt
+  # Instead of APPEND: Modify PATH or use full paths
+  SET "PATH=%PATH%;C:\DATA"
+  # Instead of BROWSTAT: Use NET VIEW or PowerShell
+  NET VIEW \\computer
+  # Instead of INUSE: Use HANDLE.EXE from Sysinternals
+  # Instead of NET PRINT: Use PowerShell Print cmdlets
+  Get-Printer | Format-Table
+  # Instead of DISKCOPY: Use ROBOCOPY or XCOPY
+  ROBOCOPY source dest /E
+  # Instead of STREAMS: Use Get-Item -Stream in PowerShell
+  powershell -Command "Get-Item file.txt -Stream *"
+  ```
+
 ## Warning Level Rules
 *Issues that are bad practice but won't necessarily break the script*
 
@@ -505,17 +536,32 @@ Line 5: Missing '@ECHO OFF' at top of file (S001)
 
 - **Deprecated commands**: Warn about commands deprecated in modern Windows
   ```batch
-  # Bad - Deprecated commands
-  xcopy source.txt dest.txt        :: Use robocopy
-  net send computer "message"      :: Use msg
-  at 14:00 script.bat              :: Use schtasks
-  cacls file.txt                   :: Use icacls
+  # Bad - Deprecated commands (W024)
+  WMIC os get caption              :: Use PowerShell WMI cmdlets
+  CACLS file.txt                   :: Use ICACLS
+  WINRM quickconfig                :: Use PowerShell Remoting
+  BITSADMIN /transfer test url dst :: Use PowerShell BitsTransfer
+  NBTSTAT -n                       :: Use PowerShell Get-NetAdapter
+  DPATH C:\DATA                    :: Modify PATH instead
+  KEYS                             :: Use CHOICE or SET /P
+  NET SEND computer "message"      :: Use MSG
+  AT 14:00 script.bat              :: Use SCHTASKS
   
   # Good - Modern alternatives
-  robocopy source dest /s
-  msg computer "message"
-  schtasks /create /tn "Task" /tr script.bat /sc daily
-  icacls file.txt /grant user:F
+  powershell -Command "Get-WmiObject Win32_OperatingSystem"
+  ICACLS file.txt /grant user:F
+  powershell -Command "Enter-PSSession -ComputerName server"
+  powershell -Command "Start-BitsTransfer -Source url -Destination dst"
+  powershell -Command "Get-NetAdapter"
+  SET "PATH=%PATH%;C:\DATA"
+  CHOICE /C YN /M "Continue"
+  MSG computer "message"
+  SCHTASKS /create /tn "Task" /tr script.bat /sc daily
+  
+  # Note: XCOPY is NOT deprecated
+  # XCOPY is still supported, though ROBOCOPY is recommended for advanced scenarios
+  XCOPY source dest /E /Y          :: Still valid
+  ROBOCOPY source dest /E          :: Recommended for advanced features
   ```
 
 - **Missing error redirection**: Warn when commands lack proper error handling

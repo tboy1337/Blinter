@@ -1481,3 +1481,341 @@ IF EXIST file.txt^>NUL (
             )
         finally:
             os.unlink(temp_file)
+
+    def test_w024_deprecated_commands_wmic(self) -> None:
+        """Test W024: WMIC command should be flagged as deprecated."""
+        content = """@ECHO OFF
+WMIC os get caption
+wmic process list
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
+            # Should detect both WMIC usages
+            assert "W024" in rule_codes, "W024 should be triggered for WMIC command"
+            assert len(w024_issues) == 2, f"Expected 2 W024 issues, got {len(w024_issues)}"
+            # Check context mentions WMIC
+            for issue in w024_issues:
+                assert (
+                    "WMIC" in issue.context.upper()
+                ), f"Context should mention WMIC: {issue.context}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_w024_deprecated_commands_cacls(self) -> None:
+        """Test W024: CACLS command should be flagged as deprecated."""
+        content = """@ECHO OFF
+CACLS file.txt /E /G user:F
+cacls folder /T
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
+            assert "W024" in rule_codes, "W024 should be triggered for CACLS command"
+            assert len(w024_issues) == 2, f"Expected 2 W024 issues, got {len(w024_issues)}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_w024_deprecated_commands_bitsadmin(self) -> None:
+        """Test W024: BITSADMIN command should be flagged as deprecated."""
+        content = """@ECHO OFF
+BITSADMIN /transfer myDownload http://example.com/file.zip c:\\temp\\file.zip
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            assert "W024" in rule_codes, "W024 should be triggered for BITSADMIN command"
+        finally:
+            os.unlink(temp_file)
+
+    def test_w024_deprecated_commands_winrm(self) -> None:
+        """Test W024: WINRM command should be flagged as deprecated."""
+        content = """@ECHO OFF
+WINRM quickconfig
+winrm get winrm/config
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
+            assert "W024" in rule_codes, "W024 should be triggered for WINRM command"
+            assert len(w024_issues) == 2, f"Expected 2 W024 issues, got {len(w024_issues)}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_w024_deprecated_commands_nbtstat(self) -> None:
+        """Test W024: NBTSTAT command should be flagged as deprecated."""
+        content = """@ECHO OFF
+NBTSTAT -n
+nbtstat -c
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
+            assert "W024" in rule_codes, "W024 should be triggered for NBTSTAT command"
+            assert len(w024_issues) == 2, f"Expected 2 W024 issues, got {len(w024_issues)}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_w024_deprecated_commands_net_send(self) -> None:
+        """Test W024: NET SEND command should be flagged as deprecated."""
+        content = """@ECHO OFF
+NET SEND computer "Hello"
+net send * "Broadcast message"
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
+            assert "W024" in rule_codes, "W024 should be triggered for NET SEND command"
+            assert len(w024_issues) == 2, f"Expected 2 W024 issues, got {len(w024_issues)}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_w024_deprecated_at_command(self) -> None:
+        """Test W024: AT command should be flagged as deprecated."""
+        content = """@ECHO OFF
+AT 14:00 script.bat
+at \\\\computer 10:00 backup.bat
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
+            assert "W024" in rule_codes, "W024 should be triggered for AT command"
+            assert len(w024_issues) == 2, f"Expected 2 W024 issues, got {len(w024_issues)}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_e034_removed_commands_caspol(self) -> None:
+        """Test E034: CASPOL command should be flagged as removed."""
+        content = """@ECHO OFF
+CASPOL -m -ag 1 -url file://c:\\temp\\* FullTrust
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            assert "E034" in rule_codes, "E034 should be triggered for CASPOL command"
+            e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
+            assert "CASPOL" in e034_issues[0].context.upper()
+        finally:
+            os.unlink(temp_file)
+
+    def test_e034_removed_commands_diskcomp(self) -> None:
+        """Test E034: DISKCOMP command should be flagged as removed."""
+        content = """@ECHO OFF
+DISKCOMP A: B:
+diskcomp c:\\disk1 d:\\disk2
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
+            assert "E034" in rule_codes, "E034 should be triggered for DISKCOMP command"
+            assert len(e034_issues) == 2, f"Expected 2 E034 issues, got {len(e034_issues)}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_e034_removed_commands_append(self) -> None:
+        """Test E034: APPEND command should be flagged as removed."""
+        content = """@ECHO OFF
+APPEND C:\\DATA
+append /X:OFF
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
+            assert "E034" in rule_codes, "E034 should be triggered for APPEND command"
+            assert len(e034_issues) == 2, f"Expected 2 E034 issues, got {len(e034_issues)}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_e034_removed_commands_browstat(self) -> None:
+        """Test E034: BROWSTAT command should be flagged as removed."""
+        content = """@ECHO OFF
+BROWSTAT status
+browstat view
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
+            assert "E034" in rule_codes, "E034 should be triggered for BROWSTAT command"
+            assert len(e034_issues) == 2, f"Expected 2 E034 issues, got {len(e034_issues)}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_e034_removed_commands_inuse(self) -> None:
+        """Test E034: INUSE command should be flagged as removed."""
+        content = """@ECHO OFF
+INUSE file.dll /Y
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            assert "E034" in rule_codes, "E034 should be triggered for INUSE command"
+        finally:
+            os.unlink(temp_file)
+
+    def test_e034_removed_commands_net_print(self) -> None:
+        """Test E034: NET PRINT command should be flagged as removed (but NET itself is ok)."""
+        content = """@ECHO OFF
+REM NET PRINT is removed
+NET PRINT \\\\computer\\printer file.txt
+net print \\\\server\\queue
+
+REM But other NET commands are fine
+NET USE Z: \\\\server\\share
+NET VIEW \\\\computer
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
+            # Should only flag NET PRINT, not other NET commands
+            assert "E034" in rule_codes, "E034 should be triggered for NET PRINT command"
+            assert (
+                len(e034_issues) == 2
+            ), f"Expected 2 E034 issues (NET PRINT only), got {len(e034_issues)}"
+            # Verify it's specifically for NET PRINT
+            for issue in e034_issues:
+                assert (
+                    "PRINT" in issue.context.upper()
+                ), f"Context should mention PRINT: {issue.context}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_e034_removed_commands_diskcopy(self) -> None:
+        """Test E034: DISKCOPY command should be flagged as removed."""
+        content = """@ECHO OFF
+DISKCOPY A: B:
+diskcopy c:\\source d:\\dest
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
+            assert "E034" in rule_codes, "E034 should be triggered for DISKCOPY command"
+            assert len(e034_issues) == 2, f"Expected 2 E034 issues, got {len(e034_issues)}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_e034_removed_commands_streams(self) -> None:
+        """Test E034: STREAMS command should be flagged as removed."""
+        content = """@ECHO OFF
+STREAMS -s file.txt
+streams -d *.doc
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
+            assert "E034" in rule_codes, "E034 should be triggered for STREAMS command"
+            assert len(e034_issues) == 2, f"Expected 2 E034 issues, got {len(e034_issues)}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_xcopy_not_deprecated(self) -> None:
+        """Test that XCOPY is NOT flagged as deprecated (per requirements)."""
+        content = """@ECHO OFF
+XCOPY source dest /E /Y
+xcopy *.txt backup\\
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            # XCOPY should NOT trigger W024 or E034
+            assert "W024" not in rule_codes, "XCOPY should NOT be flagged as deprecated"
+            assert "E034" not in rule_codes, "XCOPY should NOT be flagged as removed"
+        finally:
+            os.unlink(temp_file)
+
+    def test_net_command_not_deprecated_without_send(self) -> None:
+        """Test that NET commands (other than NET SEND and NET PRINT) are not flagged."""
+        content = """@ECHO OFF
+NET USE Z: \\\\server\\share
+NET VIEW \\\\computer
+NET USER username
+NET STOP servicename
+net start servicename
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            # These NET commands should NOT trigger W024 or E034
+            assert (
+                "W024" not in rule_codes
+            ), "NET (without SEND) should NOT be flagged as deprecated"
+            assert "E034" not in rule_codes, "NET (without PRINT) should NOT be flagged as removed"
+        finally:
+            os.unlink(temp_file)
+
+    def test_deprecated_and_removed_commands_comprehensive(self) -> None:
+        """Test comprehensive check of multiple deprecated and removed commands in one file."""
+        content = """@ECHO OFF
+REM Deprecated commands (should trigger W024)
+WMIC os get caption
+CACLS file.txt /E
+BITSADMIN /transfer test http://test.com/file.zip c:\\file.zip
+WINRM quickconfig
+NBTSTAT -n
+NET SEND computer "message"
+AT 14:00 task.bat
+DPATH C:\\DATA
+KEYS
+
+REM Removed commands (should trigger E034)
+CASPOL -m -ag 1
+DISKCOMP A: B:
+APPEND C:\\DATA
+BROWSTAT status
+INUSE file.dll
+NET PRINT \\\\server\\printer file.txt
+DISKCOPY A: B:
+STREAMS -s file.txt
+
+REM Valid commands (should NOT trigger W024 or E034)
+NET USE Z: \\\\server\\share
+XCOPY source dest /E
+ROBOCOPY source dest /E
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
+            e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
+
+            # Should have 9 deprecated command warnings
+            assert len(w024_issues) == 9, (
+                f"Expected 9 W024 issues (deprecated commands), got {len(w024_issues)}. "
+                f"Issues: {[(i.line_number, i.context) for i in w024_issues]}"
+            )
+
+            # Should have 8 removed command errors
+            assert len(e034_issues) == 8, (
+                f"Expected 8 E034 issues (removed commands), got {len(e034_issues)}. "
+                f"Issues: {[(i.line_number, i.context) for i in e034_issues]}"
+            )
+        finally:
+            os.unlink(temp_file)

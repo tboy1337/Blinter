@@ -193,11 +193,16 @@ class TestWarningIssueChecking:
     """Test warning issue detection edge cases."""
 
     def test_deprecated_command_usage(self) -> None:
-        """Test detection of deprecated commands."""
+        """Test detection of deprecated commands.
+
+        Note: Deprecated command checking (W024) has been moved to _check_deprecated_commands()
+        and is no longer part of _check_warning_issues(). See test_lint_functionality.py for
+        comprehensive deprecated command tests.
+        """
         set_vars: Set[str] = set()
         issues = _check_warning_issues("assign A: B:", 1, set_vars, False)
-        assert len(issues) == 1
-        assert "W015" in issues[0].rule.code
+        # Should not return any issues since deprecated command checking moved to W024
+        assert len(issues) == 0
 
     def test_unquoted_variable_in_echo(self) -> None:
         """Test unquoted variable in ECHO - should NOT trigger W005 (only IF comparisons do)."""
