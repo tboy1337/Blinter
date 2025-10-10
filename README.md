@@ -104,6 +104,9 @@ python -m blinter script.bat --no-config
 
 # Get help
 python -m blinter --help
+
+# Get version
+python -m blinter --version
 ```
 
 **If using standalone executable:**
@@ -125,6 +128,9 @@ Blinter-v1.0.x-windows.exe script.bat --follow-calls
 
 # Get help
 Blinter-v1.0.x-windows.exe --help
+
+# Get version
+Blinter-v1.0.x-windows.exe --version
 ```
 
 **If using manual installation:**
@@ -152,6 +158,9 @@ python blinter.py script.bat --no-config
 
 # Get help
 python blinter.py --help
+
+# Get version
+python blinter.py --version
 ```
 
 ### Command Line Options
@@ -164,6 +173,7 @@ python blinter.py --help
 - `--no-config`: Don't use configuration file (blinter.ini) even if it exists
 - `--create-config`: Create a default blinter.ini configuration file and exit
 - `--help`: Show help menu and rule categories
+- `--version`: Display version information
 
 **Note:** Command line options override configuration file settings. Blinter automatically looks for `blinter.ini` in the current directory.
 

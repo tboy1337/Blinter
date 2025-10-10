@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.48
+Version: 1.0.49
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.48"
+__version__ = "1.0.49"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1896,10 +1896,16 @@ follow_calls = false
         print(f"Error creating configuration file: {error}")
 
 
+def print_version() -> None:
+    """Print version information."""
+    print(f"v{__version__}")
+
+
 def print_help() -> None:
     """Print help information for the blinter command."""
-    help_text = """
+    help_text = f"""
 Batch Linter - Help Menu
+Version: {__version__}
 
 Usage:
   python blinter.py <path> [options]
@@ -1917,6 +1923,7 @@ Options:
   --no-config         Don't use configuration file (blinter.ini) even if it exists.
   --create-config     Create a default blinter.ini configuration file and exit.
   --help              Display this help menu and exit.
+  --version           Display version information and exit.
 
 Configuration:
   Blinter automatically looks for a 'blinter.ini' file in the current directory.
@@ -6219,6 +6226,11 @@ class CliArguments:
 
 def _parse_cli_arguments() -> Optional[CliArguments]:
     """Parse command line arguments."""
+    # Handle --version flag first
+    if "--version" in sys.argv:
+        print_version()
+        return None
+
     if len(sys.argv) < 2 or "--help" in sys.argv:
         print_help()
         return None
@@ -6529,6 +6541,9 @@ def main() -> None:
     cli_args = _parse_cli_arguments()
     if cli_args is None:
         return
+
+    # Display version information
+    print(f"Blinter v{__version__} - Batch File Linter\n")
 
     # Load configuration
     config = load_config(use_config=cli_args.use_config)

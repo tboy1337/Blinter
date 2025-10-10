@@ -1379,3 +1379,51 @@ class TestMainFunctionEdgeCases:
                         assert mock_print.called  # Should have printed error information
         finally:
             os.unlink(temp_path)
+
+
+class TestVersionFunctionality:
+    """Tests for version display functionality."""
+
+    def test_version_flag(self) -> None:
+        """Test that --version flag displays version information."""
+        with patch("sys.argv", ["blinter", "--version"]):
+            with StdoutCapture() as captured:
+                main()
+                output = captured.getvalue()
+
+                # Check for version information in output (just the version number)
+                assert "v1.0.48" in output
+                # Ensure author and license are NOT shown
+                assert "Author:" not in output
+                assert "License:" not in output
+
+    def test_version_in_help(self) -> None:
+        """Test that version is displayed in help menu."""
+        with patch("sys.argv", ["blinter", "--help"]):
+            with StdoutCapture() as captured:
+                main()
+                output = captured.getvalue()
+
+                # Check for version in help text
+                assert "Batch Linter - Help Menu" in output
+                assert "Version: 1.0.48" in output
+
+    def test_version_in_normal_run(self) -> None:
+        """Test that version is displayed when script runs normally."""
+        # Create a temporary batch file
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
+            temp_file.write("@echo off\n")
+            temp_file.write("echo Hello World\n")
+            temp_path = temp_file.name
+
+        try:
+            with patch("sys.argv", ["blinter", temp_path]):
+                with patch("sys.exit"):
+                    with StdoutCapture() as captured:
+                        main()
+                        output = captured.getvalue()
+
+                        # Check that version is displayed at the start
+                        assert "Blinter v1.0.48 - Batch File Linter" in output
+        finally:
+            os.unlink(temp_path)
