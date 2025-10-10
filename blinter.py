@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.47
+Version: 1.0.48
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.47"
+__version__ = "1.0.48"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -100,6 +100,7 @@ class BlinterConfig:
     recursive: bool = True
     show_summary: bool = False
     max_line_length: int = 150
+    follow_calls: bool = False
 
     # Rule enablement - all rules enabled by default
     enabled_rules: Optional[Set[str]] = None
@@ -1753,6 +1754,7 @@ def _load_general_settings(config: BlinterConfig, parser: configparser.ConfigPar
     config.recursive = general.getboolean("recursive", fallback=True)
     config.show_summary = general.getboolean("show_summary", fallback=False)
     config.max_line_length = general.getint("max_line_length", fallback=150)
+    config.follow_calls = general.getboolean("follow_calls", fallback=False)
 
     severity_str = general.get("min_severity", "").strip()
     if severity_str:
@@ -1858,6 +1860,10 @@ show_summary = false
 # Maximum line length before triggering S011 rule (default: 150)
 max_line_length = 150
 
+# Whether to automatically scan scripts called by CALL statements (default: false)
+# This helps analyze centralized configuration scripts that set variables
+follow_calls = false
+
 # Minimum severity level to report (default: none - show all)
 # Valid values: ERROR, SECURITY, WARNING, PERFORMANCE, STYLE
 # min_severity = WARNING
@@ -1906,6 +1912,8 @@ Options:
   --summary           Show a summary section with total errors and most common error.
   --severity          Show error severity levels and their meaning.
   --no-recursive      When processing directories, don't search subdirectories (default: recursive).
+  --follow-calls      Automatically scan scripts called by CALL statements (one level deep).
+                     This helps analyze centralized configuration scripts that set variables.
   --no-config         Don't use configuration file (blinter.ini) even if it exists.
   --create-config     Create a default blinter.ini configuration file and exit.
   --help              Display this help menu and exit.
@@ -1934,6 +1942,9 @@ Examples:
 
   python blinter.py myscript.cmd --summary
       Shows summary and detailed errors for a single file.
+
+  python blinter.py myscript.bat --follow-calls
+      Analyze script and any scripts it calls (e.g., configuration scripts).
 
   python blinter.py /project/scripts --summary --severity
       Shows summary, detailed errors and severity info for all batch files in directory.
@@ -2914,15 +2925,28 @@ def _check_echo_unicode_risk(stripped: str) -> bool:
             continue  # Skip false matches across FOR loop variables
 
         # var_content is the variable name without % signs
-        if re.search(r"[^A-Z0-9_~]", var_content, re.IGNORECASE):
-            # Allow common parameter expansions like %~n1, %~dp0
-            if not re.match(r"~[a-z]*\d*$", var_content, re.IGNORECASE):
-                complex_vars.append(var_content)
+        # Allow: alphanumeric, underscore, tilde, @ (common for internal vars), and # (also used)
+        # Strip trailing non-alphanumeric characters that might be adjacent literals
+        # e.g., %@DIVIDER-% should be treated as %@DIVIDER% followed by a literal -
+        var_name = re.match(r"^([A-Z0-9_~@#]+)", var_content, re.IGNORECASE)
+        if var_name:
+            # This is a valid simple variable name, not complex
+            continue
+
+        # Check for parameter expansions like %~n1, %~dp0
+        if re.match(r"^~[a-z]*\d*$", var_content, re.IGNORECASE):
+            continue
+
+        # If we get here, it's a complex/unusual variable expansion
+        complex_vars.append(var_content)
 
     # Check if this is safe file redirection (output to files, not complex shell operations)
     has_safe_redirection = bool(
         re.search(r">\s*(nul|\"[^\"]*\"|[^\s&|<>]+)(\s*2>&1)?\s*$", stripped, re.IGNORECASE)
     )
+
+    # Check for escaped angle brackets (^< or ^>) which are safe
+    has_escaped_brackets = bool(re.search(r"\^[<>]", stripped))
 
     # Only flag echo if it has real Unicode issues
     return (
@@ -2930,8 +2954,10 @@ def _check_echo_unicode_risk(stripped: str) -> bool:
             ord(c) < 128 for c in echo_content if c.strip()
         )  # Contains non-ASCII in actual content
         or (
-            bool(re.search(r"[<>]", stripped)) and not has_safe_redirection
-        )  # Has unsafe redirection
+            bool(re.search(r"[<>]", stripped))
+            and not has_safe_redirection
+            and not has_escaped_brackets
+        )  # Has unsafe redirection (not escaped)
         or len(complex_vars) > 0  # Has truly complex variable expansion
         or bool(re.search(r"[\x00-\x1f\x7f-\xff]", echo_content))  # Control chars in content
     )
@@ -6188,6 +6214,7 @@ class CliArguments:
     use_config: bool
     cli_show_summary: Optional[bool]
     cli_recursive: Optional[bool]
+    cli_follow_calls: Optional[bool]
 
 
 def _parse_cli_arguments() -> Optional[CliArguments]:
@@ -6205,6 +6232,7 @@ def _parse_cli_arguments() -> Optional[CliArguments]:
     use_config = True
     cli_show_summary = None  # None means use config default
     cli_recursive = None  # None means use config default
+    cli_follow_calls = None  # None means use config default
 
     for arg in sys.argv[1:]:
         if not arg.startswith("--"):
@@ -6219,13 +6247,15 @@ def _parse_cli_arguments() -> Optional[CliArguments]:
             cli_recursive = False
         elif arg == "--no-config":
             use_config = False
+        elif arg == "--follow-calls":
+            cli_follow_calls = True
 
     if not target_path:
         print("Error: No batch file or directory provided.\n")
         print_help()
         return None
 
-    return CliArguments(target_path, use_config, cli_show_summary, cli_recursive)
+    return CliArguments(target_path, use_config, cli_show_summary, cli_recursive, cli_follow_calls)
 
 
 @dataclass
@@ -6238,6 +6268,114 @@ class ProcessingResults:
     files_with_errors: int
 
 
+def _extract_called_scripts(batch_file: Path) -> List[Path]:
+    """
+    Extract paths to scripts called by CALL statements in a batch file.
+
+    Args:
+        batch_file: Path to the batch file to analyze
+
+    Returns:
+        List of Path objects for called scripts that exist
+    """
+    called_scripts: List[Path] = []
+    batch_dir = batch_file.parent
+
+    try:
+        with open(batch_file, "r", encoding="utf-8", errors="ignore") as file:
+            for line in file:
+                # Skip comments
+                stripped = line.strip().lower()
+                if stripped.startswith("rem ") or stripped.startswith("::"):
+                    continue
+
+                # Look for CALL statements with .bat or .cmd files
+                # Pattern: CALL "path\script.bat" or CALL %~dp0script.bat, etc.
+                call_match = re.search(
+                    r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|([^\s]+\.(?:bat|cmd)))',
+                    line,
+                    re.IGNORECASE,
+                )
+
+                if call_match:
+                    # Get the script path (from either quoted or unquoted group)
+                    script_path_str = call_match.group(1) or call_match.group(2)
+
+                    # Resolve batch parameter expansions
+                    # %~dp0 = directory of current script
+                    if "%~dp0" in script_path_str:
+                        script_path_str = script_path_str.replace("%~dp0", "")
+                        # Path is relative to batch file directory
+                        script_path = batch_dir / script_path_str
+                    elif "%~d0" in script_path_str:
+                        script_path_str = script_path_str.replace("%~d0", str(batch_dir.drive))
+                        script_path = Path(script_path_str)
+                    else:
+                        # Try to resolve the path
+                        script_path = Path(script_path_str)
+                        if not script_path.is_absolute():
+                            # Try relative to batch file directory
+                            script_path = batch_dir / script_path_str
+
+                    # Try to resolve the path
+                    try:
+                        # Check if file exists
+                        if script_path.exists() and script_path.is_file():
+                            # Avoid circular references
+                            if script_path.resolve() != batch_file.resolve():
+                                called_scripts.append(script_path)
+                    except (ValueError, OSError):
+                        # Invalid path, skip
+                        continue
+
+    except (OSError, UnicodeDecodeError):
+        # If we can't read the file, return empty list
+        pass
+
+    return called_scripts
+
+
+def _process_single_called_script(
+    called_script: Path,
+    config: BlinterConfig,
+    processed_files: Set[Path],
+    all_issues: List[LintIssue],
+    file_results: Dict[str, List[LintIssue]],
+) -> tuple[int, int]:
+    """
+    Process a single called script.
+
+    Returns:
+        Tuple of (files_processed, files_with_errors)
+    """
+    # Skip if already processed
+    if called_script.resolve() in processed_files:
+        return (0, 0)
+
+    try:
+        called_issues = lint_batch_file(str(called_script), config=config)
+        file_results[str(called_script)] = called_issues
+        all_issues.extend(called_issues)
+        processed_files.add(called_script.resolve())
+
+        has_errors = any(issue.rule.severity == RuleSeverity.ERROR for issue in called_issues)
+        return (1, 1 if has_errors else 0)
+
+    except (
+        UnicodeDecodeError,
+        FileNotFoundError,
+        PermissionError,
+        OSError,
+        ValueError,
+        TypeError,
+    ) as called_error:
+        error_msg = (
+            f"Warning: Could not process called script " f"'{called_script}': {called_error}"
+        )
+        print(error_msg)
+        return (0, 0)
+
+
 def _process_batch_files(
     batch_files: List[Path], config: BlinterConfig
 ) -> Optional[ProcessingResults]:
@@ -6246,16 +6384,32 @@ def _process_batch_files(
     file_results: Dict[str, List[LintIssue]] = {}
     total_files_processed = 0
     files_with_errors = 0
+    processed_files: Set[Path] = set()  # Track processed files to avoid duplicates
 
     for batch_file in batch_files:
+        # Skip if already processed (could happen with follow_calls)
+        if batch_file.resolve() in processed_files:
+            continue
+
         try:
             issues = lint_batch_file(str(batch_file), config=config)
             file_results[str(batch_file)] = issues
             all_issues.extend(issues)
             total_files_processed += 1
+            processed_files.add(batch_file.resolve())
 
             if any(issue.rule.severity == RuleSeverity.ERROR for issue in issues):
                 files_with_errors += 1
+
+            # If follow_calls is enabled, process called scripts
+            if config.follow_calls:
+                called_scripts = _extract_called_scripts(batch_file)
+                for called_script in called_scripts:
+                    processed, errors = _process_single_called_script(
+                        called_script, config, processed_files, all_issues, file_results
+                    )
+                    total_files_processed += processed
+                    files_with_errors += errors
 
         except UnicodeDecodeError as decode_error:
             print(f"Warning: Could not read '{batch_file}' due to encoding issues: {decode_error}")
@@ -6384,6 +6538,8 @@ def main() -> None:
         config.show_summary = cli_args.cli_show_summary
     if cli_args.cli_recursive is not None:
         config.recursive = cli_args.cli_recursive
+    if cli_args.cli_follow_calls is not None:
+        config.follow_calls = cli_args.cli_follow_calls
 
     # Find all batch files to process
     try:
