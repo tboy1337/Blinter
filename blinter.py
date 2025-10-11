@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.49
+Version: 1.0.50
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.49"
+__version__ = "1.0.50"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -4665,7 +4665,13 @@ def _check_advanced_for_rules(line: str, line_number: int) -> List[LintIssue]:
             )
 
     # W035: FOR /F tokenizing without proper delimiters
-    if "/f" in stripped and "delims=" not in stripped and "tokens=" in stripped:
+    # Skip if tokens=* is used (means take entire line, no tokenization needed)
+    if (
+        "/f" in stripped
+        and "delims=" not in stripped
+        and "tokens=" in stripped
+        and "tokens=*" not in stripped
+    ):
         issues.append(
             LintIssue(
                 line_number, RULES["W035"], context="FOR /F tokenizing should specify delimiters"

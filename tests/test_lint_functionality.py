@@ -1819,3 +1819,44 @@ ROBOCOPY source dest /E
             )
         finally:
             os.unlink(temp_file)
+
+    def test_w035_tokens_star_is_valid(self) -> None:
+        """Test W035: FOR /F with tokens=* should NOT trigger delimiter warning."""
+        # GitHub issue: tokens=* is a valid pattern that doesn't need explicit delimiters
+        # tokens=* means "take the entire line without tokenization"
+        content = """@ECHO OFF
+REM tokens=* is valid - should NOT trigger W035
+FOR /F "tokens=*" %%a IN ('dir /b') DO echo %%a
+FOR /F "TOKENS=*" %%b IN ('type file.txt') DO SET LINE=%%b
+
+REM tokens=* with SKIP is also valid - should NOT trigger W035
+FOR /F "SKIP=1 TOKENS=*" %%c IN ('dir /b') DO echo %%c
+
+REM Other tokens= patterns without delims= SHOULD trigger W035
+FOR /F "tokens=1,2" %%d IN ('type data.txt') DO echo %%d
+FOR /F "tokens=3" %%e IN ('dir') DO SET VALUE=%%e
+
+REM tokens= with explicit delims= should NOT trigger W035
+FOR /F "tokens=1,2 delims=," %%f IN ('type csv.txt') DO echo %%f
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            w035_issues = [issue for issue in issues if issue.rule.code == "W035"]
+
+            # Should have exactly 2 W035 issues (lines 10 and 11)
+            # Lines 3, 4, and 7 use tokens=* and should NOT trigger
+            # Line 14 has explicit delims= and should NOT trigger
+            assert len(w035_issues) == 2, (
+                f"Expected 2 W035 issues, got {len(w035_issues)}. "
+                f"Issues on lines: {[i.line_number for i in w035_issues]}"
+            )
+
+            # Verify the warnings are on the correct lines
+            warning_lines = sorted([i.line_number for i in w035_issues])
+            assert warning_lines == [
+                10,
+                11,
+            ], f"Expected W035 on lines [10, 11], got {warning_lines}"
+        finally:
+            os.unlink(temp_file)
