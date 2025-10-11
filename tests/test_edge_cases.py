@@ -1085,33 +1085,84 @@ class TestSecurityChecking:
             path_issues = [i for i in issues if i.rule.code == "SEC006"]
             assert len(path_issues) == 1
 
+    def test_hardcoded_paths_in_safe_contexts(self) -> None:
+        """Test that hardcoded paths in ECHO/REM/:: statements are not flagged."""
+        # ECHO statements should not trigger SEC006 (used for documentation/help)
+        echo_cases = [
+            "ECHO  %~n0 C:\\Scripts E:\\Scripts.Old",
+            "ECHO  %~n0 C:\\Scripts F:\\Scripts.New /U",
+            "echo Usage: C:\\Source D:\\Destination",
+            'ECHO  "C:\\Programs\\This Program" "Y:\\Remote\\A Long Folder Name"',
+            "@echo off",  # This is a command, not documentation, but should still be safe
+            "@ECHO Example: C:\\Path\\To\\File",
+            "echo /home/user/documents",
+            "echo /Users/admin/Desktop",
+        ]
+        for echo_line in echo_cases:
+            issues = _check_security_issues(echo_line, 1)
+            path_issues = [i for i in issues if i.rule.code == "SEC006"]
+            assert len(path_issues) == 0, f"ECHO line should not trigger SEC006: {echo_line}"
+
+        # REM comments should not trigger SEC006
+        rem_cases = [
+            "REM This is a comment about C:\\Path\\To\\Something",
+            "REM Example: D:\\MyApp\\config.ini",
+            "rem User directory: /home/user/files",
+            "REM\tC:\\Windows\\System32",
+        ]
+        for rem_line in rem_cases:
+            issues = _check_security_issues(rem_line, 1)
+            path_issues = [i for i in issues if i.rule.code == "SEC006"]
+            assert len(path_issues) == 0, f"REM line should not trigger SEC006: {rem_line}"
+
+        # :: comments should not trigger SEC006
+        colon_cases = [
+            ":: This is a comment about C:\\Path\\To\\Something",
+            ":: Example: E:\\Data\\backup",
+            ":: Linux path: /usr/local/bin",
+        ]
+        for colon_line in colon_cases:
+            issues = _check_security_issues(colon_line, 1)
+            path_issues = [i for i in issues if i.rule.code == "SEC006"]
+            assert len(path_issues) == 0, f":: line should not trigger SEC006: {colon_line}"
+
+        # But actual commands with hardcoded paths SHOULD still be flagged
+        actual_commands = [
+            "copy C:\\Source\\file.txt D:\\Dest\\",
+            "xcopy /s C:\\Data E:\\Backup",
+            "cd C:\\Windows\\System32",
+            "move /home/user/file.txt /tmp/",
+        ]
+        for cmd_line in actual_commands:
+            issues = _check_security_issues(cmd_line, 1)
+            path_issues = [i for i in issues if i.rule.code == "SEC006"]
+            assert len(path_issues) >= 1, f"Actual command should trigger SEC006: {cmd_line}"
+
     def test_hardcoded_temp_paths(self) -> None:
         """Test detection of hardcoded temporary paths."""
-        # The patterns are raw strings that look for literal strings
-        # r"C:\\temp" looks for "C:\temp" (single backslash in the string)
-        test_cases = [
-            ("echo test > C:\\temp\\file.txt", "C:\\temp"),  # Won't match - looking for C:\temp
-            ("copy /tmp/file.txt dest", "/tmp"),  # Will match
+        # Actual commands with hardcoded temp paths should be flagged
+        flagged_cases = [
+            "copy /tmp/file.txt dest",  # Linux temp path
+            "move C:\\temp\\file.txt dest",  # Windows temp path
+            "xcopy C:\\tmp\\* dest",  # Windows tmp path
         ]
-        matched_count = 0
-        for test_command, expected in test_cases:
-            issues = _check_security_issues(test_command, 1)
-            temp_issues = [i for i in issues if i.rule.code == "SEC007"]
-            if expected == "/tmp":
-                assert len(temp_issues) == 1
-                matched_count += 1
-
-        # Test the patterns that actually work
-        # r"C:\\temp" contains literal "\\" so need double backslashes
-        working_cases = [
-            "echo C:\\\\temp in path",  # Contains C:\\temp literally (raw string)
-            "echo C:\\\\tmp in path",  # Contains C:\\tmp literally (raw string)
-            "echo /tmp in path",  # Contains /tmp literally
-        ]
-        for cmd in working_cases:
+        for cmd in flagged_cases:
             issues = _check_security_issues(cmd, 1)
             temp_issues = [i for i in issues if i.rule.code == "SEC007"]
-            assert len(temp_issues) == 1
+            assert len(temp_issues) >= 1, f"Command should trigger SEC007: {cmd}"
+
+        # ECHO statements and comments should NOT be flagged (documentation/help text)
+        safe_cases = [
+            "echo C:\\temp in path",  # ECHO statement
+            "echo C:\\tmp in path",  # ECHO statement
+            "echo /tmp in path",  # ECHO statement
+            "REM This uses C:\\temp for temp files",  # REM comment
+            ":: Temporary directory: C:\\tmp",  # :: comment
+        ]
+        for cmd in safe_cases:
+            issues = _check_security_issues(cmd, 1)
+            temp_issues = [i for i in issues if i.rule.code == "SEC007"]
+            assert len(temp_issues) == 0, f"Safe context should not trigger SEC007: {cmd}"
 
 
 class TestPerformanceChecking:

@@ -1391,11 +1391,11 @@ class TestVersionFunctionality:
                 main()
                 output = captured.getvalue()
 
-                # Check for version information in output (just the version number)
-                assert "v1.0.49" in output
-                # Ensure author and license are NOT shown
-                assert "Author:" not in output
-                assert "License:" not in output
+        # Check for version information in output (just the version number)
+        assert "v1.0.50" in output
+        # Ensure author and license are NOT shown
+        assert "Author:" not in output
+        assert "License:" not in output
 
     def test_version_in_help(self) -> None:
         """Test that version is displayed in help menu."""
@@ -1404,9 +1404,9 @@ class TestVersionFunctionality:
                 main()
                 output = captured.getvalue()
 
-                # Check for version in help text
-                assert "Batch Linter - Help Menu" in output
-                assert "Version: 1.0.49" in output
+            # Check for version in help text
+            assert "Batch Linter - Help Menu" in output
+            assert "Version: 1.0.50" in output
 
     def test_version_in_normal_run(self) -> None:
         """Test that version is displayed when script runs normally."""
@@ -1423,7 +1423,7 @@ class TestVersionFunctionality:
                         main()
                         output = captured.getvalue()
 
-                        # Check that version is displayed at the start
-                        assert "Blinter v1.0.49 - Batch File Linter" in output
+                    # Check that version is displayed at the start
+                    assert "Blinter v1.0.50 - Batch File Linter" in output
         finally:
             os.unlink(temp_path)

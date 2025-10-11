@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.50
+Version: 1.0.51
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.50"
+__version__ = "1.0.51"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -655,7 +655,7 @@ RULES: Dict[str, Rule] = {
             "This is a portability concern, not a security issue"
         ),
         recommendation=(
-            "Use environment variables like %%USERPROFILE%%, %%PROGRAMFILES%%, etc. "
+            "Use environment variables like %USERPROFILE%, %PROGRAMFILES%, etc. "
             "instead of hardcoded paths for better portability across different systems"
         ),
     ),
@@ -3470,9 +3470,14 @@ def _check_privilege_security(
     return issues
 
 
-def _check_path_security(stripped: str, line_num: int) -> List[LintIssue]:
+def _check_path_security(line: str, stripped: str, line_num: int) -> List[LintIssue]:
     """Check for path-related security issues (SEC006-SEC007, SEC014)."""
     issues: List[LintIssue] = []
+
+    # Skip ECHO statements, REM comments, and :: comments as these are typically
+    # used for documentation/help text and don't perform actual file operations
+    if _is_command_in_safe_context(line):
+        return issues
 
     # SEC006: Hardcoded absolute path
     hardcoded_paths = [r"C:\\", r"D:\\", r"E:\\", r"/Users/", r"/home/"]
@@ -3488,7 +3493,7 @@ def _check_path_security(stripped: str, line_num: int) -> List[LintIssue]:
             break
 
     # SEC007: Hardcoded temporary directory
-    temp_paths = [r"C:\\temp", r"C:\\tmp", r"/tmp"]
+    temp_paths = [r"C:\temp", r"C:\tmp", r"/tmp"]
     for temp_path in temp_paths:
         if temp_path in stripped:
             issues.append(
@@ -3623,7 +3628,7 @@ def _check_security_issues(line: str, line_num: int) -> List[LintIssue]:
     issues.extend(_check_input_validation_sec(line, line_num, stripped))
     # Include line-by-line privilege checks for backward compatibility with tests
     issues.extend(_check_privilege_security(stripped, line_num))
-    issues.extend(_check_path_security(stripped, line_num))
+    issues.extend(_check_path_security(line, stripped, line_num))
     issues.extend(_check_info_disclosure_sec(stripped, line_num))
     issues.extend(_check_malware_security(stripped, line_num))
 
