@@ -19,11 +19,100 @@ from blinter import (
     LintIssue,
     Rule,
     RuleSeverity,
+    _check_advanced_escaping_rules,
+    _check_advanced_for_rules,
+    _check_advanced_global_patterns,
+    _check_advanced_performance,
+    _check_advanced_process_mgmt,
+    _check_advanced_security,
+    _check_advanced_style_patterns,
+    _check_advanced_style_rules,
+    _check_advanced_vars,
+    _check_basic_line_ending_issues,
+    _check_bat_cmd_differences,
+    _check_call_ambiguity,
+    _check_call_labels,
     _check_cmd_case_consistency,
+    _check_cmd_error_handling,
+    _check_code_documentation,
+    _check_code_duplication,
+    _check_command_typos,
+    _check_command_warnings,
+    _check_compatibility_warnings,
+    _check_continuation_spaces,
+    _check_deprecated_commands,
+    _check_double_percent_escaping,
+    _check_doublecolon_risks,
+    _check_echo_unicode_risk,
+    _check_enhanced_commands,
+    _check_enhanced_performance,
+    _check_enhanced_security_rules,
+    _check_errorlevel_comparison,
+    _check_errorlevel_syntax,
+    _check_extended_non_ascii,
+    _check_external_error_handling,
+    _check_for_f_options,
+    _check_for_loop_syntax,
+    _check_for_loop_var_syntax,
+    _check_function_docs,
+    _check_general_unicode_risk,
+    _check_global_priv_security,
+    _check_global_style_rules,
+    _check_goto_call_risks,
+    _check_goto_colon_consistency,
     _check_goto_labels,
+    _check_if_comparison_quotes,
+    _check_if_exist_mixing,
     _check_if_statement_formatting,
+    _check_improper_caret_escape,
+    _check_inconsistent_indentation,
+    _check_inefficient_modifiers,
+    _check_info_disclosure_sec,
+    _check_input_validation_sec,
+    _check_line_ending_rules,
+    _check_line_length,
+    _check_magic_numbers,
+    _check_malware_security,
+    _check_missing_documentation,
+    _check_missing_header_doc,
+    _check_missing_pause,
+    _check_multibyte_risks,
+    _check_multilevel_escaping,
+    _check_nested_for_loops,
+    _check_new_global_rules,
+    _check_non_ascii_chars,
+    _check_parameter_modifiers,
+    _check_path_security,
     _check_path_syntax,
+    _check_percent_tilde_syntax,
+    _check_performance_issues,
+    _check_privilege_security,
+    _check_quote_escaping,
+    _check_quotes,
+    _check_redundant_operations,
+    _check_restart_limits,
+    _check_search_unicode_risk,
+    _check_security_issues,
+    _check_self_modification,
+    _check_set_a_expression,
+    _check_set_a_quoting,
+    _check_setlocal_redundancy,
+    _check_string_operation_syntax,
+    _check_style_issues,
+    _check_subroutine_call,
+    _check_syntax_errors,
+    _check_timeout_ping_numbers,
+    _check_unc_path,
+    _check_undefined_variables,
+    _check_unicode_filenames,
+    _check_unicode_handling_issue,
+    _check_unnecessary_output_p014,
     _check_unquoted_variables,
+    _check_unreachable_code,
+    _check_var_naming,
+    _check_variable_expansion,
+    _check_variable_naming,
+    _check_warning_issues,
     _collect_indented_lines,
     _collect_labels,
     _collect_set_variables,
@@ -40,6 +129,7 @@ from blinter import (
     find_batch_files,
     group_issues,
     lint_batch_file,
+    read_file_with_encoding,
 )
 
 # ============================================================================
@@ -807,3 +897,1236 @@ class TestInvariantProperties:
         assert len(grouped[severity]) == len(specific_issues)
         for issue in grouped[severity]:
             assert issue.rule.severity == severity
+
+
+# ============================================================================
+# Additional Checking Function Property Tests
+# ============================================================================
+
+
+class TestAdditionalCheckingFunctionProperties:
+    """Property-based tests for additional checking functions."""
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_call_labels_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_call_labels should return a list of LintIssue."""
+        result = _check_call_labels(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_errorlevel_syntax_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_errorlevel_syntax should return a list of LintIssue."""
+        result = _check_errorlevel_syntax(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_if_exist_mixing_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_if_exist_mixing should return a list of LintIssue."""
+        result = _check_if_exist_mixing(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        line=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_quotes_returns_list(self, line: str, line_num: int) -> None:
+        """_check_quotes should return a list of LintIssue."""
+        result = _check_quotes(line, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_for_loop_syntax_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_for_loop_syntax should return a list of LintIssue."""
+        result = _check_for_loop_syntax(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_variable_expansion_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_variable_expansion should return a list of LintIssue."""
+        result = _check_variable_expansion(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_subroutine_call_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_subroutine_call should return a list of LintIssue."""
+        result = _check_subroutine_call(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_command_typos_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_command_typos should return a list of LintIssue."""
+        result = _check_command_typos(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_parameter_modifiers_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_parameter_modifiers should return a list of LintIssue."""
+        result = _check_parameter_modifiers(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_unc_path_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_unc_path should return a list of LintIssue."""
+        result = _check_unc_path(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_quote_escaping_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_quote_escaping should return a list of LintIssue."""
+        result = _check_quote_escaping(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_set_a_expression_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_set_a_expression should return a list of LintIssue."""
+        result = _check_set_a_expression(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        line=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_syntax_errors_returns_list(self, line: str, line_num: int) -> None:
+        """_check_syntax_errors should return a list of LintIssue."""
+        labels: Dict[str, int] = {}
+        result = _check_syntax_errors(line, line_num, labels)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_non_ascii_chars_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_non_ascii_chars should return a list of LintIssue."""
+        result = _check_non_ascii_chars(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_errorlevel_comparison_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_errorlevel_comparison should return a list of LintIssue."""
+        result = _check_errorlevel_comparison(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_inefficient_modifiers_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_inefficient_modifiers should return a list of LintIssue."""
+        result = _check_inefficient_modifiers(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_extended_non_ascii_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_extended_non_ascii should return a list of LintIssue."""
+        result = _check_extended_non_ascii(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_unicode_filenames_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_unicode_filenames should return a list of LintIssue."""
+        result = _check_unicode_filenames(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_call_ambiguity_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_call_ambiguity should return a list of LintIssue."""
+        result = _check_call_ambiguity(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_timeout_ping_numbers_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_timeout_ping_numbers should return a list of LintIssue."""
+        result = _check_timeout_ping_numbers(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_info_disclosure_sec_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_info_disclosure_sec should return a list of LintIssue."""
+        result = _check_info_disclosure_sec(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_malware_security_returns_list(self, stripped: str, line_num: int) -> None:
+        """_check_malware_security should return a list of LintIssue."""
+        result = _check_malware_security(stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_num
+
+    @given(
+        line=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_security_issues_returns_list(self, line: str, line_num: int) -> None:
+        """_check_security_issues should return a list of LintIssue."""
+        result = _check_security_issues(line, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_improper_caret_escape_returns_list(
+        self, stripped: str, line_number: int
+    ) -> None:
+        """_check_improper_caret_escape should return a list of LintIssue."""
+        result = _check_improper_caret_escape(stripped, line_number)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_number
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_multilevel_escaping_returns_list(self, stripped: str, line_number: int) -> None:
+        """_check_multilevel_escaping should return a list of LintIssue."""
+        result = _check_multilevel_escaping(stripped, line_number)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_number
+
+    @given(
+        line=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_continuation_spaces_returns_list(self, line: str, line_number: int) -> None:
+        """_check_continuation_spaces should return a list of LintIssue."""
+        stripped = line.strip()
+        result = _check_continuation_spaces(line, stripped, line_number)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_number
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_double_percent_escaping_returns_list(
+        self, stripped: str, line_number: int
+    ) -> None:
+        """_check_double_percent_escaping should return a list of LintIssue."""
+        result = _check_double_percent_escaping(stripped, line_number)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_number
+
+    @given(
+        line=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_advanced_escaping_rules_returns_list(self, line: str, line_number: int) -> None:
+        """_check_advanced_escaping_rules should return a list of LintIssue."""
+        result = _check_advanced_escaping_rules(line, line_number)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        line=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_advanced_for_rules_returns_list(self, line: str, line_number: int) -> None:
+        """_check_advanced_for_rules should return a list of LintIssue."""
+        result = _check_advanced_for_rules(line, line_number)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        line=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_advanced_process_mgmt_returns_list(self, line: str, line_number: int) -> None:
+        """_check_advanced_process_mgmt should return a list of LintIssue."""
+        result = _check_advanced_process_mgmt(line, line_number)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_percent_tilde_syntax_returns_list(self, stripped: str, line_number: int) -> None:
+        """_check_percent_tilde_syntax should return a list of LintIssue."""
+        result = _check_percent_tilde_syntax(stripped, line_number)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_number
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_for_loop_var_syntax_returns_list(self, stripped: str, line_number: int) -> None:
+        """_check_for_loop_var_syntax should return a list of LintIssue."""
+        result = _check_for_loop_var_syntax(stripped, line_number)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_number
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_string_operation_syntax_returns_list(
+        self, stripped: str, line_number: int
+    ) -> None:
+        """_check_string_operation_syntax should return a list of LintIssue."""
+        result = _check_string_operation_syntax(stripped, line_number)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_number
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_set_a_quoting_returns_list(self, stripped: str, line_number: int) -> None:
+        """_check_set_a_quoting should return a list of LintIssue."""
+        result = _check_set_a_quoting(stripped, line_number)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_number
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_deprecated_commands_returns_list(self, stripped: str, line_number: int) -> None:
+        """_check_deprecated_commands should return a list of LintIssue."""
+        result = _check_deprecated_commands(stripped, line_number)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_number
+
+    @given(
+        line=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_magic_numbers_returns_list(self, line: str, line_number: int) -> None:
+        """_check_magic_numbers should return a list of LintIssue."""
+        result = _check_magic_numbers(line, line_number)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_number
+
+    @given(
+        line=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_line_length_returns_list(self, line: str, line_number: int) -> None:
+        """_check_line_length should return a list of LintIssue."""
+        result = _check_line_length(line, line_number)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+            assert issue.line_number == line_number
+
+
+# ============================================================================
+# Boolean Return Function Property Tests
+# ============================================================================
+
+
+class TestBooleanReturnFunctionProperties:
+    """Property-based tests for boolean return functions."""
+
+    @given(stripped=st.text(max_size=200))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_echo_unicode_risk_returns_bool(self, stripped: str) -> None:
+        """_check_echo_unicode_risk should return a boolean."""
+        result = _check_echo_unicode_risk(stripped)
+        assert isinstance(result, bool)
+
+    @given(stripped=st.text(max_size=200))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_search_unicode_risk_returns_bool(self, stripped: str) -> None:
+        """_check_search_unicode_risk should return a boolean."""
+        result = _check_search_unicode_risk(stripped)
+        assert isinstance(result, bool)
+
+    @given(stripped=st.text(max_size=200))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_general_unicode_risk_returns_bool(self, stripped: str) -> None:
+        """_check_general_unicode_risk should return a boolean."""
+        result = _check_general_unicode_risk(stripped)
+        assert isinstance(result, bool)
+
+
+# ============================================================================
+# Optional Return Function Property Tests
+# ============================================================================
+
+
+class TestOptionalReturnFunctionProperties:
+    """Property-based tests for functions that return Optional[LintIssue]."""
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_unicode_handling_issue_returns_optional(
+        self, stripped: str, line_num: int
+    ) -> None:
+        """_check_unicode_handling_issue should return Optional[LintIssue]."""
+        result = _check_unicode_handling_issue(stripped, line_num)
+        assert result is None or isinstance(result, LintIssue)
+        if result is not None:
+            assert result.line_number == line_num
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_for_f_options_returns_optional(self, stripped: str, line_number: int) -> None:
+        """_check_for_f_options should return Optional[LintIssue]."""
+        result = _check_for_f_options(stripped, line_number)
+        assert result is None or isinstance(result, LintIssue)
+        if result is not None:
+            assert result.line_number == line_number
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_if_comparison_quotes_returns_optional(
+        self, stripped: str, line_number: int
+    ) -> None:
+        """_check_if_comparison_quotes should return Optional[LintIssue]."""
+        result = _check_if_comparison_quotes(stripped, line_number)
+        assert result is None or isinstance(result, LintIssue)
+        if result is not None:
+            assert result.line_number == line_number
+
+    @given(
+        lines=st.lists(st.text(max_size=100), min_size=2, max_size=50),
+        i=st.integers(min_value=0),
+        stripped=st.text(max_size=200),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_unnecessary_output_p014_returns_optional(
+        self, lines: List[str], i: int, stripped: str
+    ) -> None:
+        """_check_unnecessary_output_p014 should return Optional[LintIssue]."""
+        assume(i < len(lines) - 1)
+        result = _check_unnecessary_output_p014(lines, i, stripped)
+        assert result is None or isinstance(result, LintIssue)
+
+
+# ============================================================================
+# Global Checking Function Property Tests (List[str] input)
+# ============================================================================
+
+
+class TestGlobalCheckingFunctionProperties:
+    """Property-based tests for checking functions that take List[str]."""
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_undefined_variables_returns_list(self, lines: List[str]) -> None:
+        """_check_undefined_variables should return a list of LintIssue."""
+        set_vars: Set[str] = set()
+        result = _check_undefined_variables(lines, set_vars)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_code_documentation_returns_list(self, lines: List[str]) -> None:
+        """_check_code_documentation should return a list of LintIssue."""
+        result = _check_code_documentation(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_var_naming_returns_list(self, lines: List[str]) -> None:
+        """_check_var_naming should return a list of LintIssue."""
+        result = _check_var_naming(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_setlocal_redundancy_returns_list(self, lines: List[str]) -> None:
+        """_check_setlocal_redundancy should return a list of LintIssue."""
+        result = _check_setlocal_redundancy(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_unreachable_code_returns_list(self, lines: List[str]) -> None:
+        """_check_unreachable_code should return a list of LintIssue."""
+        result = _check_unreachable_code(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_redundant_operations_returns_list(self, lines: List[str]) -> None:
+        """_check_redundant_operations should return a list of LintIssue."""
+        result = _check_redundant_operations(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_code_duplication_returns_list(self, lines: List[str]) -> None:
+        """_check_code_duplication should return a list of LintIssue."""
+        result = _check_code_duplication(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_missing_pause_returns_list(self, lines: List[str]) -> None:
+        """_check_missing_pause should return a list of LintIssue."""
+        result = _check_missing_pause(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_missing_header_doc_returns_list(self, lines: List[str]) -> None:
+        """_check_missing_header_doc should return a list of LintIssue."""
+        result = _check_missing_header_doc(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_global_priv_security_returns_list(self, lines: List[str]) -> None:
+        """_check_global_priv_security should return a list of LintIssue."""
+        result = _check_global_priv_security(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_nested_for_loops_returns_list(self, lines: List[str]) -> None:
+        """_check_nested_for_loops should return a list of LintIssue."""
+        result = _check_nested_for_loops(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_external_error_handling_returns_list(self, lines: List[str]) -> None:
+        """_check_external_error_handling should return a list of LintIssue."""
+        result = _check_external_error_handling(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_restart_limits_returns_list(self, lines: List[str]) -> None:
+        """_check_restart_limits should return a list of LintIssue."""
+        result = _check_restart_limits(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_advanced_vars_returns_list(self, lines: List[str]) -> None:
+        """_check_advanced_vars should return a list of LintIssue."""
+        result = _check_advanced_vars(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_enhanced_commands_returns_list(self, lines: List[str]) -> None:
+        """_check_enhanced_commands should return a list of LintIssue."""
+        result = _check_enhanced_commands(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_advanced_style_rules_returns_list(self, lines: List[str]) -> None:
+        """_check_advanced_style_rules should return a list of LintIssue."""
+        result = _check_advanced_style_rules(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_enhanced_security_rules_returns_list(self, lines: List[str]) -> None:
+        """_check_enhanced_security_rules should return a list of LintIssue."""
+        result = _check_enhanced_security_rules(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_enhanced_performance_returns_list(self, lines: List[str]) -> None:
+        """_check_enhanced_performance should return a list of LintIssue."""
+        result = _check_enhanced_performance(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        lines=st.lists(batch_line_strategy(), max_size=50),
+        ending_type=st.sampled_from(["CRLF", "LF", "CR", "MIXED"]),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_multibyte_risks_returns_list(self, lines: List[str], ending_type: str) -> None:
+        """_check_multibyte_risks should return a list of LintIssue."""
+        result = _check_multibyte_risks(lines, ending_type)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        lines=st.lists(batch_line_strategy(), max_size=50),
+        ending_type=st.sampled_from(["CRLF", "LF", "CR", "MIXED"]),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_goto_call_risks_returns_list(self, lines: List[str], ending_type: str) -> None:
+        """_check_goto_call_risks should return a list of LintIssue."""
+        result = _check_goto_call_risks(lines, ending_type)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        lines=st.lists(batch_line_strategy(), max_size=50),
+        ending_type=st.sampled_from(["CRLF", "LF", "CR", "MIXED"]),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_doublecolon_risks_returns_list(self, lines: List[str], ending_type: str) -> None:
+        """_check_doublecolon_risks should return a list of LintIssue."""
+        result = _check_doublecolon_risks(lines, ending_type)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+
+# ============================================================================
+# File Path Dependent Function Property Tests
+# ============================================================================
+
+
+class TestFilePathDependentFunctionProperties:
+    """Property-based tests for functions that require file paths."""
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
+    def test_check_line_ending_rules_with_temp_file(self, lines: List[str]) -> None:
+        """_check_line_ending_rules should return a list of LintIssue."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8", newline=""
+        ) as tmp:
+            content = "\r\n".join(lines)
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            result = _check_line_ending_rules(lines, tmp_path)
+            assert isinstance(result, list)
+            for issue in result:
+                assert isinstance(issue, LintIssue)
+        finally:
+            Path(tmp_path).unlink()
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
+    def test_check_global_style_rules_with_temp_file(self, lines: List[str]) -> None:
+        """_check_global_style_rules should return a list of LintIssue."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8", newline=""
+        ) as tmp:
+            content = "\r\n".join(lines)
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            result = _check_global_style_rules(lines, tmp_path)
+            assert isinstance(result, list)
+            for issue in result:
+                assert isinstance(issue, LintIssue)
+        finally:
+            Path(tmp_path).unlink()
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
+    def test_check_new_global_rules_with_temp_file(self, lines: List[str]) -> None:
+        """_check_new_global_rules should return a list of LintIssue."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8", newline=""
+        ) as tmp:
+            content = "\r\n".join(lines)
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            result = _check_new_global_rules(lines, tmp_path)
+            assert isinstance(result, list)
+            for issue in result:
+                assert isinstance(issue, LintIssue)
+        finally:
+            Path(tmp_path).unlink()
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
+    def test_check_bat_cmd_differences_with_temp_file(self, lines: List[str]) -> None:
+        """_check_bat_cmd_differences should return a list of LintIssue."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8", newline=""
+        ) as tmp:
+            content = "\r\n".join(lines)
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            result = _check_bat_cmd_differences(lines, tmp_path)
+            assert isinstance(result, list)
+            for issue in result:
+                assert isinstance(issue, LintIssue)
+        finally:
+            Path(tmp_path).unlink()
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
+    def test_check_advanced_global_patterns_with_temp_file(self, lines: List[str]) -> None:
+        """_check_advanced_global_patterns should return a list of LintIssue."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8", newline=""
+        ) as tmp:
+            content = "\r\n".join(lines)
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            result = _check_advanced_global_patterns(lines, tmp_path)
+            assert isinstance(result, list)
+            for issue in result:
+                assert isinstance(issue, LintIssue)
+        finally:
+            Path(tmp_path).unlink()
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
+    def test_check_self_modification_with_temp_file(self, lines: List[str]) -> None:
+        """_check_self_modification should return a list of LintIssue."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8", newline=""
+        ) as tmp:
+            content = "\r\n".join(lines)
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            result = _check_self_modification(lines, tmp_path)
+            assert isinstance(result, list)
+            for issue in result:
+                assert isinstance(issue, LintIssue)
+        finally:
+            Path(tmp_path).unlink()
+
+
+# ============================================================================
+# File Encoding Property Tests
+# ============================================================================
+
+
+class TestFileEncodingProperties:  # pylint: disable=too-few-public-methods
+    """Property-based tests for file encoding functions."""
+
+    @given(lines=st.lists(batch_line_strategy(), min_size=1, max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
+    def test_read_file_with_encoding(self, lines: List[str]) -> None:
+        """read_file_with_encoding should handle various encodings."""
+        content = "\r\n".join(lines)
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8", newline=""
+        ) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            result_lines, encoding = read_file_with_encoding(tmp_path)
+            assert isinstance(result_lines, list)
+            assert isinstance(encoding, str)
+            for line in result_lines:
+                assert isinstance(line, str)
+        finally:
+            Path(tmp_path).unlink()
+
+
+# ============================================================================
+# Complex Signature Function Property Tests
+# ============================================================================
+
+
+class TestComplexSignatureFunctionProperties:
+    """Property-based tests for functions with complex signatures."""
+
+    @given(
+        line=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+        stripped=st.text(max_size=200),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_compatibility_warnings_returns_list(
+        self, line: str, line_num: int, stripped: str
+    ) -> None:
+        """_check_compatibility_warnings should return a list of LintIssue."""
+        result = _check_compatibility_warnings(line, line_num, stripped)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        line=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+        stripped=st.text(max_size=200),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_command_warnings_returns_list(
+        self, line: str, line_num: int, stripped: str
+    ) -> None:
+        """_check_command_warnings should return a list of LintIssue."""
+        result = _check_command_warnings(line, line_num, stripped)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        line=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+        delayed_expansion_enabled=st.booleans(),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_warning_issues_returns_list(
+        self, line: str, line_num: int, delayed_expansion_enabled: bool
+    ) -> None:
+        """_check_warning_issues should return a list of LintIssue."""
+        set_vars: Set[str] = set()
+        result = _check_warning_issues(line, line_num, set_vars, delayed_expansion_enabled)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        line=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+        stripped=st.text(max_size=200),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_input_validation_sec_returns_list(
+        self, line: str, line_num: int, stripped: str
+    ) -> None:
+        """_check_input_validation_sec should return a list of LintIssue."""
+        result = _check_input_validation_sec(line, line_num, stripped)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+        lines=st.lists(batch_line_strategy(), max_size=50),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_privilege_security_returns_list(
+        self, stripped: str, line_num: int, lines: List[str]
+    ) -> None:
+        """_check_privilege_security should return a list of LintIssue."""
+        result = _check_privilege_security(stripped, line_num, lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        line=st.text(max_size=200),
+        stripped=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_path_security_returns_list(
+        self, line: str, stripped: str, line_num: int
+    ) -> None:
+        """_check_path_security should return a list of LintIssue."""
+        result = _check_path_security(line, stripped, line_num)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        lines=st.lists(batch_line_strategy(), min_size=1, max_size=50),
+        line_number=st.integers(min_value=0),
+        line=st.text(max_size=200),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_advanced_performance_returns_list(
+        self, lines: List[str], line_number: int, line: str
+    ) -> None:
+        """_check_advanced_performance should return a list of LintIssue."""
+        assume(line_number < len(lines))
+        result = _check_advanced_performance(lines, line_number, line)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        line=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+        lines=st.lists(batch_line_strategy(), max_size=50),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_advanced_security_returns_list(
+        self, line: str, line_number: int, lines: List[str]
+    ) -> None:
+        """_check_advanced_security should return a list of LintIssue."""
+        labels: Dict[str, int] = {}
+        result = _check_advanced_security(line, line_number, lines, labels)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        line=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+        lines=st.lists(batch_line_strategy(), max_size=50),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_advanced_style_patterns_returns_list(
+        self, line: str, line_number: int, lines: List[str]
+    ) -> None:
+        """_check_advanced_style_patterns should return a list of LintIssue."""
+        result = _check_advanced_style_patterns(line, line_number, lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        line=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+        lines=st.lists(batch_line_strategy(), max_size=50),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_function_docs_returns_list(
+        self, line: str, line_number: int, lines: List[str]
+    ) -> None:
+        """_check_function_docs should return a list of LintIssue."""
+        result = _check_function_docs(line, line_number, lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        stripped=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+        lines=st.lists(batch_line_strategy(), max_size=50),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_cmd_error_handling_returns_optional(
+        self, stripped: str, line_number: int, lines: List[str]
+    ) -> None:
+        """_check_cmd_error_handling should return Optional[LintIssue]."""
+        result = _check_cmd_error_handling(stripped, line_number, lines)
+        assert result is None or isinstance(result, LintIssue)
+        if result is not None:
+            assert result.line_number == line_number
+
+    @given(
+        line=st.text(max_size=200),
+        line_number=st.integers(min_value=1, max_value=10000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_variable_naming_returns_list(self, line: str, line_number: int) -> None:
+        """_check_variable_naming should return a list of LintIssue."""
+        variables_seen: Dict[str, str] = {}
+        result = _check_variable_naming(line, line_number, variables_seen)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_goto_colon_consistency_returns_list(self, lines: List[str]) -> None:
+        """_check_goto_colon_consistency should return a list of LintIssue."""
+        result = _check_goto_colon_consistency(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        ending_info=st.tuples(
+            st.sampled_from(["CRLF", "LF", "CR", "MIXED"]),
+            st.booleans(),
+            st.integers(min_value=0, max_value=100),
+            st.integers(min_value=0, max_value=100),
+            st.integers(min_value=0, max_value=100),
+        )
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_basic_line_ending_issues_returns_list(
+        self, ending_info: tuple[str, bool, int, int, int]
+    ) -> None:
+        """_check_basic_line_ending_issues should return a list of LintIssue."""
+        result = _check_basic_line_ending_issues(ending_info)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_inconsistent_indentation_returns_list(self, lines: List[str]) -> None:
+        """_check_inconsistent_indentation should return a list of LintIssue."""
+        result = _check_inconsistent_indentation(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_missing_documentation_returns_list(self, lines: List[str]) -> None:
+        """_check_missing_documentation should return a list of LintIssue."""
+        result = _check_missing_documentation(lines)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        line=st.text(max_size=200),
+        line_num=st.integers(min_value=1, max_value=10000),
+        max_line_length=st.integers(min_value=80, max_value=500),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_check_style_issues_returns_list(
+        self, line: str, line_num: int, max_line_length: int
+    ) -> None:
+        """_check_style_issues should return a list of LintIssue."""
+        result = _check_style_issues(line, line_num, max_line_length)
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
+
+    @given(
+        lines=st.lists(batch_line_strategy(), max_size=50),
+        line_num=st.integers(min_value=1, max_value=10000),
+        line=st.text(max_size=200),
+        has_setlocal=st.booleans(),
+        has_set_commands=st.booleans(),
+        has_delayed_expansion=st.booleans(),
+        uses_delayed_vars=st.booleans(),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def test_check_performance_issues_returns_list(
+        self,
+        lines: List[str],
+        line_num: int,
+        line: str,
+        has_setlocal: bool,
+        has_set_commands: bool,
+        has_delayed_expansion: bool,
+        uses_delayed_vars: bool,
+    ) -> None:
+        """_check_performance_issues should return a list of LintIssue."""
+        result = _check_performance_issues(
+            lines,
+            line_num,
+            line,
+            has_setlocal,
+            has_set_commands,
+            has_delayed_expansion,
+            uses_delayed_vars,
+        )
+        assert isinstance(result, list)
+        for issue in result:
+            assert isinstance(issue, LintIssue)
