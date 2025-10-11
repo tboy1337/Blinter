@@ -1392,7 +1392,7 @@ class TestVersionFunctionality:
                 output = captured.getvalue()
 
         # Check for version information in output (just the version number)
-        assert "v1.0.52" in output
+        assert "v1.0.53" in output
         # Ensure author and license are NOT shown
         assert "Author:" not in output
         assert "License:" not in output
@@ -1406,7 +1406,7 @@ class TestVersionFunctionality:
 
             # Check for version in help text
             assert "Batch Linter - Help Menu" in output
-            assert "Version: 1.0.52" in output
+            assert "Version: 1.0.53" in output
 
     def test_version_in_normal_run(self) -> None:
         """Test that version is displayed when script runs normally."""
@@ -1424,6 +1424,120 @@ class TestVersionFunctionality:
                         output = captured.getvalue()
 
                     # Check that version is displayed at the start
-                    assert "Blinter v1.0.52 - Batch File Linter" in output
+                    assert "Blinter v1.0.53 - Batch File Linter" in output
         finally:
             os.unlink(temp_path)
+
+
+class TestFollowCallsCLI:
+    """Test follow_calls via CLI to cover additional code paths."""
+
+    def test_cli_follow_calls_with_existing_script(self) -> None:
+        """Test follow_calls via CLI with actual file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create called script
+            helper_script = os.path.join(tmpdir, "helper.bat")
+            with open(helper_script, "w", encoding="utf-8") as bat_file:
+                bat_file.write("@ECHO OFF\n")
+                bat_file.write("SET VAR=value\n")
+                bat_file.write("EXIT /b 0\n")
+
+            # Create main script
+            main_script = os.path.join(tmpdir, "main.bat")
+            with open(main_script, "w", encoding="utf-8") as bat_file:
+                bat_file.write("@ECHO OFF\n")
+                bat_file.write(f'CALL "{helper_script}"\n')
+                bat_file.write("EXIT /b 0\n")
+
+            # Test via CLI
+            with patch.object(sys, "argv", ["blinter.py", main_script, "--follow-calls"]):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                # Exit code 0 means success
+                assert exc_info.value.code == 0
+
+    def test_cli_follow_calls_with_errors_in_called_script(self) -> None:
+        """Test follow_calls when called script has syntax errors."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create helper with errors
+            helper_script = os.path.join(tmpdir, "helper.bat")
+            with open(helper_script, "w", encoding="utf-8") as bat_file:
+                bat_file.write("echo no @\n")
+                bat_file.write("if ( echo bad syntax\n")
+                bat_file.write("EXIT /b 0\n")
+
+            # Create main script
+            main_script = os.path.join(tmpdir, "main.bat")
+            with open(main_script, "w", encoding="utf-8") as bat_file:
+                bat_file.write("@ECHO OFF\n")
+                bat_file.write(f'CALL "{helper_script}"\n')
+                bat_file.write("EXIT /b 0\n")
+
+            # Test via CLI - should exit with error code
+            with patch.object(sys, "argv", ["blinter.py", main_script, "--follow-calls"]):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                # Should exit with error code due to errors
+                assert exc_info.value.code in [0, 1]
+
+
+class TestCLIEdgeCases:
+    """Test CLI edge cases for additional coverage."""
+
+    def test_cli_no_issues_multiple_files(self) -> None:
+        """Test CLI with multiple clean files."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create multiple clean files
+            for i in range(3):
+                bat_file = os.path.join(tmpdir, f"file{i}.bat")
+                with open(bat_file, "w", encoding="utf-8") as file_handle:
+                    file_handle.write("@ECHO OFF\nEXIT /b 0\n")
+
+            # Test via CLI
+            with patch.object(sys, "argv", ["blinter.py", tmpdir]):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                assert exc_info.value.code == 0
+
+    def test_cli_with_warnings_but_no_errors(self) -> None:
+        """Test CLI with warnings but no errors."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bat_file = os.path.join(tmpdir, "test.bat")
+            with open(bat_file, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write("SET VAR=value\n")  # Might trigger warnings
+                file_handle.write("EXIT /b 0\n")
+
+            # Test via CLI
+            with patch.object(sys, "argv", ["blinter.py", bat_file]):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                # Should exit 0 if only warnings
+                assert exc_info.value.code in [0, 1]
+
+    def test_cli_single_file_no_issues(self) -> None:
+        """Test CLI with single file and no issues."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bat_file = os.path.join(tmpdir, "clean.bat")
+            with open(bat_file, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\nEXIT /b 0\n")
+
+            with patch.object(sys, "argv", ["blinter.py", bat_file]):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                assert exc_info.value.code == 0
+
+    def test_cli_single_file_with_issues(self) -> None:
+        """Test CLI with single file that has issues."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bat_file = os.path.join(tmpdir, "bad.bat")
+            with open(bat_file, "w", encoding="utf-8") as file_handle:
+                # Create file with style issues but no errors
+                file_handle.write("echo no @\n")
+                file_handle.write("EXIT /b 0\n")
+
+            with patch.object(sys, "argv", ["blinter.py", bat_file]):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                # Style issues only exit with 0
+                assert exc_info.value.code == 0

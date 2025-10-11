@@ -1860,3 +1860,219 @@ FOR /F "tokens=1,2 delims=," %%f IN ('type csv.txt') DO echo %%f
             ], f"Expected W035 on lines [10, 11], got {warning_lines}"
         finally:
             os.unlink(temp_file)
+
+
+class TestInlineSuppressions:
+    """Test cases for inline lint suppression comments."""
+
+    def create_temp_batch_file(self, content: str) -> str:
+        """Helper method to create a temporary batch file."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8"
+        ) as temp_file:
+            temp_file.write(content)
+            return temp_file.name
+
+    def test_lint_ignore_line_all_rules(self) -> None:
+        """Test LINT:IGNORE-LINE suppressing all rules on same line."""
+        content = """@ECHO OFF
+echo lowercase  REM LINT:IGNORE-LINE
+EXIT /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Line 2 should have no issues because of LINT:IGNORE-LINE
+            line2_issues = [i for i in issues if i.line_number == 2]
+            assert len(line2_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_lint_ignore_line_specific_rules(self) -> None:
+        """Test LINT:IGNORE-LINE with specific rule codes."""
+        content = """@ECHO OFF
+echo lowercase  REM LINT:IGNORE-LINE STY001
+EXIT /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should suppress STY001 but not other rules
+            sty001_line2 = [i for i in issues if i.line_number == 2 and i.rule.code == "STY001"]
+            assert len(sty001_line2) == 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_lint_ignore_next_line_all_rules(self) -> None:
+        """Test LINT:IGNORE suppressing all rules on next line."""
+        content = """@ECHO OFF
+REM LINT:IGNORE
+echo lowercase
+EXIT /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Line 3 should have no issues because of LINT:IGNORE on line 2
+            line3_issues = [i for i in issues if i.line_number == 3]
+            assert len(line3_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+
+class TestNestedForLoops:
+    """Test cases for nested FOR loop detection."""
+
+    def create_temp_batch_file(self, content: str) -> str:
+        """Helper method to create a temporary batch file."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8"
+        ) as temp_file:
+            temp_file.write(content)
+            return temp_file.name
+
+    def test_nested_for_loop_without_call(self) -> None:
+        """Test W039: Nested FOR loop without CALL :subroutine."""
+        content = """@ECHO OFF
+FOR %%i IN (1 2 3) DO (
+    FOR %%j IN (a b c) DO (
+        ECHO %%i %%j
+    )
+)
+EXIT /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should detect nested FOR loop issue
+            w039_issues = [i for i in issues if i.rule.code == "W039"]
+            assert len(w039_issues) > 0
+        finally:
+            os.unlink(temp_file)
+
+
+class TestRestartLogic:
+    """Test cases for restart/retry logic without limits (SEC016)."""
+
+    def create_temp_batch_file(self, content: str) -> str:
+        """Helper method to create a temporary batch file."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8"
+        ) as temp_file:
+            temp_file.write(content)
+            return temp_file.name
+
+    def test_restart_without_limit(self) -> None:
+        """Test SEC016: Restart logic without failure attempt limits."""
+        content = """@ECHO OFF
+:retry_loop
+net start MyService
+IF ERRORLEVEL 1 GOTO retry_loop
+EXIT /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should detect restart without limit
+            sec016_issues = [i for i in issues if i.rule.code == "SEC016"]
+            assert len(sec016_issues) > 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_restart_with_counter(self) -> None:
+        """Test restart logic with counter (safe pattern)."""
+        content = """@ECHO OFF
+SET counter=0
+:retry_loop
+SET /A counter+=1
+IF %counter% GTR 5 GOTO failed
+net start MyService
+IF ERRORLEVEL 1 GOTO retry_loop
+EXIT /b 0
+:failed
+ECHO Max attempts reached
+EXIT /b 1
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should NOT detect SEC016 when counter is present
+            sec016_issues = [i for i in issues if i.rule.code == "SEC016"]
+            assert len(sec016_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+
+class TestPerformanceRules:
+    """Test cases for performance rules."""
+
+    def create_temp_batch_file(self, content: str) -> str:
+        """Helper method to create a temporary batch file."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8"
+        ) as temp_file:
+            temp_file.write(content)
+            return temp_file.name
+
+    def test_p017_redundant_file_checks(self) -> None:
+        """Test P017: Multiple redundant file existence checks."""
+        content = """@ECHO OFF
+IF EXIST test.txt ECHO File exists
+IF EXIST test.txt ECHO Checking again
+IF EXIST test.txt ECHO And again
+EXIT /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should detect redundant file checks
+            p017_issues = [i for i in issues if i.rule.code == "P017"]
+            assert len(p017_issues) > 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_p020_redundant_echo_off(self) -> None:
+        """Test P020: @echo off appearing after line 1."""
+        content = """REM Header comment
+@ECHO OFF
+ECHO This is after echo off
+EXIT /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should detect @echo off not on first line
+            p020_issues = [i for i in issues if i.rule.code == "P020"]
+            assert len(p020_issues) > 0
+        finally:
+            os.unlink(temp_file)
+
+
+class TestStyleRulesExtended:
+    """Test cases for extended style rules."""
+
+    def create_temp_batch_file(self, content: str) -> str:
+        """Helper method to create a temporary batch file."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8"
+        ) as temp_file:
+            temp_file.write(content)
+            return temp_file.name
+
+    def test_s017_inconsistent_variable_case(self) -> None:
+        """Test S017: Inconsistent variable name casing."""
+        content = """@ECHO OFF
+SET MyVar=value1
+SET MYVAR=value2
+SET myvar=value3
+ECHO %MyVar% %MYVAR% %myvar%
+EXIT /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should detect inconsistent variable casing
+            s017_issues = [i for i in issues if i.rule.code == "S017"]
+            assert len(s017_issues) > 0
+        finally:
+            os.unlink(temp_file)
