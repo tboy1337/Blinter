@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.53
+Version: 1.0.54
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.53"
+__version__ = "1.0.54"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -3692,7 +3692,8 @@ def _check_performance_issues(  # pylint: disable=too-many-arguments,too-many-po
             break
 
     # P008: Delayed expansion without enablement (moved from old delayed expansion check)
-    if not has_delayed_expansion and re.search(r"![A-Z0-9_]+!", stripped, re.IGNORECASE):
+    # Match any content between exclamation marks, including special chars like @, -, #, $, etc.
+    if not has_delayed_expansion and re.search(r"![^!]+!", stripped):
         issues.append(
             LintIssue(
                 line_number=line_num,
@@ -4211,7 +4212,9 @@ def _analyze_script_structure(lines: List[str]) -> Tuple[bool, bool, bool, bool]
     has_delayed_expansion = any(
         re.search(r"setlocal\s+enabledelayedexpansion", line, re.IGNORECASE) for line in lines
     )
-    uses_delayed_vars = any(re.search(r"![A-Z0-9_]+!", line, re.IGNORECASE) for line in lines)
+    # Match any content between exclamation marks, including special chars like @, -, #, $, etc.
+    # that are commonly used in batch variable names (e.g., !@DEBUG_MODE!, !@CRLF-%~1!)
+    uses_delayed_vars = any(re.search(r"![^!]+!", line) for line in lines)
     return has_setlocal, has_set_commands, has_delayed_expansion, uses_delayed_vars
 
 
