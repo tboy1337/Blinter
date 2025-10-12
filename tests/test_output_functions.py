@@ -141,7 +141,7 @@ class TestPrintFunctions:
         output = self.capture_stdout(print_detailed, issues)
 
         assert "DETAILED ISSUES:" in output
-        assert "No issues found! ?" in output
+        assert "No issues found! *" in output
 
     def test_print_detailed_with_issues(self) -> None:
         """Test detailed output with issues."""

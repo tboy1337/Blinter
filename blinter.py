@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.55
+Version: 1.0.56
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.55"
+__version__ = "1.0.56"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -6232,7 +6232,7 @@ def print_detailed(issues: List[LintIssue]) -> None:
     if not issues:
         print("\nDETAILED ISSUES:")
         print("----------------")
-        print("No issues found! ?\n")
+        print("No issues found! *\n")
         return
 
     # Group by severity
@@ -6671,7 +6671,7 @@ def _exit_with_results(results: ProcessingResults, target_path: str) -> None:
             file_text = "s" if results.total_files_processed != 1 else ""
             look_text = "s" if results.total_files_processed == 1 else ""
             print(
-                f"\n🎉 No issues found! All {results.total_files_processed} "
+                f"\n* No issues found! All {results.total_files_processed} "
                 f"batch file{file_text} look{look_text} great!"
             )
             sys.exit(0)
@@ -6695,6 +6695,14 @@ def _exit_with_results(results: ProcessingResults, target_path: str) -> None:
 
 def main() -> None:
     """Main entry point for the blinter application."""
+    # Configure stdout for UTF-8 encoding to handle Unicode characters on Windows
+    # This prevents UnicodeEncodeError when outputting to cp1252 console
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+    except (AttributeError, OSError):
+        # Fallback for older Python versions or when reconfigure is not available
+        pass
+
     # Parse CLI arguments
     cli_args = _parse_cli_arguments()
     if cli_args is None:
