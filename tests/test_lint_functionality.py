@@ -1120,6 +1120,42 @@ echo \"\"\"incomplete triple quote
         finally:
             os.unlink(temp_file)
 
+    def test_e028_start_empty_title_no_error(self) -> None:
+        """Test E028: START with empty window title should not trigger error."""
+        content = """@ECHO OFF
+START "" CMD /K %@RUNAPP% %*
+START "" program.exe
+START "" notepad.exe file.txt
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            # Should not contain E028 for legitimate START "" patterns
+            assert "E028" not in rule_codes
+        finally:
+            os.unlink(temp_file)
+
+    def test_e028_legitimate_empty_string_patterns(self) -> None:
+        """Test E028: Legitimate empty string patterns should not trigger error."""
+        content = """@ECHO OFF
+REM Comparison operators with empty strings
+IF "%VAR%"=="" echo Empty
+IF NOT "%VAR%"=="" echo Not empty
+IF "%VAR%" neq "" echo Not equal
+IF "%VAR%" equ "" echo Equal
+REM START with empty title
+START "" notepad.exe
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            # Should not contain E028 for these legitimate patterns
+            assert "E028" not in rule_codes
+        finally:
+            os.unlink(temp_file)
+
     def test_e029_seta_expression_errors(self) -> None:
         """Test E029: Complex SET /A expression errors."""
         content = """@ECHO OFF

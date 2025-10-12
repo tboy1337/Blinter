@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.56
+Version: 1.0.57
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.56"
+__version__ = "1.0.57"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2800,31 +2800,52 @@ def _check_unc_path(stripped: str, line_num: int) -> List[LintIssue]:
     return issues
 
 
-def _check_quote_escaping(stripped: str, line_num: int) -> List[LintIssue]:
-    """Check for complex quote escaping errors (E028)."""
-    issues: List[LintIssue] = []
-    if '"""' not in stripped and not re.search(r'["\s]""[^"]', stripped):
-        return issues
+def _is_legitimate_quote_pattern(stripped: str) -> bool:
+    """
+    Check if a line contains legitimate quote patterns that should be excluded.
 
+    Args:
+        stripped: The stripped line to check
+
+    Returns:
+        True if the line contains legitimate quote patterns, False otherwise
+    """
     # Skip ECHO statements that are displaying documentation/help text
     # Pattern: ECHO followed by spaces and text containing "Represents" or "...."
     if re.match(r"\s*echo\s+.*\.\.\.\.", stripped, re.IGNORECASE) or re.match(
         r"\s*echo\s+.*represents", stripped, re.IGNORECASE
     ):
         # This is documentation text explaining special characters
-        return issues
+        return True
 
     # Exclude legitimate patterns:
     # 1. Comparisons with empty string: neq "", equ "", == "", != ""
     if re.search(r'\b(neq|equ|==|!=|lss|leq|gtr|geq)\s+""', stripped, re.IGNORECASE):
-        return issues
+        return True
 
     # 2. START command with triple-quote escaping: start ... /c ""!var!" ...
     if re.search(r'\bstart\b.*\s+/c\s+""[^"]+!"', stripped, re.IGNORECASE):
+        return True
+
+    # 3. START command with empty window title: start "" command
+    # This is the standard syntax for START when no title is needed
+    if re.search(r'\bstart\s+""\s+', stripped, re.IGNORECASE):
+        return True
+
+    # 4. Properly formatted triple-quote patterns: """text"""
+    if re.match(r'.*"""[^"]*""".*', stripped):
+        return True
+
+    return False
+
+
+def _check_quote_escaping(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for complex quote escaping errors (E028)."""
+    issues: List[LintIssue] = []
+    if '"""' not in stripped and not re.search(r'["\s]""[^"]', stripped):
         return issues
 
-    # 3. Properly formatted triple-quote patterns: """text"""
-    if re.match(r'.*"""[^"]*""".*', stripped):
+    if _is_legitimate_quote_pattern(stripped):
         return issues
 
     # Look for potentially problematic quote patterns
