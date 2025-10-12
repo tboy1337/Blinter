@@ -2,7 +2,7 @@
 
 ## Rule Categories Summary
 
-**Blinter** provides comprehensive static analysis with **158 Built-in Rules** across 5 severity levels:
+**Blinter** provides comprehensive static analysis with **159 Built-in Rules** across 5 severity levels:
 
 ### Error Level Rules (E001-E999)
 **Critical issues that will cause script failure**
@@ -158,6 +158,7 @@
 - **P023**: Inefficient arithmetic operations
 - **P024**: Redundant SETLOCAL/ENDLOCAL pairs
 - **P025**: Inefficient wildcard usage in file operations
+- **P026**: Redundant DISABLEDELAYEDEXPANSION
 
 ## Implementation Guidelines
 *Each rule should provide clear explanations and actionable recommendations*
@@ -1082,4 +1083,54 @@ Line 5: Missing '@ECHO OFF' at top of file (S001)
   echo "Processing started..." >nul
   type readme.txt >output.log
   dir >nul 2>&1
+  ```
+
+- **P026: Redundant DISABLEDELAYEDEXPANSION**: Detect unnecessary explicit disabling of delayed expansion
+  ```batch
+  # Bad - Redundant (delayed expansion is disabled by default)
+  ECHO Starting script
+  ECHO Processing
+  ECHO More processing
+  ECHO More processing
+  ECHO More processing
+  ECHO More processing
+  ECHO More processing
+  ECHO More processing
+  ECHO More processing
+  ECHO More processing
+  ECHO More processing
+  SETLOCAL DISABLEDELAYEDEXPANSION
+  SET VAR=value
+  ECHO %VAR%
+  
+  # Good - Removed redundant command
+  ECHO Starting script
+  ECHO Processing
+  SET VAR=value
+  ECHO %VAR%
+  
+  # OK - Defensive programming at script start (lines 1-10)
+  @ECHO OFF
+  SETLOCAL DISABLEDELAYEDEXPANSION
+  SET VAR=value
+  ECHO %VAR%
+  
+  # OK - Toggling pattern after ENDLOCAL
+  SETLOCAL ENABLEDELAYEDEXPANSION
+  SET VAR=test
+  ECHO !VAR!
+  ENDLOCAL
+  
+  SETLOCAL DISABLEDELAYEDEXPANSION
+  SET VAR2=value
+  ECHO %VAR2%
+  
+  # OK - Protecting literal ! characters
+  SETLOCAL DISABLEDELAYEDEXPANSION
+  ECHO Warning! This is important
+  SET MSG=Alert! Check this
+  
+  # OK - Combined with ENABLEEXTENSIONS (common pattern)
+  SETLOCAL ENABLEEXTENSIONS DISABLEDELAYEDEXPANSION
+  SET PATH=%PATH%;C:\Tools
   ```

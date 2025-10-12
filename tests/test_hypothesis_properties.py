@@ -2126,6 +2126,9 @@ class TestComplexSignatureFunctionProperties:
             has_set_commands,
             has_delayed_expansion,
             uses_delayed_vars,
+            False,  # has_disable_delayed_expansion
+            False,  # has_literal_exclamations
+            False,  # has_disable_expansion_lines
         )
         assert isinstance(result, list)
         for issue in result:

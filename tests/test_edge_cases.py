@@ -351,14 +351,25 @@ class TestPerformanceIssueChecking:
 
     def test_inefficient_dir_command(self) -> None:
         """Test DIR command without /F flag."""
-        issues = _check_performance_issues([""], 1, "dir /s", False, False, False, False)
+        issues = _check_performance_issues(
+            [""], 1, "dir /s", False, False, False, False, False, False, False
+        )
         assert len(issues) == 1
         assert "P010" in issues[0].rule.code
 
     def test_for_loop_without_tokens(self) -> None:
         """Test FOR loop without tokens optimization."""
         issues = _check_performance_issues(
-            [""], 1, 'FOR /F "delims=," %%i IN (file.txt) DO echo %%i', False, False, False, False
+            [""],
+            1,
+            'FOR /F "delims=," %%i IN (file.txt) DO echo %%i',
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
         )
         assert len(issues) == 1
         assert "P009" in issues[0].rule.code
@@ -366,27 +377,40 @@ class TestPerformanceIssueChecking:
     def test_temporary_file_without_random(self) -> None:
         """Test temporary file without random name."""
         issues = _check_performance_issues(
-            [""], 1, "echo content > temp.txt", False, False, False, False
+            [""], 1, "echo content > temp.txt", False, False, False, False, False, False, False
         )
         assert len(issues) == 1
         assert "P007" in issues[0].rule.code
 
     def test_delayed_expansion_without_enablement(self) -> None:
         """Test delayed expansion variables without enablement."""
-        issues = _check_performance_issues([""], 1, "echo !VARIABLE!", False, False, False, False)
+        issues = _check_performance_issues(
+            [""], 1, "echo !VARIABLE!", False, False, False, False, False, False, False
+        )
         assert len(issues) == 1
         assert "P008" in issues[0].rule.code
 
     def test_unnecessary_setlocal(self) -> None:
         """Test unnecessary SETLOCAL usage."""
-        issues = _check_performance_issues([""], 1, "setlocal", False, False, False, False)
+        issues = _check_performance_issues(
+            [""], 1, "setlocal", False, False, False, False, False, False, False
+        )
         assert len(issues) == 1
         assert "P003" in issues[0].rule.code
 
     def test_unnecessary_enabledelayedexpansion(self) -> None:
         """Test unnecessary ENABLEDELAYEDEXPANSION usage."""
         issues = _check_performance_issues(
-            [""], 1, "setlocal enabledelayedexpansion", False, False, False, False
+            [""],
+            1,
+            "setlocal enabledelayedexpansion",
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
         )
         # May also trigger P003 (unnecessary SETLOCAL)
         p004_issues = [i for i in issues if i.rule.code == "P004"]
@@ -394,7 +418,9 @@ class TestPerformanceIssueChecking:
 
     def test_endlocal_without_setlocal(self) -> None:
         """Test ENDLOCAL without SETLOCAL."""
-        issues = _check_performance_issues([""], 1, "endlocal", False, False, False, False)
+        issues = _check_performance_issues(
+            [""], 1, "endlocal", False, False, False, False, False, False, False
+        )
         assert len(issues) == 1
         assert "P005" in issues[0].rule.code
 
@@ -573,9 +599,15 @@ class TestMainFunctionEdgeCases:
             "setlocal enabledelayedexpansion",
             "echo !VAR!",
         ]
-        has_setlocal, has_set_commands, has_delayed_expansion, uses_delayed_vars = (
-            _analyze_script_structure(lines)
-        )
+        (
+            has_setlocal,
+            has_set_commands,
+            has_delayed_expansion,
+            uses_delayed_vars,
+            _,
+            _,
+            _,
+        ) = _analyze_script_structure(lines)
         assert has_setlocal is True
         assert has_set_commands is True
         assert has_delayed_expansion is True
@@ -647,7 +679,7 @@ class TestAdditionalEdgeCaseScenarios:
         # Empty lines
         lines: list[str] = []
         result = _analyze_script_structure(lines)
-        assert result == (False, False, False, False)
+        assert result == (False, False, False, False, False, False, False)
 
         # Lines with various patterns
         lines = [
@@ -657,9 +689,15 @@ class TestAdditionalEdgeCaseScenarios:
             "setlocal enabledelayedexpansion",
             "echo !VAR!",
         ]
-        has_setlocal, has_set_commands, has_delayed_expansion, uses_delayed_vars = (
-            _analyze_script_structure(lines)
-        )
+        (
+            has_setlocal,
+            has_set_commands,
+            has_delayed_expansion,
+            uses_delayed_vars,
+            _,
+            _,
+            _,
+        ) = _analyze_script_structure(lines)
         assert has_setlocal is True
         assert has_set_commands is True  # Should detect set /p and set /a
         assert has_delayed_expansion is True
@@ -763,7 +801,16 @@ class TestAdditionalEdgeCaseScenarios:
 
         # Test temp file with random - should not trigger P007
         issues = _check_performance_issues(
-            [""], 1, "echo content > temp_%RANDOM%.txt", False, False, False, False
+            [""],
+            1,
+            "echo content > temp_%RANDOM%.txt",
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
         )
         p007_issues = [i for i in issues if i.rule.code == "P007"]
         assert len(p007_issues) == 0  # Should not flag when RANDOM is used
@@ -1171,7 +1218,9 @@ class TestPerformanceChecking:
     def test_setlocal_without_set_commands(self) -> None:
         """Test detection of unnecessary SETLOCAL."""
         lines = ["@echo off", "setlocal", "echo hello"]
-        issues = _check_performance_issues(lines, 2, "setlocal", False, False, False, False)
+        issues = _check_performance_issues(
+            lines, 2, "setlocal", False, False, False, False, False, False, False
+        )
         setlocal_issues = [i for i in issues if i.rule.code == "P003"]
         assert len(setlocal_issues) == 1
 
@@ -1179,7 +1228,16 @@ class TestPerformanceChecking:
         """Test detection of unnecessary ENABLEDELAYEDEXPANSION."""
         lines = ["setlocal enabledelayedexpansion", "echo hello"]
         issues = _check_performance_issues(
-            lines, 1, "setlocal enabledelayedexpansion", True, True, True, False
+            lines,
+            1,
+            "setlocal enabledelayedexpansion",
+            True,
+            True,
+            True,
+            False,
+            False,
+            False,
+            False,
         )
         delayed_issues = [i for i in issues if i.rule.code == "P004"]
         assert len(delayed_issues) == 1
@@ -1187,7 +1245,9 @@ class TestPerformanceChecking:
     def test_endlocal_without_setlocal(self) -> None:
         """Test detection of ENDLOCAL without SETLOCAL."""
         lines = ["@echo off", "endlocal"]
-        issues = _check_performance_issues(lines, 2, "endlocal", False, False, False, False)
+        issues = _check_performance_issues(
+            lines, 2, "endlocal", False, False, False, False, False, False, False
+        )
         endlocal_issues = [i for i in issues if i.rule.code == "P005"]
         assert len(endlocal_issues) == 1
 
@@ -1197,7 +1257,7 @@ class TestPerformanceChecking:
         for pattern in temp_patterns:
             lines = [f"echo test > {pattern}"]
             issues = _check_performance_issues(
-                lines, 1, f"echo test > {pattern}", False, False, False, False
+                lines, 1, f"echo test > {pattern}", False, False, False, False, False, False, False
             )
             temp_issues = [i for i in issues if i.rule.code == "P007"]
             assert len(temp_issues) == 1
@@ -1206,7 +1266,16 @@ class TestPerformanceChecking:
         """Test that temp files with random names don't trigger issues."""
         lines = ["echo test > temp_%RANDOM%.txt"]
         issues = _check_performance_issues(
-            lines, 1, "echo test > temp_%RANDOM%.txt", False, False, False, False
+            lines,
+            1,
+            "echo test > temp_%RANDOM%.txt",
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
         )
         temp_issues = [i for i in issues if i.rule.code == "P007"]
         assert len(temp_issues) == 0
@@ -1214,7 +1283,9 @@ class TestPerformanceChecking:
     def test_delayed_expansion_without_enablement(self) -> None:
         """Test detection of delayed expansion without enablement."""
         lines = ["echo !MYVAR!"]
-        issues = _check_performance_issues(lines, 1, "echo !MYVAR!", False, False, False, False)
+        issues = _check_performance_issues(
+            lines, 1, "echo !MYVAR!", False, False, False, False, False, False, False
+        )
         delayed_issues = [i for i in issues if i.rule.code == "P008"]
         assert len(delayed_issues) == 1
 
