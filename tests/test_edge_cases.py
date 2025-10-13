@@ -2428,3 +2428,188 @@ SET VAR=value
             assert len(s021_issues) == 0
         finally:
             os.unlink(temp_file)
+
+
+class TestE011VariableExpansionPatterns:
+    """Test cases for E011 rule - variable expansion with wildcards and special patterns."""
+
+    def create_temp_batch_file(self, content: str) -> str:
+        """Helper method to create a temporary batch file with given content."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8"
+        ) as temp_file:
+            temp_file.write(content)
+            return temp_file.name
+
+    def test_variable_with_wildcard_suffix(self) -> None:
+        """Test that variables followed by wildcards don't trigger E011."""
+        content = """@ECHO OFF
+SET @SOURCE=%@INPUT%*%~n1*
+DIR "%@BK_PREFIX%*.*" /OD /A-D
+FOR %%F IN (%@ROOT%*.BAT) DO ECHO %%F
+DIR "%TEMP%\\%@PREFIX%*"
+SET @WCARD=%~3& IF "%~3"=="" SET @FILE2=%%~F.%@YYYY%*%~x2
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e011_issues = [i for i in issues if i.rule.code == "E011"]
+            assert len(e011_issues) == 0, (
+                f"Variables with wildcards should not trigger E011: "
+                f"{[i.context for i in e011_issues]}"
+            )
+        finally:
+            os.unlink(temp_file)
+
+    def test_variable_with_numeric_suffix(self) -> None:
+        """Test that variables with numeric suffixes don't trigger E011."""
+        content = """@ECHO OFF
+IF %@PORT%0 LSS 1 SET "@PORT=24"
+IF %@PORT%0 GTR 655350 SET "@PORT=24"
+SET NUM=%VALUE%123
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e011_issues = [i for i in issues if i.rule.code == "E011"]
+            assert len(e011_issues) == 0, (
+                f"Variables with numeric suffixes should not trigger E011: "
+                f"{[i.context for i in e011_issues]}"
+            )
+        finally:
+            os.unlink(temp_file)
+
+    def test_escaped_percent_signs(self) -> None:
+        """Test that escaped percent signs (%%%%) don't trigger E011."""
+        content = """@ECHO OFF
+FOR %%s IN ("%%%%Failed" "%%%%Unable") DO ECHO %%s
+IF NOT "%~3"=="" FOR /R "%@LOGSOURCE%" %%f IN (*.RECORDING.TXT) DO FOR %%s IN ("%%%%Failed" "%%%%Unable") DO CALL RemoveLine "%%~f" "%%~s"
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e011_issues = [i for i in issues if i.rule.code == "E011"]
+            assert len(e011_issues) == 0, (
+                f"Escaped percent signs should not trigger E011: "
+                f"{[i.context for i in e011_issues]}"
+            )
+        finally:
+            os.unlink(temp_file)
+
+    def test_complex_ipv4_ipv6_patterns(self) -> None:
+        """Test that complex IP format patterns don't trigger E011."""
+        content = """@ECHO OFF
+SET @N=[0-9]
+SET @AN=[a-f,0-9]
+SET @IPV4-FORMAT=%@N%*\\.%@N%*\\.%@N%*\\.%@N%*\\/%@N%*
+SET @IPV6-FORMAT=%@AN%%@AN%%@AN%%@AN%:%@AN%%@AN%%@AN%%@AN%:%@AN%%@AN%%@AN%%@AN%::\\/%@N%*
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e011_issues = [i for i in issues if i.rule.code == "E011"]
+            assert len(e011_issues) == 0, (
+                f"Complex IP format patterns should not trigger E011: "
+                f"{[i.context for i in e011_issues]}"
+            )
+        finally:
+            os.unlink(temp_file)
+
+    def test_variable_with_string_replacement_wildcard(self) -> None:
+        """Test that string replacement with wildcards doesn't trigger E011."""
+        content = """@ECHO OFF
+SET @THESE=*%@MACHINE:\\=%*.CSV
+CALL :SwapIt @SHARE %%@SHARE:%@OLDSTRING%=%@NEWSTRING%%%
+CALL :SwapIt @SHARE "%%@DRIVE:%@OLDSTRING%=%@NEWSTRING%%%"
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e011_issues = [i for i in issues if i.rule.code == "E011"]
+            assert len(e011_issues) == 0, (
+                f"String replacement with wildcards should not trigger E011: "
+                f"{[i.context for i in e011_issues]}"
+            )
+        finally:
+            os.unlink(temp_file)
+
+    def test_variable_in_file_operations(self) -> None:
+        """Test that variables in file operations with wildcards don't trigger E011."""
+        content = """@ECHO OFF
+DEL %@CFGFILE%*
+ROBOCOPY "%@SOURCEDIR%" "%@DESTDIR%" %@FILENAME%*.*
+FILEHASH --%@LOG_HASH% -g %@CHECKSUM% -d "%@ZIPPATH%" "%COMPUTERNAME%-%@LOGNAME%*"
+IF EXIST "%@LOGBASE%*.TXT" COPY "%@LOGBASE%*.TXT" "%@NETLOG%" /Y
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e011_issues = [i for i in issues if i.rule.code == "E011"]
+            assert len(e011_issues) == 0, (
+                f"Variables in file operations should not trigger E011: "
+                f"{[i.context for i in e011_issues]}"
+            )
+        finally:
+            os.unlink(temp_file)
+
+    def test_variable_in_for_loop_with_wildcards(self) -> None:
+        """Test that variables in FOR loops with wildcards don't trigger E011."""
+        content = """@ECHO OFF
+FOR /F "SKIP=%@MAXBACKUPS% TOKENS=*" %%E IN ('DIR /OG-D /B /A "%@BK_PREFIX%*.*" ') DO ECHO %%E
+FOR /F "TOKENS=*" %%F IN ('DIR /B /S "%@CONFIG_ROOT%*.xml" ') DO ECHO %%F
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e011_issues = [i for i in issues if i.rule.code == "E011"]
+            assert len(e011_issues) == 0, (
+                f"FOR loops with wildcards should not trigger E011: "
+                f"{[i.context for i in e011_issues]}"
+            )
+        finally:
+            os.unlink(temp_file)
+
+    def test_genuinely_incomplete_variables_still_caught(self) -> None:
+        """Test that genuinely incomplete variables are still flagged by E011."""
+        content = """@ECHO OFF
+SET BAD=%MISSING
+ECHO This has %INCOMPLETE
+SET RESULT=%ERRORLEVEL
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e011_issues = [i for i in issues if i.rule.code == "E011"]
+            assert (
+                len(e011_issues) >= 3
+            ), f"Incomplete variables should still trigger E011, found {len(e011_issues)}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_mixed_valid_and_invalid_patterns(self) -> None:
+        """Test file with both valid wildcard patterns and genuinely invalid ones."""
+        content = """@ECHO OFF
+REM Valid patterns - should not trigger E011
+DIR "%@PREFIX%*.txt"
+IF %@PORT%0 LSS 1 SET PORT=80
+FOR %%s IN ("%%%%Failed") DO ECHO %%s
+
+REM Invalid patterns - should trigger E011
+SET BAD=%INCOMPLETE
+ECHO Missing delimiter %WRONGVAR
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e011_issues = [i for i in issues if i.rule.code == "E011"]
+            # Should only flag the two genuinely invalid ones
+            assert len(e011_issues) == 2, (
+                f"Should only flag genuinely invalid patterns, "
+                f"found {len(e011_issues)}: {[i.context for i in e011_issues]}"
+            )
+            # Verify issues are on correct lines (8 and 9 - @ECHO OFF at line 1)
+            assert all(
+                i.line_number in [8, 9] for i in e011_issues
+            ), f"Wrong lines flagged: {[i.line_number for i in e011_issues]}"
+        finally:
+            os.unlink(temp_file)

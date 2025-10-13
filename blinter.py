@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.64
+Version: 1.0.65
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.64"
+__version__ = "1.0.65"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2708,27 +2708,41 @@ def _check_for_loop_syntax(stripped: str, line_num: int) -> List[LintIssue]:
     return issues
 
 
+def _has_special_variable_patterns(stripped: str) -> bool:
+    """Check if line contains special variable patterns that should skip E011 checks."""
+    # Check for indirect variable expansion patterns like !%1!, !%var%!, or !%~n1!
+    if re.search(r"!([^!]*%[^%!]+%?[^!]*|%~?[a-z0-9]+)!", stripped, re.IGNORECASE):
+        return True
+
+    # Check for dynamic variable assignment like set "%1=value" or set "%%~a=value"
+    if re.search(r'set\s+"[^"]*%%?~?[a-z0-9][^"]*=', stripped, re.IGNORECASE):
+        return True
+
+    # Check for wildcard patterns with variables
+    if re.search(
+        r"(?:\*+%%?[A-Z0-9_@-]+(?::[^%]*=[^%]*)?%%?|\b%%?[A-Z0-9_@-]+(?::[^%]*=[^%]*)?%%?\*+)",
+        stripped,
+        re.IGNORECASE,
+    ):
+        return True
+
+    # Check for escaped percent signs, string replacement, or variables with suffixes
+    return (
+        "%%%%" in stripped
+        or bool(re.search(r"%%?[A-Z0-9_@-]+:.+=.+%%?", stripped, re.IGNORECASE))
+        or bool(re.search(r"%[A-Z0-9_@-]+%[\w.*\\/:]+", stripped, re.IGNORECASE))
+    )
+
+
 def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for invalid variable expansion syntax (E011)."""
     issues: List[LintIssue] = []
 
-    # Check for indirect variable expansion patterns like !%1!, !%var%!, or !%~n1!
-    has_indirect_expansion = re.search(
-        r"!([^!]*%[^%!]+%?[^!]*|%~?[a-z0-9]+)!", stripped, re.IGNORECASE
-    )
-
-    # Check for dynamic variable assignment like set "%1=value" or set "%%~a=value"
-    has_dynamic_assignment = re.search(r'set\s+"[^"]*%%?~?[a-z0-9][^"]*=', stripped, re.IGNORECASE)
-
-    # Check for wildcard patterns with variables like "*%VAR%*" or "prefix*%VAR%*suffix"
-    # These are valid patterns used in file matching operations
-    has_wildcard_pattern = re.search(r'["\s]\*+%[A-Z0-9_@]+%\*+', stripped, re.IGNORECASE)
-
-    # Only check for mismatched delimiters if not using special patterns
-    if has_indirect_expansion or has_dynamic_assignment or has_wildcard_pattern:
+    # Skip checking if line has special patterns
+    if _has_special_variable_patterns(stripped):
         return issues
 
-    # Remove FOR loop variables with modifiers (%%~a, %%~nx1, etc.) first
+    # Remove FOR loop variables with modifiers (%%~a, %%~nx1, etc.)
     temp_stripped = re.sub(r"%%~[a-zA-Z]+", "", stripped)
     temp_stripped = re.sub(r"%%[a-zA-Z]", "", temp_stripped)
 
@@ -2738,19 +2752,11 @@ def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
     )
 
     # Remove all valid variable expansion patterns (including @ prefix)
-    temp_no_percent_vars = re.sub(r"%[A-Z0-9_~@]+[^%]*%", "", temp_stripped, flags=re.IGNORECASE)
-    temp_no_exclaim_vars = re.sub(r"![A-Z0-9_@]+[^!]*!", "", temp_stripped, flags=re.IGNORECASE)
+    temp_no_percent = re.sub(r"%[A-Z0-9_~@]+[^%]*%", "", temp_stripped, flags=re.IGNORECASE)
+    temp_no_exclaim = re.sub(r"![A-Z0-9_@]+[^!]*!", "", temp_stripped, flags=re.IGNORECASE)
 
-    # Now look for incomplete variable patterns that suggest mismatched delimiters
-    has_incomplete_percent = re.search(
-        r"%[A-Z0-9_@]+(?:[^%]|$)", temp_no_percent_vars, re.IGNORECASE
-    )
-    has_incomplete_exclaim = re.search(
-        r"![A-Z0-9_@]+(?:[^!]|$)", temp_no_exclaim_vars, re.IGNORECASE
-    )
-
-    # Only flag if we found incomplete variable patterns
-    if has_incomplete_percent:
+    # Look for incomplete variable patterns that suggest mismatched delimiters
+    if re.search(r"%[A-Z0-9_@]+(?:[^%]|$)", temp_no_percent, re.IGNORECASE):
         issues.append(
             LintIssue(
                 line_number=line_num,
@@ -2759,7 +2765,7 @@ def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
             )
         )
 
-    if has_incomplete_exclaim:
+    if re.search(r"![A-Z0-9_@]+(?:[^!]|$)", temp_no_exclaim, re.IGNORECASE):
         issues.append(
             LintIssue(
                 line_number=line_num,
