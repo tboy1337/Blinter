@@ -1397,20 +1397,129 @@ class TestGlobalChecks:
             ), f"Redirection should not be flagged as unreachable: {lines[-1]}"
 
     def test_truly_unreachable_code_still_detected(self) -> None:
-        """Test that truly unreachable code is still detected after block with redirection."""
-        # Redirection should not prevent detection of actual unreachable code
+        """Test that truly unreachable code is still detected after unconditional EXIT."""
+        # EXIT at depth 0 (not in a conditional block) makes following code unreachable
         lines = [
-            "IF true (",
-            "  ECHO inside block",
-            "  EXIT /B",
-            ") >output.txt 2>&1",
+            "ECHO start",
+            "EXIT /B",
             "ECHO this is truly unreachable",  # This IS unreachable
         ]
         issues = _check_unreachable_code(lines)
         unreachable_issues = [i for i in issues if i.rule.code == "E008"]
-        # Should detect the ECHO command after the block as unreachable
+        # Should detect the ECHO command after unconditional EXIT as unreachable
         assert len(unreachable_issues) == 1
-        assert unreachable_issues[0].line_number == 5
+        assert unreachable_issues[0].line_number == 3
+
+    def test_exit_inside_if_block_with_redirect_append(self) -> None:
+        """Test EXIT inside IF block with redirect append operator (>>)."""
+        lines = [
+            'IF "%~1"=="test" (',
+            "  ECHO Processing test",
+            "  EXIT /B",
+            ") >>%LOGFILE% 2>&1",
+            "ECHO Main routine continues",  # This IS reachable
+        ]
+        issues = _check_unreachable_code(lines)
+        unreachable_issues = [i for i in issues if i.rule.code == "E008"]
+        # Line 5 is reachable because EXIT is inside IF block
+        assert len(unreachable_issues) == 0
+
+    def test_goto_inside_if_block_with_redirect_single(self) -> None:
+        """Test GOTO inside IF block with single redirect operator (>)."""
+        lines = [
+            'IF EXIST "file.txt" (',
+            "  ECHO File found",
+            "  GOTO :process",
+            ") >output.log",
+            "ECHO Default processing",  # This IS reachable
+            ":process",
+            "ECHO Processing file",
+        ]
+        issues = _check_unreachable_code(lines)
+        unreachable_issues = [i for i in issues if i.rule.code == "E008"]
+        # Line 5 is reachable because GOTO is inside IF block
+        assert len(unreachable_issues) == 0
+
+    def test_exit_inside_nested_blocks_with_redirect(self) -> None:
+        """Test EXIT inside nested blocks with redirect operators."""
+        lines = [
+            'IF "%~1"=="outer" (',
+            '  IF "%~2"=="inner" (',
+            "    ECHO Inner condition",
+            "    EXIT /B 0",
+            "  ) >inner.log",
+            "  ECHO Outer continues",  # This IS reachable
+            ") >>outer.log 2>&1",
+            "CALL :MainRoutine",  # This IS reachable
+        ]
+        issues = _check_unreachable_code(lines)
+        unreachable_issues = [i for i in issues if i.rule.code == "E008"]
+        # Both lines after the EXIT are reachable
+        assert len(unreachable_issues) == 0
+
+    def test_exit_with_redirect_error_stream(self) -> None:
+        """Test EXIT with error stream redirect (2>)."""
+        lines = [
+            "IF DEFINED MYVAR (",
+            "  SET VALUE=%MYVAR%",
+            "  EXIT /B",
+            ") 2>error.log",
+            "ECHO Processing without MYVAR",  # This IS reachable
+        ]
+        issues = _check_unreachable_code(lines)
+        unreachable_issues = [i for i in issues if i.rule.code == "E008"]
+        assert len(unreachable_issues) == 0
+
+    def test_exit_with_combined_redirect(self) -> None:
+        """Test EXIT with combined stdout and stderr redirect (>file 2>&1)."""
+        lines = [
+            "IF ERRORLEVEL 1 (",
+            "  ECHO Error occurred",
+            "  EXIT /B 1",
+            ") >output.txt 2>&1",
+            "ECHO Success path",  # This IS reachable
+        ]
+        issues = _check_unreachable_code(lines)
+        unreachable_issues = [i for i in issues if i.rule.code == "E008"]
+        assert len(unreachable_issues) == 0
+
+    def test_exit_with_nul_redirect(self) -> None:
+        """Test EXIT with redirect to nul."""
+        lines = [
+            "IF NOT EXIST file.txt (",
+            "  ECHO File not found",
+            "  EXIT /B 2",
+            ") >nul 2>&1",
+            "ECHO File exists",  # This IS reachable
+        ]
+        issues = _check_unreachable_code(lines)
+        unreachable_issues = [i for i in issues if i.rule.code == "E008"]
+        assert len(unreachable_issues) == 0
+
+    def test_ops_logs_exact_pattern(self) -> None:
+        """Test the exact pattern from OpsLogs.BAT that triggered the bug."""
+        lines = [
+            " rem -- Print Count of Discovered Systems by OS",
+            ' IF "%~1"=="----" (',
+            "\t ECHO:",
+            '\t FOR /F "TOKENS=2-3 DELIMS==#" %%F IN (\'SET "#COUNT#" 2^>NUL\') DO (',
+            "\t\t CALL :ChangeCase #NAME#%%F -U",
+            "\t\t SET @THISOS=%%F",
+            "\t\t SET @THISOS=!@THISOS:_=,!",
+            "\t\t ECHO \t%%G \t!@THISOS:–= !",
+            "\t\t ECHO \t\t -- !#NAME#%%F!",
+            "\t\t ECHO:",
+            "\t )",
+            "\t EXIT /B",
+            " ) >>%@LOGFILE% 2>&1",
+            "",
+            " rem -- Main Routine",
+            " CALL :DisplaySysInfo %~1",  # Line 16: This IS reachable
+        ]
+        issues = _check_unreachable_code(lines)
+        unreachable_issues = [i for i in issues if i.rule.code == "E008"]
+        # Line 16 should NOT be flagged as unreachable
+        assert len(unreachable_issues) == 0
 
     def test_check_redundant_operations(self) -> None:
         """Test redundant operations detection."""

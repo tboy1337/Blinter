@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.62
+Version: 1.0.63
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.62"
+__version__ = "1.0.63"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -5788,9 +5788,14 @@ def _scan_for_unreachable_code(
 
 def _update_paren_depth(line: str, current_depth: int) -> int:
     """Update parentheses depth based on the line content."""
-    if re.search(r"\bif\b.*\(", line):
+    # Match IF or FOR statements with opening parentheses
+    if re.search(r"\b(?:if|for)\b.*\(", line):
         return current_depth + 1
-    if line == ")":
+    # Match closing parenthesis even with redirect operators
+    # Examples: ), ) >>file.txt, ) 2>&1, ) >>file.log 2>&1, ) >nul 2>&1
+    # Pattern: ) followed by optional whitespace and optional redirects
+    # Order matters: >> must be checked before > to avoid partial match
+    if re.match(r"^\)(?:\s*(?:>>|[12]>|[<>]))?", line):
         return current_depth - 1
     return current_depth
 
