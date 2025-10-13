@@ -93,7 +93,7 @@ python -m blinter /path/to/batch/files --no-recursive
 # Analyze with summary
 python -m blinter script.bat --summary
 
-# Analyze script and scripts it calls (e.g., configuration scripts)
+# Analyze script and scripts it calls with shared variable context
 python -m blinter script.bat --follow-calls
 
 # Create configuration file
@@ -123,7 +123,7 @@ Blinter-v1.0.x-windows.exe /path/to/batch/files --no-recursive
 # Analyze with summary
 Blinter-v1.0.x-windows.exe script.bat --summary
 
-# Analyze script and scripts it calls (e.g., configuration scripts)
+# Analyze script and scripts it calls with shared variable context
 Blinter-v1.0.x-windows.exe script.bat --follow-calls
 
 # Get help
@@ -147,7 +147,7 @@ python blinter.py /path/to/batch/files --no-recursive
 # Analyze with summary
 python blinter.py script.bat --summary
 
-# Analyze script and scripts it calls (e.g., configuration scripts)
+# Analyze script and scripts it calls with shared variable context
 python blinter.py script.bat --follow-calls
 
 # Create configuration file
@@ -169,7 +169,7 @@ python blinter.py --version
 - `--summary`: Display summary statistics of issues found
 - `--severity`: Show detailed severity level breakdown (always included)
 - `--no-recursive`: When processing directories, only analyze files in the specified directory (not subdirectories)
-- `--follow-calls`: Automatically analyze scripts called by CALL statements (one level deep). This helps analyze centralized configuration scripts that set variables used by the main script
+- `--follow-calls`: Automatically analyze scripts called by CALL statements and merge their variable context. When enabled, variables defined in called scripts are recognized as "defined" in the calling script (position-aware: only after the CALL statement). This eliminates false positive undefined variable errors for configuration scripts
 - `--no-config`: Don't use configuration file (blinter.ini) even if it exists
 - `--create-config`: Create a default blinter.ini configuration file and exit
 - `--help`: Show help menu and rule categories
@@ -184,7 +184,7 @@ python blinter.py --version
 | `[general]` | `recursive` | Search subdirectories when analyzing folders | `true` |
 | `[general]` | `show_summary` | Display summary statistics after analysis | `false` |
 | `[general]` | `max_line_length` | Maximum line length for S011 rule | `120` |
-| `[general]` | `follow_calls` | Automatically analyze scripts called by CALL statements | `false` |
+| `[general]` | `follow_calls` | Analyze scripts called by CALL statements with shared variable context | `false` |
 | `[general]` | `min_severity` | Minimum severity level to report | None (all) |
 | `[rules]` | `enabled_rules` | Comma-separated list of rules to enable exclusively | None (all enabled) |
 | `[rules]` | `disabled_rules` | Comma-separated list of rules to disable | None |
@@ -200,7 +200,7 @@ python -m blinter myscript.bat
 # Override config to show summary
 python -m blinter myscript.bat --summary
 
-# Analyze script and any scripts it calls
+# Analyze script and scripts it calls with shared variable context
 python -m blinter myscript.bat --follow-calls
 
 # Ignore config file completely

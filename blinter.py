@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.63
+Version: 1.0.64
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.63"
+__version__ = "1.0.64"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -145,6 +145,60 @@ class BlinterConfig:
 
         return severity_order.get(severity, 0) >= severity_order.get(self.min_severity, 0)
 
+
+# Built-in environment variables that don't need to be SET
+BUILTIN_VARS: Set[str] = {
+    "DATE",
+    "TIME",
+    "CD",
+    "ERRORLEVEL",
+    "RANDOM",
+    "CMDCMDLINE",
+    "CMDEXTVERSION",
+    "COMPUTERNAME",
+    "COMSPEC",
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "LOGONSERVER",
+    "NUMBER_OF_PROCESSORS",
+    "OS",
+    "PATH",
+    "PATHEXT",
+    "PROCESSOR_ARCHITECTURE",
+    "PROCESSOR_ARCHITEW6432",  # WOW64 - native architecture on 64-bit when running 32-bit
+    "PROCESSOR_IDENTIFIER",
+    "PROCESSOR_LEVEL",
+    "PROCESSOR_REVISION",
+    "PROMPT",
+    "SYSTEMDRIVE",
+    "SYSTEMROOT",
+    "TEMP",
+    "TMP",
+    "USERDOMAIN",
+    "USERDNSDOMAIN",
+    "USERNAME",
+    "USERPROFILE",
+    "WINDIR",
+    "PROGRAMFILES",
+    "PROGRAMFILES(X86)",
+    "PROGRAMW6432",  # 64-bit program files folder
+    "COMMONPROGRAMFILES",
+    "COMMONPROGRAMFILES(X86)",
+    "ALLUSERSPROFILE",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "PROGRAMDATA",
+    "PUBLIC",
+    "SESSIONNAME",
+    "CLIENTNAME",
+    # Optional environment variables that may or may not be set
+    "SUDO_USER",  # Set by newer Windows sudo command
+    "ORIGINAL_USER",  # Sometimes set by scripts for elevation tracking
+    "DRIVERDATA",  # Driver data directory (Windows 10+)
+    "ONEDRIVE",  # OneDrive directory if configured
+    "ONEDRIVECONSUMER",  # Consumer OneDrive
+    "ONEDRIVECOMMERCIAL",  # Business OneDrive
+}
 
 # Comprehensive rule definitions
 RULES: Dict[str, Rule] = {
@@ -3876,8 +3930,25 @@ def _check_performance_issues(  # pylint: disable=too-many-arguments,too-many-po
     return issues
 
 
-def _check_undefined_variables(lines: List[str], set_vars: Set[str]) -> List[LintIssue]:
-    """Check for usage of undefined variables."""
+def _check_undefined_variables(
+    lines: List[str],
+    set_vars: Set[str],
+    called_scripts_vars: Optional[Dict[int, Set[str]]] = None,
+) -> List[LintIssue]:
+    """
+    Check for usage of undefined variables with position-aware tracking.
+
+    When called_scripts_vars is provided (via --follow-calls), variables from called
+    scripts are considered "defined" only for lines AFTER the CALL statement.
+
+    Args:
+        lines: Lines of the batch file
+        set_vars: Variables defined in the current file
+        called_scripts_vars: Optional dict mapping line numbers to variables from called scripts
+
+    Returns:
+        List of LintIssue objects for undefined variables
+    """
     issues: List[LintIssue] = []
 
     # If script uses dynamic variable assignment, be lenient about undefined vars
@@ -3887,64 +3958,20 @@ def _check_undefined_variables(lines: List[str], set_vars: Set[str]) -> List[Lin
     # operations and builtin variables
     var_usage_pattern = re.compile(r"%([A-Z][A-Z0-9_]*)%|!([A-Z][A-Z0-9_]*)!", re.IGNORECASE)
 
-    # Built-in variables that don't need to be SET
-    builtin_vars = {
-        "DATE",
-        "TIME",
-        "CD",
-        "ERRORLEVEL",
-        "RANDOM",
-        "CMDCMDLINE",
-        "CMDEXTVERSION",
-        "COMPUTERNAME",
-        "COMSPEC",
-        "HOMEDRIVE",
-        "HOMEPATH",
-        "LOGONSERVER",
-        "NUMBER_OF_PROCESSORS",
-        "OS",
-        "PATH",
-        "PATHEXT",
-        "PROCESSOR_ARCHITECTURE",
-        "PROCESSOR_ARCHITEW6432",  # WOW64 - native architecture on 64-bit when running 32-bit
-        "PROCESSOR_IDENTIFIER",
-        "PROCESSOR_LEVEL",
-        "PROCESSOR_REVISION",
-        "PROMPT",
-        "SYSTEMDRIVE",
-        "SYSTEMROOT",
-        "TEMP",
-        "TMP",
-        "USERDOMAIN",
-        "USERDNSDOMAIN",
-        "USERNAME",
-        "USERPROFILE",
-        "WINDIR",
-        "PROGRAMFILES",
-        "PROGRAMFILES(X86)",
-        "PROGRAMW6432",  # 64-bit program files folder
-        "COMMONPROGRAMFILES",
-        "COMMONPROGRAMFILES(X86)",
-        "ALLUSERSPROFILE",
-        "APPDATA",
-        "LOCALAPPDATA",
-        "PROGRAMDATA",
-        "PUBLIC",
-        "SESSIONNAME",
-        "CLIENTNAME",
-        # Optional environment variables that may or may not be set
-        "SUDO_USER",  # Set by newer Windows sudo command
-        "ORIGINAL_USER",  # Sometimes set by scripts for elevation tracking
-        "DRIVERDATA",  # Driver data directory (Windows 10+)
-        "ONEDRIVE",  # OneDrive directory if configured
-        "ONEDRIVECONSUMER",  # Consumer OneDrive
-        "ONEDRIVECOMMERCIAL",  # Business OneDrive
-    }
-
     for i, line in enumerate(lines, start=1):
         # Skip lines with string operations like %DATE:/=-%
         if re.search(r"%[A-Z]+:[^%]*%", line, re.IGNORECASE):
             continue
+
+        # Build the set of variables available at this line
+        available_vars = set_vars.copy()
+
+        # If follow_calls is enabled, add variables from called scripts
+        # Variables are available from lines AFTER the CALL statement
+        if called_scripts_vars:
+            for call_line_num, called_vars in called_scripts_vars.items():
+                if call_line_num < i:  # Only include if CALL was before current line
+                    available_vars.update(called_vars)
 
         for match in var_usage_pattern.finditer(line):
             var_match_1: Optional[str] = match.group(1)
@@ -3952,7 +3979,7 @@ def _check_undefined_variables(lines: List[str], set_vars: Set[str]) -> List[Lin
             var_name: str = (var_match_1 or var_match_2 or "").upper()
 
             # Skip built-in variables and single character variables (usually loop variables)
-            if var_name in builtin_vars or len(var_name) <= 1:
+            if var_name in BUILTIN_VARS or len(var_name) <= 1:
                 continue
 
             # If dynamic vars are used, skip undefined variable warnings
@@ -3960,7 +3987,7 @@ def _check_undefined_variables(lines: List[str], set_vars: Set[str]) -> List[Lin
             if uses_dynamic_vars:
                 continue
 
-            if var_name not in set_vars:
+            if var_name not in available_vars:
                 issues.append(
                     LintIssue(
                         line_number=i,
@@ -4616,11 +4643,13 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
     has_disable_expansion_lines: bool,
     config: BlinterConfig,
     skip_lines: Optional[Set[int]] = None,
+    called_scripts_vars: Optional[Dict[int, Set[str]]] = None,
 ) -> List[LintIssue]:
     """Process all line-by-line and global checks.
 
     Args:
         skip_lines: Optional set of line numbers to skip (e.g., embedded script blocks)
+        called_scripts_vars: Optional dict mapping line numbers to variables from called scripts
     """
     issues: List[LintIssue] = []
 
@@ -4678,7 +4707,7 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
         issues.extend(_check_advanced_performance(lines, i, line))
 
     # Global checks (across all lines)
-    issues.extend(_check_undefined_variables(lines, set_vars))
+    issues.extend(_check_undefined_variables(lines, set_vars, called_scripts_vars))
     issues.extend(_check_unreachable_code(lines))
     issues.extend(_check_redundant_operations(lines))
     issues.extend(_check_code_duplication(lines))
@@ -5192,6 +5221,16 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     # Collect set variables for undefined variable checking
     set_vars = _collect_set_variables(lines)
 
+    # Collect variables from called scripts if follow_calls is enabled
+    called_scripts_vars: Optional[Dict[int, Set[str]]] = None
+    if config.follow_calls:
+        try:
+            batch_path = Path(file_path)
+            called_scripts_vars = _collect_called_vars(batch_path)
+        except (OSError, ValueError):
+            # If we can't collect called script variables, continue without them
+            called_scripts_vars = None
+
     # Process all line-by-line and global checks
     issues.extend(
         _process_file_checks(
@@ -5207,6 +5246,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
             has_disable_expansion_lines,
             config,
             skip_lines,
+            called_scripts_vars,
         )
     )
 
@@ -6568,6 +6608,85 @@ def _extract_called_scripts(batch_file: Path) -> List[Path]:
         pass
 
     return called_scripts
+
+
+def _collect_called_vars(
+    batch_file: Path,
+) -> Dict[int, Set[str]]:
+    """
+    For each CALL statement in the batch file, collect variables from the called script.
+
+    This function implements position-aware variable tracking: variables from called scripts
+    are only considered "defined" for lines AFTER the CALL statement that invokes them.
+
+    Args:
+        batch_file: Path to the batch file to analyze
+
+    Returns:
+        Dictionary mapping line numbers to sets of variables available after that line.
+        For example, if line 10 has a CALL to a script that defines VAR1 and VAR2,
+        the returned dict will have {10: {'VAR1', 'VAR2'}}.
+    """
+    called_vars_by_line: Dict[int, Set[str]] = {}
+    batch_dir = batch_file.parent
+
+    try:
+        with open(batch_file, "r", encoding="utf-8", errors="ignore") as file:
+            for line_num, line in enumerate(file, start=1):
+                # Skip comments
+                stripped = line.strip().lower()
+                if stripped.startswith("rem ") or stripped.startswith("::"):
+                    continue
+
+                # Look for CALL statements with .bat or .cmd files
+                call_match = re.search(
+                    r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|([^\s]+\.(?:bat|cmd)))',
+                    line,
+                    re.IGNORECASE,
+                )
+
+                if call_match:
+                    # Get the script path (from either quoted or unquoted group)
+                    script_path_str = call_match.group(1) or call_match.group(2)
+
+                    # Resolve batch parameter expansions
+                    if "%~dp0" in script_path_str:
+                        script_path_str = script_path_str.replace("%~dp0", "")
+                        script_path = batch_dir / script_path_str
+                    elif "%~d0" in script_path_str:
+                        script_path_str = script_path_str.replace("%~d0", str(batch_dir.drive))
+                        script_path = Path(script_path_str)
+                    else:
+                        script_path = Path(script_path_str)
+                        if not script_path.is_absolute():
+                            script_path = batch_dir / script_path_str
+
+                    # Try to read the called script and collect its variables
+                    try:
+                        if script_path.exists() and script_path.is_file():
+                            # Avoid circular references
+                            if script_path.resolve() != batch_file.resolve():
+                                # Read the called script
+                                with open(
+                                    script_path, "r", encoding="utf-8", errors="ignore"
+                                ) as called_file:
+                                    called_lines = called_file.readlines()
+                                    # Collect variables from the called script
+                                    called_vars = _collect_set_variables(called_lines)
+                                    # Remove special markers like __DYNAMIC_VARS__
+                                    called_vars.discard("__DYNAMIC_VARS__")
+                                    # Store variables available after this CALL statement
+                                    if called_vars:
+                                        called_vars_by_line[line_num] = called_vars
+                    except (ValueError, OSError, UnicodeDecodeError):
+                        # If we can't read the called script, skip it
+                        continue
+
+    except (OSError, UnicodeDecodeError):
+        # If we can't read the main file, return empty dict
+        pass
+
+    return called_vars_by_line
 
 
 def _process_single_called_script(
