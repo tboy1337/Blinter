@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.61
+Version: 1.0.62
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.61"
+__version__ = "1.0.62"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2668,7 +2668,7 @@ def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
 
     # Check for wildcard patterns with variables like "*%VAR%*" or "prefix*%VAR%*suffix"
     # These are valid patterns used in file matching operations
-    has_wildcard_pattern = re.search(r'["\s]\*+%[A-Z0-9_]+%\*+', stripped, re.IGNORECASE)
+    has_wildcard_pattern = re.search(r'["\s]\*+%[A-Z0-9_@]+%\*+', stripped, re.IGNORECASE)
 
     # Only check for mismatched delimiters if not using special patterns
     if has_indirect_expansion or has_dynamic_assignment or has_wildcard_pattern:
@@ -2683,16 +2683,16 @@ def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
         r"%~?[fdpnxsatz]*[0-9*](?![0-9])", "", temp_stripped, flags=re.IGNORECASE
     )
 
-    # Remove all valid variable expansion patterns
-    temp_no_percent_vars = re.sub(r"%[A-Z0-9_~]+[^%]*%", "", temp_stripped, flags=re.IGNORECASE)
-    temp_no_exclaim_vars = re.sub(r"![A-Z0-9_]+[^!]*!", "", temp_stripped, flags=re.IGNORECASE)
+    # Remove all valid variable expansion patterns (including @ prefix)
+    temp_no_percent_vars = re.sub(r"%[A-Z0-9_~@]+[^%]*%", "", temp_stripped, flags=re.IGNORECASE)
+    temp_no_exclaim_vars = re.sub(r"![A-Z0-9_@]+[^!]*!", "", temp_stripped, flags=re.IGNORECASE)
 
     # Now look for incomplete variable patterns that suggest mismatched delimiters
     has_incomplete_percent = re.search(
-        r"%[A-Z0-9_]+(?:[^%]|$)", temp_no_percent_vars, re.IGNORECASE
+        r"%[A-Z0-9_@]+(?:[^%]|$)", temp_no_percent_vars, re.IGNORECASE
     )
     has_incomplete_exclaim = re.search(
-        r"![A-Z0-9_]+(?:[^!]|$)", temp_no_exclaim_vars, re.IGNORECASE
+        r"![A-Z0-9_@]+(?:[^!]|$)", temp_no_exclaim_vars, re.IGNORECASE
     )
 
     # Only flag if we found incomplete variable patterns
