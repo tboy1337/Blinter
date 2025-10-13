@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.67
+Version: 1.0.68
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.67"
+__version__ = "1.0.68"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -6515,18 +6515,21 @@ def print_summary(issues: List[LintIssue]) -> None:
             print(f"  {severity.value}: {count}")
 
 
-def _format_line_numbers_with_files(issues: List[LintIssue]) -> str:
+def _format_line_numbers_with_files(
+    issues: List[LintIssue],
+) -> Tuple[bool, Union[str, Dict[str, List[int]]]]:
     """Format line numbers with file annotations for multi-file issues.
 
     Args:
         issues: List of LintIssue objects for the same rule
 
     Returns:
-        Formatted string like "Line 296 [helper.bat], 303 [helper.bat], 4709 [main.bat]"
-        or "Line 296, 303, 4709" if all from same file or no file info
+        Tuple of (is_multi_file, data) where:
+        - If single file: (False, "Line 296, 303, 4709")
+        - If multiple files: (True, {"file1.bat": [1, 2, 3], "file2.bat": [4, 5]})
     """
 
-    # Sort issues by line number
+    # Sort issues by file and line number
     def sort_key(issue: LintIssue) -> Tuple[str, int]:
         """Return sort key for LintIssue."""
         return (issue.file_path or "", issue.line_number)
@@ -6539,18 +6542,75 @@ def _format_line_numbers_with_files(issues: List[LintIssue]) -> str:
     # If single file or no file info, use simple format
     if len(files) <= 1:
         line_numbers = sorted([issue.line_number for issue in sorted_issues])
-        return f"Line {', '.join(map(str, line_numbers))}"
+        return (False, f"Line {', '.join(map(str, line_numbers))}")
 
-    # Multiple files - use hybrid format with annotations
-    parts = []
+    # Multiple files - group by file
+    file_lines: Dict[str, List[int]] = defaultdict(list)
     for issue in sorted_issues:
         if issue.file_path:
             filename = Path(issue.file_path).name
-            parts.append(f"{issue.line_number} [{filename}]")
-        else:
-            parts.append(str(issue.line_number))
+            file_lines[filename].append(issue.line_number)
 
-    return f"Line {', '.join(parts)}"
+    return (True, dict(file_lines))
+
+
+def _get_unique_contexts(rule_issues: List[LintIssue]) -> List[str]:
+    """Extract unique contexts from rule issues, preserving order.
+
+    Args:
+        rule_issues: List of LintIssue objects
+
+    Returns:
+        List of unique context strings
+    """
+    contexts = [issue.context for issue in rule_issues if issue.context]
+    if not contexts:
+        return []
+
+    # Remove duplicates while preserving order
+    unique_contexts: List[str] = []
+    seen: Set[str] = set()
+    for context in contexts:
+        if context not in seen:
+            unique_contexts.append(context)
+            seen.add(context)
+    return unique_contexts
+
+
+def _print_rule_group(rule_code: str, rule_issues: List[LintIssue]) -> None:
+    """Print a group of issues for a single rule.
+
+    Args:
+        rule_code: The rule code identifier
+        rule_issues: List of LintIssue objects for this rule
+    """
+    rule = rule_issues[0].rule
+
+    # Format line numbers with file annotations if multiple files are involved
+    is_multi_file, line_data = _format_line_numbers_with_files(rule_issues)
+
+    if is_multi_file:
+        # Hierarchical format for multiple files
+        print(f"\n**{rule.name} ({rule_code})**")
+        # line_data is Dict[str, List[int]]
+        assert isinstance(line_data, dict)
+        for filename in sorted(line_data.keys()):
+            line_nums = line_data[filename]
+            line_str = ", ".join(map(str, line_nums))
+            print(f"  **[{filename}] Line {line_str}**")
+    else:
+        # Simple format for single file
+        # line_data is str like "Line 296, 303, 4709"
+        assert isinstance(line_data, str)
+        print(f"\n{line_data}: {rule.name} ({rule_code})")
+
+    print(f"- Explanation: {rule.explanation}")
+    print(f"- Recommendation: {rule.recommendation}")
+
+    # Add context if available
+    unique_contexts = _get_unique_contexts(rule_issues)
+    for context in unique_contexts:
+        print(f"- Context: {context}")
 
 
 def print_detailed(issues: List[LintIssue]) -> None:
@@ -6593,28 +6653,7 @@ def print_detailed(issues: List[LintIssue]) -> None:
             rule_groups[issue.rule.code].append(issue)
 
         for rule_code in sorted(rule_groups.keys()):
-            rule_issues = rule_groups[rule_code]
-            rule = rule_issues[0].rule
-
-            # Format line numbers with file annotations if multiple files are involved
-            line_display = _format_line_numbers_with_files(rule_issues)
-
-            print(f"\n{line_display}: {rule.name} ({rule_code})")
-            print(f"- Explanation: {rule.explanation}")
-            print(f"- Recommendation: {rule.recommendation}")
-
-            # Add context if available
-            contexts = [issue.context for issue in rule_issues if issue.context]
-            if contexts:
-                # Remove duplicates while preserving order
-                unique_contexts: List[str] = []
-                seen: Set[str] = set()
-                for context in contexts:
-                    if context not in seen:
-                        unique_contexts.append(context)
-                        seen.add(context)
-                for context in unique_contexts:
-                    print(f"- Context: {context}")
+            _print_rule_group(rule_code, rule_groups[rule_code])
 
         print()  # Extra spacing between severity levels
 

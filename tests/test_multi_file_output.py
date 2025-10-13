@@ -38,7 +38,8 @@ class TestFormatLineNumbersWithFiles:
             LintIssue(line_number=30, rule=rule, file_path="test.bat"),
         ]
 
-        result = _format_line_numbers_with_files(issues)
+        is_multi_file, result = _format_line_numbers_with_files(issues)
+        assert is_multi_file is False
         assert result == "Line 10, 20, 30"
         assert "[" not in result  # No file annotations
 
@@ -58,7 +59,8 @@ class TestFormatLineNumbersWithFiles:
             LintIssue(line_number=30, rule=rule),
         ]
 
-        result = _format_line_numbers_with_files(issues)
+        is_multi_file, result = _format_line_numbers_with_files(issues)
+        assert is_multi_file is False
         assert result == "Line 10, 20, 30"
         assert "[" not in result  # No file annotations
 
@@ -78,8 +80,13 @@ class TestFormatLineNumbersWithFiles:
             LintIssue(line_number=4709, rule=rule, file_path="main.bat"),
         ]
 
-        result = _format_line_numbers_with_files(issues)
-        assert result == "Line 296 [helper.bat], 303 [helper.bat], 4709 [main.bat]"
+        is_multi_file, result = _format_line_numbers_with_files(issues)
+        assert is_multi_file is True
+        assert isinstance(result, dict)
+        assert "helper.bat" in result
+        assert "main.bat" in result
+        assert result["helper.bat"] == [296, 303]
+        assert result["main.bat"] == [4709]
 
     def test_full_path_shows_basename_only(self) -> None:
         """Full paths should be reduced to just the filename."""
@@ -96,8 +103,13 @@ class TestFormatLineNumbersWithFiles:
             LintIssue(line_number=20, rule=rule, file_path="D:\\projects\\scripts\\main.bat"),
         ]
 
-        result = _format_line_numbers_with_files(issues)
-        assert result == "Line 10 [helper.bat], 20 [main.bat]"
+        is_multi_file, result = _format_line_numbers_with_files(issues)
+        assert is_multi_file is True
+        assert isinstance(result, dict)
+        assert "helper.bat" in result
+        assert "main.bat" in result
+        assert result["helper.bat"] == [10]
+        assert result["main.bat"] == [20]
 
     def test_mixed_file_path_and_none(self) -> None:
         """Issues with mixed file_path (some None) should handle gracefully."""
@@ -115,11 +127,15 @@ class TestFormatLineNumbersWithFiles:
             LintIssue(line_number=30, rule=rule, file_path="other.bat"),
         ]
 
-        result = _format_line_numbers_with_files(issues)
-        # Should show annotations since we have multiple files
-        assert "[test.bat]" in result
-        assert "[other.bat]" in result
-        assert "20" in result  # Line without file should still appear
+        is_multi_file, result = _format_line_numbers_with_files(issues)
+        # Should show multi-file format since we have multiple files
+        assert is_multi_file is True
+        assert isinstance(result, dict)
+        assert "test.bat" in result
+        assert "other.bat" in result
+        assert result["test.bat"] == [10]
+        assert result["other.bat"] == [30]
+        # Note: Line 20 without file_path is not included in multi-file mode
 
     def test_sorting_by_file_and_line(self) -> None:
         """Issues should be sorted by file path then line number."""
@@ -139,11 +155,15 @@ class TestFormatLineNumbersWithFiles:
             LintIssue(line_number=305, rule=rule, file_path="helper.bat"),
         ]
 
-        result = _format_line_numbers_with_files(issues)
+        is_multi_file, result = _format_line_numbers_with_files(issues)
         # Should be sorted by file then line
-        assert (
-            result == "Line 296 [helper.bat], 303 [helper.bat], 305 [helper.bat], 4709 [main.bat]"
-        )
+        assert is_multi_file is True
+        assert isinstance(result, dict)
+        assert "helper.bat" in result
+        assert "main.bat" in result
+        # Lines should be sorted within each file
+        assert result["helper.bat"] == [296, 303, 305]
+        assert result["main.bat"] == [4709]
 
     def test_three_files_with_annotations(self) -> None:
         """Three or more files should all show annotations."""
@@ -161,8 +181,15 @@ class TestFormatLineNumbersWithFiles:
             LintIssue(line_number=30, rule=rule, file_path="script3.bat"),
         ]
 
-        result = _format_line_numbers_with_files(issues)
-        assert result == "Line 10 [script1.bat], 20 [script2.bat], 30 [script3.bat]"
+        is_multi_file, result = _format_line_numbers_with_files(issues)
+        assert is_multi_file is True
+        assert isinstance(result, dict)
+        assert "script1.bat" in result
+        assert "script2.bat" in result
+        assert "script3.bat" in result
+        assert result["script1.bat"] == [10]
+        assert result["script2.bat"] == [20]
+        assert result["script3.bat"] == [30]
 
 
 class TestFollowCallsOutputIntegration:

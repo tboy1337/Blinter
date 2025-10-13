@@ -12,6 +12,7 @@ from blinter import (
     LintIssue,
     RuleSeverity,
     _display_analyzed_scripts,
+    _format_line_numbers_with_files,
     group_issues,
     print_detailed,
     print_help,
@@ -242,8 +243,8 @@ class TestOutputFormatting:
         output = self.capture_stdout(print_severity_info, issues)
         assert "2 issues" in output
 
-    def test_line_number_formatting(self) -> None:
-        """Test proper formatting of line numbers in detailed output."""
+    def test_line_number_formatting_single_file(self) -> None:
+        """Test proper formatting of line numbers in detailed output for single file."""
         issues = [
             self.create_lint_issue(1, "W005"),
             self.create_lint_issue(3, "W005"),
@@ -255,6 +256,58 @@ class TestOutputFormatting:
 
         # Should have comma-separated, sorted line numbers
         assert "Line 1, 3, 5, 7: Unquoted variable with spaces (W005)" in output
+
+    def test_line_number_formatting_multi_file(self) -> None:
+        """Test proper formatting of line numbers in detailed output for multiple files."""
+        issues = [
+            LintIssue(line_number=197, rule=RULES["W039"], file_path="DriveInfo.BAT"),
+            LintIssue(line_number=245, rule=RULES["W039"], file_path="DriveInfo.BAT"),
+            LintIssue(line_number=529, rule=RULES["W039"], file_path="SetDrive.BAT"),
+            LintIssue(line_number=564, rule=RULES["W039"], file_path="SetDrive.BAT"),
+            LintIssue(line_number=440, rule=RULES["W039"], file_path="StorageInfo.BAT"),
+            LintIssue(line_number=643, rule=RULES["W039"], file_path="StorageInfo.BAT"),
+        ]
+
+        output = self.capture_stdout(print_detailed, issues)
+
+        # Should have hierarchical format with file grouping
+        assert "**Nested FOR loops without call optimization (W039)**" in output
+        assert "**[DriveInfo.BAT] Line 197, 245**" in output
+        assert "**[SetDrive.BAT] Line 529, 564**" in output
+        assert "**[StorageInfo.BAT] Line 440, 643**" in output
+        # Should not have the old format
+        assert "Line 197 [DriveInfo.BAT]" not in output
+
+    def test_format_line_numbers_with_files_single_file(self) -> None:
+        """Test _format_line_numbers_with_files for single file."""
+        issues = [
+            self.create_lint_issue(1, "W005"),
+            self.create_lint_issue(3, "W005"),
+            self.create_lint_issue(5, "W005"),
+        ]
+
+        is_multi_file, line_data = _format_line_numbers_with_files(issues)
+
+        assert is_multi_file is False
+        assert line_data == "Line 1, 3, 5"
+
+    def test_format_line_numbers_with_files_multi_file(self) -> None:
+        """Test _format_line_numbers_with_files for multiple files."""
+        issues = [
+            LintIssue(line_number=100, rule=RULES["W039"], file_path="script1.bat"),
+            LintIssue(line_number=200, rule=RULES["W039"], file_path="script1.bat"),
+            LintIssue(line_number=50, rule=RULES["W039"], file_path="script2.bat"),
+            LintIssue(line_number=150, rule=RULES["W039"], file_path="script2.bat"),
+        ]
+
+        is_multi_file, line_data = _format_line_numbers_with_files(issues)
+
+        assert is_multi_file is True
+        assert isinstance(line_data, dict)
+        assert "script1.bat" in line_data
+        assert "script2.bat" in line_data
+        assert line_data["script1.bat"] == [100, 200]
+        assert line_data["script2.bat"] == [50, 150]
 
     def test_special_characters_in_output(self) -> None:
         """Test handling of special characters in error messages and context."""
