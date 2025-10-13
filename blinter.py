@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.57
+Version: 1.0.58
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.57"
+__version__ = "1.0.58"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2660,8 +2660,12 @@ def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
     # Check for dynamic variable assignment like set "%1=value" or set "%%~a=value"
     has_dynamic_assignment = re.search(r'set\s+"[^"]*%%?~?[a-z0-9][^"]*=', stripped, re.IGNORECASE)
 
-    # Only check for mismatched delimiters if not using indirect expansion or dynamic assignment
-    if has_indirect_expansion or has_dynamic_assignment:
+    # Check for wildcard patterns with variables like "*%VAR%*" or "prefix*%VAR%*suffix"
+    # These are valid patterns used in file matching operations
+    has_wildcard_pattern = re.search(r'["\s]\*+%[A-Z0-9_]+%\*+', stripped, re.IGNORECASE)
+
+    # Only check for mismatched delimiters if not using special patterns
+    if has_indirect_expansion or has_dynamic_assignment or has_wildcard_pattern:
         return issues
 
     # Remove FOR loop variables with modifiers (%%~a, %%~nx1, etc.) first
@@ -2810,33 +2814,27 @@ def _is_legitimate_quote_pattern(stripped: str) -> bool:
     Returns:
         True if the line contains legitimate quote patterns, False otherwise
     """
-    # Skip ECHO statements that are displaying documentation/help text
-    # Pattern: ECHO followed by spaces and text containing "Represents" or "...."
-    if re.match(r"\s*echo\s+.*\.\.\.\.", stripped, re.IGNORECASE) or re.match(
-        r"\s*echo\s+.*represents", stripped, re.IGNORECASE
-    ):
-        # This is documentation text explaining special characters
-        return True
+    # Check all legitimate patterns
+    legitimate_patterns = [
+        # ECHO statements displaying documentation/help text
+        # Pattern: ECHO followed by spaces and text containing "Represents" or "...."
+        re.match(r"\s*echo\s+.*\.\.\.\.", stripped, re.IGNORECASE) is not None,
+        re.match(r"\s*echo\s+.*represents", stripped, re.IGNORECASE) is not None,
+        # Comparisons with empty string: neq "", equ "", == "", != ""
+        re.search(r'\b(neq|equ|==|!=|lss|leq|gtr|geq)\s+""', stripped, re.IGNORECASE) is not None,
+        # START command with triple-quote escaping: start ... /c ""!var!" ...
+        re.search(r'\bstart\b.*\s+/c\s+""[^"]+!"', stripped, re.IGNORECASE) is not None,
+        # START command with empty window title: start "" command
+        re.search(r'\bstart\s+""\s+', stripped, re.IGNORECASE) is not None,
+        # Properly formatted triple-quote patterns: """text"""
+        re.match(r'.*"""[^"]*""".*', stripped) is not None,
+        # Empty string as function/subroutine parameter: CALL :label param1 "" param2
+        re.search(r'\bcall\s+:[^\s]+.*\s+""\s+', stripped, re.IGNORECASE) is not None,
+        # Empty string as command parameter (not just in CALL): command param "" param
+        re.search(r'\s+""\s+[^\s]', stripped) is not None,
+    ]
 
-    # Exclude legitimate patterns:
-    # 1. Comparisons with empty string: neq "", equ "", == "", != ""
-    if re.search(r'\b(neq|equ|==|!=|lss|leq|gtr|geq)\s+""', stripped, re.IGNORECASE):
-        return True
-
-    # 2. START command with triple-quote escaping: start ... /c ""!var!" ...
-    if re.search(r'\bstart\b.*\s+/c\s+""[^"]+!"', stripped, re.IGNORECASE):
-        return True
-
-    # 3. START command with empty window title: start "" command
-    # This is the standard syntax for START when no title is needed
-    if re.search(r'\bstart\s+""\s+', stripped, re.IGNORECASE):
-        return True
-
-    # 4. Properly formatted triple-quote patterns: """text"""
-    if re.match(r'.*"""[^"]*""".*', stripped):
-        return True
-
-    return False
+    return any(legitimate_patterns)
 
 
 def _check_quote_escaping(stripped: str, line_num: int) -> List[LintIssue]:
@@ -2873,6 +2871,13 @@ def _check_set_a_expression(stripped: str, line_num: int) -> List[LintIssue]:
         return issues
 
     expression: str = seta_match.group(1)
+
+    # Extract only the arithmetic expression, stopping at command separators
+    # Command separators: & | && || (but not when escaped with ^)
+    # Stop at the first unescaped command separator
+    expr_match = re.match(r"^([^&|]*?)(?:\s*(?:[^\\^]|^)[&|]|$)", expression)
+    if expr_match:
+        expression = expr_match.group(1).strip()
 
     # Check for unbalanced parentheses in arithmetic expressions
     paren_count: int = expression.count("(") - expression.count(")")
@@ -4695,7 +4700,7 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
 # Advanced rule detection functions
 
 
-def _should_flag_caret_escape(stripped: str, caret_pos: int) -> bool:
+def _should_flag_caret_escape(stripped: str, caret_pos: int, line: str = "") -> bool:
     """Check if a caret escape sequence should be flagged as improper."""
     # Check if this is within a FOR loop command string (within single quotes)
     # In FOR loops, command strings like 'command 2^>nul ^| filter' use single caret correctly
@@ -4723,10 +4728,27 @@ def _should_flag_caret_escape(stripped: str, caret_pos: int) -> bool:
         # SET statements commonly use single carets to store command strings - don't flag these
         return False
 
+    # Check if this line is within a parenthesized command block (FOR DO block, IF block, etc.)
+    # Lines inside blocks are typically indented and need carets for proper redirection
+    # Pattern: line starts with whitespace/tabs (indented) and contains command with redirection
+    if line and re.match(r"^\s+", line):
+        # This is an indented line, likely inside a block
+        # Carets for redirection (2^>NUL, ^|, etc.) are necessary in blocks
+        # to prevent premature evaluation
+        return False
+
+    # Check if this line is a DO block on the same line as FOR
+    # Pattern: FOR ... DO ( command with carets )
+    if re.search(r"\bdo\s*\(", stripped, re.IGNORECASE):
+        # This is a FOR DO block, carets are necessary
+        return False
+
     return True
 
 
-def _check_improper_caret_escape(stripped: str, line_number: int) -> List[LintIssue]:
+def _check_improper_caret_escape(
+    stripped: str, line_number: int, line: str = ""
+) -> List[LintIssue]:
     """Check for E030: Improper caret escape sequence."""
     issues: List[LintIssue] = []
     # Look for single caret attempting to escape special chars
@@ -4734,7 +4756,7 @@ def _check_improper_caret_escape(stripped: str, line_number: int) -> List[LintIs
     caret_matches = re.finditer(r"\^[&|><](?!\^)", stripped)
     for match in caret_matches:
         caret_pos = match.start()
-        if _should_flag_caret_escape(stripped, caret_pos):
+        if _should_flag_caret_escape(stripped, caret_pos, line):
             issues.append(LintIssue(line_number, RULES["E030"], context=stripped))
     return issues
 
@@ -4793,7 +4815,7 @@ def _check_advanced_escaping_rules(line: str, line_number: int) -> List[LintIssu
     stripped = line.strip()
 
     # E030: Improper caret escape sequence
-    issues.extend(_check_improper_caret_escape(stripped, line_number))
+    issues.extend(_check_improper_caret_escape(stripped, line_number, line))
 
     # E031: Invalid multilevel escaping
     issues.extend(_check_multilevel_escaping(stripped, line_number))
