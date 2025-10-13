@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.66
+Version: 1.0.67
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.66"
+__version__ = "1.0.67"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -83,6 +83,7 @@ class LintIssue:
     line_number: int
     rule: Rule
     context: str = ""  # Additional context about the issue
+    file_path: Optional[str] = None  # Path to file containing the issue
 
     def __post_init__(self) -> None:
         """Validate issue after initialization."""
@@ -3094,13 +3095,7 @@ def _check_quote_escaping(stripped: str, line_num: int) -> List[LintIssue]:
     elif re.search(r'["\s]""[^"]', stripped):
         quote_context = "Complex quote escaping detected"
 
-    issues.append(
-        LintIssue(
-            line_number=line_num,
-            rule=RULES["E028"],
-            context=quote_context,
-        )
-    )
+    issues.append(LintIssue(line_number=line_num, rule=RULES["E028"], context=quote_context))
     return issues
 
 
@@ -5311,6 +5306,44 @@ def _check_advanced_style_patterns(
     return issues
 
 
+def _filter_issues_by_config(
+    issues: List[LintIssue],
+    config: BlinterConfig,
+    suppressions: Dict[int, Set[str]],
+) -> List[LintIssue]:
+    """
+    Filter issues based on configuration settings and inline suppressions.
+
+    Args:
+        issues: List of all issues found during linting
+        config: Configuration object with rule and severity settings
+        suppressions: Dictionary mapping line numbers to sets of suppressed rule codes
+
+    Returns:
+        Filtered list of issues that should be reported
+    """
+    filtered_issues = []
+    for issue in issues:
+        # Check if rule is enabled
+        if not config.is_rule_enabled(issue.rule.code):
+            continue
+
+        # Check if severity should be included
+        if not config.should_include_severity(issue.rule.severity):
+            continue
+
+        # Check if issue is suppressed by inline comment
+        if issue.line_number in suppressions:
+            suppressed_codes = suppressions[issue.line_number]
+            # Empty set means suppress all rules on this line
+            if not suppressed_codes or issue.rule.code in suppressed_codes:
+                continue
+
+        filtered_issues.append(issue)
+
+    return filtered_issues
+
+
 def lint_batch_file(  # pylint: disable=too-many-locals
     file_path: str,
     config: Optional[BlinterConfig] = None,
@@ -5438,28 +5471,16 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     if config.max_line_length != 150:
         RULES["S011"] = original_s011_rule
 
+    # Set file_path on all issues that don't have it
+    for issue in issues:
+        if issue.file_path is None:
+            issue.file_path = file_path
+
     # Parse inline suppression comments
     suppressions = _parse_suppression_comments(lines)
 
     # Filter issues based on configuration and inline suppressions
-    filtered_issues = []
-    for issue in issues:
-        # Check if rule is enabled
-        if not config.is_rule_enabled(issue.rule.code):
-            continue
-
-        # Check if severity should be included
-        if not config.should_include_severity(issue.rule.severity):
-            continue
-
-        # Check if issue is suppressed by inline comment
-        if issue.line_number in suppressions:
-            suppressed_codes = suppressions[issue.line_number]
-            # Empty set means suppress all rules on this line
-            if not suppressed_codes or issue.rule.code in suppressed_codes:
-                continue
-
-        filtered_issues.append(issue)
+    filtered_issues = _filter_issues_by_config(issues, config, suppressions)
 
     logger.info(
         "Lint analysis completed. Found %d issues (filtered to %d) across %d error(s), "
@@ -6241,11 +6262,7 @@ def _find_file_mixed_indent(indented_lines: List[Tuple[int, str]]) -> Optional[L
                 f"File mixes spaces (line {first_space_line}) and tabs "
                 f"(line {first_tab_line}) for indentation"
             )
-        return LintIssue(
-            line_number=later_line,
-            rule=RULES["S012"],
-            context=context,
-        )
+        return LintIssue(line_number=later_line, rule=RULES["S012"], context=context)
     return None
 
 
@@ -6498,6 +6515,44 @@ def print_summary(issues: List[LintIssue]) -> None:
             print(f"  {severity.value}: {count}")
 
 
+def _format_line_numbers_with_files(issues: List[LintIssue]) -> str:
+    """Format line numbers with file annotations for multi-file issues.
+
+    Args:
+        issues: List of LintIssue objects for the same rule
+
+    Returns:
+        Formatted string like "Line 296 [helper.bat], 303 [helper.bat], 4709 [main.bat]"
+        or "Line 296, 303, 4709" if all from same file or no file info
+    """
+
+    # Sort issues by line number
+    def sort_key(issue: LintIssue) -> Tuple[str, int]:
+        """Return sort key for LintIssue."""
+        return (issue.file_path or "", issue.line_number)
+
+    sorted_issues = sorted(issues, key=sort_key)
+
+    # Check if we have multiple files
+    files = {issue.file_path for issue in sorted_issues if issue.file_path}
+
+    # If single file or no file info, use simple format
+    if len(files) <= 1:
+        line_numbers = sorted([issue.line_number for issue in sorted_issues])
+        return f"Line {', '.join(map(str, line_numbers))}"
+
+    # Multiple files - use hybrid format with annotations
+    parts = []
+    for issue in sorted_issues:
+        if issue.file_path:
+            filename = Path(issue.file_path).name
+            parts.append(f"{issue.line_number} [{filename}]")
+        else:
+            parts.append(str(issue.line_number))
+
+    return f"Line {', '.join(parts)}"
+
+
 def print_detailed(issues: List[LintIssue]) -> None:
     """Print detailed issue information in the new format.
 
@@ -6540,9 +6595,11 @@ def print_detailed(issues: List[LintIssue]) -> None:
         for rule_code in sorted(rule_groups.keys()):
             rule_issues = rule_groups[rule_code]
             rule = rule_issues[0].rule
-            line_numbers = sorted([issue.line_number for issue in rule_issues])
 
-            print(f"\nLine {', '.join(map(str, line_numbers))}: {rule.name} ({rule_code})")
+            # Format line numbers with file annotations if multiple files are involved
+            line_display = _format_line_numbers_with_files(rule_issues)
+
+            print(f"\n{line_display}: {rule.name} ({rule_code})")
             print(f"- Explanation: {rule.explanation}")
             print(f"- Recommendation: {rule.recommendation}")
 
