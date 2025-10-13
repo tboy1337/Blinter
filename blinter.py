@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.58
+Version: 1.0.59
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.58"
+__version__ = "1.0.59"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2230,6 +2230,12 @@ def _check_call_labels(stripped: str, line_num: int) -> List[LintIssue]:
         return issues
 
     call_label_text: str = call_match.group(1)
+
+    # Skip if the call target contains environment variables (runtime expansion)
+    # Pattern matches %VAR%, %@VAR%, and similar variable syntax
+    if re.search(r"%[@\w]+%", call_label_text):
+        return issues
+
     # Check if this looks like a label call (not an external program)
     # Skip if it contains path separators, extensions, or is a known command
     builtin_commands = {

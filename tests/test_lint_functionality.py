@@ -827,6 +827,44 @@ CALL ECHO Test
         finally:
             os.unlink(temp_file)
 
+    def test_call_environment_variables(self) -> None:
+        """Test CALL with environment variables (should not trigger E014)."""
+        content = """@echo off
+REM Test case from GitHub issue - environment variable as executable
+CALL "%@EMERGENCY_JOB%"
+REM Other environment variable patterns
+CALL "%VARIABLE%"
+CALL "%PATH_VAR%"
+CALL %MY_SCRIPT%
+CALL "%MY_APP%\\script.bat"
+REM Mixed quotes and variables
+CALL "%PROGRAM_FILES%\\app.exe" arg1 arg2
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            assert "E014" not in rule_codes  # Should not trigger for environment variables
+        finally:
+            os.unlink(temp_file)
+
+    def test_call_label_still_triggers_e014(self) -> None:
+        """Test that actual label calls without colon still trigger E014."""
+        content = """@echo off
+CALL mylabel
+GOTO :EOF
+:mylabel
+ECHO In subroutine
+GOTO :EOF
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            assert "E014" in rule_codes  # Should still trigger for actual labels
+        finally:
+            os.unlink(temp_file)
+
     def test_goto_eof_without_colon(self) -> None:
         """Test E015: Missing colon in GOTO EOF statement."""
         content = """@echo off
