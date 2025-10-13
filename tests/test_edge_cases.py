@@ -1783,15 +1783,135 @@ FOR %%i IN (1 2 3) ECHO %%i
 
         from blinter import lint_batch_file
 
+        # Test case: attempting to invoke a label without CALL or GOTO
         content = """@echo off
-:myfunction param1 param2
-ECHO This should trigger E012
+REM Define a subroutine
+:ProcessFile
+ECHO Processing %1
+EXIT /B
+
+REM Incorrect invocation - missing CALL
+ProcessFile mydata.txt
+
+REM Correct invocations - should NOT trigger E012
+CALL :ProcessFile mydata2.txt
+GOTO :EOF
 """
         temp_file = self.create_temp_batch_file(content)
         try:
             issues = lint_batch_file(temp_file)
             e012_issues = [i for i in issues if i.rule.code == "E012"]
+            # Should trigger E012 only for "ProcessFile mydata.txt" line
             assert len(e012_issues) == 1
+            assert e012_issues[0].line_number == 8
+        finally:
+            os.unlink(temp_file)
+
+    def test_e012_label_definition_with_comment(self) -> None:
+        """Test E012 does NOT trigger for label definitions with inline comments."""
+        import os
+
+        from blinter import lint_batch_file
+
+        content = """@echo off
+:GetDate7 -- Deprecated because the DOFF utility is no longer available
+ECHO This is GetDate7
+EXIT /B
+
+:MyFunction - This is my function
+ECHO Processing
+EXIT /B
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e012_issues = [i for i in issues if i.rule.code == "E012"]
+            # Label definitions with comments should NOT trigger E012
+            assert len(e012_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_e012_builtin_commands(self) -> None:
+        """Test E012 does NOT trigger for builtin commands that match label names."""
+        import os
+
+        from blinter import lint_batch_file
+
+        content = """@echo off
+:echo
+ECHO This is a label named echo
+EXIT /B
+
+:set
+SET VAR=value
+EXIT /B
+
+REM These should NOT trigger E012 because echo and set are builtins
+echo Hello World
+set MY_VAR=test
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e012_issues = [i for i in issues if i.rule.code == "E012"]
+            # Builtin commands should NOT trigger E012 even if labels exist
+            assert len(e012_issues) == 0
+        finally:
+            os.unlink(temp_file)
+
+    def test_e012_case_insensitive(self) -> None:
+        """Test E012 detects case-insensitive label invocations."""
+        import os
+
+        from blinter import lint_batch_file
+
+        content = """@echo off
+:MyFunction
+ECHO In function
+EXIT /B
+
+REM All of these should trigger E012
+myfunction arg1
+MYFUNCTION arg2
+MyFunction arg3
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e012_issues = [i for i in issues if i.rule.code == "E012"]
+            # All three case variations should trigger E012
+            assert len(e012_issues) == 3
+        finally:
+            os.unlink(temp_file)
+
+    def test_e012_correct_invocations(self) -> None:
+        """Test E012 does NOT trigger for correct CALL and GOTO usage."""
+        import os
+
+        from blinter import lint_batch_file
+
+        content = """@echo off
+:MyFunction
+ECHO In function
+EXIT /B
+
+:AnotherFunction
+ECHO Another function
+EXIT /B
+
+REM Correct usages - should NOT trigger E012
+CALL :MyFunction
+call :MyFunction
+CALL :MyFunction arg1 arg2
+GOTO :AnotherFunction
+goto :MyFunction
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e012_issues = [i for i in issues if i.rule.code == "E012"]
+            # Correct CALL/GOTO usage should NOT trigger E012
+            assert len(e012_issues) == 0
         finally:
             os.unlink(temp_file)
 

@@ -992,7 +992,8 @@ class TestAdditionalCheckingFunctionProperties:
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
     def test_check_subroutine_call_returns_list(self, stripped: str, line_num: int) -> None:
         """_check_subroutine_call should return a list of LintIssue."""
-        result = _check_subroutine_call(stripped, line_num)
+        labels: Dict[str, int] = {}
+        result = _check_subroutine_call(stripped, line_num, labels)
         assert isinstance(result, list)
         for issue in result:
             assert isinstance(issue, LintIssue)

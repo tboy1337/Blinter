@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.65
+Version: 1.0.66
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.65"
+__version__ = "1.0.66"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2776,17 +2776,192 @@ def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
     return issues
 
 
-def _check_subroutine_call(stripped: str, line_num: int) -> List[LintIssue]:
-    """Check for missing CALL for subroutine invocation (E012)."""
+def _check_subroutine_call(stripped: str, line_num: int, labels: Dict[str, int]) -> List[LintIssue]:
+    """Check for missing CALL for subroutine invocation (E012).
+
+    Detects when a user tries to invoke a defined label/subroutine without using
+    CALL or GOTO, which won't work in batch files.
+
+    Example:
+        :MyFunction         <- Label definition
+        MyFunction arg1     <- ERROR: Should be CALL :MyFunction arg1
+    """
     issues: List[LintIssue] = []
-    if re.match(r":[A-Z0-9_]+\s+\S+", stripped, re.IGNORECASE):
+
+    # Skip empty lines, comments, and label definitions
+    if not stripped or stripped.startswith(("rem ", "rem\t", "::", ":")):
+        return issues
+
+    # Skip lines that already use CALL or GOTO
+    if re.match(r"^(call|goto)\s+", stripped, re.IGNORECASE):
+        return issues
+
+    # Extract the first word (command/potential label invocation)
+    first_word_match = re.match(r"^([a-z0-9_-]+)\b", stripped, re.IGNORECASE)
+    if not first_word_match:
+        return issues
+
+    first_word: str = first_word_match.group(1).lower()
+
+    # Builtin batch commands and common external programs
+    builtin_commands = {
+        # Core batch commands
+        "echo",
+        "set",
+        "if",
+        "for",
+        "goto",
+        "call",
+        "exit",
+        "pause",
+        "setlocal",
+        "endlocal",
+        "shift",
+        "pushd",
+        "popd",
+        # File operations
+        "dir",
+        "copy",
+        "move",
+        "del",
+        "erase",
+        "ren",
+        "rename",
+        "type",
+        "xcopy",
+        "robocopy",
+        "mkdir",
+        "md",
+        "rmdir",
+        "rd",
+        "cd",
+        "chdir",
+        "attrib",
+        # System commands
+        "cls",
+        "ver",
+        "vol",
+        "date",
+        "time",
+        "title",
+        "color",
+        "prompt",
+        "path",
+        "help",
+        "start",
+        "cmd",
+        "tasklist",
+        "taskkill",
+        # Network commands
+        "ping",
+        "ipconfig",
+        "netstat",
+        "net",
+        "nslookup",
+        "tracert",
+        # Other common commands
+        "find",
+        "findstr",
+        "sort",
+        "more",
+        "choice",
+        "timeout",
+        "sc",
+        "reg",
+        "wmic",
+        "powershell",
+        "cscript",
+        "wscript",
+        "msiexec",
+        # Common external programs
+        "npm",
+        "node",
+        "npx",
+        "yarn",
+        "pnpm",
+        "git",
+        "gh",
+        "svn",
+        "hg",
+        "python",
+        "python3",
+        "py",
+        "pip",
+        "pip3",
+        "pipenv",
+        "poetry",
+        "ruby",
+        "gem",
+        "bundle",
+        "php",
+        "composer",
+        "java",
+        "javac",
+        "maven",
+        "mvn",
+        "gradle",
+        "dotnet",
+        "nuget",
+        "msbuild",
+        "cargo",
+        "rustc",
+        "rustup",
+        "go",
+        "gofmt",
+        "docker",
+        "docker-compose",
+        "kubectl",
+        "helm",
+        "aws",
+        "az",
+        "gcloud",
+        "terraform",
+        "make",
+        "cmake",
+        "ninja",
+        "wget",
+        "curl",
+        "aria2c",
+        "7z",
+        "zip",
+        "unzip",
+        "tar",
+        "gzip",
+        "choco",
+        "scoop",
+        "winget",
+        "code",
+        "vim",
+        "nano",
+        "notepad",
+        "ssh",
+        "scp",
+        "ftp",
+        "telnet",
+    }
+
+    # Skip if it's a known builtin command or external program
+    if first_word in builtin_commands:
+        return issues
+
+    # Skip if it looks like a file path or has an extension
+    if re.search(r"[\\/.:]|\.(?:bat|cmd|exe|com|ps1)$", first_word):
+        return issues
+
+    # Check if this word matches any defined label (case-insensitive)
+    # Labels are stored with colon prefix in lowercase (e.g., ":mylabel")
+    potential_label = ":" + first_word
+
+    # Check if this matches a defined label
+    if potential_label in labels:
         issues.append(
             LintIssue(
                 line_number=line_num,
                 rule=RULES["E012"],
-                context="Potential subroutine call without CALL keyword",
+                context=f"Attempting to call label '{first_word}' without CALL or GOTO",
             )
         )
+
     return issues
 
 
@@ -2984,7 +3159,7 @@ def _check_syntax_errors(line: str, line_num: int, labels: Dict[str, int]) -> Li
     issues.extend(_check_quotes(line, line_num))
     issues.extend(_check_for_loop_syntax(stripped, line_num))
     issues.extend(_check_variable_expansion(stripped, line_num))
-    issues.extend(_check_subroutine_call(stripped, line_num))
+    issues.extend(_check_subroutine_call(stripped, line_num, labels))
     issues.extend(_check_command_typos(stripped, line_num))
     issues.extend(_check_parameter_modifiers(stripped, line_num))
     issues.extend(_check_unc_path(stripped, line_num))
