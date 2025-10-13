@@ -5,12 +5,13 @@ import io
 import queue
 import sys
 import threading
-from typing import Callable, List, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 from blinter import (
     RULES,
     LintIssue,
     RuleSeverity,
+    _display_analyzed_scripts,
     group_issues,
     print_detailed,
     print_help,
@@ -382,3 +383,85 @@ class TestOutputFormatting:
             "Most common issue: 'Inconsistent command capitalization' "
             "(S003) - 3 occurrences" in output
         )
+
+
+class TestDisplayAnalyzedScripts:
+    """Test cases for the _display_analyzed_scripts function."""
+
+    def capture_stdout(
+        self, func: Callable[[List[Tuple[str, Optional[str]]], str, bool], None], *args: object
+    ) -> str:
+        """Helper method to capture stdout output."""
+        old_stdout = sys.stdout
+        sys.stdout = captured_output = io.StringIO()
+        try:
+            func(*args)
+            return captured_output.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+    def test_display_single_script(self) -> None:
+        """Test displaying a single analyzed script."""
+        processed_files = [("D:\\test\\script.bat", None)]
+        target_path = "D:\\test"
+
+        output = self.capture_stdout(_display_analyzed_scripts, processed_files, target_path, False)
+
+        assert "Scripts Analyzed:" in output
+        assert "1. script.bat" in output
+
+    def test_display_multiple_scripts(self) -> None:
+        """Test displaying multiple analyzed scripts."""
+        processed_files = [
+            ("D:\\test\\main.bat", None),
+            ("D:\\test\\utils.bat", None),
+            ("D:\\test\\config.cmd", None),
+        ]
+        target_path = "D:\\test"
+
+        output = self.capture_stdout(_display_analyzed_scripts, processed_files, target_path, True)
+
+        assert "Scripts Analyzed:" in output
+        assert "1. main.bat" in output
+        assert "2. utils.bat" in output
+        assert "3. config.cmd" in output
+
+    def test_display_called_scripts_with_parent(self) -> None:
+        """Test displaying called scripts with parent information."""
+        processed_files = [
+            ("D:\\test\\main.bat", None),
+            ("D:\\test\\config.bat", "D:\\test\\main.bat"),
+            ("D:\\test\\other.bat", None),
+        ]
+        target_path = "D:\\test"
+
+        output = self.capture_stdout(_display_analyzed_scripts, processed_files, target_path, True)
+
+        assert "Scripts Analyzed:" in output
+        assert "1. main.bat" in output
+        assert "2.   ↳ config.bat (called by main.bat)" in output
+        assert "3. other.bat" in output
+
+    def test_display_empty_list(self) -> None:
+        """Test displaying with no processed files."""
+        processed_files: list[tuple[str, Union[str, None]]] = []
+        target_path = "D:\\test"
+
+        output = self.capture_stdout(_display_analyzed_scripts, processed_files, target_path, False)
+
+        # Should output nothing for empty list
+        assert output == ""
+
+    def test_display_scripts_relative_path_directory(self) -> None:
+        """Test displaying scripts with relative paths in directory mode."""
+        processed_files = [
+            ("D:\\test\\subdir\\script.bat", None),
+            ("D:\\test\\main.bat", None),
+        ]
+        target_path = "D:\\test"
+
+        output = self.capture_stdout(_display_analyzed_scripts, processed_files, target_path, True)
+
+        assert "Scripts Analyzed:" in output
+        assert "subdir" in output or "subdir\\script.bat" in output
+        # Should show relative paths in directory mode

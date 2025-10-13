@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.60
+Version: 1.0.61
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.60"
+__version__ = "1.0.61"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -6485,6 +6485,17 @@ class ProcessingResults:
     file_results: Dict[str, List[LintIssue]]
     total_files_processed: int
     files_with_errors: int
+    processed_file_paths: List[Tuple[str, Optional[str]]]  # (file_path, called_by_parent)
+
+
+@dataclass
+class ProcessingState:
+    """State container for batch file processing."""
+
+    processed_files: Set[Path]
+    all_issues: List[LintIssue]
+    file_results: Dict[str, List[LintIssue]]
+    processed_file_paths: List[Tuple[str, Optional[str]]]
 
 
 def _extract_called_scripts(batch_file: Path) -> List[Path]:
@@ -6560,16 +6571,17 @@ def _process_single_called_script(
     processed_files: Set[Path],
     all_issues: List[LintIssue],
     file_results: Dict[str, List[LintIssue]],
-) -> tuple[int, int]:
+) -> Tuple[int, int, Optional[str]]:
     """
     Process a single called script.
 
     Returns:
-        Tuple of (files_processed, files_with_errors)
+        Tuple of (files_processed, files_with_errors, processed_path)
+        processed_path is None if the file was not processed
     """
     # Skip if already processed
     if called_script.resolve() in processed_files:
-        return (0, 0)
+        return (0, 0, None)
 
     try:
         called_issues = lint_batch_file(str(called_script), config=config)
@@ -6578,7 +6590,7 @@ def _process_single_called_script(
         processed_files.add(called_script.resolve())
 
         has_errors = any(issue.rule.severity == RuleSeverity.ERROR for issue in called_issues)
-        return (1, 1 if has_errors else 0)
+        return (1, 1 if has_errors else 0, str(called_script))
 
     except (
         UnicodeDecodeError,
@@ -6592,43 +6604,72 @@ def _process_single_called_script(
             f"Warning: Could not process called script " f"'{called_script}': {called_error}"
         )
         print(error_msg)
-        return (0, 0)
+        return (0, 0, None)
+
+
+def _process_called_scripts(
+    batch_file: Path,
+    config: BlinterConfig,
+    state: ProcessingState,
+) -> Tuple[int, int]:
+    """
+    Process all called scripts for a batch file.
+
+    Args:
+        batch_file: The batch file to extract called scripts from
+        config: Configuration settings
+        state: Processing state container
+
+    Returns:
+        Tuple of (files_processed, files_with_errors)
+    """
+    files_processed = 0
+    files_with_errors = 0
+    called_scripts = _extract_called_scripts(batch_file)
+
+    for called_script in called_scripts:
+        result = _process_single_called_script(
+            called_script, config, state.processed_files, state.all_issues, state.file_results
+        )
+        files_processed += result[0]
+        files_with_errors += result[1]
+        if result[2]:  # called_path
+            state.processed_file_paths.append((result[2], str(batch_file)))
+
+    return files_processed, files_with_errors
 
 
 def _process_batch_files(
     batch_files: List[Path], config: BlinterConfig
 ) -> Optional[ProcessingResults]:
     """Process all batch files and collect results."""
-    all_issues: List[LintIssue] = []
-    file_results: Dict[str, List[LintIssue]] = {}
+    state = ProcessingState(
+        processed_files=set(), all_issues=[], file_results={}, processed_file_paths=[]
+    )
     total_files_processed = 0
     files_with_errors = 0
-    processed_files: Set[Path] = set()  # Track processed files to avoid duplicates
 
     for batch_file in batch_files:
         # Skip if already processed (could happen with follow_calls)
-        if batch_file.resolve() in processed_files:
+        if batch_file.resolve() in state.processed_files:
             continue
 
         try:
             issues = lint_batch_file(str(batch_file), config=config)
-            file_results[str(batch_file)] = issues
-            all_issues.extend(issues)
+            state.file_results[str(batch_file)] = issues
+            state.all_issues.extend(issues)
             total_files_processed += 1
-            processed_files.add(batch_file.resolve())
+            state.processed_files.add(batch_file.resolve())
+            state.processed_file_paths.append((str(batch_file), None))  # Main file, no parent
 
             if any(issue.rule.severity == RuleSeverity.ERROR for issue in issues):
                 files_with_errors += 1
 
             # If follow_calls is enabled, process called scripts
             if config.follow_calls:
-                called_scripts = _extract_called_scripts(batch_file)
-                for called_script in called_scripts:
-                    processed, errors = _process_single_called_script(
-                        called_script, config, processed_files, all_issues, file_results
-                    )
-                    total_files_processed += processed
-                    files_with_errors += errors
+                called_results = _process_called_scripts(batch_file, config, state)
+                total_files_processed += called_results[0]
+                files_with_errors += called_results[1]
 
         except UnicodeDecodeError as decode_error:
             print(f"Warning: Could not read '{batch_file}' due to encoding issues: {decode_error}")
@@ -6641,7 +6682,52 @@ def _process_batch_files(
         print("Error: No batch files could be processed.")
         return None
 
-    return ProcessingResults(all_issues, file_results, total_files_processed, files_with_errors)
+    return ProcessingResults(
+        state.all_issues,
+        state.file_results,
+        total_files_processed,
+        files_with_errors,
+        state.processed_file_paths,
+    )
+
+
+def _display_analyzed_scripts(
+    processed_file_paths: List[Tuple[str, Optional[str]]],
+    target_path: str,
+    is_directory: bool,
+) -> None:
+    """
+    Display the list of analyzed scripts.
+
+    Args:
+        processed_file_paths: List of (file_path, called_by_parent) tuples
+        target_path: The original target path provided by user
+        is_directory: Whether the target was a directory
+    """
+    if not processed_file_paths:
+        return
+
+    print("Scripts Analyzed:")
+    for idx, (file_path, parent) in enumerate(processed_file_paths, 1):
+        # Format the file path
+        display_path: str
+        if is_directory:
+            try:
+                display_path = str(Path(file_path).relative_to(Path(target_path)))
+            except ValueError:
+                # If relative_to fails (file outside target), use absolute path
+                display_path = str(Path(file_path))
+        else:
+            display_path = Path(file_path).name
+
+        # Display with parent information if it's a called script
+        if parent:
+            parent_name = Path(parent).name
+            print(f"  {idx}.   ↳ {display_path} (called by {parent_name})")
+        else:
+            print(f"  {idx}. {display_path}")
+
+    print()
 
 
 def _display_results(
@@ -6658,6 +6744,9 @@ def _display_results(
         file_count_text = "s" if results.total_files_processed != 1 else ""
         print(f"Processed {results.total_files_processed} batch file{file_count_text}")
         print()
+
+        # Show list of analyzed scripts
+        _display_analyzed_scripts(results.processed_file_paths, target_path, is_directory)
 
         # Show results for each file if there are multiple files
         if len(results.file_results) > 1:
@@ -6678,6 +6767,10 @@ def _display_results(
         # Single file processing
         print(f"\n Batch File Analysis: {target_path}")
         print("=" * (25 + len(target_path)))
+
+        # Show list of analyzed scripts
+        _display_analyzed_scripts(results.processed_file_paths, target_path, is_directory)
+
         print_detailed(results.all_issues)
 
     # Show combined summary if processing multiple files
