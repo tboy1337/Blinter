@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.59
+Version: 1.0.60
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.59"
+__version__ = "1.0.60"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -7161,6 +7161,10 @@ def _check_function_docs(line: str, line_number: int, lines: List[str]) -> List[
 
 def _check_magic_numbers(line: str, line_number: int) -> List[LintIssue]:
     """Check for magic numbers (S019)."""
+    # Skip comment lines - magic numbers in comments are documentation, not code
+    if _is_comment_line(line):
+        return []
+
     issues: List[LintIssue] = []
     number_pattern = r"\b(?<!%)\d{2,}\b(?!%)"
 

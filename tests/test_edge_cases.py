@@ -1839,6 +1839,53 @@ class TestSpecializedEdgeCases:
             issues = _check_magic_numbers(line, line_num)
             assert isinstance(issues, list)
 
+    def test_magic_numbers_not_flagged_in_comments(self) -> None:
+        """Test that magic numbers in comments are not flagged (S019 bug fix)."""
+        # Test REM comments with various numeric patterns
+        rem_comment_lines = [
+            "rem Created On: 22 Jun 2003",
+            "REM         By: Andrew S. Baker",
+            "rem OS Required: Windows 2008 or later (previously Windows 2003+)",
+            "rem Updated to v4.0 in 2018",
+            "REM Using code page 1252 or 65001",
+        ]
+
+        # Test :: and ::: comments with numeric patterns
+        colon_comment_lines = [
+            ":: Notes Prior to January 2014 Have Been Purged",
+            "::: (Nov 2014) v7.1 -- Reverted to old method",
+            "::: (Mar 2012) v6.0 -- Added support for 64-bit systems",
+            "::  https://www.dostips.com/forum/viewtopic.php?t=774",
+            "::: Change from Code Page 1252 to Code Page 65001 (Unicode)",
+        ]
+
+        # Test that no magic numbers are flagged in comments
+        for line in rem_comment_lines + colon_comment_lines:
+            issues = _check_magic_numbers(line, 1)
+            assert len(issues) == 0, f"Magic numbers should not be flagged in comment: {line}"
+
+        # Test that magic numbers ARE still flagged in actual code
+        # Using numbers that won't trigger path/GUID heuristics (avoid /, \, -, etc.)
+        code_lines_should_flag = [
+            "set YEAR=2003",  # Year - should flag 2003
+            "set LIMIT=5000",  # Custom limit - should flag 5000
+            "set MAX_RETRIES=999",  # Large retry count - should flag 999
+        ]
+
+        code_lines_should_not_flag = [
+            "set count=1",  # Single digit
+            "set max=100",  # Common exception
+            "set timeout=60",  # Common exception (60 seconds)
+        ]
+
+        for code_line in code_lines_should_flag:
+            issues = _check_magic_numbers(code_line, 1)
+            assert len(issues) > 0, f"Magic number should be flagged in code: {code_line}"
+
+        for code_line in code_lines_should_not_flag:
+            issues = _check_magic_numbers(code_line, 1)
+            assert len(issues) == 0, f"This number should not be flagged: {code_line}"
+
     def test_line_length_function(self) -> None:
         """Test _check_line_length function."""
         # Test with very long line
