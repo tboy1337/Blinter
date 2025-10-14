@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.70
+Version: 1.0.71
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.70"
+__version__ = "1.0.71"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -199,6 +199,126 @@ BUILTIN_VARS: Set[str] = {
     "ONEDRIVE",  # OneDrive directory if configured
     "ONEDRIVECONSUMER",  # Consumer OneDrive
     "ONEDRIVECOMMERCIAL",  # Business OneDrive
+}
+
+# Common exceptions for magic numbers (S019): standard values, conversion factors, and constants
+MAGIC_NUMBER_EXCEPTIONS: Set[str] = {
+    # Basic numbers
+    "0",
+    "1",
+    "10",
+    "100",
+    "256",
+    "60",
+    "24",
+    "365",
+    # Conversion factors
+    "1024",  # Bytes to KB
+    "1000",  # Bytes to MB (decimal), Hz to kHz
+    "1000000",  # Bytes to MB, Hz to MHz
+    "1073741824",  # GB in bytes (1024^3)
+    # Common system values
+    "65536",  # 64KB, 16-bit limit
+    "32768",  # 32KB, signed 16-bit limit
+    "255",  # Byte limit, RGB values
+    "127",  # Signed byte limit
+    "255.255.255.255",  # IP address limit (partial match will work)
+    # Time constants
+    "3600",  # Seconds in hour
+    "86400",  # Seconds in day
+    "604800",  # Seconds in week
+    # File size constants
+    "512",  # Common block size
+    "4096",  # Common page size
+    # HTTP/networking
+    "80",
+    "443",
+    "8080",
+    "3389",  # Common ports
+    # Windows-specific
+    "260",  # MAX_PATH in Windows
+    "32767",  # MAX_SHORT
+    # ANSI color codes (foreground)
+    *[str(i) for i in range(30, 38)],
+    # ANSI color codes (background)
+    *[str(i) for i in range(40, 48)],
+    # ANSI bright color codes (foreground)
+    *[str(i) for i in range(90, 98)],
+    # ANSI bright color codes (background)
+    *[str(i) for i in range(100, 108)],
+    # Common exit codes and small numbers
+    *[str(i) for i in range(11, 26)],
+    # Single and double digit numbers commonly used in scripts
+    "01",
+    "02",
+    "03",
+    "04",
+    "05",
+    "06",
+    "07",
+    "08",
+    "09",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "38",
+    "39",  # Additional ANSI codes
+    "48",
+    "49",  # Additional ANSI codes
+    "50",
+    "51",
+    "52",
+    "53",
+    "54",
+    "55",
+    "56",
+    "57",
+    "58",
+    "59",
+    "61",
+    "62",
+    "63",
+    "64",
+    "65",
+    "66",
+    "67",
+    "68",
+    "69",
+    "70",
+    "71",
+    "72",
+    "73",
+    "74",
+    "75",
+    "76",
+    "77",
+    "78",
+    "79",
+    "81",
+    "82",
+    "83",
+    "84",
+    "85",
+    "86",
+    "87",
+    "88",
+    "89",
+    "99",
 }
 
 # Comprehensive rule definitions
@@ -7842,6 +7962,92 @@ def _check_function_docs(line: str, line_number: int, lines: List[str]) -> List[
     return issues
 
 
+def _find_set_exclusion_ranges(line: str) -> List[Tuple[int, int]]:
+    """
+    Find exclusion ranges for SET statements in a line.
+
+    Args:
+        line: The line to analyze
+
+    Returns:
+        List of (start, end) tuples representing character ranges to exclude from checks
+    """
+    # Pattern matches: SET VAR=value, SET /A VAR=value, including in IF statements
+    # We want to skip checking the value part after the = sign
+    set_pattern = r"\bSET\s+(?:/A\s+)?([A-Z_@#$][A-Z0-9_@#$]*)\s*="
+
+    # Find all SET statement positions to create exclusion zones
+    exclusion_ranges: List[Tuple[int, int]] = []
+    for set_match in re.finditer(set_pattern, line, re.IGNORECASE):
+        # Find the equals sign position
+        equals_pos = set_match.end() - 1
+
+        # The exclusion zone starts right after the equals sign and goes to:
+        # 1. End of line
+        # 2. Next SET statement
+        # 3. Closing parenthesis (for IF statements)
+        # 4. Start of next command (via & or |)
+
+        search_start = equals_pos + 1
+        end_pos = len(line)
+
+        # Look for terminators after the equals sign
+        remainder = line[search_start:]
+
+        # Find the earliest terminator
+        # Check for command separators (but not in quoted strings)
+        # Simple heuristic: look for & or | that aren't inside quotes
+        for i, char in enumerate(remainder):
+            if char in ("&", "|", ")"):
+                # Check if we're inside quotes (simple check)
+                before = remainder[:i]
+                if before.count('"') % 2 == 0:  # Even number of quotes = not in string
+                    end_pos = search_start + i
+                    break
+
+        exclusion_ranges.append((search_start, end_pos))
+
+    return exclusion_ranges
+
+
+def _is_number_in_special_context(
+    immediate_before: str, immediate_after: str, context_before: str, context_after: str
+) -> bool:
+    """
+    Check if a number is in a special context (GUID, path, math expr) and should be skipped.
+
+    Args:
+        immediate_before: Last 2 chars before number (stripped)
+        immediate_after: First 2 chars after number (stripped)
+        context_before: Full text before number
+        context_after: Full text after number
+
+    Returns:
+        True if number should be skipped, False otherwise
+    """
+    # Check for GUID or identifier pattern: dash/brace immediately adjacent
+    has_guid_before = immediate_before and immediate_before[-1] in ["-", "{"]
+    has_guid_after = immediate_after and immediate_after[0] in ["-", "}"]
+
+    # Check for file path: backslash or forward slash immediately adjacent
+    has_path_before = immediate_before and immediate_before[-1] in ["\\", "/"]
+    has_path_after = immediate_after and immediate_after[0] in ["\\", "/"]
+
+    # Check if it's in a PowerShell math expression context
+    context_lower = context_before.lower()
+    in_math_round = "round(" in context_lower and ")" in context_after
+    in_math_class = "[math]::" in context_lower
+
+    return (
+        has_guid_before
+        or has_guid_after
+        or has_path_before
+        or has_path_after
+        or in_math_round
+        or in_math_class
+    )
+
+
 def _check_magic_numbers(line: str, line_number: int) -> List[LintIssue]:
     """Check for magic numbers (S019)."""
     # Skip comment lines - magic numbers in comments are documentation, not code
@@ -7851,145 +8057,31 @@ def _check_magic_numbers(line: str, line_number: int) -> List[LintIssue]:
     issues: List[LintIssue] = []
     number_pattern = r"\b(?<!%)\d{2,}\b(?!%)"
 
-    # Common exceptions: standard values, conversion factors, and system constants
-    common_exceptions = {
-        # Basic numbers
-        "0",
-        "1",
-        "10",
-        "100",
-        "256",
-        "60",
-        "24",
-        "365",
-        # Conversion factors
-        "1024",  # Bytes to KB
-        "1000",  # Bytes to MB (decimal), Hz to kHz
-        "1000000",  # Bytes to MB, Hz to MHz
-        "1073741824",  # GB in bytes (1024^3)
-        # Common system values
-        "65536",  # 64KB, 16-bit limit
-        "32768",  # 32KB, signed 16-bit limit
-        "255",  # Byte limit, RGB values
-        "127",  # Signed byte limit
-        "255.255.255.255",  # IP address limit (partial match will work)
-        # Time constants
-        "3600",  # Seconds in hour
-        "86400",  # Seconds in day
-        "604800",  # Seconds in week
-        # File size constants
-        "512",  # Common block size
-        "4096",  # Common page size
-        # HTTP/networking
-        "80",
-        "443",
-        "8080",
-        "3389",  # Common ports
-        # Windows-specific
-        "260",  # MAX_PATH in Windows
-        "32767",  # MAX_SHORT
-        # ANSI color codes (foreground)
-        *[str(i) for i in range(30, 38)],
-        # ANSI color codes (background)
-        *[str(i) for i in range(40, 48)],
-        # ANSI bright color codes (foreground)
-        *[str(i) for i in range(90, 98)],
-        # ANSI bright color codes (background)
-        *[str(i) for i in range(100, 108)],
-        # Common exit codes and small numbers
-        *[str(i) for i in range(11, 26)],
-        # Single and double digit numbers commonly used in scripts
-        "01",
-        "02",
-        "03",
-        "04",
-        "05",
-        "06",
-        "07",
-        "08",
-        "09",
-        "11",
-        "12",
-        "13",
-        "14",
-        "15",
-        "16",
-        "17",
-        "18",
-        "19",
-        "20",
-        "21",
-        "22",
-        "23",
-        "25",
-        "26",
-        "27",
-        "28",
-        "29",
-        "38",
-        "39",  # Additional ANSI codes
-        "48",
-        "49",  # Additional ANSI codes
-        "50",
-        "51",
-        "52",
-        "53",
-        "54",
-        "55",
-        "56",
-        "57",
-        "58",
-        "59",
-        "61",
-        "62",
-        "63",
-        "64",
-        "65",
-        "66",
-        "67",
-        "68",
-        "69",
-        "70",
-        "71",
-        "72",
-        "73",
-        "74",
-        "75",
-        "76",
-        "77",
-        "78",
-        "79",
-        "81",
-        "82",
-        "83",
-        "84",
-        "85",
-        "86",
-        "87",
-        "88",
-        "89",
-        "99",
-    }
+    # Find SET statement exclusion zones
+    exclusion_ranges = _find_set_exclusion_ranges(line)
 
-    for match in re.finditer(number_pattern, line.strip()):
+    for match in re.finditer(number_pattern, line):
         number = match.group(0)
+        match_start = match.start()
 
-        # Don't flag numbers that are clearly part of identifiers, GUIDs, or registry paths
+        # Skip if this number is within a SET statement's value assignment
+        if any(start <= match_start < end for start, end in exclusion_ranges):
+            continue
+
+        # Get context around the number
         context_before = line[: match.start()]
         context_after = line[match.end() :]
+        immediate_before = context_before[-2:].strip()
+        immediate_after = context_after[:2].strip()
 
-        # Skip if it looks like part of a GUID, file path, or identifier
-        if (
-            any(c in context_before[-10:] for c in ["-", "\\", "/", "{"])
-            or any(c in context_after[:10] for c in ["-", "\\", "/", "}"])
-            or
-            # Skip if it's in a PowerShell math expression context
-            ("round(" in context_before.lower() and ")" in context_after)
-            or ("[math]::" in context_before.lower())
+        # Skip if in special context (GUID, path, math expression)
+        if _is_number_in_special_context(
+            immediate_before, immediate_after, context_before, context_after
         ):
             continue
 
-        if number not in common_exceptions:
+        # Check if number is a common exception
+        if number not in MAGIC_NUMBER_EXCEPTIONS:
             issues.append(
                 LintIssue(
                     line_number=line_number,

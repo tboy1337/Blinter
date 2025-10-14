@@ -2150,3 +2150,94 @@ EXIT /b 0
             assert len(s017_issues) > 0
         finally:
             os.unlink(temp_file)
+
+    def test_s019_magic_numbers_in_set_not_flagged(self) -> None:
+        """Test S019: Numbers in SET statements should not be flagged as magic numbers."""
+        content = """@ECHO OFF
+SET @NMAP_TIME=00:30:00
+SET @SHORT_TIME=00:10:00
+SET @COREINFO_TIME=00:30:00
+SET @MAX_RUN_TIME=01:00:00
+SET @PRIME_LIMIT=1000000000
+SET @JOBTIME=06:01:00
+SET @MAX_SPAWN_TIME=00:02:00
+SET @CODEPAGE_OEM=437
+SET @CODEPAGE_BWCC=65001
+SET /A RESULT=12345
+EXIT /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should NOT detect any S019 issues - these are constant definitions
+            s019_issues = [i for i in issues if i.rule.code == "S019"]
+            assert len(s019_issues) == 0, f"Found unexpected S019 issues: {s019_issues}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_s019_magic_numbers_in_other_contexts_flagged(self) -> None:
+        """Test S019: Numbers in contexts other than SET statements should be flagged."""
+        content = """@ECHO OFF
+TIMEOUT /T 3600
+PING -n 1234 localhost
+IF %ERRORLEVEL% EQU 5678 GOTO error
+CALL :function 9999
+EXIT /b 0
+:function
+EXIT /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should detect magic numbers in command arguments
+            s019_issues = [i for i in issues if i.rule.code == "S019"]
+            # Should flag 1234, 5678, 9999 (3600 is in common_exceptions as seconds in an hour)
+            assert len(s019_issues) >= 3, f"Expected at least 3 S019 issues, got {len(s019_issues)}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_s019_magic_numbers_mixed_contexts(self) -> None:
+        """Test S019: Mixed contexts - SET statements and other uses."""
+        content = """@ECHO OFF
+SET @TIMEOUT=3600
+TIMEOUT /T 7200
+SET @RETRIES=1234
+PING -n 5678 localhost
+EXIT /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should detect magic numbers only in TIMEOUT and PING commands
+            s019_issues = [i for i in issues if i.rule.code == "S019"]
+            # Should flag 7200 and 5678, but NOT 3600 or 1234 (they're in SET)
+            assert (
+                len(s019_issues) == 2
+            ), f"Expected 2 S019 issues, got {len(s019_issues)}: {s019_issues}"
+            # Verify the flagged line numbers
+            flagged_lines = {issue.line_number for issue in s019_issues}
+            assert 3 in flagged_lines  # TIMEOUT line
+            assert 5 in flagged_lines  # PING line
+        finally:
+            os.unlink(temp_file)
+
+    def test_s019_set_statements_in_if_blocks(self) -> None:
+        """Test S019: SET statements inside IF blocks should not flag numbers."""
+        content = """@ECHO OFF
+IF "%1"=="test" (
+    SET @TIMEOUT=3600
+    SET @RETRIES=1234
+) ELSE (
+    SET @TIMEOUT=7200
+)
+IF "%2"=="quick" (SET @DELAY=30) ELSE (SET @DELAY=300)
+EXIT /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # Should NOT detect any S019 issues - all numbers are in SET statements
+            s019_issues = [i for i in issues if i.rule.code == "S019"]
+            assert len(s019_issues) == 0, f"Found unexpected S019 issues: {s019_issues}"
+        finally:
+            os.unlink(temp_file)

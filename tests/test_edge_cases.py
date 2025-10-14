@@ -2093,18 +2093,21 @@ class TestSpecializedEdgeCases:
             issues = _check_magic_numbers(line, 1)
             assert len(issues) == 0, f"Magic numbers should not be flagged in comment: {line}"
 
-        # Test that magic numbers ARE still flagged in actual code
+        # Test that magic numbers ARE still flagged in actual code (not in SET statements)
         # Using numbers that won't trigger path/GUID heuristics (avoid /, \, -, etc.)
         code_lines_should_flag = [
-            "set YEAR=2003",  # Year - should flag 2003
-            "set LIMIT=5000",  # Custom limit - should flag 5000
-            "set MAX_RETRIES=999",  # Large retry count - should flag 999
+            "TIMEOUT /T 2003",  # Custom timeout - should flag 2003
+            "PING -n 5000 localhost",  # Custom ping count - should flag 5000
+            "IF %ERRORLEVEL% EQU 999 GOTO error",  # Custom error level - should flag 999
         ]
 
         code_lines_should_not_flag = [
             "set count=1",  # Single digit
             "set max=100",  # Common exception
             "set timeout=60",  # Common exception (60 seconds)
+            "set YEAR=2003",  # SET statement - defining a constant (correct pattern)
+            "set LIMIT=5000",  # SET statement - defining a constant (correct pattern)
+            "set MAX_RETRIES=999",  # SET statement - defining a constant (correct pattern)
         ]
 
         for code_line in code_lines_should_flag:
