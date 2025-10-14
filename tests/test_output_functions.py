@@ -271,10 +271,10 @@ class TestOutputFormatting:
         output = self.capture_stdout(print_detailed, issues)
 
         # Should have hierarchical format with file grouping
-        assert "**Nested FOR loops without call optimization (W039)**" in output
-        assert "**[DriveInfo.BAT] Line 197, 245**" in output
-        assert "**[SetDrive.BAT] Line 529, 564**" in output
-        assert "**[StorageInfo.BAT] Line 440, 643**" in output
+        assert "Nested FOR loops without call optimization (W039)" in output
+        assert "[DriveInfo.BAT] Line 197, 245" in output
+        assert "[SetDrive.BAT] Line 529, 564" in output
+        assert "[StorageInfo.BAT] Line 440, 643" in output
         # Should not have the old format
         assert "Line 197 [DriveInfo.BAT]" not in output
 

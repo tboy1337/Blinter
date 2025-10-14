@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.68
+Version: 1.0.69
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.68"
+__version__ = "1.0.69"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -5347,6 +5347,7 @@ def _filter_issues_by_config(
 def lint_batch_file(  # pylint: disable=too-many-locals
     file_path: str,
     config: Optional[BlinterConfig] = None,
+    dependency_graph: Optional[Dict[Path, Set[Path]]] = None,
 ) -> List[LintIssue]:
     """
     Lint a batch file and return list of issues found.
@@ -5362,6 +5363,8 @@ def lint_batch_file(  # pylint: disable=too-many-locals
         file_path: Path to the batch file (.bat or .cmd) to lint.
                   Can be absolute or relative path.
         config: BlinterConfig object with configuration settings. If None, uses defaults.
+        dependency_graph: Optional pre-built dependency graph from folder scanning.
+                         When provided, enables cross-file variable tracking.
 
     Returns:
         List of LintIssue objects containing detailed issue information.
@@ -5440,7 +5443,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     if config.follow_calls:
         try:
             batch_path = Path(file_path)
-            called_scripts_vars = _collect_called_vars(batch_path)
+            called_scripts_vars = _collect_called_vars(batch_path, dependency_graph)
         except (OSError, ValueError):
             # If we can't collect called script variables, continue without them
             called_scripts_vars = None
@@ -6591,13 +6594,13 @@ def _print_rule_group(rule_code: str, rule_issues: List[LintIssue]) -> None:
 
     if is_multi_file:
         # Hierarchical format for multiple files
-        print(f"\n**{rule.name} ({rule_code})**")
+        print(f"\n{rule.name} ({rule_code})")
         # line_data is Dict[str, List[int]]
         assert isinstance(line_data, dict)
         for filename in sorted(line_data.keys()):
             line_nums = line_data[filename]
             line_str = ", ".join(map(str, line_nums))
-            print(f"  **[{filename}] Line {line_str}**")
+            print(f"  [{filename}] Line {line_str}")
     else:
         # Simple format for single file
         # line_data is str like "Line 296, 303, 4709"
@@ -6887,8 +6890,199 @@ def _extract_called_scripts(batch_file: Path) -> List[Path]:
     return called_scripts
 
 
+def _build_call_dependency_graph(batch_files: List[Path]) -> Dict[Path, Set[Path]]:
+    """
+    Build a dependency graph showing which batch files call which other files.
+
+    This function scans all provided batch files and builds a directed graph of
+    CALL relationships. The graph includes transitive dependencies, so if fileA
+    calls fileB and fileB calls fileC, then fileA's dependencies include both
+    fileB and fileC.
+
+    Args:
+        batch_files: List of Path objects representing batch files to analyze
+
+    Returns:
+        Dictionary mapping each file Path to a Set of Path objects it depends on
+        (directly or transitively via CALL statements).
+    """
+    # First pass: build direct dependencies only
+    direct_deps: Dict[Path, Set[Path]] = {}
+
+    for batch_file in batch_files:
+        batch_file_resolved = batch_file.resolve()
+        direct_deps[batch_file_resolved] = set()
+
+        try:
+            with open(batch_file, "r", encoding="utf-8", errors="ignore") as file:
+                batch_dir = batch_file.parent
+
+                for line in file:
+                    # Skip comments
+                    stripped = line.strip().lower()
+                    if stripped.startswith("rem ") or stripped.startswith("::"):
+                        continue
+
+                    # Look for CALL statements with .bat or .cmd files
+                    call_match = re.search(
+                        r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|([^\s]+\.(?:bat|cmd)))',
+                        line,
+                        re.IGNORECASE,
+                    )
+
+                    if call_match:
+                        # Get the script path (from either quoted or unquoted group)
+                        script_path_str = call_match.group(1) or call_match.group(2)
+
+                        # Resolve batch parameter expansions
+                        if "%~dp0" in script_path_str:
+                            script_path_str = script_path_str.replace("%~dp0", "")
+                            script_path = batch_dir / script_path_str
+                        elif "%~d0" in script_path_str:
+                            script_path_str = script_path_str.replace("%~d0", str(batch_dir.drive))
+                            script_path = Path(script_path_str)
+                        else:
+                            script_path = Path(script_path_str)
+                            if not script_path.is_absolute():
+                                script_path = batch_dir / script_path_str
+
+                        # Add to dependencies if the file exists
+                        try:
+                            if script_path.exists() and script_path.is_file():
+                                # Avoid self-references
+                                resolved_script = script_path.resolve()
+                                if resolved_script != batch_file_resolved:
+                                    direct_deps[batch_file_resolved].add(resolved_script)
+                        except (ValueError, OSError):
+                            # Invalid path, skip
+                            continue
+
+        except (OSError, UnicodeDecodeError):
+            # If we can't read the file, skip it
+            continue
+
+    # Second pass: compute transitive closure
+    # For each file, recursively add all dependencies of its dependencies
+    transitive_deps: Dict[Path, Set[Path]] = {}
+
+    def get_all_deps(file_path: Path, visited: Set[Path]) -> Set[Path]:
+        """Recursively get all dependencies (direct and transitive)."""
+        if file_path in visited:
+            # Circular dependency or already processed
+            return set()
+
+        visited.add(file_path)
+        all_deps = set(direct_deps.get(file_path, set()))
+
+        # Add transitive dependencies
+        for dep in list(all_deps):
+            all_deps.update(get_all_deps(dep, visited))
+
+        return all_deps
+
+    for batch_file in batch_files:
+        batch_file_resolved = batch_file.resolve()
+        transitive_deps[batch_file_resolved] = get_all_deps(batch_file_resolved, set())
+
+    return transitive_deps
+
+
+def _collect_vars_from_dependencies(
+    batch_file_resolved: Path,
+    dependency_graph: Dict[Path, Set[Path]],
+) -> Dict[int, Set[str]]:
+    """
+    Collect variables from all dependencies in the dependency graph.
+
+    Args:
+        batch_file_resolved: Resolved path to the batch file
+        dependency_graph: Pre-built graph of file dependencies from folder scan
+
+    Returns:
+        Dictionary with {0: all_vars} where all_vars includes variables from all
+        dependencies in the graph.
+    """
+    all_vars: Set[str] = set()
+    dependencies = dependency_graph.get(batch_file_resolved, set())
+
+    for dep_file in dependencies:
+        try:
+            with open(dep_file, "r", encoding="utf-8", errors="ignore") as called_file:
+                called_lines = called_file.readlines()
+                # Collect variables from the dependency
+                dep_vars = _collect_set_variables(called_lines)
+                # Remove special markers like __DYNAMIC_VARS__
+                dep_vars.discard("__DYNAMIC_VARS__")
+                all_vars.update(dep_vars)
+        except (ValueError, OSError, UnicodeDecodeError):
+            # If we can't read a dependency, skip it
+            continue
+
+    # Store all variables as available from line 0 (start of file)
+    return {0: all_vars} if all_vars else {}
+
+
+def _resolve_script_path(script_path_str: str, batch_dir: Path) -> Path:
+    """
+    Resolve a script path from a CALL statement.
+
+    Args:
+        script_path_str: The script path string from the CALL statement
+        batch_dir: The directory of the batch file containing the CALL
+
+    Returns:
+        Resolved Path object for the script
+    """
+    # Resolve batch parameter expansions
+    if "%~dp0" in script_path_str:
+        script_path_str = script_path_str.replace("%~dp0", "")
+        return batch_dir / script_path_str
+    if "%~d0" in script_path_str:
+        script_path_str = script_path_str.replace("%~d0", str(batch_dir.drive))
+        return Path(script_path_str)
+
+    script_path = Path(script_path_str)
+    if not script_path.is_absolute():
+        return batch_dir / script_path_str
+    return script_path
+
+
+def _collect_vars_from_script(
+    script_path: Path,
+    batch_file_resolved: Path,
+) -> Set[str]:
+    """
+    Collect variables from a called script.
+
+    Args:
+        script_path: Path to the called script
+        batch_file_resolved: Resolved path to the calling batch file
+
+    Returns:
+        Set of variable names defined in the called script
+    """
+    if not (script_path.exists() and script_path.is_file()):
+        return set()
+
+    # Avoid circular references
+    if script_path.resolve() == batch_file_resolved:
+        return set()
+
+    try:
+        with open(script_path, "r", encoding="utf-8", errors="ignore") as called_file:
+            called_lines = called_file.readlines()
+            # Collect variables from the called script
+            called_vars = _collect_set_variables(called_lines)
+            # Remove special markers like __DYNAMIC_VARS__
+            called_vars.discard("__DYNAMIC_VARS__")
+            return called_vars
+    except (ValueError, OSError, UnicodeDecodeError):
+        return set()
+
+
 def _collect_called_vars(
     batch_file: Path,
+    dependency_graph: Optional[Dict[Path, Set[Path]]] = None,
 ) -> Dict[int, Set[str]]:
     """
     For each CALL statement in the batch file, collect variables from the called script.
@@ -6896,14 +7090,29 @@ def _collect_called_vars(
     This function implements position-aware variable tracking: variables from called scripts
     are only considered "defined" for lines AFTER the CALL statement that invokes them.
 
+    When a dependency_graph is provided (from folder scanning with --follow-calls), this
+    function collects variables from all dependencies in the graph, making them available
+    from line 0 (start of file) since we're treating the entire folder as interconnected.
+
     Args:
         batch_file: Path to the batch file to analyze
+        dependency_graph: Optional pre-built graph of file dependencies from folder scan
 
     Returns:
         Dictionary mapping line numbers to sets of variables available after that line.
         For example, if line 10 has a CALL to a script that defines VAR1 and VAR2,
         the returned dict will have {10: {'VAR1', 'VAR2'}}.
+
+        When dependency_graph is provided, returns {0: all_vars} where all_vars includes
+        variables from all dependencies in the graph.
     """
+    batch_file_resolved = batch_file.resolve()
+
+    # If we have a dependency graph, use it to collect all variables from dependencies
+    if dependency_graph is not None:
+        return _collect_vars_from_dependencies(batch_file_resolved, dependency_graph)
+
+    # Original behavior: scan for CALL statements line by line
     called_vars_by_line: Dict[int, Set[str]] = {}
     batch_dir = batch_file.parent
 
@@ -6925,39 +7134,12 @@ def _collect_called_vars(
                 if call_match:
                     # Get the script path (from either quoted or unquoted group)
                     script_path_str = call_match.group(1) or call_match.group(2)
-
-                    # Resolve batch parameter expansions
-                    if "%~dp0" in script_path_str:
-                        script_path_str = script_path_str.replace("%~dp0", "")
-                        script_path = batch_dir / script_path_str
-                    elif "%~d0" in script_path_str:
-                        script_path_str = script_path_str.replace("%~d0", str(batch_dir.drive))
-                        script_path = Path(script_path_str)
-                    else:
-                        script_path = Path(script_path_str)
-                        if not script_path.is_absolute():
-                            script_path = batch_dir / script_path_str
+                    script_path = _resolve_script_path(script_path_str, batch_dir)
 
                     # Try to read the called script and collect its variables
-                    try:
-                        if script_path.exists() and script_path.is_file():
-                            # Avoid circular references
-                            if script_path.resolve() != batch_file.resolve():
-                                # Read the called script
-                                with open(
-                                    script_path, "r", encoding="utf-8", errors="ignore"
-                                ) as called_file:
-                                    called_lines = called_file.readlines()
-                                    # Collect variables from the called script
-                                    called_vars = _collect_set_variables(called_lines)
-                                    # Remove special markers like __DYNAMIC_VARS__
-                                    called_vars.discard("__DYNAMIC_VARS__")
-                                    # Store variables available after this CALL statement
-                                    if called_vars:
-                                        called_vars_by_line[line_num] = called_vars
-                    except (ValueError, OSError, UnicodeDecodeError):
-                        # If we can't read the called script, skip it
-                        continue
+                    called_vars = _collect_vars_from_script(script_path, batch_file_resolved)
+                    if called_vars:
+                        called_vars_by_line[line_num] = called_vars
 
     except (OSError, UnicodeDecodeError):
         # If we can't read the main file, return empty dict
@@ -7050,13 +7232,20 @@ def _process_batch_files(
     total_files_processed = 0
     files_with_errors = 0
 
+    # Build dependency graph if follow_calls is enabled
+    dependency_graph: Optional[Dict[Path, Set[Path]]] = None
+    if config.follow_calls:
+        dependency_graph = _build_call_dependency_graph(batch_files)
+
     for batch_file in batch_files:
         # Skip if already processed (could happen with follow_calls)
         if batch_file.resolve() in state.processed_files:
             continue
 
         try:
-            issues = lint_batch_file(str(batch_file), config=config)
+            issues = lint_batch_file(
+                str(batch_file), config=config, dependency_graph=dependency_graph
+            )
             state.file_results[str(batch_file)] = issues
             state.all_issues.extend(issues)
             total_files_processed += 1
