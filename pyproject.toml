@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools-scm[toml]>=6.2"]
+requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +7,8 @@ name = "Blinter"
 dynamic = ["version"]
 description = "Blinter is a linter for Windows batch files. It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems."
 readme = "README.md"
-license = {text = "CRL"}
+license = "LicenseRef-CRL"
+license-files = ["LICENSE.md"]
 authors = [
     {name = "tboy1337", email = "tboy1337@proton.me"}
 ]
@@ -18,7 +19,6 @@ keywords = ["lint", "python", "windows", "analysis", "script", "linting", "linte
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: Other/Proprietary License",
     "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
