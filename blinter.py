@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.71
+Version: 1.0.72
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.71"
+__version__ = "1.0.72"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2166,7 +2166,9 @@ def _is_comment_line(line: str) -> bool:
 
 def _is_command_in_safe_context(line: str) -> bool:
     """
-    Check if a potentially dangerous command is in a safe context (REM comment or ECHO statement).
+    Check if a potentially dangerous command is in a safe context.
+
+    Safe contexts include REM comments, ECHO statements, or SET statements.
 
     Args:
         line: The line to check
@@ -2186,6 +2188,10 @@ def _is_command_in_safe_context(line: str) -> bool:
 
     # Check for @ECHO off (common at start of scripts)
     if stripped.startswith("@echo ") or stripped.startswith("@echo\t"):
+        return True
+
+    # Check if line is a SET statement (environment variable assignment)
+    if stripped.startswith("set ") or stripped.startswith("set\t"):
         return True
 
     return False
@@ -3815,10 +3821,14 @@ def _has_priv_check_before(lines: List[str], target_line_num: int) -> bool:
 
 
 def _check_privilege_security(
-    stripped: str, line_num: int, lines: Optional[List[str]] = None
+    stripped: str, line_num: int, lines: Optional[List[str]] = None, line: str = ""
 ) -> List[LintIssue]:
     """Check for privilege escalation security issues (SEC005)."""
     issues: List[LintIssue] = []
+
+    # Skip commands in safe contexts (comments, ECHO, SET statements)
+    if line and _is_command_in_safe_context(line):
+        return issues
 
     # SEC005: Missing privilege check for admin operations
     admin_commands = ["reg add hklm", "reg delete hklm", "sc "]
@@ -4023,7 +4033,7 @@ def _check_security_issues(line: str, line_num: int) -> List[LintIssue]:
     # Check different categories of security issues
     issues.extend(_check_input_validation_sec(line, line_num, stripped))
     # Include line-by-line privilege checks for backward compatibility with tests
-    issues.extend(_check_privilege_security(stripped, line_num))
+    issues.extend(_check_privilege_security(stripped, line_num, line=line))
     issues.extend(_check_path_security(line, stripped, line_num))
     issues.extend(_check_info_disclosure_sec(stripped, line_num))
     issues.extend(_check_malware_security(stripped, line_num))
@@ -5636,6 +5646,10 @@ def _check_global_priv_security(lines: List[str]) -> List[LintIssue]:
     # If no privilege check found, flag all commands that need privileges
     if not has_privilege_check:
         for i, line in enumerate(lines, start=1):
+            # Skip commands in safe contexts (comments, ECHO, SET statements)
+            if _is_command_in_safe_context(line):
+                continue
+
             stripped = line.strip().lower()
 
             # Check for admin commands

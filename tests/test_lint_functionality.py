@@ -1845,6 +1845,96 @@ net start servicename
         finally:
             os.unlink(temp_file)
 
+    def test_net_command_in_comments_not_flagged(self) -> None:
+        """Test that NET commands in comments are not flagged as requiring privileges."""
+        content = """@ECHO OFF
+REM This script used to use NET VIEW to enumerate computers
+:: We replaced NET VIEW with ADFIND
+::: First we used NET VIEW, then we moved to NETDOM, but now we use ADFIND
+ECHO Script completed
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            sec005_issues = [i for i in issues if i.rule.code == "SEC005"]
+            # NET commands in comments should NOT trigger SEC005
+            assert "SEC005" not in rule_codes, (
+                f"NET commands in comments should NOT be flagged, "
+                f"but got: {[i.context for i in sec005_issues]}"
+            )
+        finally:
+            os.unlink(temp_file)
+
+    def test_net_command_in_set_statement_not_flagged(self) -> None:
+        """Test that NET commands in SET statements are not flagged as requiring privileges."""
+        content = """@ECHO OFF
+SET @ESSENTIAL=PRODUKEY NET PSINFO UPTIME2 SRVINFO
+SET TOOLS=NET USER NET VIEW NET STOP
+SET @UTILS=NETDOM NLTEST REPADMIN
+ECHO Script completed
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            sec005_issues = [i for i in issues if i.rule.code == "SEC005"]
+            # NET commands in SET statements should NOT trigger SEC005
+            assert "SEC005" not in rule_codes, (
+                f"NET commands in SET statements should NOT be flagged, "
+                f"but got: {[i.context for i in sec005_issues]}"
+            )
+        finally:
+            os.unlink(temp_file)
+
+    def test_net_command_in_echo_not_flagged(self) -> None:
+        """Test that NET commands in ECHO statements are not flagged as requiring privileges."""
+        content = """@ECHO OFF
+ECHO Use NET VIEW to list computers
+ECHO Or use NET USER to manage users
+@ECHO NET STOP servicename will stop a service
+ECHO Script completed
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            sec005_issues = [i for i in issues if i.rule.code == "SEC005"]
+            # NET commands in ECHO statements should NOT trigger SEC005
+            assert "SEC005" not in rule_codes, (
+                f"NET commands in ECHO statements should NOT be flagged, "
+                f"but got: {[i.context for i in sec005_issues]}"
+            )
+        finally:
+            os.unlink(temp_file)
+
+    def test_actual_net_command_still_flagged(self) -> None:
+        """Test that actual NET commands outside safe contexts are still flagged."""
+        content = """@ECHO OFF
+NET VIEW \\\\computer
+NET USER username password /add
+ECHO Script completed
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            sec005_issues = [i for i in issues if i.rule.code == "SEC005"]
+            # Actual NET commands should still trigger SEC005
+            assert (
+                len(sec005_issues) >= 2
+            ), f"Expected at least 2 SEC005 issues, got {len(sec005_issues)}"
+            # Check that both NET commands are flagged
+            net_view_flagged = any(
+                "NET command" in i.context for i in sec005_issues if i.line_number == 2
+            )
+            net_user_flagged = any(
+                "NET command" in i.context for i in sec005_issues if i.line_number == 3
+            )
+            assert net_view_flagged, "NET VIEW on line 2 should be flagged"
+            assert net_user_flagged, "NET USER on line 3 should be flagged"
+        finally:
+            os.unlink(temp_file)
+
     def test_deprecated_and_removed_commands_comprehensive(self) -> None:
         """Test comprehensive check of multiple deprecated and removed commands in one file."""
         content = """@ECHO OFF
