@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.74
+Version: 1.0.75
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.74"
+__version__ = "1.0.75"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1945,6 +1945,216 @@ CREDENTIAL_PATTERNS = [rf"{keyword}\s*=\s*[\"']?[^\s\"']+[\"']?" for keyword in 
 # Build sensitive echo patterns dynamically from sensitive keywords
 SENSITIVE_ECHO_PATTERNS = [rf"echo.*{keyword}" for keyword in SENSITIVE_KEYWORDS]
 
+# Comprehensive set of builtin Windows commands and common external programs
+# Used to distinguish between commands and potential label calls
+BUILTIN_COMMANDS: Set[str] = {
+    # Core batch commands
+    "echo",
+    "set",
+    "if",
+    "for",
+    "goto",
+    "call",
+    "exit",
+    "pause",
+    "setlocal",
+    "endlocal",
+    "shift",
+    "pushd",
+    "popd",
+    # File operations
+    "dir",
+    "copy",
+    "move",
+    "del",
+    "erase",
+    "ren",
+    "rename",
+    "type",
+    "xcopy",
+    "robocopy",
+    "mkdir",
+    "md",
+    "rmdir",
+    "rd",
+    "cd",
+    "chdir",
+    "attrib",
+    # System commands
+    "cls",
+    "ver",
+    "vol",
+    "date",
+    "time",
+    "title",
+    "color",
+    "prompt",
+    "path",
+    "help",
+    "start",
+    "cmd",
+    "tasklist",
+    "taskkill",
+    # Network commands
+    "ping",
+    "ipconfig",
+    "netstat",
+    "net",
+    "nslookup",
+    "tracert",
+    # Other common commands
+    "find",
+    "findstr",
+    "sort",
+    "more",
+    "choice",
+    "timeout",
+    "sc",
+    "reg",
+    "wmic",
+    "powershell",
+    "cscript",
+    "wscript",
+    "msiexec",
+    # Common external programs
+    "npm",
+    "node",
+    "npx",
+    "yarn",
+    "pnpm",
+    "git",
+    "gh",
+    "svn",
+    "hg",
+    "python",
+    "python3",
+    "py",
+    "pip",
+    "pip3",
+    "pipenv",
+    "poetry",
+    "ruby",
+    "gem",
+    "bundle",
+    "php",
+    "composer",
+    "java",
+    "javac",
+    "maven",
+    "mvn",
+    "gradle",
+    "dotnet",
+    "nuget",
+    "msbuild",
+    "cargo",
+    "rustc",
+    "rustup",
+    "go",
+    "gofmt",
+    "docker",
+    "docker-compose",
+    "kubectl",
+    "helm",
+    "aws",
+    "az",
+    "gcloud",
+    "terraform",
+    "make",
+    "cmake",
+    "ninja",
+    "wget",
+    "curl",
+    "aria2c",
+    "7z",
+    "zip",
+    "unzip",
+    "tar",
+    "gzip",
+    "choco",
+    "scoop",
+    "winget",
+    "code",
+    "vim",
+    "nano",
+    "notepad",
+    "ssh",
+    "scp",
+    "ftp",
+    "telnet",
+}
+
+# Embedded script detection patterns - PowerShell indicators
+POWERSHELL_PATTERNS: List[str] = [
+    r"\$\w+\s*=",  # PowerShell variable assignment: $var =
+    r"\$\w+\.\w+",  # PowerShell member access: $var.property
+    r"\[.*::\w+\]",  # PowerShell static method/type: [Type::Method]
+    r"-match\s+",  # PowerShell -match operator
+    r"-eq\s+",  # PowerShell -eq operator
+    r"-ne\s+",  # PowerShell -ne operator
+    r"-ge\s+",  # PowerShell -ge operator
+    r"-le\s+",  # PowerShell -le operator
+    r"-gt\s+",  # PowerShell -gt operator
+    r"-lt\s+",  # PowerShell -lt operator
+    r"Get-\w+",  # PowerShell cmdlets (Get-*)
+    r"Set-\w+",  # PowerShell cmdlets (Set-*)
+    r"Write-\w+",  # PowerShell cmdlets (Write-*)
+    r"New-\w+",  # PowerShell cmdlets (New-*)
+    r"foreach\s*\(",  # PowerShell foreach loop (lowercase)
+    r"ForEach-Object",  # PowerShell ForEach-Object cmdlet
+    r"\|\s*%\s*{",  # PowerShell pipe to % (ForEach-Object alias)
+    r"\.Get\(\)",  # PowerShell method call pattern
+    r"\.OpenSubKey\(",  # Registry access pattern
+    r"\.GetSubKeyNames\(\)",  # Registry enumeration
+    r"\[Microsoft\.Win32\.",  # .NET type usage
+    r"\[System\.",  # .NET System namespace
+    r"\[Convert\]::\w+",  # .NET Convert class
+    r"\[Math\]::\w+",  # .NET Math class
+]
+
+# Embedded script detection patterns - VBScript indicators
+VBSCRIPT_PATTERNS: List[str] = [
+    r"^\s*Dim\s+",  # VBScript Dim statement
+    r"^\s*Set\s+\w+\s*=\s*CreateObject",  # VBScript CreateObject
+    r"WScript\.",  # WScript object
+    r"^\s*On\s+Error\s+Resume\s+Next",  # VBScript error handling
+    r"^\s*Function\s+\w+\(",  # VBScript function definition
+    r"^\s*Sub\s+\w+\(",  # VBScript subroutine definition
+    r"^\s*End\s+Function",  # VBScript end function
+    r"^\s*End\s+Sub",  # VBScript end sub
+    r"^\s*'",  # VBScript comment (line starting with ')
+]
+
+# Embedded script detection patterns - C# indicators
+CSHARP_PATTERNS: List[str] = [
+    r"^\s*using\s+System",  # C# using statement
+    # C# access modifiers
+    r"^\s*(public|private|protected|internal)\s+(class|static|void|string|int|bool)",
+    r"^\s*namespace\s+",  # C# namespace
+    r"\bforeach\s*\(\s*\w+\s+\w+\s+in\s+",  # C# foreach (type var in collection)
+    r"\bfor\s*\(\s*int\s+\w+\s*=",  # C# for loop with int declaration
+    r"\bfor\s*\(\s*uint\s+\w+\s*=",  # C# for loop with uint declaration
+    r"\bfor\s*\(\s*long\s+\w+\s*=",  # C# for loop with long declaration
+    r"byte\s+\w+\s+in\s+",  # C# byte iteration
+    r"^\s*{\s*$",  # C# opening brace on its own line (common in C#)
+    r"0x[0-9A-Fa-f]+",  # Hexadecimal literals (common in C#/C++)
+    r"\b(uint|byte|long|ushort|ulong)\s+",  # C# primitive types
+]
+
+# Batch code indicators for detecting end of embedded script blocks
+BATCH_INDICATORS: List[str] = [
+    r"^@?echo\s+",
+    r"^setlocal\b",
+    r"^endlocal\b",
+    r"^set\s+[A-Z_]+=",  # Batch SET with uppercase var
+    r"^if\s+",
+    r"^FOR\s+",  # FOR in uppercase is batch
+    r"^goto\s+",
+    r"^call\s+",
+    r"^exit\s+",
+    r"^pause\s*$",
+    r"^timeout\s+",
+]
+
 
 def _load_general_settings(config: BlinterConfig, parser: configparser.ConfigParser) -> None:
     """Load general settings from config parser."""
@@ -2447,119 +2657,9 @@ def _check_call_labels(stripped: str, line_num: int) -> List[LintIssue]:
 
     # Check if this looks like a label call (not an external program)
     # Skip if it contains path separators, extensions, or is a known command
-    builtin_commands = {
-        # Windows builtin commands
-        "dir",
-        "echo",
-        "copy",
-        "move",
-        "del",
-        "type",
-        "find",
-        "findstr",
-        "sort",
-        "more",
-        "cls",
-        "cd",
-        "pushd",
-        "popd",
-        "mkdir",
-        "rmdir",
-        "attrib",
-        "xcopy",
-        "robocopy",
-        "ping",
-        "ipconfig",
-        "netstat",
-        "tasklist",
-        "taskkill",
-        "sc",
-        "net",
-        "reg",
-        "wmic",
-        "powershell",
-        "timeout",
-        "choice",
-        "ver",
-        "vol",
-        "date",
-        "time",
-        "help",
-        "set",
-        "setlocal",
-        "endlocal",
-        # Common external commands and package managers
-        "npm",
-        "node",
-        "npx",
-        "yarn",
-        "pnpm",
-        "git",
-        "gh",
-        "svn",
-        "hg",
-        "python",
-        "python3",
-        "py",
-        "pip",
-        "pip3",
-        "pipenv",
-        "poetry",
-        "ruby",
-        "gem",
-        "bundle",
-        "php",
-        "composer",
-        "java",
-        "javac",
-        "maven",
-        "mvn",
-        "gradle",
-        "dotnet",
-        "nuget",
-        "msbuild",
-        "cargo",
-        "rustc",
-        "rustup",
-        "go",
-        "gofmt",
-        "docker",
-        "docker-compose",
-        "kubectl",
-        "helm",
-        "aws",
-        "az",
-        "gcloud",
-        "terraform",
-        "make",
-        "cmake",
-        "ninja",
-        "wget",
-        "curl",
-        "aria2c",
-        "7z",
-        "zip",
-        "unzip",
-        "tar",
-        "gzip",
-        "choco",
-        "scoop",
-        "winget",
-        "code",
-        "vim",
-        "nano",
-        "notepad",
-        "ssh",
-        "scp",
-        "ftp",
-        "telnet",
-        "cscript",
-        "wscript",
-        "msiexec",
-    }
     if (
         not re.search(r"[\\/.:]|\.(?:bat|cmd|exe|com)$", call_label_text.lower())
-        and call_label_text.lower() not in builtin_commands
+        and call_label_text.lower() not in BUILTIN_COMMANDS
     ):
         # This appears to be a label call without colon
         issues.append(
@@ -2958,145 +3058,8 @@ def _check_subroutine_call(stripped: str, line_num: int, labels: Dict[str, int])
 
     first_word: str = first_word_match.group(1).lower()
 
-    # Builtin batch commands and common external programs
-    builtin_commands = {
-        # Core batch commands
-        "echo",
-        "set",
-        "if",
-        "for",
-        "goto",
-        "call",
-        "exit",
-        "pause",
-        "setlocal",
-        "endlocal",
-        "shift",
-        "pushd",
-        "popd",
-        # File operations
-        "dir",
-        "copy",
-        "move",
-        "del",
-        "erase",
-        "ren",
-        "rename",
-        "type",
-        "xcopy",
-        "robocopy",
-        "mkdir",
-        "md",
-        "rmdir",
-        "rd",
-        "cd",
-        "chdir",
-        "attrib",
-        # System commands
-        "cls",
-        "ver",
-        "vol",
-        "date",
-        "time",
-        "title",
-        "color",
-        "prompt",
-        "path",
-        "help",
-        "start",
-        "cmd",
-        "tasklist",
-        "taskkill",
-        # Network commands
-        "ping",
-        "ipconfig",
-        "netstat",
-        "net",
-        "nslookup",
-        "tracert",
-        # Other common commands
-        "find",
-        "findstr",
-        "sort",
-        "more",
-        "choice",
-        "timeout",
-        "sc",
-        "reg",
-        "wmic",
-        "powershell",
-        "cscript",
-        "wscript",
-        "msiexec",
-        # Common external programs
-        "npm",
-        "node",
-        "npx",
-        "yarn",
-        "pnpm",
-        "git",
-        "gh",
-        "svn",
-        "hg",
-        "python",
-        "python3",
-        "py",
-        "pip",
-        "pip3",
-        "pipenv",
-        "poetry",
-        "ruby",
-        "gem",
-        "bundle",
-        "php",
-        "composer",
-        "java",
-        "javac",
-        "maven",
-        "mvn",
-        "gradle",
-        "dotnet",
-        "nuget",
-        "msbuild",
-        "cargo",
-        "rustc",
-        "rustup",
-        "go",
-        "gofmt",
-        "docker",
-        "docker-compose",
-        "kubectl",
-        "helm",
-        "aws",
-        "az",
-        "gcloud",
-        "terraform",
-        "make",
-        "cmake",
-        "ninja",
-        "wget",
-        "curl",
-        "aria2c",
-        "7z",
-        "zip",
-        "unzip",
-        "tar",
-        "gzip",
-        "choco",
-        "scoop",
-        "winget",
-        "code",
-        "vim",
-        "nano",
-        "notepad",
-        "ssh",
-        "scp",
-        "ftp",
-        "telnet",
-    }
-
     # Skip if it's a known builtin command or external program
-    if first_word in builtin_commands:
+    if first_word in BUILTIN_COMMANDS:
         return issues
 
     # Skip if it looks like a file path or has an extension
@@ -4371,63 +4334,6 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals,too-many-
     """
     skip_lines: Set[int] = set()
 
-    # PowerShell indicators (strong signals)
-    powershell_patterns = [
-        r"\$\w+\s*=",  # PowerShell variable assignment: $var =
-        r"\$\w+\.\w+",  # PowerShell member access: $var.property
-        r"\[.*::\w+\]",  # PowerShell static method/type: [Type::Method]
-        r"-match\s+",  # PowerShell -match operator
-        r"-eq\s+",  # PowerShell -eq operator
-        r"-ne\s+",  # PowerShell -ne operator
-        r"-ge\s+",  # PowerShell -ge operator
-        r"-le\s+",  # PowerShell -le operator
-        r"-gt\s+",  # PowerShell -gt operator
-        r"-lt\s+",  # PowerShell -lt operator
-        r"Get-\w+",  # PowerShell cmdlets (Get-*)
-        r"Set-\w+",  # PowerShell cmdlets (Set-*)
-        r"Write-\w+",  # PowerShell cmdlets (Write-*)
-        r"New-\w+",  # PowerShell cmdlets (New-*)
-        r"foreach\s*\(",  # PowerShell foreach loop (lowercase)
-        r"ForEach-Object",  # PowerShell ForEach-Object cmdlet
-        r"\|\s*%\s*{",  # PowerShell pipe to % (ForEach-Object alias)
-        r"\.Get\(\)",  # PowerShell method call pattern
-        r"\.OpenSubKey\(",  # Registry access pattern
-        r"\.GetSubKeyNames\(\)",  # Registry enumeration
-        r"\[Microsoft\.Win32\.",  # .NET type usage
-        r"\[System\.",  # .NET System namespace
-        r"\[Convert\]::\w+",  # .NET Convert class
-        r"\[Math\]::\w+",  # .NET Math class
-    ]
-
-    # VBScript indicators
-    vbscript_patterns = [
-        r"^\s*Dim\s+",  # VBScript Dim statement
-        r"^\s*Set\s+\w+\s*=\s*CreateObject",  # VBScript CreateObject
-        r"WScript\.",  # WScript object
-        r"^\s*On\s+Error\s+Resume\s+Next",  # VBScript error handling
-        r"^\s*Function\s+\w+\(",  # VBScript function definition
-        r"^\s*Sub\s+\w+\(",  # VBScript subroutine definition
-        r"^\s*End\s+Function",  # VBScript end function
-        r"^\s*End\s+Sub",  # VBScript end sub
-        r"^\s*'",  # VBScript comment (line starting with ')
-    ]
-
-    # C# indicators (often embedded in advanced scripts)
-    csharp_patterns = [
-        r"^\s*using\s+System",  # C# using statement
-        # C# access modifiers
-        r"^\s*(public|private|protected|internal)\s+(class|static|void|string|int|bool)",
-        r"^\s*namespace\s+",  # C# namespace
-        r"\bforeach\s*\(\s*\w+\s+\w+\s+in\s+",  # C# foreach (type var in collection)
-        r"\bfor\s*\(\s*int\s+\w+\s*=",  # C# for loop with int declaration
-        r"\bfor\s*\(\s*uint\s+\w+\s*=",  # C# for loop with uint declaration
-        r"\bfor\s*\(\s*long\s+\w+\s*=",  # C# for loop with long declaration
-        r"byte\s+\w+\s+in\s+",  # C# byte iteration
-        r"^\s*{\s*$",  # C# opening brace on its own line (common in C#)
-        r"0x[0-9A-Fa-f]+",  # Hexadecimal literals (common in C#/C++)
-        r"\b(uint|byte|long|ushort|ulong)\s+",  # C# primitive types
-    ]
-
     # Track if we're in an embedded script block
     in_powershell_block = False
     in_vbscript_block = False
@@ -4475,21 +4381,21 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals,too-many-
 
         # Check for PowerShell patterns
         is_powershell_line = False
-        for pattern in powershell_patterns:
+        for pattern in POWERSHELL_PATTERNS:
             if re.search(pattern, line, re.IGNORECASE):
                 is_powershell_line = True
                 break
 
         # Check for VBScript patterns
         is_vbscript_line = False
-        for pattern in vbscript_patterns:
+        for pattern in VBSCRIPT_PATTERNS:
             if re.search(pattern, line):
                 is_vbscript_line = True
                 break
 
         # Check for C# patterns
         is_csharp_line = False
-        for pattern in csharp_patterns:
+        for pattern in CSHARP_PATTERNS:
             if re.search(pattern, line):
                 is_csharp_line = True
                 break
@@ -4534,26 +4440,11 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals,too-many-
         # Continue skipping if we're in a block
         if in_powershell_block or in_vbscript_block or in_csharp_block:
             # Check if this looks like batch code (might be end of embedded block)
-            # Batch indicators: @echo, set, if, for (uppercase), goto, call, exit
-            batch_indicators = [
-                r"^@?echo\s+",
-                r"^setlocal\b",
-                r"^endlocal\b",
-                r"^set\s+[A-Z_]+=",  # Batch SET with uppercase var
-                r"^if\s+",
-                r"^FOR\s+",  # FOR in uppercase is batch
-                r"^goto\s+",
-                r"^call\s+",
-                r"^exit\s+",
-                r"^pause\s*$",
-                r"^timeout\s+",
-            ]
-
             is_batch_line = False
-            for pattern in batch_indicators:
+            for pattern in BATCH_INDICATORS:
                 if re.match(pattern, stripped, re.IGNORECASE):
                     # Additional check: make sure it's not PowerShell
-                    if not any(re.search(p, line, re.IGNORECASE) for p in powershell_patterns):
+                    if not any(re.search(p, line, re.IGNORECASE) for p in POWERSHELL_PATTERNS):
                         is_batch_line = True
                         break
 
