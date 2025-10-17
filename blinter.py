@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.76
+Version: 1.0.77
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.76"
+__version__ = "1.0.77"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -145,6 +145,72 @@ class BlinterConfig:
         }
 
         return severity_order.get(severity, 0) >= severity_order.get(self.min_severity, 0)
+
+
+# Helper functions for reducing code duplication
+
+
+def _add_issue(
+    issues: List[LintIssue],
+    line_number: int,
+    rule_code: str,
+    context: str = "",
+    file_path: Optional[str] = None,
+) -> None:
+    """
+    Add a linting issue to the issues list.
+
+    This helper function reduces code duplication by centralizing the pattern of
+    creating and appending LintIssue objects.
+
+    Args:
+        issues: List to append the issue to
+        line_number: Line number where the issue occurs
+        rule_code: Code of the rule being violated (e.g., "E001")
+        context: Additional context about the issue
+        file_path: Optional path to the file containing the issue
+
+    Thread-safe: Yes - only appends to provided list (caller manages thread safety)
+    """
+    issues.append(
+        LintIssue(
+            line_number=line_number,
+            rule=RULES[rule_code],
+            context=context,
+            file_path=file_path,
+        )
+    )
+
+
+def _create_rule(
+    code: str,
+    name: str,
+    severity: RuleSeverity,
+    explanation: str,
+    recommendation: str,
+) -> Rule:
+    """
+    Create a Rule object with validation.
+
+    This helper centralizes rule creation and provides a consistent interface.
+
+    Args:
+        code: Rule code (e.g., "E001")
+        name: Short name of the rule
+        severity: Rule severity level
+        explanation: Detailed explanation of what the rule checks
+        recommendation: How to fix violations of this rule
+
+    Returns:
+        Rule: Validated Rule object
+    """
+    return Rule(
+        code=code,
+        name=name,
+        severity=severity,
+        explanation=explanation,
+        recommendation=recommendation,
+    )
 
 
 # Built-in environment variables that don't need to be SET
@@ -1629,7 +1695,7 @@ def _detect_line_endings(file_path: str) -> Tuple[str, bool, int, int, int]:
     if cr_only_count > 0:
         ending_types.append("CR")
 
-    if len(ending_types) == 0:
+    if not ending_types:
         # No line endings found (empty file or single line)
         dominant_type = "NONE"
         has_mixed = False
@@ -1695,6 +1761,87 @@ def _has_multibyte_chars(lines: List[str]) -> Tuple[bool, List[int]]:
     return has_multibyte, affected_lines
 
 
+def _detect_encoding_with_chardet(file_path: str, encodings_list: List[str]) -> List[str]:
+    """
+    Detect file encoding using chardet library if available.
+
+    Thread-safe: Yes - uses only local variables
+    Performance: Single file read operation
+
+    Args:
+        file_path: Path to the file to analyze
+        encodings_list: List of encodings to prioritize
+
+    Returns:
+        Updated list of encodings with detected encoding moved to front
+    """
+    try:
+        import chardet  # pylint: disable=import-outside-toplevel  # isort: skip
+
+        with open(file_path, "rb") as file_handle:
+            raw_data = file_handle.read()
+
+        detected = chardet.detect(raw_data)  # type: ignore[misc]
+        if (
+            not detected  # type: ignore[misc]
+            or not detected["encoding"]  # type: ignore[misc]
+            or detected["confidence"] <= 0.7  # type: ignore[misc]
+        ):
+            return encodings_list
+
+        detected_encoding: str = detected["encoding"].lower()  # type: ignore[misc]
+        logger.debug(
+            "Chardet detected encoding: %s (confidence: %.2f)",
+            detected_encoding,
+            detected["confidence"],  # type: ignore[misc]
+        )
+
+        # Add detected encoding to the front if not already there
+        if detected_encoding not in [enc.lower() for enc in encodings_list]:
+            encodings_list.insert(0, detected_encoding)
+            return encodings_list
+
+        # Move detected encoding to front if it exists in our list
+        for i, enc in enumerate(encodings_list):
+            if enc.lower() == detected_encoding:
+                encodings_list.insert(0, encodings_list.pop(i))
+                break
+
+        return encodings_list
+
+    except ImportError:
+        logger.debug("chardet not available, using fallback encoding detection")
+        return encodings_list
+    except (OSError, ValueError, TypeError) as detection_error:
+        logger.debug("Encoding detection failed: %s, using fallback", detection_error)
+        return encodings_list
+
+
+def _try_read_with_encoding(file_path: str, encoding: str) -> Optional[List[str]]:
+    """
+    Attempt to read a file with a specific encoding.
+
+    Thread-safe: Yes - uses only local file operations
+    Performance: Single file read operation
+
+    Args:
+        file_path: Path to the file to read
+        encoding: Encoding to try
+
+    Returns:
+        List of lines if successful, None if encoding fails
+    """
+    try:
+        logger.debug("Attempting to read file with encoding: %s", encoding)
+        with open(file_path, "r", encoding=encoding, errors="strict") as file_handle:
+            lines = file_handle.readlines()
+        logger.debug("Successfully read %d lines using %s encoding", len(lines), encoding)
+        return lines
+    except (UnicodeDecodeError, LookupError, ValueError) as error:
+        logger.debug("Failed to read with %s: %s", encoding, error)
+        return None
+
+
 def read_file_with_encoding(file_path: str) -> Tuple[List[str], str]:
     """
     Reads a file with robust encoding detection and fallback mechanisms.
@@ -1739,64 +1886,19 @@ def read_file_with_encoding(file_path: str) -> Tuple[List[str], str]:
     ]
 
     # Try to detect encoding using chardet if available
-    try:
-        import chardet  # pylint: disable=import-outside-toplevel  # isort: skip
-
-        with open(file_path, "rb") as file_handle:
-            raw_data = file_handle.read()
-
-        # chardet.detect returns Dict[str, Any] - type: ignore for external library
-        detected = chardet.detect(raw_data)  # type: ignore[misc]
-        if detected and detected["encoding"] and detected["confidence"] > 0.7:  # type: ignore[misc]
-            detected_encoding: str = detected["encoding"].lower()  # type: ignore[misc]
-            logger.debug(
-                "Chardet detected encoding: %s (confidence: %.2f)",
-                detected_encoding,
-                detected["confidence"],  # type: ignore[misc]
-            )
-            # Add detected encoding to the front of our list if it's not already there
-            if detected_encoding not in [enc.lower() for enc in encodings_to_try]:
-                encodings_to_try.insert(0, detected_encoding)
-            else:
-                # Move detected encoding to front if it exists in our list
-                for i, enc in enumerate(encodings_to_try):
-                    if enc.lower() == detected_encoding:
-                        encodings_to_try.insert(0, encodings_to_try.pop(i))
-                        break
-    except ImportError:
-        # chardet not available, continue with fallback approach
-        logger.debug("chardet not available, using fallback encoding detection")
-    except (OSError, ValueError, TypeError) as detection_error:
-        # Any other error in detection, continue with fallback
-        logger.debug("Encoding detection failed: %s, using fallback", detection_error)
+    encodings_to_try = _detect_encoding_with_chardet(file_path, encodings_to_try)
 
     # Try each encoding until one works
-    last_exception: Optional[Exception] = None
     for encoding in encodings_to_try:
-        try:
-            logger.debug("Attempting to read file with encoding: %s", encoding)
-            with open(file_path, "r", encoding=encoding, errors="strict") as file_handle:
-                lines = file_handle.readlines()
-            logger.debug("Successfully read %d lines using %s encoding", len(lines), encoding)
+        lines = _try_read_with_encoding(file_path, encoding)
+        if lines is not None:
             return lines, encoding
-        except UnicodeDecodeError as decode_error:
-            logger.debug("UnicodeDecodeError with %s: %s", encoding, decode_error)
-            last_exception = decode_error
-            continue
-        except (LookupError, ValueError) as encoding_error:
-            # Encoding not supported or invalid
-            logger.debug("Encoding error with %s: %s", encoding, encoding_error)
-            last_exception = encoding_error
-            continue
 
     # If we get here, all encodings failed - this should be extremely rare
-    # since latin1 can decode any byte sequence
-    if last_exception:
-        raise OSError(
-            f"All encoding attempts failed for file '{file_path}'. " f"Last error: {last_exception}"
-        ) from last_exception
-
-    raise OSError(f"Could not read file '{file_path}' with any supported encoding")
+    raise OSError(
+        f"All encoding attempts failed for file '{file_path}'. "
+        f"Could not read file with any supported encoding"
+    )
 
 
 # Pattern definitions for rule matching
@@ -2470,12 +2572,11 @@ def _collect_labels(lines: List[str]) -> Tuple[Dict[str, int], List[LintIssue]]:
                 continue
 
             if label in labels:
-                issues.append(
-                    LintIssue(
-                        line_number=i,
-                        rule=RULES["W013"],  # Duplicate label
-                        context=f"Label '{label}' already defined on line {labels[label]}",
-                    )
+                _add_issue(
+                    issues,
+                    line_number=i,
+                    rule_code="W013",
+                    context=f"Label '{label}' already defined on line {labels[label]}",
                 )
             else:
                 labels[label] = i
@@ -4255,6 +4356,60 @@ def _check_performance_issues(  # pylint: disable=too-many-arguments,too-many-po
     return issues
 
 
+def _get_available_vars_at_line(
+    line_num: int,
+    set_vars: Set[str],
+    called_scripts_vars: Optional[Dict[int, Set[str]]],
+) -> Set[str]:
+    """
+    Get all variables available at a specific line number.
+
+    Args:
+        line_num: Current line number
+        set_vars: Variables defined in current file
+        called_scripts_vars: Optional dict mapping line numbers to variables from called scripts
+
+    Returns:
+        Set of all available variable names
+    """
+    available_vars = set_vars.copy()
+
+    if called_scripts_vars:
+        for call_line_num, called_vars in called_scripts_vars.items():
+            if call_line_num < line_num:
+                available_vars.update(called_vars)
+
+    return available_vars
+
+
+def _should_check_variable(
+    var_name: str,
+    uses_dynamic_vars: bool,
+    available_vars: Set[str],
+) -> bool:
+    """
+    Determine if a variable should be checked for being undefined.
+
+    Args:
+        var_name: Variable name to check
+        uses_dynamic_vars: Whether script uses dynamic variable assignment
+        available_vars: Set of available variables
+
+    Returns:
+        True if variable should be checked
+    """
+    # Skip built-in variables and single character variables (usually loop variables)
+    if var_name in BUILTIN_VARS or len(var_name) <= 1:
+        return False
+
+    # If dynamic vars are used, skip undefined variable warnings
+    if uses_dynamic_vars:
+        return False
+
+    # Only check if variable is not defined
+    return var_name not in available_vars
+
+
 def _check_undefined_variables(
     lines: List[str],
     set_vars: Set[str],
@@ -4275,50 +4430,26 @@ def _check_undefined_variables(
         List of LintIssue objects for undefined variables
     """
     issues: List[LintIssue] = []
-
-    # If script uses dynamic variable assignment, be lenient about undefined vars
     uses_dynamic_vars = "__DYNAMIC_VARS__" in set_vars
-
-    # Improved pattern to match only valid variable names, excluding string
-    # operations and builtin variables
     var_usage_pattern = re.compile(r"%([A-Z][A-Z0-9_]*)%|!([A-Z][A-Z0-9_]*)!", re.IGNORECASE)
+    string_op_pattern = re.compile(r"%[A-Z]+:[^%]*%", re.IGNORECASE)
 
     for i, line in enumerate(lines, start=1):
         # Skip lines with string operations like %DATE:/=-%
-        if re.search(r"%[A-Z]+:[^%]*%", line, re.IGNORECASE):
+        if string_op_pattern.search(line):
             continue
 
-        # Build the set of variables available at this line
-        available_vars = set_vars.copy()
-
-        # If follow_calls is enabled, add variables from called scripts
-        # Variables are available from lines AFTER the CALL statement
-        if called_scripts_vars:
-            for call_line_num, called_vars in called_scripts_vars.items():
-                if call_line_num < i:  # Only include if CALL was before current line
-                    available_vars.update(called_vars)
+        available_vars = _get_available_vars_at_line(i, set_vars, called_scripts_vars)
 
         for match in var_usage_pattern.finditer(line):
-            var_match_1: Optional[str] = match.group(1)
-            var_match_2: Optional[str] = match.group(2)
-            var_name: str = (var_match_1 or var_match_2 or "").upper()
+            var_name: str = (match.group(1) or match.group(2) or "").upper()
 
-            # Skip built-in variables and single character variables (usually loop variables)
-            if var_name in BUILTIN_VARS or len(var_name) <= 1:
-                continue
-
-            # If dynamic vars are used, skip undefined variable warnings
-            # (too many false positives when variables are created dynamically)
-            if uses_dynamic_vars:
-                continue
-
-            if var_name not in available_vars:
-                issues.append(
-                    LintIssue(
-                        line_number=i,
-                        rule=RULES["E006"],  # Undefined variable reference
-                        context=f"Variable '{var_name}' is used but never defined",
-                    )
+            if _should_check_variable(var_name, uses_dynamic_vars, available_vars):
+                _add_issue(
+                    issues,
+                    line_number=i,
+                    rule_code="E006",
+                    context=f"Variable '{var_name}' is used but never defined",
                 )
 
     return issues
@@ -6059,70 +6190,82 @@ def _check_missing_documentation(
     return issues
 
 
+def _categorize_variable_style(var_name: str) -> str:
+    """
+    Determine the naming style of a variable.
+
+    Args:
+        var_name: Variable name to analyze
+
+    Returns:
+        Style name: "snake_case", "PascalCase", "camelCase", "UPPERCASE", or "lowercase"
+    """
+    if "_" in var_name and var_name.islower():
+        return "snake_case"
+    if var_name[0].isupper() and any(c.islower() for c in var_name[1:]):
+        return "PascalCase"
+    if var_name[0].islower() and any(c.isupper() for c in var_name[1:]):
+        return "camelCase"
+    if var_name.isupper():
+        return "UPPERCASE"
+    if var_name.islower():
+        return "lowercase"
+    return "unknown"
+
+
+def _should_skip_line_for_var_check(stripped: str) -> bool:
+    """
+    Check if line should be skipped for variable name checking.
+
+    Args:
+        stripped: Stripped line content
+
+    Returns:
+        True if line should be skipped
+    """
+    skip_prefixes = ("echo ", "rem ", "::")
+    skip_chars = (">", ">>")
+
+    if any(stripped.startswith(prefix) for prefix in skip_prefixes):
+        return True
+    if any(char in stripped for char in skip_chars):
+        return True
+    return False
+
+
 def _check_var_naming(lines: List[str]) -> List[LintIssue]:
     """Check for inconsistent variable naming conventions."""
     issues: List[LintIssue] = []
     variable_names = set()
-    naming_styles = {
-        "camelCase": 0,
-        "PascalCase": 0,
-        "snake_case": 0,
-        "lowercase": 0,
-        "UPPERCASE": 0,
-    }
+    naming_styles: DefaultDict[str, int] = defaultdict(int)
+
+    # Combined pattern for efficiency
+    set_pattern = re.compile(r'^\s*set\s+(?:")?([a-zA-Z_][a-zA-Z0-9_]*)\s*=', re.IGNORECASE)
 
     for line in lines:
-        # Skip lines that are clearly not batch SET commands
         stripped = line.strip()
-        if (
-            stripped.startswith("echo ")
-            or stripped.startswith("rem ")
-            or stripped.startswith("::")
-            or ">" in stripped
-            or ">>" in stripped
-        ):
+        if _should_skip_line_for_var_check(stripped):
             continue
 
-        # Extract variable names from SET commands - handle quoted and unquoted
-        set_matches: List[str] = []
-        set_patterns = [
-            r"^\s*set\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=",  # Regular set: set VAR=value (line start)
-            r'^\s*set\s+"([a-zA-Z_][a-zA-Z0-9_]*)\s*=',  # Quoted set: set "VAR=value" (line start)
-        ]
-        for pattern in set_patterns:
-            matches: List[str] = re.findall(pattern, line, re.IGNORECASE)
-            set_matches.extend(matches)
-        for var_name in set_matches:
+        # Extract variable names from SET commands
+        match = set_pattern.search(line)
+        if match:
+            var_name = match.group(1)
             variable_names.add(var_name)
-
-            # Categorize naming style
-            if "_" in var_name and var_name.islower():
-                naming_styles["snake_case"] += 1
-            elif var_name[0].isupper() and any(c.islower() for c in var_name[1:]):
-                naming_styles["PascalCase"] += 1
-            elif var_name[0].islower() and any(c.isupper() for c in var_name[1:]):
-                naming_styles["camelCase"] += 1
-            elif var_name.isupper():
-                naming_styles["UPPERCASE"] += 1
-            elif var_name.islower():
-                naming_styles["lowercase"] += 1
+            style = _categorize_variable_style(var_name)
+            naming_styles[style] += 1
 
     # Check for mixed styles (only if we have enough variables to analyze)
     if len(variable_names) >= 3:
         used_styles = sum(1 for count in naming_styles.values() if count > 0)
         if used_styles > 1:
-
-            def get_count(style_name: str) -> int:
-                return naming_styles[style_name]
-
-            dominant_style: str = max(naming_styles, key=get_count)
-            issues.append(
-                LintIssue(
-                    line_number=1,
-                    rule=RULES["S022"],
-                    context=f"Mixed variable naming styles detected. "
-                    f"Consider using {dominant_style} consistently",
-                )
+            dominant_style = max(naming_styles, key=naming_styles.get)  # type: ignore[arg-type]
+            _add_issue(
+                issues,
+                line_number=1,
+                rule_code="S022",
+                context=f"Mixed variable naming styles detected. "
+                f"Consider using {dominant_style} consistently",
             )
 
     return issues
