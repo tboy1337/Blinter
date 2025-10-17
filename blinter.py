@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.75
+Version: 1.0.76
 License: CRL
 """
 
@@ -30,10 +30,10 @@ import logging
 from pathlib import Path
 import re
 import sys
-from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
+from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.75"
+__version__ = "1.0.76"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1814,6 +1814,19 @@ DANGEROUS_COMMAND_NAMES: List[str] = [
 # Build the regex pattern once for performance (used in multiple places)
 _DANGEROUS_CMDS_REGEX: str = "|".join(DANGEROUS_COMMAND_NAMES)
 
+# Pre-compiled regex patterns for performance optimization
+# These patterns are used multiple times throughout the codebase
+_COMPILED_IF_PATTERN = re.compile(r"if\s+(.+)", re.IGNORECASE)
+_COMPILED_SETLOCAL_DISABLE = re.compile(r"setlocal\s+disabledelayedexpansion", re.IGNORECASE)
+_COMPILED_SET_PATTERN = re.compile(r"\bset\s+", re.IGNORECASE)
+_COMPILED_GOTO_PATTERN = re.compile(r"goto\s+(:?\S+)", re.IGNORECASE)
+_COMPILED_VAR_EXPANSION = re.compile(r"%[^%]+%|!\w+!")
+_COMPILED_ECHO_DOTS = re.compile(r"\s*echo\s+.*\.\.\.\.", re.IGNORECASE)
+_COMPILED_NON_ASCII = re.compile(r"[\x00-\x1f\x7f-\xff]")
+_COMPILED_NET_SESSION = re.compile(r"net\s+session\s*(>|$)", re.IGNORECASE)
+_COMPILED_NET_COMMAND = re.compile(r"\bnet\s+", re.IGNORECASE)
+_COMPILED_DELAYED_VAR = re.compile(r"![^!]+!")
+
 DANGEROUS_COMMAND_PATTERNS: List[Tuple[str, str]] = [
     (r"del\s+(?:[/-]\w+\s+)*[\"']?\*\.\*[\"']?(\s|$)", "SEC003"),  # del *.* with optional flags
     (
@@ -2678,7 +2691,7 @@ def _check_call_labels(stripped: str, line_num: int) -> List[LintIssue]:
 def _check_if_statement_formatting(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for IF statement formatting issues (E003)."""
     issues: List[LintIssue] = []
-    if_match = re.match(r"if\s+(.+)", stripped, re.IGNORECASE)
+    if_match = _COMPILED_IF_PATTERN.match(stripped)
     if not if_match:
         return issues
 
@@ -2722,7 +2735,7 @@ def _check_if_statement_formatting(stripped: str, line_num: int) -> List[LintIss
 def _check_errorlevel_syntax(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for invalid errorlevel comparison syntax (E016)."""
     issues: List[LintIssue] = []
-    errorlevel_if_match = re.match(r"if\s+(.+)", stripped, re.IGNORECASE)
+    errorlevel_if_match = _COMPILED_IF_PATTERN.match(stripped)
     if not errorlevel_if_match:
         return issues
 
@@ -3518,7 +3531,7 @@ def _check_non_ascii_chars(stripped: str, line_num: int) -> List[LintIssue]:
 def _check_errorlevel_comparison(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for errorlevel comparison semantic difference (W017)."""
     issues: List[LintIssue] = []
-    w017_if_match = re.match(r"if\s+(.+)", stripped, re.IGNORECASE)
+    w017_if_match = _COMPILED_IF_PATTERN.match(stripped)
     if not w017_if_match:
         return issues
 
@@ -4119,7 +4132,7 @@ def _check_redundant_disable_delay(
 ) -> List[LintIssue]:
     """Check for P026: Redundant DISABLEDELAYEDEXPANSION."""
     issues: List[LintIssue] = []
-    if not re.search(r"setlocal\s+disabledelayedexpansion", stripped, re.IGNORECASE):
+    if not _COMPILED_SETLOCAL_DISABLE.search(stripped):
         return issues
 
     # Check if this is redundant based on context
@@ -4311,7 +4324,206 @@ def _check_undefined_variables(
     return issues
 
 
-def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def _is_script_language_line(line: str, patterns: List[str]) -> bool:
+    """
+    Check if a line matches any pattern from a script language.
+
+    Args:
+        line: The line to check
+        patterns: List of regex patterns to match against
+
+    Returns:
+        True if the line matches any pattern
+    """
+    for pattern in patterns:
+        if re.search(pattern, line, re.IGNORECASE):
+            return True
+    return False
+
+
+def _is_batch_code_line(line: str, stripped: str) -> bool:
+    """
+    Check if a line looks like batch code rather than embedded script.
+
+    Args:
+        line: The full line to check
+        stripped: The stripped version of the line
+
+    Returns:
+        True if the line appears to be batch code
+    """
+    for pattern in BATCH_INDICATORS:
+        if re.match(pattern, stripped, re.IGNORECASE):
+            # Additional check: make sure it's not PowerShell
+            if not any(re.search(p, line, re.IGNORECASE) for p in POWERSHELL_PATTERNS):
+                return True
+    return False
+
+
+@dataclass
+class ScriptBlockState:
+    """State information for script block detection."""
+
+    is_script_line: bool
+    in_current_block: bool
+    in_other_blocks: bool
+    script_type: str
+    line_num: int
+    last_label_line: int
+
+
+def _handle_script_block_start(state: ScriptBlockState) -> Tuple[bool, int]:
+    """
+    Handle the start of a script block.
+
+    Args:
+        state: Script block state information
+
+    Returns:
+        Tuple of (should_enter_block, block_start_line)
+    """
+    if state.is_script_line and not state.in_other_blocks:
+        if not state.in_current_block:
+            logger.debug(
+                "Detected %s block starting at line %d (after label on line %d)",
+                state.script_type,
+                state.line_num,
+                state.last_label_line,
+            )
+            return True, state.line_num
+    return state.in_current_block, 0
+
+
+def _handle_script_block_end(
+    is_batch_line: bool,
+    block_type: str,
+    line_num: int,
+    block_start: int,
+) -> bool:
+    """
+    Handle the end of a script block.
+
+    Args:
+        is_batch_line: Whether the current line looks like batch code
+        block_type: Type of block being ended
+        line_num: Current line number
+        block_start: Line where the block started
+
+    Returns:
+        False to indicate the block has ended
+    """
+    if is_batch_line:
+        logger.debug(
+            "%s block ended at line %d (lasted %d lines)",
+            block_type,
+            line_num - 1,
+            line_num - block_start,
+        )
+        return False
+    return True
+
+
+def _process_heredoc_block(
+    stripped: str,
+    i: int,
+    in_heredoc: bool,
+    block_start: int,
+    skip_lines: Set[int],
+) -> Tuple[bool, int, bool]:
+    """
+    Process PowerShell heredoc blocks (<# ... #>).
+
+    Returns:
+        Tuple of (in_heredoc, block_start, should_continue)
+    """
+    # Check for heredoc start
+    if re.search(r"<#", stripped) and not in_heredoc:
+        skip_lines.add(i)
+        logger.debug("Detected PowerShell heredoc block starting at line %d", i)
+        return True, i, True
+
+    # Check for heredoc end
+    if in_heredoc:
+        skip_lines.add(i)
+        if re.search(r"#>", stripped):
+            logger.debug(
+                "PowerShell heredoc block ended at line %d (lasted %d lines)",
+                i,
+                i - block_start + 1,
+            )
+            return False, 0, True
+        return True, block_start, True
+
+    return False, block_start, False
+
+
+@dataclass
+class ScriptProcessingContext:
+    """Context information for script block processing."""
+
+    line: str
+    stripped: str
+    line_num: int
+    last_label_line: int
+    block_states: Dict[str, bool]
+    block_start_line: int
+    skip_lines: Set[int]
+
+
+def _process_script_blocks(
+    ctx: ScriptProcessingContext,
+) -> Tuple[Dict[str, bool], int, bool]:
+    """
+    Process script language blocks (PowerShell, VBScript, C#).
+
+    Args:
+        ctx: Script processing context
+
+    Returns:
+        Tuple of (updated_block_states, block_start_line, should_continue)
+    """
+    # Check for script patterns
+    script_patterns = {
+        "powershell": _is_script_language_line(ctx.line, POWERSHELL_PATTERNS),
+        "vbscript": _is_script_language_line(ctx.line, VBSCRIPT_PATTERNS),
+        "csharp": _is_script_language_line(ctx.line, CSHARP_PATTERNS),
+    }
+
+    # Handle block starts for each script type
+    for script_type, is_script_line in script_patterns.items():
+        other_blocks = any(
+            ctx.block_states[other] for other in ctx.block_states if other != script_type
+        )
+        ctx.block_states[script_type], start = _handle_script_block_start(
+            ScriptBlockState(
+                is_script_line,
+                ctx.block_states[script_type],
+                other_blocks,
+                script_type.capitalize(),
+                ctx.line_num,
+                ctx.last_label_line,
+            )
+        )
+        if start:
+            ctx.skip_lines.add(ctx.line_num)
+            return ctx.block_states, start, True
+
+    # Handle block ends if in any block
+    if any(ctx.block_states.values()):
+        is_batch_line = _is_batch_code_line(ctx.line, ctx.stripped)
+        for script_type in ctx.block_states:
+            if ctx.block_states[script_type]:
+                ended = _handle_script_block_end(
+                    is_batch_line, script_type.capitalize(), ctx.line_num, ctx.block_start_line
+                )
+                ctx.block_states[script_type] = not ended
+        if not is_batch_line:
+            ctx.skip_lines.add(ctx.line_num)
+
+    return ctx.block_states, ctx.block_start_line, False
+
+
+def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals
     lines: List[str],
 ) -> Set[int]:
     """
@@ -4333,15 +4545,9 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals,too-many-
         Set of line numbers (1-indexed) that should be skipped during linting
     """
     skip_lines: Set[int] = set()
-
-    # Track if we're in an embedded script block
-    in_powershell_block = False
-    in_vbscript_block = False
-    in_csharp_block = False
-    in_powershell_heredoc = False  # Track PowerShell heredoc blocks (<# ... #>)
+    block_states = {"powershell": False, "vbscript": False, "csharp": False}
+    in_powershell_heredoc = False
     block_start_line = 0
-
-    # Track the last label line to detect blocks after labels
     last_label_line = 0
 
     for i, line in enumerate(lines, start=1):
@@ -4351,129 +4557,27 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals,too-many-
         if not stripped or stripped.startswith("::") or stripped.upper().startswith("REM "):
             continue
 
-        # Check for PowerShell heredoc block start (<#)
-        if re.search(r"<#", stripped):
-            in_powershell_heredoc = True
-            block_start_line = i
-            skip_lines.add(i)
-            logger.debug("Detected PowerShell heredoc block starting at line %d", i)
-            continue
-
-        # Check for PowerShell heredoc block end (#>)
-        if in_powershell_heredoc:
-            skip_lines.add(i)
-            if re.search(r"#>", stripped):
-                logger.debug(
-                    "PowerShell heredoc block ended at line %d (lasted %d lines)",
-                    i,
-                    i - block_start_line + 1,
-                )
-                in_powershell_heredoc = False
+        # Handle heredoc blocks
+        in_powershell_heredoc, block_start_line, should_continue = _process_heredoc_block(
+            stripped, i, in_powershell_heredoc, block_start_line, skip_lines
+        )
+        if should_continue:
             continue
 
         # Track labels (potential start of embedded script block)
         if re.match(r"^:[a-zA-Z_][\w]*:", stripped):
             last_label_line = i
-            in_powershell_block = False
-            in_vbscript_block = False
-            in_csharp_block = False
+            block_states = {"powershell": False, "vbscript": False, "csharp": False}
             continue
 
-        # Check for PowerShell patterns
-        is_powershell_line = False
-        for pattern in POWERSHELL_PATTERNS:
-            if re.search(pattern, line, re.IGNORECASE):
-                is_powershell_line = True
-                break
-
-        # Check for VBScript patterns
-        is_vbscript_line = False
-        for pattern in VBSCRIPT_PATTERNS:
-            if re.search(pattern, line):
-                is_vbscript_line = True
-                break
-
-        # Check for C# patterns
-        is_csharp_line = False
-        for pattern in CSHARP_PATTERNS:
-            if re.search(pattern, line):
-                is_csharp_line = True
-                break
-
-        # If we detect embedded script syntax, start a block
-        if is_powershell_line and not in_vbscript_block and not in_csharp_block:
-            if not in_powershell_block:
-                in_powershell_block = True
-                block_start_line = i
-                logger.debug(
-                    "Detected PowerShell block starting at line %d (after label on line %d)",
-                    i,
-                    last_label_line,
-                )
-            skip_lines.add(i)
+        # Process script blocks
+        block_states, block_start_line, should_continue = _process_script_blocks(
+            ScriptProcessingContext(
+                line, stripped, i, last_label_line, block_states, block_start_line, skip_lines
+            )
+        )
+        if should_continue:
             continue
-
-        if is_vbscript_line and not in_powershell_block and not in_csharp_block:
-            if not in_vbscript_block:
-                in_vbscript_block = True
-                block_start_line = i
-                logger.debug(
-                    "Detected VBScript block starting at line %d (after label on line %d)",
-                    i,
-                    last_label_line,
-                )
-            skip_lines.add(i)
-            continue
-
-        if is_csharp_line and not in_powershell_block and not in_vbscript_block:
-            if not in_csharp_block:
-                in_csharp_block = True
-                block_start_line = i
-                logger.debug(
-                    "Detected C# block starting at line %d (after label on line %d)",
-                    i,
-                    last_label_line,
-                )
-            skip_lines.add(i)
-            continue
-
-        # Continue skipping if we're in a block
-        if in_powershell_block or in_vbscript_block or in_csharp_block:
-            # Check if this looks like batch code (might be end of embedded block)
-            is_batch_line = False
-            for pattern in BATCH_INDICATORS:
-                if re.match(pattern, stripped, re.IGNORECASE):
-                    # Additional check: make sure it's not PowerShell
-                    if not any(re.search(p, line, re.IGNORECASE) for p in POWERSHELL_PATTERNS):
-                        is_batch_line = True
-                        break
-
-            if is_batch_line:
-                # Looks like we're back to batch code
-                if in_powershell_block:
-                    logger.debug(
-                        "PowerShell block ended at line %d (lasted %d lines)",
-                        i - 1,
-                        i - block_start_line,
-                    )
-                    in_powershell_block = False
-                if in_vbscript_block:
-                    logger.debug(
-                        "VBScript block ended at line %d (lasted %d lines)",
-                        i - 1,
-                        i - block_start_line,
-                    )
-                    in_vbscript_block = False
-                if in_csharp_block:
-                    logger.debug(
-                        "C# block ended at line %d (lasted %d lines)",
-                        i - 1,
-                        i - block_start_line,
-                    )
-                    in_csharp_block = False
-            else:
-                # Still in embedded script, skip this line
-                skip_lines.add(i)
 
     if skip_lines:
         logger.info(
@@ -4609,9 +4713,7 @@ def _analyze_script_structure(
     uses_delayed_vars = any(re.search(r"![^!]+!", line) for line in lines)
 
     # Check for SETLOCAL DISABLEDELAYEDEXPANSION usage
-    has_disable_delayed_expansion = any(
-        re.search(r"setlocal\s+disabledelayedexpansion", line, re.IGNORECASE) for line in lines
-    )
+    has_disable_delayed_expansion = any(_COMPILED_SETLOCAL_DISABLE.search(line) for line in lines)
 
     # Check for literal ! characters in strings (not delayed expansion variables)
     # Look for ! characters that are NOT part of delayed expansion !var! patterns
@@ -4628,7 +4730,7 @@ def _analyze_script_structure(
     # Track which lines have disabledelayedexpansion and if they follow endlocal
     disable_expansion_lines: Dict[int, bool] = {}  # line_num -> is_after_endlocal
     for i, line in enumerate(lines, start=1):
-        if re.search(r"setlocal\s+disabledelayedexpansion", line, re.IGNORECASE):
+        if _COMPILED_SETLOCAL_DISABLE.search(line):
             # Check if there's an ENDLOCAL in previous lines
             is_after_endlocal = any("endlocal" in prev_line.lower() for prev_line in lines[: i - 1])
             disable_expansion_lines[i] = is_after_endlocal
@@ -5847,7 +5949,80 @@ def _check_code_documentation(lines: List[str]) -> List[LintIssue]:
     return issues
 
 
-# pylint: disable=too-many-branches
+def _is_complex_block_start(stripped: str, line: str) -> bool:
+    """
+    Check if a line starts a complex code block.
+
+    Args:
+        stripped: Stripped and lowercased line
+        line: Original line with casing
+
+    Returns:
+        True if the line starts a complex block
+    """
+    return (
+        stripped.startswith("for ")
+        or (stripped.startswith("if ") and "(" in line)
+        or (stripped.startswith(":") and len(stripped) > 5)
+    )
+
+
+def _has_preceding_documentation(lines: List[str], line_index: int) -> bool:
+    """
+    Check if there's documentation in the 3 lines before the current line.
+
+    Args:
+        lines: All lines in the file
+        line_index: Current line index (1-based)
+
+    Returns:
+        True if documentation is found
+    """
+    for j in range(max(0, line_index - 3), line_index):
+        if j < len(lines) and _is_comment_line(lines[j]):
+            return True
+    return False
+
+
+def _is_block_end_marker(
+    stripped: str, line: str, i: int, lines: List[str], block_start: int
+) -> bool:
+    """
+    Check if current line marks the end of a complex block.
+
+    Args:
+        stripped: Stripped and lowercased line
+        line: Original line with casing
+        i: Current line number (1-based)
+        lines: All lines in the file
+        block_start: Line where the block started
+
+    Returns:
+        True if this line ends the block
+    """
+    # Check for new label (starts a new section/subroutine) or control flow
+    if (
+        (stripped.startswith(":") and not stripped.startswith("::"))
+        or re.match(r"^(goto|exit)\b", stripped, re.IGNORECASE)
+        or re.match(r"^call\s+:", stripped, re.IGNORECASE)
+    ):
+        return True
+
+    # Check for closing parenthesis or consecutive empty lines (paragraph break)
+    if line.count(")") > line.count("(") or (
+        line.strip() == "" and i < len(lines) and lines[i].strip() == ""
+    ):
+        return True
+
+    # Check for significant distance from start (>15 lines) AND a clear boundary
+    if i - block_start > 15 and (
+        line.strip() == "" or re.match(r"^(echo|set|if|for|call|rem)\b", stripped, re.IGNORECASE)
+    ):
+        return True
+
+    return False
+
+
 def _check_missing_documentation(
     lines: List[str],
 ) -> List[LintIssue]:
@@ -5860,22 +6035,12 @@ def _check_missing_documentation(
         stripped = line.strip().lower()
 
         # Identify complex code blocks
-        is_complex_start = (
-            stripped.startswith("for ")
-            or (stripped.startswith("if ") and "(" in line)
-            or (stripped.startswith(":") and len(stripped) > 5)
-        )
-
-        if is_complex_start and not in_complex_block:
+        if _is_complex_block_start(stripped, line) and not in_complex_block:
             in_complex_block = True
             complex_block_start = i
 
             # Check for documentation in previous 3 lines
-            has_doc = False
-            for j in range(max(0, i - 3), i):
-                if j < len(lines) and _is_comment_line(lines[j]):
-                    has_doc = True
-                    break
+            has_doc = _has_preceding_documentation(lines, i)
 
             if not has_doc and ":" in stripped:
                 issues.append(
@@ -5887,45 +6052,8 @@ def _check_missing_documentation(
                 )
 
         # Comprehensive end of block detection
-        # Detect actual block termination through various batch file constructs
         if in_complex_block:
-            block_ended = False
-
-            # Check for new label (starts a new section/subroutine)
-            if stripped.startswith(":") and not stripped.startswith("::"):
-                block_ended = True
-
-            # Check for explicit control flow that exits the block
-            elif re.match(r"^(goto|exit)\b", stripped, re.IGNORECASE):
-                block_ended = True
-
-            # Check for CALL to another label (may indicate block end)
-            elif re.match(r"^call\s+:", stripped, re.IGNORECASE):
-                block_ended = True
-
-            # Check for closing parenthesis of multi-line IF or FOR blocks
-            # Count parentheses to detect when we've closed the block
-            open_parens = line.count("(")
-            close_parens = line.count(")")
-            if close_parens > open_parens:
-                # More closing than opening suggests end of a block
-                block_ended = True
-
-            # Check for two consecutive empty lines (paragraph break)
-            if line.strip() == "":
-                # Look ahead to see if next line is also empty
-                if i < len(lines) and lines[i].strip() == "":
-                    block_ended = True
-
-            # Check for significant distance from start (>15 lines) AND a clear boundary
-            # (empty line, new command, etc.)
-            if i - complex_block_start > 15:
-                if line.strip() == "" or re.match(
-                    r"^(echo|set|if|for|call|rem)\b", stripped, re.IGNORECASE
-                ):
-                    block_ended = True
-
-            if block_ended:
+            if _is_block_end_marker(stripped, line, i, lines, complex_block_start):
                 in_complex_block = False
 
     return issues
@@ -6824,43 +6952,90 @@ class CliArguments:
     cli_follow_calls: Optional[bool]
 
 
-def _parse_cli_arguments() -> Optional[CliArguments]:
-    """Parse command line arguments."""
-    # Handle --version flag first
+def _handle_special_cli_flags() -> Optional[bool]:
+    """
+    Handle special CLI flags that should exit early.
+
+    Returns:
+        None if should continue parsing, False if should exit with None
+    """
     if "--version" in sys.argv:
         print_version()
-        return None
+        return False
 
     if len(sys.argv) < 2 or "--help" in sys.argv:
         print_help()
-        return None
+        return False
 
-    # Handle special commands first
     if "--create-config" in sys.argv:
         create_default_config_file()
-        return None
+        return False
 
+    return None
+
+
+def _parse_regular_arguments() -> (
+    Tuple[Optional[str], bool, Optional[bool], Optional[bool], Optional[bool]]
+):
+    """
+    Parse regular command-line arguments using a lookup table.
+
+    Returns:
+        Tuple of (target_path, use_config, cli_show_summary, cli_recursive, cli_follow_calls)
+    """
     target_path: Optional[str] = None
     use_config = True
-    cli_show_summary = None  # None means use config default
-    cli_recursive = None  # None means use config default
-    cli_follow_calls = None  # None means use config default
+    cli_show_summary = None
+    cli_recursive = None
+    cli_follow_calls = None
+
+    # Argument handlers lookup table
+    arg_handlers: Dict[
+        str,
+        Callable[[], Tuple[None, Optional[bool], Optional[bool], Optional[bool], Optional[bool]]],
+    ] = {
+        "--summary": lambda: (
+            None,
+            None,
+            True,
+            None,
+            None,
+        ),  # (path, config, summary, recursive, follow)
+        "--severity": lambda: (None, None, None, None, None),  # Always shown, no-op
+        "--no-recursive": lambda: (None, None, None, False, None),
+        "--no-config": lambda: (None, False, None, None, None),
+        "--follow-calls": lambda: (None, None, None, None, True),
+    }
 
     for arg in sys.argv[1:]:
         if not arg.startswith("--"):
-            # This should be the file or directory path
             if target_path is None:
                 target_path = arg
-        elif arg == "--summary":
-            cli_show_summary = True
-        elif arg == "--severity":
-            pass  # Severity is always shown
-        elif arg == "--no-recursive":
-            cli_recursive = False
-        elif arg == "--no-config":
-            use_config = False
-        elif arg == "--follow-calls":
-            cli_follow_calls = True
+        elif arg in arg_handlers:
+            _, config, summary, recursive, follow = arg_handlers[arg]()
+            if config is not None:
+                use_config = config
+            if summary is not None:
+                cli_show_summary = summary
+            if recursive is not None:
+                cli_recursive = recursive
+            if follow is not None:
+                cli_follow_calls = follow
+
+    return target_path, use_config, cli_show_summary, cli_recursive, cli_follow_calls
+
+
+def _parse_cli_arguments() -> Optional[CliArguments]:
+    """Parse command line arguments."""
+    # Handle special flags that exit early
+    should_continue = _handle_special_cli_flags()
+    if should_continue is False:
+        return None
+
+    # Parse regular arguments
+    target_path, use_config, cli_show_summary, cli_recursive, cli_follow_calls = (
+        _parse_regular_arguments()
+    )
 
     if not target_path:
         print("Error: No batch file or directory provided.\n")
@@ -6958,6 +7133,94 @@ def _extract_called_scripts(batch_file: Path) -> List[Path]:
     return called_scripts
 
 
+def _resolve_call_script_path(script_path_str: str, batch_dir: Path) -> Optional[Path]:
+    """
+    Resolve a CALL script path with batch parameter expansions.
+
+    Args:
+        script_path_str: The script path string from the CALL statement
+        batch_dir: The directory containing the batch file
+
+    Returns:
+        Resolved Path object, or None if resolution fails
+    """
+    # Resolve batch parameter expansions
+    if "%~dp0" in script_path_str:
+        script_path_str = script_path_str.replace("%~dp0", "")
+        return batch_dir / script_path_str
+    if "%~d0" in script_path_str:
+        script_path_str = script_path_str.replace("%~d0", str(batch_dir.drive))
+        return Path(script_path_str)
+
+    script_path = Path(script_path_str)
+    if not script_path.is_absolute():
+        return batch_dir / script_path_str
+    return script_path
+
+
+def _try_add_dependency(script_path: Path, batch_file_resolved: Path, deps: Set[Path]) -> None:
+    """
+    Try to add a dependency if the script path is valid.
+
+    Args:
+        script_path: Path to the script file
+        batch_file_resolved: Resolved path of the current batch file
+        deps: Set to add the dependency to
+    """
+    try:
+        if not (script_path.exists() and script_path.is_file()):
+            return
+        resolved_script = script_path.resolve()
+        if resolved_script != batch_file_resolved:
+            deps.add(resolved_script)
+    except (ValueError, OSError):
+        pass
+
+
+def _extract_direct_dependencies(batch_file: Path, batch_file_resolved: Path) -> Set[Path]:
+    """
+    Extract direct dependencies from a batch file by parsing CALL statements.
+
+    Args:
+        batch_file: Path to the batch file
+        batch_file_resolved: Resolved path of the batch file
+
+    Returns:
+        Set of resolved Path objects that this file directly depends on
+    """
+    deps: Set[Path] = set()
+    try:
+        with open(batch_file, "r", encoding="utf-8", errors="ignore") as file:
+            batch_dir = batch_file.parent
+
+            for line in file:
+                # Skip comments
+                stripped = line.strip().lower()
+                if stripped.startswith("rem ") or stripped.startswith("::"):
+                    continue
+
+                # Look for CALL statements with .bat or .cmd files
+                call_match = re.search(
+                    r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|([^\s]+\.(?:bat|cmd)))',
+                    line,
+                    re.IGNORECASE,
+                )
+
+                if not call_match:
+                    continue
+
+                script_path_str = call_match.group(1) or call_match.group(2)
+                script_path = _resolve_call_script_path(script_path_str, batch_dir)
+
+                if script_path:
+                    _try_add_dependency(script_path, batch_file_resolved, deps)
+
+    except (OSError, UnicodeDecodeError):
+        pass
+
+    return deps
+
+
 def _build_call_dependency_graph(batch_files: List[Path]) -> Dict[Path, Set[Path]]:
     """
     Build a dependency graph showing which batch files call which other files.
@@ -6979,64 +7242,16 @@ def _build_call_dependency_graph(batch_files: List[Path]) -> Dict[Path, Set[Path
 
     for batch_file in batch_files:
         batch_file_resolved = batch_file.resolve()
-        direct_deps[batch_file_resolved] = set()
-
-        try:
-            with open(batch_file, "r", encoding="utf-8", errors="ignore") as file:
-                batch_dir = batch_file.parent
-
-                for line in file:
-                    # Skip comments
-                    stripped = line.strip().lower()
-                    if stripped.startswith("rem ") or stripped.startswith("::"):
-                        continue
-
-                    # Look for CALL statements with .bat or .cmd files
-                    call_match = re.search(
-                        r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|([^\s]+\.(?:bat|cmd)))',
-                        line,
-                        re.IGNORECASE,
-                    )
-
-                    if call_match:
-                        # Get the script path (from either quoted or unquoted group)
-                        script_path_str = call_match.group(1) or call_match.group(2)
-
-                        # Resolve batch parameter expansions
-                        if "%~dp0" in script_path_str:
-                            script_path_str = script_path_str.replace("%~dp0", "")
-                            script_path = batch_dir / script_path_str
-                        elif "%~d0" in script_path_str:
-                            script_path_str = script_path_str.replace("%~d0", str(batch_dir.drive))
-                            script_path = Path(script_path_str)
-                        else:
-                            script_path = Path(script_path_str)
-                            if not script_path.is_absolute():
-                                script_path = batch_dir / script_path_str
-
-                        # Add to dependencies if the file exists
-                        try:
-                            if script_path.exists() and script_path.is_file():
-                                # Avoid self-references
-                                resolved_script = script_path.resolve()
-                                if resolved_script != batch_file_resolved:
-                                    direct_deps[batch_file_resolved].add(resolved_script)
-                        except (ValueError, OSError):
-                            # Invalid path, skip
-                            continue
-
-        except (OSError, UnicodeDecodeError):
-            # If we can't read the file, skip it
-            continue
+        direct_deps[batch_file_resolved] = _extract_direct_dependencies(
+            batch_file, batch_file_resolved
+        )
 
     # Second pass: compute transitive closure
-    # For each file, recursively add all dependencies of its dependencies
     transitive_deps: Dict[Path, Set[Path]] = {}
 
     def get_all_deps(file_path: Path, visited: Set[Path]) -> Set[Path]:
         """Recursively get all dependencies (direct and transitive)."""
         if file_path in visited:
-            # Circular dependency or already processed
             return set()
 
         visited.add(file_path)
