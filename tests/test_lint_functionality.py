@@ -176,6 +176,88 @@ rmdir /s /q C:\\temp
         finally:
             os.unlink(temp_file)
 
+    def test_sec003_shutdown_false_positives(self) -> None:
+        """Test SEC003 does not flag shutdown in labels, GOTO, or variable names."""
+        content = """@echo off
+rem Test that shutdown in various contexts doesn't trigger false positives
+
+rem -- Label containing shutdown - should NOT flag
+:ShutDown
+echo In shutdown label
+
+rem -- GOTO statement with shutdown label - should NOT flag
+GOTO :ShutDown
+GOTO :Abort-ShutDown
+
+rem -- Another label with shutdown - should NOT flag
+:Abort-Shutdown
+echo Aborting
+
+rem -- Variable name containing shutdown - should NOT flag
+IF DEFINED @MSSHUTDOWN echo Variable defined
+SET @MSSHUTDOWN=TRUE
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            sec003_issues = [issue for issue in issues if issue.rule.code == "SEC003"]
+            # Should have NO SEC003 issues - all are false positive contexts
+            assert len(sec003_issues) == 0, (
+                f"Expected no SEC003 issues but found {len(sec003_issues)}: "
+                f"{[issue.line_number for issue in sec003_issues]}"
+            )
+        finally:
+            os.unlink(temp_file)
+
+    def test_sec003_shutdown_true_positives(self) -> None:
+        """Test SEC003 correctly flags actual shutdown commands."""
+        content = """@echo off
+rem Test that actual shutdown commands are flagged
+
+rem -- Actual SHUTDOWN command - SHOULD flag
+START "Shutdown" SHUTDOWN -s -f -m \\\\SERVER -t 75 -c "Emergency"
+
+rem -- PSSHUTDOWN command - SHOULD flag
+START "Shutdown" PSSHUTDOWN -k -f -t 75 -m "Emergency" \\\\SERVER
+
+rem -- Abort shutdown - SHOULD flag
+SHUTDOWN -a -m \\\\SERVER
+
+rem -- PSSHUTDOWN abort - SHOULD flag
+PSSHUTDOWN -a \\\\SERVER
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            sec003_issues = [issue for issue in issues if issue.rule.code == "SEC003"]
+            # Should have 4 SEC003 issues - one for each actual command
+            assert len(sec003_issues) == 4, (
+                f"Expected 4 SEC003 issues but found {len(sec003_issues)}: "
+                f"lines {[issue.line_number for issue in sec003_issues]}"
+            )
+        finally:
+            os.unlink(temp_file)
+
+    def test_sec003_where_shutdown(self) -> None:
+        """Test SEC003 flags WHERE SHUTDOWN in command substitution."""
+        content = """@echo off
+rem Test that WHERE SHUTDOWN is flagged even in SET statements
+
+rem -- WHERE SHUTDOWN in FOR loop - SHOULD flag
+SET @MSSHUTDOWN=& FOR /F %%V IN ('WHERE SHUTDOWN 2^>NUL') DO SET @MSSHUTDOWN=TRUE
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            sec003_issues = [issue for issue in issues if issue.rule.code == "SEC003"]
+            # Should have 1 SEC003 issue for WHERE SHUTDOWN
+            assert len(sec003_issues) == 1, (
+                f"Expected 1 SEC003 issue for WHERE SHUTDOWN but found {len(sec003_issues)}: "
+                f"lines {[issue.line_number for issue in sec003_issues]}"
+            )
+        finally:
+            os.unlink(temp_file)
+
     def test_long_lines(self) -> None:
         """Test detection of lines exceeding 150 characters."""
         long_line = "echo " + "x" * 155  # Exceed 150 character limit
@@ -407,7 +489,7 @@ echo Process finished
             elif "format" in pattern:
                 test_content = "@echo off\nformat c:\n"
             elif "shutdown" in pattern:
-                test_content = "@echo off\nshutdown\n"
+                test_content = "@echo off\nshutdown /s\n"
             elif "rmdir" in pattern:
                 test_content = "@echo off\nrmdir /s /q C:\\\n"
             else:
@@ -684,7 +766,7 @@ echo Escaped ^> character
         test_cases = [
             (r"del\s+\*/\*|\*\.?\*", ["del *.*", "DEL */*"]),
             (r"format\s+[a-z]:", ["format c:", "format a:", "format d:"]),
-            (r"shutdown", ["shutdown", "SHUTDOWN", "shutdown /s"]),
+            (r"\b(ps)?shutdown\s+[/-]", ["shutdown /s", "SHUTDOWN -t", "psshutdown /a"]),
             (r"rmdir\s+/s\s+/q\s+", ["rmdir /s /q temp", "RMDIR /S /Q folder"]),
         ]
 

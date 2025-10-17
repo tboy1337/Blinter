@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.72
+Version: 1.0.73
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.72"
+__version__ = "1.0.73"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1745,13 +1745,14 @@ def read_file_with_encoding(file_path: str) -> Tuple[List[str], str]:
         with open(file_path, "rb") as file_handle:
             raw_data = file_handle.read()
 
-        detected = chardet.detect(raw_data)
-        if detected and detected["encoding"] and detected["confidence"] > 0.7:
-            detected_encoding = detected["encoding"].lower()
+        # chardet.detect returns Dict[str, Any] - type: ignore for external library
+        detected = chardet.detect(raw_data)  # type: ignore[misc]
+        if detected and detected["encoding"] and detected["confidence"] > 0.7:  # type: ignore[misc]
+            detected_encoding: str = detected["encoding"].lower()  # type: ignore[misc]
             logger.debug(
                 "Chardet detected encoding: %s (confidence: %.2f)",
                 detected_encoding,
-                detected["confidence"],
+                detected["confidence"],  # type: ignore[misc]
             )
             # Add detected encoding to the front of our list if it's not already there
             if detected_encoding not in [enc.lower() for enc in encodings_to_try]:
@@ -1810,7 +1811,7 @@ DANGEROUS_COMMAND_PATTERNS: List[Tuple[str, str]] = [
         "SEC003",
     ),  # del c:\* type commands with optional flags
     (r"format\s+(?:[/-]\w+\s+)*[a-z]:", "SEC003"),  # format c: type commands with optional flags
-    (r"shutdown", "SEC003"),  # shutdown commands
+    (r"\b(ps)?shutdown\s+[/-]", "SEC003"),  # shutdown/psshutdown commands with flags
     (r"rmdir\s+/s\s+/q\s+", "SEC003"),  # rmdir /s /q commands
     (r"reg\s+delete\s+.*\s+/f", "SEC004"),  # forced registry deletions
 ]
@@ -2168,7 +2169,8 @@ def _is_command_in_safe_context(line: str) -> bool:
     """
     Check if a potentially dangerous command is in a safe context.
 
-    Safe contexts include REM comments, ECHO statements, or SET statements.
+    Safe contexts include REM comments, ECHO statements, labels, GOTO statements,
+    or IF DEFINED variable checks.
 
     Args:
         line: The line to check
@@ -2182,17 +2184,24 @@ def _is_command_in_safe_context(line: str) -> bool:
     if _is_comment_line(line):
         return True
 
-    # Check if line starts with ECHO (output statement)
-    if stripped.startswith("echo ") or stripped.startswith("echo\t"):
+    # Check if line is a label definition (starts with :)
+    if stripped.startswith(":"):
         return True
 
-    # Check for @ECHO off (common at start of scripts)
-    if stripped.startswith("@echo ") or stripped.startswith("@echo\t"):
+    # Check if line starts with ECHO or @ECHO (output statements)
+    if stripped.startswith(("echo ", "echo\t", "@echo ", "@echo\t")):
+        return True
+
+    # Check if line contains GOTO statement (navigation to labels)
+    # or IF DEFINED for variable checks
+    if re.search(r"\bgoto\s+:", stripped) or re.search(r"\bif\s+defined\s+", stripped):
         return True
 
     # Check if line is a SET statement (environment variable assignment)
-    if stripped.startswith("set ") or stripped.startswith("set\t"):
-        return True
+    # But NOT if it contains WHERE SHUTDOWN in command substitution
+    if stripped.startswith(("set ", "set\t")):
+        if not re.search(r"where\s+shutdown", stripped):
+            return True
 
     return False
 
@@ -3807,6 +3816,18 @@ def _check_input_validation_sec(line: str, line_num: int, stripped: str) -> List
                     )
                 )
                 break
+
+    # SEC003: Special check for WHERE SHUTDOWN in command substitution
+    # This checks for shutdown command existence and should be flagged
+    # But skip if it's in a comment line
+    if not _is_comment_line(line) and re.search(r"where\s+shutdown", stripped, re.IGNORECASE):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["SEC003"],
+                context="Checking for shutdown command should have user confirmation",
+            )
+        )
 
     return issues
 
