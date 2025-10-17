@@ -238,23 +238,46 @@ PSSHUTDOWN -a \\\\SERVER
         finally:
             os.unlink(temp_file)
 
-    def test_sec003_where_shutdown(self) -> None:
-        """Test SEC003 flags WHERE SHUTDOWN in command substitution."""
+    def test_sec003_where_dangerous_commands(self) -> None:
+        """Test SEC003 flags WHERE with dangerous commands in command substitution."""
         content = """@echo off
-rem Test that WHERE SHUTDOWN is flagged even in SET statements
+rem Test that WHERE with dangerous commands is flagged even in SET statements
 
 rem -- WHERE SHUTDOWN in FOR loop - SHOULD flag
 SET @MSSHUTDOWN=& FOR /F %%V IN ('WHERE SHUTDOWN 2^>NUL') DO SET @MSSHUTDOWN=TRUE
+
+rem -- WHERE FORMAT - SHOULD flag
+SET @HASFORMAT=& FOR /F %%V IN ('WHERE FORMAT 2^>NUL') DO SET @HASFORMAT=TRUE
+
+rem -- WHERE DEL - SHOULD flag
+SET @HASDEL=& FOR /F %%V IN ('WHERE DEL 2^>NUL') DO SET @HASDEL=TRUE
+
+rem -- WHERE RMDIR - SHOULD flag
+SET @HASRMDIR=& FOR /F %%V IN ('WHERE RMDIR 2^>NUL') DO SET @HASRMDIR=TRUE
+
+rem -- WHERE PSSHUTDOWN - SHOULD flag
+SET @HASPSSHUTDOWN=& FOR /F %%V IN ('WHERE PSSHUTDOWN 2^>NUL') DO SET @HASPSSHUTDOWN=TRUE
+
+rem -- WHERE REG - SHOULD flag
+SET @HASREG=& FOR /F %%V IN ('WHERE REG 2^>NUL') DO SET @HASREG=TRUE
 """
         temp_file = self.create_temp_batch_file(content)
         try:
             issues = lint_batch_file(temp_file)
             sec003_issues = [issue for issue in issues if issue.rule.code == "SEC003"]
-            # Should have 1 SEC003 issue for WHERE SHUTDOWN
-            assert len(sec003_issues) == 1, (
-                f"Expected 1 SEC003 issue for WHERE SHUTDOWN but found {len(sec003_issues)}: "
+            # Should have 6 SEC003 issues - one for each WHERE command
+            assert len(sec003_issues) == 6, (
+                f"Expected 6 SEC003 issues for WHERE commands but found {len(sec003_issues)}: "
                 f"lines {[issue.line_number for issue in sec003_issues]}"
             )
+            # Verify each dangerous command is detected
+            contexts = [issue.context for issue in sec003_issues]
+            assert any("SHUTDOWN" in ctx for ctx in contexts), "Should detect WHERE SHUTDOWN"
+            assert any("FORMAT" in ctx for ctx in contexts), "Should detect WHERE FORMAT"
+            assert any("DEL" in ctx for ctx in contexts), "Should detect WHERE DEL"
+            assert any("RMDIR" in ctx for ctx in contexts), "Should detect WHERE RMDIR"
+            assert any("PSSHUTDOWN" in ctx for ctx in contexts), "Should detect WHERE PSSHUTDOWN"
+            assert any("REG" in ctx for ctx in contexts), "Should detect WHERE REG"
         finally:
             os.unlink(temp_file)
 

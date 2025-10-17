@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.73
+Version: 1.0.74
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.73"
+__version__ = "1.0.74"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1800,6 +1800,20 @@ def read_file_with_encoding(file_path: str) -> Tuple[List[str], str]:
 
 
 # Pattern definitions for rule matching
+# List of dangerous command names for centralized reference
+# These are used in WHERE checks and command substitution detection
+DANGEROUS_COMMAND_NAMES: List[str] = [
+    "del",
+    "format",
+    "shutdown",
+    "psshutdown",
+    "rmdir",
+    "reg",
+]
+
+# Build the regex pattern once for performance (used in multiple places)
+_DANGEROUS_CMDS_REGEX: str = "|".join(DANGEROUS_COMMAND_NAMES)
+
 DANGEROUS_COMMAND_PATTERNS: List[Tuple[str, str]] = [
     (r"del\s+(?:[/-]\w+\s+)*[\"']?\*\.\*[\"']?(\s|$)", "SEC003"),  # del *.* with optional flags
     (
@@ -1913,25 +1927,23 @@ COMMON_COMMAND_TYPOS = {
     "exitt": "exit",
 }
 
-CREDENTIAL_PATTERNS = [
-    r"password\s*=\s*[\"']?[^\s\"']+[\"']?",
-    r"pwd\s*=\s*[\"']?[^\s\"']+[\"']?",
-    r"passwd\s*=\s*[\"']?[^\s\"']+[\"']?",
-    r"apikey\s*=\s*[\"']?[^\s\"']+[\"']?",
-    r"api_key\s*=\s*[\"']?[^\s\"']+[\"']?",
-    r"secret\s*=\s*[\"']?[^\s\"']+[\"']?",
-    r"token\s*=\s*[\"']?[^\s\"']+[\"']?",
+# List of sensitive keyword names for centralized reference
+# These are used in credential detection and sensitive ECHO detection
+SENSITIVE_KEYWORDS: List[str] = [
+    "password",
+    "pwd",
+    "passwd",
+    "apikey",
+    "api_key",
+    "secret",
+    "token",
 ]
 
-SENSITIVE_ECHO_PATTERNS = [
-    r"echo.*password",
-    r"echo.*pwd",
-    r"echo.*passwd",
-    r"echo.*apikey",
-    r"echo.*api_key",
-    r"echo.*secret",
-    r"echo.*token",
-]
+# Build credential patterns dynamically from sensitive keywords
+CREDENTIAL_PATTERNS = [rf"{keyword}\s*=\s*[\"']?[^\s\"']+[\"']?" for keyword in SENSITIVE_KEYWORDS]
+
+# Build sensitive echo patterns dynamically from sensitive keywords
+SENSITIVE_ECHO_PATTERNS = [rf"echo.*{keyword}" for keyword in SENSITIVE_KEYWORDS]
 
 
 def _load_general_settings(config: BlinterConfig, parser: configparser.ConfigParser) -> None:
@@ -2170,7 +2182,9 @@ def _is_command_in_safe_context(line: str) -> bool:
     Check if a potentially dangerous command is in a safe context.
 
     Safe contexts include REM comments, ECHO statements, labels, GOTO statements,
-    or IF DEFINED variable checks.
+    or IF DEFINED variable checks. SET statements are generally safe UNLESS they
+    contain dangerous commands in command substitution contexts (e.g., WHERE FORMAT,
+    WHERE SHUTDOWN, etc.).
 
     Args:
         line: The line to check
@@ -2198,9 +2212,14 @@ def _is_command_in_safe_context(line: str) -> bool:
         return True
 
     # Check if line is a SET statement (environment variable assignment)
-    # But NOT if it contains WHERE SHUTDOWN in command substitution
+    # But NOT if it contains dangerous commands in command substitution
     if stripped.startswith(("set ", "set\t")):
-        if not re.search(r"where\s+shutdown", stripped):
+        # Check for any dangerous command pattern in command substitution
+        # Common patterns: WHERE <dangerous_cmd>, or the dangerous command itself in quotes
+        dangerous_in_substitution = re.search(
+            rf"where\s+({_DANGEROUS_CMDS_REGEX})", stripped
+        ) or re.search(rf"['\(]\s*({_DANGEROUS_CMDS_REGEX})\s+", stripped)
+        if not dangerous_in_substitution:
             return True
 
     return False
@@ -3817,17 +3836,20 @@ def _check_input_validation_sec(line: str, line_num: int, stripped: str) -> List
                 )
                 break
 
-    # SEC003: Special check for WHERE SHUTDOWN in command substitution
-    # This checks for shutdown command existence and should be flagged
+    # SEC003: Special check for WHERE with dangerous commands in command substitution
+    # This checks for dangerous command existence and should be flagged
     # But skip if it's in a comment line
-    if not _is_comment_line(line) and re.search(r"where\s+shutdown", stripped, re.IGNORECASE):
-        issues.append(
-            LintIssue(
-                line_number=line_num,
-                rule=RULES["SEC003"],
-                context="Checking for shutdown command should have user confirmation",
+    if not _is_comment_line(line):
+        where_match = re.search(rf"where\s+({_DANGEROUS_CMDS_REGEX})", stripped, re.IGNORECASE)
+        if where_match:
+            cmd = str(where_match.group(1)).upper()
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["SEC003"],
+                    context=f"Checking for {cmd} command should have user confirmation",
+                )
             )
-        )
 
     return issues
 
