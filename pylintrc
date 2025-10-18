@@ -49,7 +49,8 @@ disable=raw-checker-failed,
         use-symbolic-message-instead,
         too-many-public-methods,
         broad-exception-caught,
-        duplicate-code
+        duplicate-code,
+        line-too-long
 
 # Enable the message, report, category or checker with the given id(s).
 enable=c-extension-no-member
@@ -211,7 +212,7 @@ indent-after-paren=4
 indent-string='    '
 
 # Maximum number of characters on a single line.
-max-line-length=100
+max-line-length=88
 
 # Maximum number of lines in a module.
 max-module-lines=1000

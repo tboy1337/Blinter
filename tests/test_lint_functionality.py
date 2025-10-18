@@ -40,7 +40,9 @@ EXIT /b 0
         try:
             issues = lint_batch_file(temp_file)
             # Should have some issues but mostly style-related (like .bat extension)
-            error_issues = [issue for issue in issues if issue.rule.severity == RuleSeverity.ERROR]
+            error_issues = [
+                issue for issue in issues if issue.rule.severity == RuleSeverity.ERROR
+            ]
             # Should have minimal critical errors
             assert len(error_issues) <= 1  # Allow for potential edge case detections
         finally:
@@ -272,18 +274,24 @@ SET @HASREG=& FOR /F %%V IN ('WHERE REG 2^>NUL') DO SET @HASREG=TRUE
             )
             # Verify each dangerous command is detected
             contexts = [issue.context for issue in sec003_issues]
-            assert any("SHUTDOWN" in ctx for ctx in contexts), "Should detect WHERE SHUTDOWN"
-            assert any("FORMAT" in ctx for ctx in contexts), "Should detect WHERE FORMAT"
+            assert any(
+                "SHUTDOWN" in ctx for ctx in contexts
+            ), "Should detect WHERE SHUTDOWN"
+            assert any(
+                "FORMAT" in ctx for ctx in contexts
+            ), "Should detect WHERE FORMAT"
             assert any("DEL" in ctx for ctx in contexts), "Should detect WHERE DEL"
             assert any("RMDIR" in ctx for ctx in contexts), "Should detect WHERE RMDIR"
-            assert any("PSSHUTDOWN" in ctx for ctx in contexts), "Should detect WHERE PSSHUTDOWN"
+            assert any(
+                "PSSHUTDOWN" in ctx for ctx in contexts
+            ), "Should detect WHERE PSSHUTDOWN"
             assert any("REG" in ctx for ctx in contexts), "Should detect WHERE REG"
         finally:
             os.unlink(temp_file)
 
     def test_long_lines(self) -> None:
-        """Test detection of lines exceeding 150 characters."""
-        long_line = "echo " + "x" * 155  # Exceed 150 character limit
+        """Test detection of lines exceeding 88 characters."""
+        long_line = "echo " + "x" * 93  # Exceed 88 character limit
         content = f"""@echo off
 {long_line}
 echo Normal line
@@ -522,7 +530,9 @@ echo Process finished
             try:
                 issues = lint_batch_file(temp_file)
                 rule_codes = [issue.rule.code for issue in issues]
-                assert expected_rule in rule_codes, f"Pattern {pattern} was not detected"
+                assert (
+                    expected_rule in rule_codes
+                ), f"Pattern {pattern} was not detected"
             finally:
                 os.unlink(temp_file)
 
@@ -543,14 +553,22 @@ class TestRuleSystem:
         for rule_code, rule in RULES.items():
             assert isinstance(rule.code, str), f"Rule {rule_code} has invalid code"
             assert isinstance(rule.name, str), f"Rule {rule_code} has invalid name"
-            assert isinstance(rule.severity, RuleSeverity), f"Rule {rule_code} has invalid severity"
-            assert isinstance(rule.explanation, str), f"Rule {rule_code} has invalid explanation"
+            assert isinstance(
+                rule.severity, RuleSeverity
+            ), f"Rule {rule_code} has invalid severity"
+            assert isinstance(
+                rule.explanation, str
+            ), f"Rule {rule_code} has invalid explanation"
             assert isinstance(
                 rule.recommendation, str
             ), f"Rule {rule_code} has invalid recommendation"
             assert len(rule.explanation) > 0, f"Rule {rule_code} has empty explanation"
-            assert len(rule.recommendation) > 0, f"Rule {rule_code} has empty recommendation"
-            assert rule.code == rule_code, f"Rule code mismatch: {rule.code} != {rule_code}"
+            assert (
+                len(rule.recommendation) > 0
+            ), f"Rule {rule_code} has empty recommendation"
+            assert (
+                rule.code == rule_code
+            ), f"Rule code mismatch: {rule.code} != {rule_code}"
 
     def test_rule_code_categories(self) -> None:
         """Test that rule codes follow the proper categorization."""
@@ -559,7 +577,9 @@ class TestRuleSystem:
         security_codes = [code for code in RULES if code.startswith("SEC")]
         # Style codes start with S but not SEC
         style_codes = [
-            code for code in RULES if code.startswith("S") and not code.startswith("SEC")
+            code
+            for code in RULES
+            if code.startswith("S") and not code.startswith("SEC")
         ]
         performance_codes = [code for code in RULES if code.startswith("P")]
 
@@ -618,7 +638,9 @@ echo Done
             issues = lint_batch_file(temp_file)
 
             # Filter for unsafe set command issues
-            unsafe_set_issues = [issue for issue in issues if issue.rule.code == "SEC002"]
+            unsafe_set_issues = [
+                issue for issue in issues if issue.rule.code == "SEC002"
+            ]
 
             # Should NOT have unsafe set command issues because they're properly quoted
             assert len(unsafe_set_issues) == 0
@@ -734,7 +756,9 @@ if %var1%==value1 echo match
             assert "E006" in rule_codes
 
             # Should detect unquoted variable usage in IF comparison (W005)
-            assert "W005" in rule_codes, "W005 should trigger for unquoted IF string comparison"
+            assert (
+                "W005" in rule_codes
+            ), "W005 should trigger for unquoted IF string comparison"
         finally:
             os.unlink(temp_file)
 
@@ -789,7 +813,10 @@ echo Escaped ^> character
         test_cases = [
             (r"del\s+\*/\*|\*\.?\*", ["del *.*", "DEL */*"]),
             (r"format\s+[a-z]:", ["format c:", "format a:", "format d:"]),
-            (r"\b(ps)?shutdown\s+[/-]", ["shutdown /s", "SHUTDOWN -t", "psshutdown /a"]),
+            (
+                r"\b(ps)?shutdown\s+[/-]",
+                ["shutdown /s", "SHUTDOWN -t", "psshutdown /a"],
+            ),
             (r"rmdir\s+/s\s+/q\s+", ["rmdir /s /q temp", "RMDIR /S /Q folder"]),
         ]
 
@@ -806,7 +833,9 @@ echo Escaped ^> character
                 try:
                     issues = lint_batch_file(temp_file)
                     rule_codes = [issue.rule.code for issue in issues]
-                    assert "SEC003" in rule_codes, f"Should detect dangerous command: {example}"
+                    assert (
+                        "SEC003" in rule_codes
+                    ), f"Should detect dangerous command: {example}"
                 finally:
                     os.unlink(temp_file)
 
@@ -949,7 +978,9 @@ CALL "%PROGRAM_FILES%\\app.exe" arg1 arg2
         try:
             issues = lint_batch_file(temp_file)
             rule_codes = [issue.rule.code for issue in issues]
-            assert "E014" not in rule_codes  # Should not trigger for environment variables
+            assert (
+                "E014" not in rule_codes
+            )  # Should not trigger for environment variables
         finally:
             os.unlink(temp_file)
 
@@ -1098,7 +1129,9 @@ GOTO :EOF
             # for the dynamic ones, but :normal_label vs normal_label would not be consistent
             # However, since dynamic labels are mixed in, the consistency check may be affected
             # The important thing is that dynamic labels don't cause crashes
-            assert "E002" not in rule_codes  # Dynamic labels should not trigger missing label
+            assert (
+                "E002" not in rule_codes
+            )  # Dynamic labels should not trigger missing label
         finally:
             os.unlink(temp_file)
 
@@ -1146,7 +1179,9 @@ endlocal
             # Find the specific W017 issue
             w017_issues = [issue for issue in issues if issue.rule.code == "W017"]
             assert len(w017_issues) > 0
-            assert "behaves differently than IF NOT ERRORLEVEL 1" in w017_issues[0].context
+            assert (
+                "behaves differently than IF NOT ERRORLEVEL 1" in w017_issues[0].context
+            )
         finally:
             os.unlink(temp_file)
 
@@ -1674,7 +1709,9 @@ wmic process list
             w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
             # Should detect both WMIC usages
             assert "W024" in rule_codes, "W024 should be triggered for WMIC command"
-            assert len(w024_issues) == 2, f"Expected 2 W024 issues, got {len(w024_issues)}"
+            assert (
+                len(w024_issues) == 2
+            ), f"Expected 2 W024 issues, got {len(w024_issues)}"
             # Check context mentions WMIC
             for issue in w024_issues:
                 assert (
@@ -1695,7 +1732,9 @@ cacls folder /T
             rule_codes = [issue.rule.code for issue in issues]
             w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
             assert "W024" in rule_codes, "W024 should be triggered for CACLS command"
-            assert len(w024_issues) == 2, f"Expected 2 W024 issues, got {len(w024_issues)}"
+            assert (
+                len(w024_issues) == 2
+            ), f"Expected 2 W024 issues, got {len(w024_issues)}"
         finally:
             os.unlink(temp_file)
 
@@ -1708,7 +1747,9 @@ BITSADMIN /transfer myDownload http://example.com/file.zip c:\\temp\\file.zip
         try:
             issues = lint_batch_file(temp_file)
             rule_codes = [issue.rule.code for issue in issues]
-            assert "W024" in rule_codes, "W024 should be triggered for BITSADMIN command"
+            assert (
+                "W024" in rule_codes
+            ), "W024 should be triggered for BITSADMIN command"
         finally:
             os.unlink(temp_file)
 
@@ -1724,7 +1765,9 @@ winrm get winrm/config
             rule_codes = [issue.rule.code for issue in issues]
             w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
             assert "W024" in rule_codes, "W024 should be triggered for WINRM command"
-            assert len(w024_issues) == 2, f"Expected 2 W024 issues, got {len(w024_issues)}"
+            assert (
+                len(w024_issues) == 2
+            ), f"Expected 2 W024 issues, got {len(w024_issues)}"
         finally:
             os.unlink(temp_file)
 
@@ -1740,7 +1783,9 @@ nbtstat -c
             rule_codes = [issue.rule.code for issue in issues]
             w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
             assert "W024" in rule_codes, "W024 should be triggered for NBTSTAT command"
-            assert len(w024_issues) == 2, f"Expected 2 W024 issues, got {len(w024_issues)}"
+            assert (
+                len(w024_issues) == 2
+            ), f"Expected 2 W024 issues, got {len(w024_issues)}"
         finally:
             os.unlink(temp_file)
 
@@ -1756,7 +1801,9 @@ net send * "Broadcast message"
             rule_codes = [issue.rule.code for issue in issues]
             w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
             assert "W024" in rule_codes, "W024 should be triggered for NET SEND command"
-            assert len(w024_issues) == 2, f"Expected 2 W024 issues, got {len(w024_issues)}"
+            assert (
+                len(w024_issues) == 2
+            ), f"Expected 2 W024 issues, got {len(w024_issues)}"
         finally:
             os.unlink(temp_file)
 
@@ -1772,7 +1819,9 @@ at \\\\computer 10:00 backup.bat
             rule_codes = [issue.rule.code for issue in issues]
             w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
             assert "W024" in rule_codes, "W024 should be triggered for AT command"
-            assert len(w024_issues) == 2, f"Expected 2 W024 issues, got {len(w024_issues)}"
+            assert (
+                len(w024_issues) == 2
+            ), f"Expected 2 W024 issues, got {len(w024_issues)}"
         finally:
             os.unlink(temp_file)
 
@@ -1803,7 +1852,9 @@ diskcomp c:\\disk1 d:\\disk2
             rule_codes = [issue.rule.code for issue in issues]
             e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
             assert "E034" in rule_codes, "E034 should be triggered for DISKCOMP command"
-            assert len(e034_issues) == 2, f"Expected 2 E034 issues, got {len(e034_issues)}"
+            assert (
+                len(e034_issues) == 2
+            ), f"Expected 2 E034 issues, got {len(e034_issues)}"
         finally:
             os.unlink(temp_file)
 
@@ -1819,7 +1870,9 @@ append /X:OFF
             rule_codes = [issue.rule.code for issue in issues]
             e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
             assert "E034" in rule_codes, "E034 should be triggered for APPEND command"
-            assert len(e034_issues) == 2, f"Expected 2 E034 issues, got {len(e034_issues)}"
+            assert (
+                len(e034_issues) == 2
+            ), f"Expected 2 E034 issues, got {len(e034_issues)}"
         finally:
             os.unlink(temp_file)
 
@@ -1835,7 +1888,9 @@ browstat view
             rule_codes = [issue.rule.code for issue in issues]
             e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
             assert "E034" in rule_codes, "E034 should be triggered for BROWSTAT command"
-            assert len(e034_issues) == 2, f"Expected 2 E034 issues, got {len(e034_issues)}"
+            assert (
+                len(e034_issues) == 2
+            ), f"Expected 2 E034 issues, got {len(e034_issues)}"
         finally:
             os.unlink(temp_file)
 
@@ -1869,7 +1924,9 @@ NET VIEW \\\\computer
             rule_codes = [issue.rule.code for issue in issues]
             e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
             # Should only flag NET PRINT, not other NET commands
-            assert "E034" in rule_codes, "E034 should be triggered for NET PRINT command"
+            assert (
+                "E034" in rule_codes
+            ), "E034 should be triggered for NET PRINT command"
             assert (
                 len(e034_issues) == 2
             ), f"Expected 2 E034 issues (NET PRINT only), got {len(e034_issues)}"
@@ -1893,7 +1950,9 @@ diskcopy c:\\source d:\\dest
             rule_codes = [issue.rule.code for issue in issues]
             e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
             assert "E034" in rule_codes, "E034 should be triggered for DISKCOPY command"
-            assert len(e034_issues) == 2, f"Expected 2 E034 issues, got {len(e034_issues)}"
+            assert (
+                len(e034_issues) == 2
+            ), f"Expected 2 E034 issues, got {len(e034_issues)}"
         finally:
             os.unlink(temp_file)
 
@@ -1909,7 +1968,9 @@ streams -d *.doc
             rule_codes = [issue.rule.code for issue in issues]
             e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
             assert "E034" in rule_codes, "E034 should be triggered for STREAMS command"
-            assert len(e034_issues) == 2, f"Expected 2 E034 issues, got {len(e034_issues)}"
+            assert (
+                len(e034_issues) == 2
+            ), f"Expected 2 E034 issues, got {len(e034_issues)}"
         finally:
             os.unlink(temp_file)
 
@@ -1946,7 +2007,9 @@ net start servicename
             assert (
                 "W024" not in rule_codes
             ), "NET (without SEND) should NOT be flagged as deprecated"
-            assert "E034" not in rule_codes, "NET (without PRINT) should NOT be flagged as removed"
+            assert (
+                "E034" not in rule_codes
+            ), "NET (without PRINT) should NOT be flagged as removed"
         finally:
             os.unlink(temp_file)
 
@@ -2167,7 +2230,9 @@ EXIT /b 0
         try:
             issues = lint_batch_file(temp_file)
             # Should suppress STY001 but not other rules
-            sty001_line2 = [i for i in issues if i.line_number == 2 and i.rule.code == "STY001"]
+            sty001_line2 = [
+                i for i in issues if i.line_number == 2 and i.rule.code == "STY001"
+            ]
             assert len(sty001_line2) == 0
         finally:
             os.unlink(temp_file)
@@ -2387,7 +2452,9 @@ EXIT /b 0
             # Should detect magic numbers in command arguments
             s019_issues = [i for i in issues if i.rule.code == "S019"]
             # Should flag 1234, 5678, 9999 (3600 is in common_exceptions as seconds in an hour)
-            assert len(s019_issues) >= 3, f"Expected at least 3 S019 issues, got {len(s019_issues)}"
+            assert (
+                len(s019_issues) >= 3
+            ), f"Expected at least 3 S019 issues, got {len(s019_issues)}"
         finally:
             os.unlink(temp_file)
 

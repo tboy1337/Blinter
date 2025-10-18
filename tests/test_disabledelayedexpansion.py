@@ -35,7 +35,9 @@ def test_redundant_disable_mid(tmp_path: pathlib.Path) -> None:
 
     issues = lint_batch_file(str(script))
     p026_issues = [issue for issue in issues if issue.rule.code == "P026"]
-    assert len(p026_issues) == 1, "Should flag P026 for redundant DISABLEDELAYEDEXPANSION"
+    assert (
+        len(p026_issues) == 1
+    ), "Should flag P026 for redundant DISABLEDELAYEDEXPANSION"
     assert p026_issues[0].line_number == 12
 
 
@@ -58,7 +60,9 @@ def test_not_redundant_after_end(tmp_path: pathlib.Path) -> None:
 
     issues = lint_batch_file(str(script))
     p026_issues = [issue for issue in issues if issue.rule.code == "P026"]
-    assert len(p026_issues) == 0, "Should NOT flag P026 after ENDLOCAL (toggling pattern)"
+    assert (
+        len(p026_issues) == 0
+    ), "Should NOT flag P026 after ENDLOCAL (toggling pattern)"
 
 
 def test_not_redundant_at_start(tmp_path: pathlib.Path) -> None:
@@ -75,7 +79,9 @@ def test_not_redundant_at_start(tmp_path: pathlib.Path) -> None:
 
     issues = lint_batch_file(str(script))
     p026_issues = [issue for issue in issues if issue.rule.code == "P026"]
-    assert len(p026_issues) == 0, "Should NOT flag P026 at script start (defensive programming)"
+    assert (
+        len(p026_issues) == 0
+    ), "Should NOT flag P026 at script start (defensive programming)"
 
 
 def test_not_redundant_with_literal(tmp_path: pathlib.Path) -> None:
@@ -103,7 +109,9 @@ def test_not_redundant_with_literal(tmp_path: pathlib.Path) -> None:
 
     issues = lint_batch_file(str(script))
     p026_issues = [issue for issue in issues if issue.rule.code == "P026"]
-    assert len(p026_issues) == 0, "Should NOT flag P026 when script has literal ! characters"
+    assert (
+        len(p026_issues) == 0
+    ), "Should NOT flag P026 when script has literal ! characters"
 
 
 def test_not_redundant_with_enable(tmp_path: pathlib.Path) -> None:
@@ -130,7 +138,9 @@ def test_not_redundant_with_enable(tmp_path: pathlib.Path) -> None:
 
     issues = lint_batch_file(str(script))
     p026_issues = [issue for issue in issues if issue.rule.code == "P026"]
-    assert len(p026_issues) == 0, "Should NOT flag P026 with ENABLEEXTENSIONS (common pattern)"
+    assert (
+        len(p026_issues) == 0
+    ), "Should NOT flag P026 with ENABLEEXTENSIONS (common pattern)"
 
 
 def test_mas_aio_pattern(tmp_path: pathlib.Path) -> None:
@@ -232,7 +242,9 @@ def test_case_insensitive_detection(tmp_path: pathlib.Path) -> None:
 
     issues = lint_batch_file(str(script))
     p026_issues = [issue for issue in issues if issue.rule.code == "P026"]
-    assert len(p026_issues) == 1, "Should detect DISABLEDELAYEDEXPANSION case-insensitively"
+    assert (
+        len(p026_issues) == 1
+    ), "Should detect DISABLEDELAYEDEXPANSION case-insensitively"
 
 
 def test_line_10_boundary(tmp_path: pathlib.Path) -> None:

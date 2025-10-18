@@ -44,8 +44,12 @@ class TestFollowCallsVariableContext:
             helper_var_issues = [i for i in e006_issues if "HELPER_VAR" in i.context]
             another_var_issues = [i for i in e006_issues if "ANOTHER_VAR" in i.context]
 
-            assert len(helper_var_issues) == 0, "HELPER_VAR should be recognized as defined"
-            assert len(another_var_issues) == 0, "ANOTHER_VAR should be recognized as defined"
+            assert (
+                len(helper_var_issues) == 0
+            ), "HELPER_VAR should be recognized as defined"
+            assert (
+                len(another_var_issues) == 0
+            ), "ANOTHER_VAR should be recognized as defined"
 
     def test_variable_used_before_call_triggers_error(self) -> None:
         """Variable used BEFORE the CALL should still trigger E006 error."""
@@ -61,9 +65,13 @@ class TestFollowCallsVariableContext:
             main_script = os.path.join(tmpdir, "main.bat")
             with open(main_script, "w", encoding="utf-8") as file_handle:
                 file_handle.write("@ECHO OFF\n")
-                file_handle.write("ECHO Using helper variable BEFORE call: %HELPER_VAR%\n")
+                file_handle.write(
+                    "ECHO Using helper variable BEFORE call: %HELPER_VAR%\n"
+                )
                 file_handle.write(f'CALL "{helper_script}"\n')
-                file_handle.write("ECHO Using helper variable AFTER call: %HELPER_VAR%\n")
+                file_handle.write(
+                    "ECHO Using helper variable AFTER call: %HELPER_VAR%\n"
+                )
                 file_handle.write("EXIT /b 0\n")
 
             # Lint with follow_calls enabled
@@ -71,10 +79,14 @@ class TestFollowCallsVariableContext:
             issues = lint_batch_file(main_script, config=config)
 
             # Should have E006 error for line 2 (before call) but NOT for line 4 (after call)
-            e006_issues = [i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context]
+            e006_issues = [
+                i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context
+            ]
 
             assert len(e006_issues) == 1, "Should have exactly one E006 for HELPER_VAR"
-            assert e006_issues[0].line_number == 2, "E006 should be on line 2 (before CALL)"
+            assert (
+                e006_issues[0].line_number == 2
+            ), "E006 should be on line 2 (before CALL)"
 
     def test_multiple_call_statements_accumulate_variables(self) -> None:
         """Multiple CALL statements should accumulate variables."""
@@ -132,7 +144,9 @@ class TestFollowCallsVariableContext:
 
             # Should still work and detect undefined variable
             e006_issues = [
-                i for i in issues if i.rule.code == "E006" and "UNDEFINED_VAR" in i.context
+                i
+                for i in issues
+                if i.rule.code == "E006" and "UNDEFINED_VAR" in i.context
             ]
             assert (
                 len(e006_issues) == 1
@@ -161,8 +175,12 @@ class TestFollowCallsVariableContext:
             issues = lint_batch_file(main_script, config=config)
 
             # Should have E006 error for HELPER_VAR
-            e006_issues = [i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context]
-            assert len(e006_issues) == 1, "Should have E006 when follow_calls is disabled"
+            e006_issues = [
+                i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context
+            ]
+            assert (
+                len(e006_issues) == 1
+            ), "Should have E006 when follow_calls is disabled"
 
     def test_circular_call_handling(self) -> None:
         """Should handle circular calls gracefully (script calls itself)."""
@@ -205,7 +223,9 @@ class TestFollowCallsVariableContext:
             issues = lint_batch_file(main_script, config=config)
 
             # Should NOT have E006 error for HELPER_VAR
-            e006_issues = [i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context]
+            e006_issues = [
+                i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context
+            ]
             assert len(e006_issues) == 0, "Should handle relative path calls"
 
     def test_percent_dp0_path_call(self) -> None:
@@ -235,7 +255,9 @@ class TestFollowCallsVariableContext:
             issues = lint_batch_file(main_script, config=config)
 
             # Should NOT have E006 error for HELPER_VAR
-            e006_issues = [i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context]
+            e006_issues = [
+                i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context
+            ]
             assert len(e006_issues) == 0, "Should handle %~dp0 syntax in calls"
 
     def test_unicode_encoding_in_called_script(self) -> None:
@@ -262,7 +284,9 @@ class TestFollowCallsVariableContext:
             issues = lint_batch_file(main_script, config=config)
 
             # Should handle Unicode gracefully and recognize the variable
-            e006_issues = [i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context]
+            e006_issues = [
+                i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context
+            ]
             assert len(e006_issues) == 0, "Should handle Unicode in called scripts"
 
     def test_call_in_comment_not_processed(self) -> None:
@@ -288,7 +312,9 @@ class TestFollowCallsVariableContext:
             issues = lint_batch_file(main_script, config=config)
 
             # Should have E006 error since CALL in comment shouldn't count
-            e006_issues = [i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context]
+            e006_issues = [
+                i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context
+            ]
             assert len(e006_issues) == 1, "CALL in comment should be ignored"
 
     def test_multiple_variables_from_single_call(self) -> None:
@@ -324,10 +350,15 @@ class TestFollowCallsVariableContext:
             var_issues = [
                 i
                 for i in e006_issues
-                if any(var in i.context for var in ["VAR1", "VAR2", "VAR3", "VAR4", "VAR5", "VAR6"])
+                if any(
+                    var in i.context
+                    for var in ["VAR1", "VAR2", "VAR3", "VAR4", "VAR5", "VAR6"]
+                )
             ]
 
-            assert len(var_issues) == 0, "All variables from called script should be recognized"
+            assert (
+                len(var_issues) == 0
+            ), "All variables from called script should be recognized"
 
     def test_cmd_extension_call(self) -> None:
         """Should work with .cmd extension as well as .bat."""
@@ -352,7 +383,9 @@ class TestFollowCallsVariableContext:
             issues = lint_batch_file(main_script, config=config)
 
             # Should NOT have E006 error for HELPER_VAR
-            e006_issues = [i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context]
+            e006_issues = [
+                i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context
+            ]
             assert len(e006_issues) == 0, "Should handle .cmd extension"
 
 

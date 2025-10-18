@@ -91,7 +91,9 @@ class TestRuleValidation:
 
     def test_rule_invalid_severity_validation(self) -> None:
         """Test Rule validation with invalid severity."""
-        with pytest.raises(ValueError, match="Rule severity must be a RuleSeverity enum"):
+        with pytest.raises(
+            ValueError, match="Rule severity must be a RuleSeverity enum"
+        ):
             Rule(
                 code="E001",
                 name="Test Rule",
@@ -102,7 +104,9 @@ class TestRuleValidation:
 
     def test_rule_empty_explanation_validation(self) -> None:
         """Test Rule validation with empty explanation."""
-        with pytest.raises(ValueError, match="Rule explanation must be a non-empty string"):
+        with pytest.raises(
+            ValueError, match="Rule explanation must be a non-empty string"
+        ):
             Rule(
                 code="E001",
                 name="Test Rule",
@@ -113,7 +117,9 @@ class TestRuleValidation:
 
     def test_rule_none_explanation_validation(self) -> None:
         """Test Rule validation with None explanation."""
-        with pytest.raises(ValueError, match="Rule explanation must be a non-empty string"):
+        with pytest.raises(
+            ValueError, match="Rule explanation must be a non-empty string"
+        ):
             Rule(
                 code="E001",
                 name="Test Rule",
@@ -124,7 +130,9 @@ class TestRuleValidation:
 
     def test_rule_non_string_explanation_validation(self) -> None:
         """Test Rule validation with non-string explanation."""
-        with pytest.raises(ValueError, match="Rule explanation must be a non-empty string"):
+        with pytest.raises(
+            ValueError, match="Rule explanation must be a non-empty string"
+        ):
             Rule(
                 code="E001",
                 name="Test Rule",
@@ -135,7 +143,9 @@ class TestRuleValidation:
 
     def test_rule_empty_recommendation_validation(self) -> None:
         """Test Rule validation with empty recommendation."""
-        with pytest.raises(ValueError, match="Rule recommendation must be a non-empty string"):
+        with pytest.raises(
+            ValueError, match="Rule recommendation must be a non-empty string"
+        ):
             Rule(
                 code="E001",
                 name="Test Rule",
@@ -146,7 +156,9 @@ class TestRuleValidation:
 
     def test_rule_none_recommendation_validation(self) -> None:
         """Test Rule validation with None recommendation."""
-        with pytest.raises(ValueError, match="Rule recommendation must be a non-empty string"):
+        with pytest.raises(
+            ValueError, match="Rule recommendation must be a non-empty string"
+        ):
             Rule(
                 code="E001",
                 name="Test Rule",
@@ -157,7 +169,9 @@ class TestRuleValidation:
 
     def test_rule_non_string_recommendation_validation(self) -> None:
         """Test Rule validation with non-string recommendation."""
-        with pytest.raises(ValueError, match="Rule recommendation must be a non-empty string"):
+        with pytest.raises(
+            ValueError, match="Rule recommendation must be a non-empty string"
+        ):
             Rule(
                 code="E001",
                 name="Test Rule",

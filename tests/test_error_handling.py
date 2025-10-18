@@ -46,7 +46,9 @@ class TestRealWorldErrorHandling:
 
     def test_empty_file_edge_case_in_context(self) -> None:
         """Test handling empty files in real linting context."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
             temp_file.write("")  # Empty file
             temp_path = temp_file.name
 
@@ -61,7 +63,9 @@ class TestRealWorldErrorHandling:
         # Create a large batch file with many lines
         large_content = "@ECHO OFF\n" + "REM Large file test\n" * 1000 + "EXIT /B 0\n"
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
             temp_file.write(large_content)
             temp_path = temp_file.name
 
@@ -76,7 +80,9 @@ class TestRealWorldErrorHandling:
         """Test handling of binary files masquerading as batch files."""
         binary_content = b"\x00\x01\x02\x03" * 100  # Binary content
 
-        with tempfile.NamedTemporaryFile(mode="wb", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", suffix=".bat", delete=False
+        ) as temp_file:
             temp_file.write(binary_content)
             temp_path = temp_file.name
 
@@ -90,11 +96,11 @@ class TestRealWorldErrorHandling:
 
     def test_file_with_mixed_line_endings(self) -> None:
         """Test handling of files with mixed line endings."""
-        mixed_content = (
-            "@ECHO OFF\r\necho Windows line ending\necho Unix line ending\r\necho Mixed\n"
-        )
+        mixed_content = "@ECHO OFF\r\necho Windows line ending\necho Unix line ending\r\necho Mixed\n"
 
-        with tempfile.NamedTemporaryFile(mode="wb", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", suffix=".bat", delete=False
+        ) as temp_file:
             temp_file.write(mixed_content.encode("utf-8"))
             temp_path = temp_file.name
 
@@ -110,7 +116,9 @@ class TestRealWorldErrorHandling:
         long_line = "REM " + "A" * 500 + "\n"
         content = "@ECHO OFF\n" + long_line + "EXIT /B 0\n"
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
             temp_file.write(content)
             temp_path = temp_file.name
 
@@ -126,7 +134,9 @@ class TestRealWorldErrorHandling:
         """Test handling concurrent access to the same file."""
         content = "@ECHO OFF\necho test\nEXIT /B 0\n"
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
             temp_file.write(content)
             temp_path = temp_file.name
 
@@ -170,7 +180,10 @@ class TestSpecificEdgeCases:
             ("if %UNDEFINED_VAR%==value echo test", True),  # Should trigger W005
             ("echo %PATH%", False),  # Should NOT trigger W005 (echo is safe)
             ("set NEWVAR=%PATH%", False),  # Should NOT trigger W005 (set is safe)
-            ('if "%UNDEFINED_VAR%"=="value" echo test', False),  # Quoted, should not trigger
+            (
+                'if "%UNDEFINED_VAR%"=="value" echo test',
+                False,
+            ),  # Quoted, should not trigger
         ]
 
         for command, should_trigger in test_cases:
@@ -192,7 +205,10 @@ class TestSpecificEdgeCases:
             ("set PATH=%PATH%;C:\\new", "SEC002"),
             # Registry operations
             ("reg delete HKLM\\Software\\Test /f", "SEC004"),
-            ("regedit /s dangerous.reg", None),  # May or may not trigger depending on pattern
+            (
+                "regedit /s dangerous.reg",
+                None,
+            ),  # May or may not trigger depending on pattern
             # Privilege checks
             ("net user admin password /add", "SEC005"),
             ("sc create TestService binpath=test.exe", "SEC005"),
@@ -202,7 +218,9 @@ class TestSpecificEdgeCases:
             issues = _check_security_issues(command, 1)
             if expected_rule:
                 matching_issues = [i for i in issues if i.rule.code == expected_rule]
-                assert len(matching_issues) >= 1, f"Should trigger {expected_rule} for: {command}"
+                assert (
+                    len(matching_issues) >= 1
+                ), f"Should trigger {expected_rule} for: {command}"
 
     def test_unicode_and_special_characters(self) -> None:
         """Test handling of Unicode and special characters."""
@@ -223,7 +241,9 @@ class TestSpecificEdgeCases:
             # Should detect non-ASCII characters
             non_ascii_issues = [i for i in issues if i.rule.code == "W012"]
             if not all(ord(c) < 128 for c in command):
-                assert len(non_ascii_issues) >= 1, f"Should detect non-ASCII in: {command}"
+                assert (
+                    len(non_ascii_issues) >= 1
+                ), f"Should detect non-ASCII in: {command}"
 
 
 class TestMainFunctionEdgeCases:
@@ -232,7 +252,9 @@ class TestMainFunctionEdgeCases:
     def test_main_with_invalid_file_extension(self) -> None:
         """Test main function with invalid file extensions."""
         # Create a test file with wrong extension
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False
+        ) as temp_file:
             temp_file.write("@ECHO OFF\necho test")
             temp_path = temp_file.name
 
@@ -330,7 +352,9 @@ class TestPerformanceAndScalability:
 def lint_batch_file_from_lines(lines: list[str]) -> List[LintIssue]:
     """Helper function to lint batch file from list of lines."""
     content = "\n".join(lines)
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".bat", delete=False
+    ) as temp_file:
         temp_file.write(content)
         temp_path = temp_file.name
 
@@ -346,7 +370,9 @@ class TestAdditionalErrorHandling:
     def test_file_encoding_error_scenarios(self) -> None:
         """Test file encoding error scenarios."""
         # Create a file with problematic encoding
-        with tempfile.NamedTemporaryFile(mode="wb", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", suffix=".bat", delete=False
+        ) as temp_file:
             # Write some bytes that might cause encoding issues
             temp_file.write(b"@echo off\r\n")
             temp_file.write(b"echo \xff\xfe test\r\n")  # Invalid UTF-8 sequence
@@ -366,7 +392,9 @@ class TestAdditionalErrorHandling:
     def test_line_1111_encoding_fallback(self) -> None:
         """Test line 1111 - encoding fallback scenario."""
         # Create a file that might trigger specific encoding detection failure
-        with tempfile.NamedTemporaryFile(mode="wb", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", suffix=".bat", delete=False
+        ) as temp_file:
             # Write content with problematic byte sequences
             temp_file.write(b"@echo off\r\n")
             temp_file.write(b"\x80\x81 Invalid UTF-8\r\n")
@@ -387,7 +415,9 @@ class TestAdditionalErrorHandling:
         """Test encoding scenarios for edge cases and error paths."""
 
         # Test file with BOM
-        with tempfile.NamedTemporaryFile(mode="wb", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", suffix=".bat", delete=False
+        ) as temp_file:
             # Write UTF-8 BOM + content
             temp_file.write(b"\xef\xbb\xbf@echo off\r\necho UTF-8 BOM test\r\n")
             temp_file_path = temp_file.name
@@ -400,7 +430,9 @@ class TestAdditionalErrorHandling:
             os.unlink(temp_file_path)
 
         # Test file with mixed encodings (problematic scenario)
-        with tempfile.NamedTemporaryFile(mode="wb", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", suffix=".bat", delete=False
+        ) as temp_file:
             temp_file.write(b"@echo off\r\n")
             temp_file.write("echo Niño".encode("latin1"))  # Latin1 encoding
             temp_file.write(b"\r\n")
@@ -435,7 +467,9 @@ class TestAdditionalErrorHandling:
     def test_specific_encoding_detection_scenario(self) -> None:
         """Test specific encoding detection scenario for edge cases."""
         # This targets a specific scenario in _detect_line_endings
-        with tempfile.NamedTemporaryFile(mode="wb", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", suffix=".bat", delete=False
+        ) as temp_file:
             # Create content that might trigger specific encoding paths
             temp_file.write(b"@echo off\r\n")
             temp_file.write(b"echo test\n")  # Mixed line endings

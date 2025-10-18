@@ -18,7 +18,9 @@ class TestStringReplacementSyntax:
     """Test that string replacement syntax is not incorrectly flagged as E009."""
 
     # pylint: disable=invalid-name  # Test method names are descriptive
-    def test_delayed_expansion_string_replacement_remove_quotes(self, tmp_path: Path) -> None:
+    def test_delayed_expansion_string_replacement_remove_quotes(
+        self, tmp_path: Path
+    ) -> None:
         """Test !VAR:"=! syntax (remove quotes from variable)."""
         test_file = tmp_path / "test.cmd"
         test_file.write_text(
@@ -36,7 +38,9 @@ class TestStringReplacementSyntax:
             len(e009_issues) == 0
         ), f'E009 should not be triggered for !VAR:"=! syntax, but found: {e009_issues}'
 
-    def test_delayed_expansion_string_replacement_with_text(self, tmp_path: Path) -> None:
+    def test_delayed_expansion_string_replacement_with_text(
+        self, tmp_path: Path
+    ) -> None:
         """Test !VAR:searchString=replaceString! syntax with quotes."""
         test_file = tmp_path / "test.cmd"
         test_file.write_text(
@@ -54,7 +58,9 @@ class TestStringReplacementSyntax:
             len(e009_issues) == 0
         ), "E009 should not be triggered for string replacement with quotes"
 
-    def test_percent_style_string_replacement_remove_quotes(self, tmp_path: Path) -> None:
+    def test_percent_style_string_replacement_remove_quotes(
+        self, tmp_path: Path
+    ) -> None:
         """Test %VAR:"=% syntax (old-style remove quotes)."""
         test_file = tmp_path / "test.cmd"
         test_file.write_text(
@@ -172,7 +178,9 @@ class TestStringReplacementSyntax:
         issues: List[LintIssue] = lint_batch_file(str(test_file))
         e009_issues = [issue for issue in issues if issue.rule.code == "E009"]
 
-        assert len(e009_issues) == 1, "Legitimate mismatched quote should still be detected"
+        assert (
+            len(e009_issues) == 1
+        ), "Legitimate mismatched quote should still be detected"
 
 
 class TestDocumentationCommentSyntax:
@@ -191,7 +199,9 @@ class TestDocumentationCommentSyntax:
         issues: List[LintIssue] = lint_batch_file(str(test_file))
         e009_issues = [issue for issue in issues if issue.rule.code == "E009"]
 
-        assert len(e009_issues) == 0, "::: documentation comments should not trigger E009"
+        assert (
+            len(e009_issues) == 0
+        ), "::: documentation comments should not trigger E009"
 
     def test_triple_colon_vs_double_colon_comments(self, tmp_path: Path) -> None:
         """Test that ::: comments are treated like REM comments."""
@@ -298,14 +308,18 @@ class TestCombinedScenarios:
         issues: List[LintIssue] = lint_batch_file(str(test_file))
         e009_issues = [issue for issue in issues if issue.rule.code == "E009"]
 
-        assert len(e009_issues) == 0, "Various string replacement patterns should not trigger E009"
+        assert (
+            len(e009_issues) == 0
+        ), "Various string replacement patterns should not trigger E009"
 
 
 class TestEdgeCasesAndRegressions:
     """Test edge cases to ensure fixes don't cause regressions."""
 
     # pylint: disable=invalid-name  # Test method names are descriptive
-    def test_actual_quote_error_with_string_replacement_present(self, tmp_path: Path) -> None:
+    def test_actual_quote_error_with_string_replacement_present(
+        self, tmp_path: Path
+    ) -> None:
         """Ensure legitimate errors are still caught even with valid string replacement."""
         test_file = tmp_path / "test.cmd"
         test_file.write_text(
@@ -334,7 +348,9 @@ class TestEdgeCasesAndRegressions:
         issues: List[LintIssue] = lint_batch_file(str(test_file))
         e009_issues = [issue for issue in issues if issue.rule.code == "E009"]
 
-        assert len(e009_issues) == 0, "String replacement in IF statements should not trigger E009"
+        assert (
+            len(e009_issues) == 0
+        ), "String replacement in IF statements should not trigger E009"
 
     def test_nested_string_replacements(self, tmp_path: Path) -> None:
         """Test complex nested scenarios."""
@@ -352,4 +368,6 @@ class TestEdgeCasesAndRegressions:
         issues: List[LintIssue] = lint_batch_file(str(test_file))
         e009_issues = [issue for issue in issues if issue.rule.code == "E009"]
 
-        assert len(e009_issues) == 0, "Nested string replacement should not trigger E009"
+        assert (
+            len(e009_issues) == 0
+        ), "Nested string replacement should not trigger E009"

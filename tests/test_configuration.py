@@ -24,7 +24,7 @@ class TestBlinterConfig:
 
         assert config.recursive is True
         assert config.show_summary is False
-        assert config.max_line_length == 150
+        assert config.max_line_length == 88
         assert config.enabled_rules == set()
         assert config.disabled_rules == set()
         assert config.min_severity is None
@@ -76,7 +76,9 @@ class TestBlinterConfig:
 
     def test_is_rule_enabled_disabled_overrides_enabled(self) -> None:
         """Test that disabled rules override enabled rules."""
-        config = BlinterConfig(enabled_rules={"E001", "W001", "S001"}, disabled_rules={"E001"})
+        config = BlinterConfig(
+            enabled_rules={"E001", "W001", "S001"}, disabled_rules={"E001"}
+        )
 
         assert config.is_rule_enabled("E001") is False
         assert config.is_rule_enabled("W001") is True
@@ -125,7 +127,7 @@ class TestConfigurationLoading:
             # Should return default config
             assert config.recursive is True
             assert config.show_summary is False
-            assert config.max_line_length == 150
+            assert config.max_line_length == 88
             assert config.enabled_rules == set()
             assert config.disabled_rules == set()
             assert config.min_severity is None
@@ -137,7 +139,7 @@ class TestConfigurationLoading:
         # Should return default config regardless of file existence
         assert config.recursive is True
         assert config.show_summary is False
-        assert config.max_line_length == 150
+        assert config.max_line_length == 88
 
     def test_load_config_with_general_settings(self) -> None:
         """Test loading configuration with general settings."""
@@ -149,7 +151,9 @@ max_line_length = 80
 min_severity = WARNING
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".ini", delete=False) as config_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".ini", delete=False
+        ) as config_file:
             config_file.write(config_content)
             config_file.flush()
             config_file.close()  # Close file before reading on Windows
@@ -175,7 +179,9 @@ enabled_rules = E001,E002,W001
 disabled_rules = S001,S002,S003
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".ini", delete=False) as config_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".ini", delete=False
+        ) as config_file:
             config_file.write(config_content)
             config_file.flush()
             config_file.close()  # Close file before reading on Windows
@@ -199,7 +205,9 @@ enabled_rules =
 disabled_rules = 
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".ini", delete=False) as config_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".ini", delete=False
+        ) as config_file:
             config_file.write(config_content)
             config_file.flush()
             config_file.close()  # Close file before reading on Windows
@@ -223,7 +231,9 @@ enabled_rules = E001, E002 , W001
 disabled_rules = S001 ,S002,  S003  
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".ini", delete=False) as config_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".ini", delete=False
+        ) as config_file:
             config_file.write(config_content)
             config_file.flush()
             config_file.close()  # Close file before reading on Windows
@@ -246,7 +256,9 @@ disabled_rules = S001 ,S002,  S003
 min_severity = INVALID
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".ini", delete=False) as config_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".ini", delete=False
+        ) as config_file:
             config_file.write(config_content)
             config_file.flush()
             config_file.close()  # Close file before reading on Windows
@@ -268,7 +280,9 @@ min_severity = INVALID
         """Test loading configuration with malformed file."""
         config_content = "This is not a valid INI file"
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".ini", delete=False) as config_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".ini", delete=False
+        ) as config_file:
             config_file.write(config_content)
             config_file.flush()
             config_file.close()  # Close file before reading on Windows
@@ -297,7 +311,9 @@ show_summary = true
 disabled_rules = S001
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".ini", delete=False) as config_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".ini", delete=False
+        ) as config_file:
             config_file.write(config_content)
             config_file.flush()
             config_file.close()  # Close file before reading on Windows
@@ -311,7 +327,7 @@ disabled_rules = S001
 
             # Unspecified settings should use defaults
             assert config.recursive is True
-            assert config.max_line_length == 150
+            assert config.max_line_length == 88
             assert config.enabled_rules == set()
         finally:
             try:
@@ -365,9 +381,13 @@ class TestConfigurationIntegration:
         """Test that configuration affects rule filtering."""
 
         # Create a simple batch file for testing
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as batch_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as batch_file:
             batch_file.write("@echo off\n")
-            batch_file.write("echo " + "x" * 150 + "\n")  # Create a line longer than 120 chars
+            batch_file.write(
+                "echo " + "x" * 88 + "\n"
+            )  # Create a line longer than 88 chars
             batch_file.flush()
             batch_file.close()  # Close file before reading on Windows
 
@@ -398,7 +418,9 @@ class TestConfigurationIntegration:
         # Create a batch file with a line of specific length
         line_content = "echo " + "x" * 80  # 85 characters total
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as batch_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as batch_file:
             batch_file.write("@echo off\n")
             batch_file.write(line_content + "\n")
             batch_file.flush()
@@ -429,9 +451,13 @@ class TestConfigurationIntegration:
         """Test that configuration affects severity filtering."""
 
         # Create a batch file that will generate multiple severity levels
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as batch_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as batch_file:
             batch_file.write("echo off\n")  # S002 - style issue
-            batch_file.write("if exist file.txt (\n")  # E001 - error (unmatched parenthesis)
+            batch_file.write(
+                "if exist file.txt (\n"
+            )  # E001 - error (unmatched parenthesis)
             batch_file.flush()
             batch_file.close()  # Close file before reading on Windows
 
@@ -445,7 +471,9 @@ class TestConfigurationIntegration:
                 issues_warn = lint_batch_file(batch_file.name, config=config_warn)
 
                 # Should have fewer issues with severity filter
-                style_issues_all = [i for i in issues_all if i.rule.severity == RuleSeverity.STYLE]
+                style_issues_all = [
+                    i for i in issues_all if i.rule.severity == RuleSeverity.STYLE
+                ]
                 style_issues_warn = [
                     i for i in issues_warn if i.rule.severity == RuleSeverity.STYLE
                 ]
@@ -486,7 +514,10 @@ EXIT /b 0
             issues = lint_batch_file(temp_file, config=config)
             # Should filter out STYLE and WARNING issues
             for issue in issues:
-                assert issue.rule.severity in [RuleSeverity.ERROR, RuleSeverity.SECURITY]
+                assert issue.rule.severity in [
+                    RuleSeverity.ERROR,
+                    RuleSeverity.SECURITY,
+                ]
         finally:
             os.unlink(temp_file)
 

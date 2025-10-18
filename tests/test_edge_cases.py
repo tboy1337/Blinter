@@ -48,7 +48,14 @@ class TestFileEncodingEdgeCases:
             patch("chardet.detect", side_effect=OSError("Test OSError")),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
-            assert encoding in ["utf-8", "utf-8-sig", "latin1", "cp1252", "iso-8859-1", "ascii"]
+            assert encoding in [
+                "utf-8",
+                "utf-8-sig",
+                "latin1",
+                "cp1252",
+                "iso-8859-1",
+                "ascii",
+            ]
             assert len(lines) > 0
 
     def test_chardet_valueerror_handling(self) -> None:
@@ -58,7 +65,14 @@ class TestFileEncodingEdgeCases:
             patch("chardet.detect", side_effect=ValueError("Test ValueError")),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
-            assert encoding in ["utf-8", "utf-8-sig", "latin1", "cp1252", "iso-8859-1", "ascii"]
+            assert encoding in [
+                "utf-8",
+                "utf-8-sig",
+                "latin1",
+                "cp1252",
+                "iso-8859-1",
+                "ascii",
+            ]
             assert len(lines) > 0
 
     def test_chardet_typeerror_handling(self) -> None:
@@ -68,7 +82,14 @@ class TestFileEncodingEdgeCases:
             patch("chardet.detect", side_effect=TypeError("Test TypeError")),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
-            assert encoding in ["utf-8", "utf-8-sig", "latin1", "cp1252", "iso-8859-1", "ascii"]
+            assert encoding in [
+                "utf-8",
+                "utf-8-sig",
+                "latin1",
+                "cp1252",
+                "iso-8859-1",
+                "ascii",
+            ]
             assert len(lines) > 0
 
     def test_encoding_lookup_error_fallback(self) -> None:
@@ -256,7 +277,9 @@ class TestWarningIssueChecking:
     def test_non_ascii_characters(self) -> None:
         """Test non-ASCII character detection."""
         set_vars: Set[str] = set()
-        issues = _check_warning_issues("echo Ñandú", 1, set_vars, False)  # Contains non-ASCII
+        issues = _check_warning_issues(
+            "echo Ñandú", 1, set_vars, False
+        )  # Contains non-ASCII
         # May also trigger W011 (Unicode handling issue for echo command)
         w012_issues = [i for i in issues if i.rule.code == "W012"]
         assert len(w012_issues) == 1
@@ -267,7 +290,9 @@ class TestStyleIssueChecking:
 
     def test_long_parameter_list(self) -> None:
         """Test long parameter list detection."""
-        issues = _check_style_issues("CALL :myfunc param1 param2 param3 param4 param5 param6", 1)
+        issues = _check_style_issues(
+            "CALL :myfunc param1 param2 param3 param4 param5 param6", 1
+        )
         assert len(issues) == 1
         assert "S014" in issues[0].rule.code
 
@@ -377,7 +402,16 @@ class TestPerformanceIssueChecking:
     def test_temporary_file_without_random(self) -> None:
         """Test temporary file without random name."""
         issues = _check_performance_issues(
-            [""], 1, "echo content > temp.txt", False, False, False, False, False, False, False
+            [""],
+            1,
+            "echo content > temp.txt",
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
         )
         assert len(issues) == 1
         assert "P007" in issues[0].rule.code
@@ -662,10 +696,15 @@ class TestAdditionalEdgeCaseScenarios:
             os.close(fd)
 
             with patch("pathlib.Path.stat", side_effect=mock_stat):
-                with patch("builtins.open", mock_open(read_data="@echo off\necho test")):
+                with patch(
+                    "builtins.open", mock_open(read_data="@echo off\necho test")
+                ):
                     lines, encoding = _validate_and_read_file(temp_path)
                     assert len(lines) > 0
-                    assert encoding in ["utf-8", "latin1"]  # Should succeed with some encoding
+                    assert encoding in [
+                        "utf-8",
+                        "latin1",
+                    ]  # Should succeed with some encoding
         finally:
             try:
                 os.unlink(temp_path)
@@ -946,7 +985,9 @@ class TestWarningChecking:
     def test_setx_path_modification(self) -> None:
         """Test SETX PATH modification detection."""
         set_vars: set[str] = set()
-        issues = _check_warning_issues("setx PATH %PATH%;C:\\newpath", 1, set_vars, False)
+        issues = _check_warning_issues(
+            "setx PATH %PATH%;C:\\newpath", 1, set_vars, False
+        )
         warning_issues = [i for i in issues if i.rule.code == "W008"]
         assert len(warning_issues) == 1
 
@@ -993,7 +1034,9 @@ class TestWarningChecking:
         assert "type" in warning_issues[0].context
 
         # Test find/findstr with Unicode content
-        issues = _check_warning_issues("findstr /i pattérn file.txt", 1, set_vars, False)
+        issues = _check_warning_issues(
+            "findstr /i pattérn file.txt", 1, set_vars, False
+        )
         warning_issues = [i for i in issues if i.rule.code == "W011"]
         assert len(warning_issues) == 1
 
@@ -1025,7 +1068,9 @@ class TestWarningChecking:
         # FOR loop variables should NOT trigger W011 Unicode warning
         issues = _check_warning_issues("echo %%a %%b", 1, set_vars, False)
         w011_issues = [i for i in issues if i.rule.code == "W011"]
-        assert len(w011_issues) == 0, "FOR loop variables should not trigger Unicode warnings"
+        assert (
+            len(w011_issues) == 0
+        ), "FOR loop variables should not trigger Unicode warnings"
 
     def test_consecutive_variables_no_false_positive(self) -> None:
         """Test that consecutive variables like %red%%under% don't trigger false
@@ -1034,7 +1079,9 @@ class TestWarningChecking:
         # Consecutive variables should NOT trigger W011 Unicode warning
         issues = _check_warning_issues("echo %red%%under%text%def%", 1, set_vars, False)
         w011_issues = [i for i in issues if i.rule.code == "W011"]
-        assert len(w011_issues) == 0, "Consecutive variables should not trigger Unicode warnings"
+        assert (
+            len(w011_issues) == 0
+        ), "Consecutive variables should not trigger Unicode warnings"
 
     def test_echo_with_actual_unicode_still_flagged(self) -> None:
         """Test that actual Unicode content in echo still triggers warnings."""
@@ -1042,7 +1089,9 @@ class TestWarningChecking:
         # Real Unicode content should still trigger W011
         issues = _check_warning_issues("echo Ñandú birds", 1, set_vars, False)
         w011_issues = [i for i in issues if i.rule.code == "W011"]
-        assert len(w011_issues) == 1, "Actual Unicode content should still trigger warnings"
+        assert (
+            len(w011_issues) == 1
+        ), "Actual Unicode content should still trigger warnings"
 
 
 class TestStyleChecking:
@@ -1083,7 +1132,9 @@ class TestStyleChecking:
 
             consistency_issues = _check_cmd_case_consistency(test_lines)
             casing_issues = [i for i in consistency_issues if i.rule.code == "S003"]
-            assert len(casing_issues) >= 1, f"No S003 issues found for keyword: {keyword}"
+            assert (
+                len(casing_issues) >= 1
+            ), f"No S003 issues found for keyword: {keyword}"
             # Check that the keyword appears in one of the contexts
             contexts = [issue.context for issue in casing_issues]
             assert any(keyword in context.lower() for context in contexts)
@@ -1148,7 +1199,9 @@ class TestSecurityChecking:
         for echo_line in echo_cases:
             issues = _check_security_issues(echo_line, 1)
             path_issues = [i for i in issues if i.rule.code == "SEC006"]
-            assert len(path_issues) == 0, f"ECHO line should not trigger SEC006: {echo_line}"
+            assert (
+                len(path_issues) == 0
+            ), f"ECHO line should not trigger SEC006: {echo_line}"
 
         # REM comments should not trigger SEC006
         rem_cases = [
@@ -1160,7 +1213,9 @@ class TestSecurityChecking:
         for rem_line in rem_cases:
             issues = _check_security_issues(rem_line, 1)
             path_issues = [i for i in issues if i.rule.code == "SEC006"]
-            assert len(path_issues) == 0, f"REM line should not trigger SEC006: {rem_line}"
+            assert (
+                len(path_issues) == 0
+            ), f"REM line should not trigger SEC006: {rem_line}"
 
         # :: comments should not trigger SEC006
         colon_cases = [
@@ -1171,7 +1226,9 @@ class TestSecurityChecking:
         for colon_line in colon_cases:
             issues = _check_security_issues(colon_line, 1)
             path_issues = [i for i in issues if i.rule.code == "SEC006"]
-            assert len(path_issues) == 0, f":: line should not trigger SEC006: {colon_line}"
+            assert (
+                len(path_issues) == 0
+            ), f":: line should not trigger SEC006: {colon_line}"
 
         # But actual commands with hardcoded paths SHOULD still be flagged
         actual_commands = [
@@ -1183,7 +1240,9 @@ class TestSecurityChecking:
         for cmd_line in actual_commands:
             issues = _check_security_issues(cmd_line, 1)
             path_issues = [i for i in issues if i.rule.code == "SEC006"]
-            assert len(path_issues) >= 1, f"Actual command should trigger SEC006: {cmd_line}"
+            assert (
+                len(path_issues) >= 1
+            ), f"Actual command should trigger SEC006: {cmd_line}"
 
     def test_hardcoded_temp_paths(self) -> None:
         """Test detection of hardcoded temporary paths."""
@@ -1209,7 +1268,9 @@ class TestSecurityChecking:
         for cmd in safe_cases:
             issues = _check_security_issues(cmd, 1)
             temp_issues = [i for i in issues if i.rule.code == "SEC007"]
-            assert len(temp_issues) == 0, f"Safe context should not trigger SEC007: {cmd}"
+            assert (
+                len(temp_issues) == 0
+            ), f"Safe context should not trigger SEC007: {cmd}"
 
 
 class TestPerformanceChecking:
@@ -1257,7 +1318,16 @@ class TestPerformanceChecking:
         for pattern in temp_patterns:
             lines = [f"echo test > {pattern}"]
             issues = _check_performance_issues(
-                lines, 1, f"echo test > {pattern}", False, False, False, False, False, False, False
+                lines,
+                1,
+                f"echo test > {pattern}",
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
             )
             temp_issues = [i for i in issues if i.rule.code == "P007"]
             assert len(temp_issues) == 1
@@ -1303,7 +1373,12 @@ class TestGlobalChecks:
 
     def test_collect_set_variables_comprehensive(self) -> None:
         """Test comprehensive variable collection."""
-        lines = ["set VAR1=value1", "set /p VAR2=Enter value:", "set /a VAR3=5+3", "SET UPPER=test"]
+        lines = [
+            "set VAR1=value1",
+            "set /p VAR2=Enter value:",
+            "set /a VAR3=5+3",
+            "SET UPPER=test",
+        ]
         variables = _collect_set_variables(lines)
         assert "VAR1" in variables
         assert "VAR2" in variables
@@ -1523,7 +1598,11 @@ class TestGlobalChecks:
 
     def test_check_redundant_operations(self) -> None:
         """Test redundant operations detection."""
-        lines = ["if exist file.txt echo found", "echo something", "if exist file.txt del file.txt"]
+        lines = [
+            "if exist file.txt echo found",
+            "echo something",
+            "if exist file.txt del file.txt",
+        ]
         issues = _check_redundant_operations(lines)
         redundant_issues = [i for i in issues if i.rule.code == "P001"]
         assert len(redundant_issues) == 1
@@ -1952,7 +2031,9 @@ class TestSpecializedEdgeCases:
     def test_detect_line_endings_permission_error(self) -> None:
         """Test _detect_line_endings with permission error."""
         # Create a temporary file and then try to simulate permission error
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
             temp_file.write("@echo off\r\n")
             temp_file_path = temp_file.name
 
@@ -2091,7 +2172,9 @@ class TestSpecializedEdgeCases:
         # Test that no magic numbers are flagged in comments
         for line in rem_comment_lines + colon_comment_lines:
             issues = _check_magic_numbers(line, 1)
-            assert len(issues) == 0, f"Magic numbers should not be flagged in comment: {line}"
+            assert (
+                len(issues) == 0
+            ), f"Magic numbers should not be flagged in comment: {line}"
 
         # Test that magic numbers ARE still flagged in actual code (not in SET statements)
         # Using numbers that won't trigger path/GUID heuristics (avoid /, \, -, etc.)
@@ -2112,7 +2195,9 @@ class TestSpecializedEdgeCases:
 
         for code_line in code_lines_should_flag:
             issues = _check_magic_numbers(code_line, 1)
-            assert len(issues) > 0, f"Magic number should be flagged in code: {code_line}"
+            assert (
+                len(issues) > 0
+            ), f"Magic number should be flagged in code: {code_line}"
 
         for code_line in code_lines_should_not_flag:
             issues = _check_magic_numbers(code_line, 1)
@@ -2175,13 +2260,17 @@ class TestSpecializedEdgeCases:
 
     def test_security_powershell_execution_policy_bypass(self) -> None:
         """Test PowerShell execution policy bypass detection."""
-        result = _check_security_issues("powershell -ExecutionPolicy Bypass -Command malicious", 1)
+        result = _check_security_issues(
+            "powershell -ExecutionPolicy Bypass -Command malicious", 1
+        )
         assert any(issue.rule.code == "SEC009" for issue in result)
 
     def test_security_powershell_execution_bypass_lowercase(self) -> None:
         """Test SEC009 PowerShell execution policy bypass detection with lowercase."""
         # Test case that should trigger line 2528 in blinter.py
-        result = _check_security_issues("powershell -executionpolicy bypass -command dangerous", 1)
+        result = _check_security_issues(
+            "powershell -executionpolicy bypass -command dangerous", 1
+        )
         sec009_issues = [i for i in result if i.rule.code == "SEC009"]
         assert len(sec009_issues) >= 1
 
@@ -2285,7 +2374,9 @@ ECHO This is a caret-escaped quote: ^"test^"
         try:
             issues = lint_batch_file(temp_file)
             # Should not report unmatched quotes for caret-escaped quotes
-            quote_issues = [issue for issue in issues if "quote" in issue.rule.name.lower()]
+            quote_issues = [
+                issue for issue in issues if "quote" in issue.rule.name.lower()
+            ]
             assert len(quote_issues) == 0
         finally:
             os.unlink(temp_file)
@@ -2314,7 +2405,9 @@ ECHO This line continues^
         try:
             issues = lint_batch_file(temp_file)
             # Should handle line continuation properly
-            quote_issues = [issue for issue in issues if "quote" in issue.rule.name.lower()]
+            quote_issues = [
+                issue for issue in issues if "quote" in issue.rule.name.lower()
+            ]
             # Line continuation should prevent false positive
             assert len(quote_issues) == 0
         finally:
@@ -2330,7 +2423,9 @@ SET "VAR=!OTHER_VAR!"
         try:
             issues = lint_batch_file(temp_file)
             # Should not incorrectly flag delayed expansion
-            quote_issues = [issue for issue in issues if "quote" in issue.rule.name.lower()]
+            quote_issues = [
+                issue for issue in issues if "quote" in issue.rule.name.lower()
+            ]
             assert len(quote_issues) == 0
         finally:
             os.unlink(temp_file)
@@ -2349,7 +2444,9 @@ EXIT /B
         try:
             issues = lint_batch_file(temp_file)
             # Should handle CALL label substitution without false positives
-            quote_issues = [issue for issue in issues if "quote" in issue.rule.name.lower()]
+            quote_issues = [
+                issue for issue in issues if "quote" in issue.rule.name.lower()
+            ]
             assert len(quote_issues) == 0
         finally:
             os.unlink(temp_file)
@@ -2365,7 +2462,9 @@ IF EXIST "file.txt" (
         try:
             issues = lint_batch_file(temp_file)
             # Should correctly handle quotes within parentheses
-            quote_issues = [issue for issue in issues if "quote" in issue.rule.name.lower()]
+            quote_issues = [
+                issue for issue in issues if "quote" in issue.rule.name.lower()
+            ]
             assert len(quote_issues) == 0
         finally:
             os.unlink(temp_file)
@@ -2379,7 +2478,9 @@ ECHO "This quote is unmatched
         try:
             issues = lint_batch_file(temp_file)
             # Should detect the unmatched quote
-            quote_issues = [issue for issue in issues if "quote" in issue.rule.name.lower()]
+            quote_issues = [
+                issue for issue in issues if "quote" in issue.rule.name.lower()
+            ]
             assert len(quote_issues) > 0
         finally:
             os.unlink(temp_file)
@@ -2408,9 +2509,13 @@ GOTO :EOF
         try:
             issues = lint_batch_file(temp_file)
             # Block should end with GOTO
-            doc_issues = [issue for issue in issues if "documentation" in issue.rule.name.lower()]
+            doc_issues = [
+                issue for issue in issues if "documentation" in issue.rule.name.lower()
+            ]
             # Should not flag missing documentation after GOTO
-            assert len(doc_issues) == 0 or all(issue.line_number <= 3 for issue in doc_issues)
+            assert len(doc_issues) == 0 or all(
+                issue.line_number <= 3 for issue in doc_issues
+            )
         finally:
             os.unlink(temp_file)
 
@@ -2426,9 +2531,13 @@ EXIT /B 0
         try:
             issues = lint_batch_file(temp_file)
             # Block should end with EXIT
-            doc_issues = [issue for issue in issues if "documentation" in issue.rule.name.lower()]
+            doc_issues = [
+                issue for issue in issues if "documentation" in issue.rule.name.lower()
+            ]
             # Should not flag missing documentation after EXIT
-            assert len(doc_issues) == 0 or all(issue.line_number <= 3 for issue in doc_issues)
+            assert len(doc_issues) == 0 or all(
+                issue.line_number <= 3 for issue in doc_issues
+            )
         finally:
             os.unlink(temp_file)
 
@@ -2447,7 +2556,9 @@ ECHO Second section
         try:
             issues = lint_batch_file(temp_file)
             # Each label should start a new block
-            doc_issues = [issue for issue in issues if "documentation" in issue.rule.name.lower()]
+            doc_issues = [
+                issue for issue in issues if "documentation" in issue.rule.name.lower()
+            ]
             # Should properly handle multiple labeled sections
             assert len(doc_issues) == 0
         finally:
@@ -2470,7 +2581,9 @@ EXIT /B
         try:
             issues = lint_batch_file(temp_file)
             # CALL to label should be handled
-            doc_issues = [issue for issue in issues if "documentation" in issue.rule.name.lower()]
+            doc_issues = [
+                issue for issue in issues if "documentation" in issue.rule.name.lower()
+            ]
             # Should properly handle CALL to label
             assert len(doc_issues) == 0
         finally:
@@ -2489,7 +2602,9 @@ IF EXIST file.txt (
         try:
             issues = lint_batch_file(temp_file)
             # Closing parenthesis should end the block
-            doc_issues = [issue for issue in issues if "documentation" in issue.rule.name.lower()]
+            doc_issues = [
+                issue for issue in issues if "documentation" in issue.rule.name.lower()
+            ]
             # Should handle parentheses correctly
             assert len(doc_issues) == 0
         finally:
@@ -2511,7 +2626,9 @@ ECHO Done
         try:
             issues = lint_batch_file(temp_file)
             # Double empty lines should end the block
-            doc_issues = [issue for issue in issues if "documentation" in issue.rule.name.lower()]
+            doc_issues = [
+                issue for issue in issues if "documentation" in issue.rule.name.lower()
+            ]
             # Should handle paragraph breaks
             assert len(doc_issues) == 0
         finally:

@@ -1,0 +1,7 @@
+include py.typed
+include README.md
+include LICENSE.md
+include mypy.ini
+include pylintrc
+include pytest.ini
+include pyproject.toml

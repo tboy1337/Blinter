@@ -24,9 +24,13 @@ from blinter import (
 class TestGroupIssues:
     """Test cases for issue grouping functionality."""
 
-    def create_lint_issue(self, line_number: int, rule_code: str, context: str = "") -> LintIssue:
+    def create_lint_issue(
+        self, line_number: int, rule_code: str, context: str = ""
+    ) -> LintIssue:
         """Helper method to create LintIssue objects for testing."""
-        return LintIssue(line_number=line_number, rule=RULES[rule_code], context=context)
+        return LintIssue(
+            line_number=line_number, rule=RULES[rule_code], context=context
+        )
 
     def test_group_issues_empty(self) -> None:
         """Test grouping with no issues."""
@@ -91,9 +95,13 @@ class TestPrintFunctions:
         finally:
             sys.stdout = old_stdout
 
-    def create_lint_issue(self, line_number: int, rule_code: str, context: str = "") -> LintIssue:
+    def create_lint_issue(
+        self, line_number: int, rule_code: str, context: str = ""
+    ) -> LintIssue:
         """Helper method to create LintIssue objects for testing."""
-        return LintIssue(line_number=line_number, rule=RULES[rule_code], context=context)
+        return LintIssue(
+            line_number=line_number, rule=RULES[rule_code], context=context
+        )
 
     def test_print_help(self) -> None:
         """Test help function output."""
@@ -206,9 +214,13 @@ class TestOutputFormatting:
         finally:
             sys.stdout = old_stdout
 
-    def create_lint_issue(self, line_number: int, rule_code: str, context: str = "") -> LintIssue:
+    def create_lint_issue(
+        self, line_number: int, rule_code: str, context: str = ""
+    ) -> LintIssue:
         """Helper method to create LintIssue objects for testing."""
-        return LintIssue(line_number=line_number, rule=RULES[rule_code], context=context)
+        return LintIssue(
+            line_number=line_number, rule=RULES[rule_code], context=context
+        )
 
     def test_print_detailed_all_severity_levels(self) -> None:
         """Test detailed output includes all severity levels."""
@@ -312,7 +324,9 @@ class TestOutputFormatting:
     def test_special_characters_in_output(self) -> None:
         """Test handling of special characters in error messages and context."""
         issues = [
-            self.create_lint_issue(1, "E002", "GOTO points to non-existent label 'special_label'"),
+            self.create_lint_issue(
+                1, "E002", "GOTO points to non-existent label 'special_label'"
+            ),
         ]
 
         output = self.capture_stdout(print_detailed, issues)
@@ -332,7 +346,9 @@ class TestOutputFormatting:
     def test_context_information_display(self) -> None:
         """Test that context information is properly displayed."""
         issues = [
-            self.create_lint_issue(1, "E002", "GOTO points to non-existent label 'missing_label'"),
+            self.create_lint_issue(
+                1, "E002", "GOTO points to non-existent label 'missing_label'"
+            ),
             self.create_lint_issue(5, "S001", "Script should start with @ECHO OFF"),
         ]
 
@@ -442,7 +458,9 @@ class TestDisplayAnalyzedScripts:
     """Test cases for the _display_analyzed_scripts function."""
 
     def capture_stdout(
-        self, func: Callable[[List[Tuple[str, Optional[str]]], str, bool], None], *args: object
+        self,
+        func: Callable[[List[Tuple[str, Optional[str]]], str, bool], None],
+        *args: object,
     ) -> str:
         """Helper method to capture stdout output."""
         old_stdout = sys.stdout
@@ -458,7 +476,9 @@ class TestDisplayAnalyzedScripts:
         processed_files = [("D:\\test\\script.bat", None)]
         target_path = "D:\\test"
 
-        output = self.capture_stdout(_display_analyzed_scripts, processed_files, target_path, False)
+        output = self.capture_stdout(
+            _display_analyzed_scripts, processed_files, target_path, False
+        )
 
         assert "Scripts Analyzed:" in output
         assert "1. script.bat" in output
@@ -472,7 +492,9 @@ class TestDisplayAnalyzedScripts:
         ]
         target_path = "D:\\test"
 
-        output = self.capture_stdout(_display_analyzed_scripts, processed_files, target_path, True)
+        output = self.capture_stdout(
+            _display_analyzed_scripts, processed_files, target_path, True
+        )
 
         assert "Scripts Analyzed:" in output
         assert "1. main.bat" in output
@@ -488,7 +510,9 @@ class TestDisplayAnalyzedScripts:
         ]
         target_path = "D:\\test"
 
-        output = self.capture_stdout(_display_analyzed_scripts, processed_files, target_path, True)
+        output = self.capture_stdout(
+            _display_analyzed_scripts, processed_files, target_path, True
+        )
 
         assert "Scripts Analyzed:" in output
         assert "1. main.bat" in output
@@ -500,7 +524,9 @@ class TestDisplayAnalyzedScripts:
         processed_files: list[tuple[str, Union[str, None]]] = []
         target_path = "D:\\test"
 
-        output = self.capture_stdout(_display_analyzed_scripts, processed_files, target_path, False)
+        output = self.capture_stdout(
+            _display_analyzed_scripts, processed_files, target_path, False
+        )
 
         # Should output nothing for empty list
         assert output == ""
@@ -513,7 +539,9 @@ class TestDisplayAnalyzedScripts:
         ]
         target_path = "D:\\test"
 
-        output = self.capture_stdout(_display_analyzed_scripts, processed_files, target_path, True)
+        output = self.capture_stdout(
+            _display_analyzed_scripts, processed_files, target_path, True
+        )
 
         assert "Scripts Analyzed:" in output
         assert "subdir" in output or "subdir\\script.bat" in output

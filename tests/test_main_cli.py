@@ -110,7 +110,9 @@ class TestMainFunction:
 
     def test_main_non_bat_file(self) -> None:
         """Test main function with non-.bat file."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False
+        ) as temp_file:
             temp_file.write("test content")
             temp_file_path = temp_file.name
 
@@ -209,7 +211,9 @@ echo %var%
         temp_file = self.create_temp_batch_file(content)
 
         try:
-            with patch("sys.argv", ["blinter.py", temp_file, "--summary", "--severity"]):
+            with patch(
+                "sys.argv", ["blinter.py", temp_file, "--summary", "--severity"]
+            ):
                 with self.capture_stdout() as captured:
                     try:
                         main()
@@ -244,7 +248,10 @@ echo %var%
         temp_file = self.create_temp_batch_file("@echo off\necho test\n")
 
         try:
-            with patch("blinter.lint_batch_file", side_effect=PermissionError("Permission denied")):
+            with patch(
+                "blinter.lint_batch_file",
+                side_effect=PermissionError("Permission denied"),
+            ):
                 with patch("sys.argv", ["blinter.py", temp_file]):
                     with self.capture_stdout() as captured:
                         try:
@@ -254,7 +261,10 @@ echo %var%
                             assert sys_exit.code in [0, 1]
                         output = captured.getvalue()
 
-                    assert "Warning: Could not process" in output and "Permission denied" in output
+                    assert (
+                        "Warning: Could not process" in output
+                        and "Permission denied" in output
+                    )
         finally:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
@@ -277,7 +287,10 @@ echo %var%
                             assert sys_exit.code in [0, 1]
                         output = captured.getvalue()
 
-                    assert "Warning: Could not read" in output and "encoding issues" in output
+                    assert (
+                        "Warning: Could not read" in output
+                        and "encoding issues" in output
+                    )
         finally:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
@@ -287,7 +300,10 @@ echo %var%
         temp_file = self.create_temp_batch_file("@echo off\necho test\n")
 
         try:
-            with patch("blinter.lint_batch_file", side_effect=ValueError("Something went wrong")):
+            with patch(
+                "blinter.lint_batch_file",
+                side_effect=ValueError("Something went wrong"),
+            ):
                 with patch("sys.argv", ["blinter.py", temp_file]):
                     with self.capture_stdout() as captured:
                         try:
@@ -341,7 +357,9 @@ echo %var%
         content = "@echo off\necho test\n"
 
         # Create file with mixed case extension
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".BaT", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".BaT", delete=False
+        ) as temp_file:
             temp_file.write(content)
             temp_file_path = temp_file.name
 
@@ -364,7 +382,9 @@ echo %var%
         content = "@echo off\necho test\n"
 
         # Create file with .cmd extension
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".cmd", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".cmd", delete=False
+        ) as temp_file:
             temp_file.write(content)
             temp_file_path = temp_file.name
 
@@ -387,7 +407,9 @@ echo %var%
         content = "@echo off\necho test\n"
 
         # Create file with mixed case extension
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".CmD", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".CmD", delete=False
+        ) as temp_file:
             temp_file.write(content)
             temp_file_path = temp_file.name
 
@@ -547,7 +569,9 @@ class TestCommandLineIntegration:
         """Test integration with pathlib Path objects."""
         content = "@echo off\necho test\n"
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
             temp_file.write(content)
             temp_file_path = temp_file.name
 
@@ -583,14 +607,18 @@ class TestCommandLineIntegration:
         temp_file = None
 
         try:
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as tf:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".bat", delete=False
+            ) as tf:
                 tf.write(content)
                 temp_file = tf.name
 
             for _error_name, error_obj in test_scenarios:
                 with patch("blinter.lint_batch_file", side_effect=error_obj):
                     with patch("sys.argv", ["blinter.py", temp_file]):
-                        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                        with patch(
+                            "sys.stdout", new_callable=io.StringIO
+                        ) as mock_stdout:
                             main()  # Should not raise an exception
                             output = mock_stdout.getvalue()
                             assert "Warning:" in output or "Error:" in output
@@ -624,7 +652,9 @@ finally:
         os.unlink(test_file)
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as script_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".py", delete=False
+        ) as script_file:
             script_file.write(test_script_content)
             script_file_path = script_file.name
 
@@ -944,7 +974,9 @@ class TestCLIMainFunctionScenarios:
         captured = capsys.readouterr()
         assert "Batch Linter - Help Menu" in captured.out
 
-    def test_main_with_nonexistent_file(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_main_with_nonexistent_file(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test main function with nonexistent file."""
         with patch("sys.argv", ["blinter.py", "nonexistent.bat"]):
             main()
@@ -952,13 +984,17 @@ class TestCLIMainFunctionScenarios:
         captured = capsys.readouterr()
         assert "Error: Path 'nonexistent.bat' not found." in captured.out
 
-    def test_main_with_permission_error(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_main_with_permission_error(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test main function with permission error."""
         import blinter
 
         with patch("sys.argv", ["blinter.py", "protected.bat"]):
             with patch.object(
-                blinter, "find_batch_files", side_effect=PermissionError("Access denied")
+                blinter,
+                "find_batch_files",
+                side_effect=PermissionError("Access denied"),
             ):
                 main()
 
@@ -972,7 +1008,9 @@ class TestCLIMainFunctionScenarios:
         import blinter
 
         # Create a test file
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".bat") as temp_file_handle:
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, suffix=".bat"
+        ) as temp_file_handle:
             temp_file_handle.write("@echo off\\n")
             temp_file = temp_file_handle.name
 
@@ -998,14 +1036,18 @@ class TestCLIMainFunctionScenarios:
         import blinter
 
         # Create a test file
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".bat") as temp_file_handle:
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, suffix=".bat"
+        ) as temp_file_handle:
             temp_file_handle.write("@echo off\\n")
             temp_file = temp_file_handle.name
 
         try:
             with patch("sys.argv", ["blinter.py", temp_file]):
                 with patch.object(
-                    blinter, "lint_batch_file", side_effect=OSError("Generic file error")
+                    blinter,
+                    "lint_batch_file",
+                    side_effect=OSError("Generic file error"),
                 ):
                     main()
 
@@ -1014,19 +1056,25 @@ class TestCLIMainFunctionScenarios:
         finally:
             os.unlink(temp_file)
 
-    def test_main_no_files_could_be_processed(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_main_no_files_could_be_processed(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test main function when no files can be processed."""
         import blinter
 
         # Create a test file that will cause processing to fail
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".bat") as temp_file_handle:
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, suffix=".bat"
+        ) as temp_file_handle:
             temp_file_handle.write("@echo off\\n")
             temp_file = temp_file_handle.name
 
         try:
             with patch("sys.argv", ["blinter.py", temp_file]):
                 with patch.object(
-                    blinter, "lint_batch_file", side_effect=ValueError("Processing error")
+                    blinter,
+                    "lint_batch_file",
+                    side_effect=ValueError("Processing error"),
                 ):
                     main()
 
@@ -1104,7 +1152,9 @@ class TestMainFunctionEdgeCases:
                     main()
 
                     # Verify error message and help are shown
-                    mock_print.assert_any_call("Error: No batch file or directory provided.\n")
+                    mock_print.assert_any_call(
+                        "Error: No batch file or directory provided.\n"
+                    )
                     mock_help.assert_called_once()
         finally:
             sys.argv = original_argv
@@ -1121,7 +1171,9 @@ class TestMainFunctionEdgeCases:
             sys.argv = ["blinter", "--severity", "test.bat"]
 
             # Create a temporary file
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".bat", delete=False
+            ) as temp_file:
                 temp_file.write("@echo off\necho test\n")
                 temp_file_path = temp_file.name
 
@@ -1335,7 +1387,9 @@ class TestMainFunctionEdgeCases:
     def test_main_success_path_with_clean_file(self) -> None:
         """Test main() success path when no issues are found."""
         # Create a very simple, clean batch file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
             # Write minimal content that should have no issues
             temp_file.write("@echo off\n")
             temp_path = temp_file.name
@@ -1360,8 +1414,12 @@ class TestMainFunctionEdgeCases:
     def test_main_error_path_with_critical_issues(self) -> None:
         """Test main() error path when critical errors are found."""
         # Create a batch file with critical errors
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
-            temp_file.write('echo "unclosed quote\n')  # This should cause critical errors
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
+            temp_file.write(
+                'echo "unclosed quote\n'
+            )  # This should cause critical errors
             temp_path = temp_file.name
 
         try:
@@ -1373,10 +1431,14 @@ class TestMainFunctionEdgeCases:
                         # Should exit with error code 1
                         assert mock_exit.called
                         # Check that error handling was triggered
-                        exit_code = mock_exit.call_args[0][0] if mock_exit.call_args else 0
+                        exit_code = (
+                            mock_exit.call_args[0][0] if mock_exit.call_args else 0
+                        )
                         assert exit_code in [0, 1]  # Either success or error is valid
                         # Verify that some output was generated
-                        assert mock_print.called  # Should have printed error information
+                        assert (
+                            mock_print.called
+                        )  # Should have printed error information
         finally:
             os.unlink(temp_path)
 
@@ -1392,7 +1454,7 @@ class TestVersionFunctionality:
                 output = captured.getvalue()
 
         # Check for version information in output (just the version number)
-        assert "v1.0.77" in output
+        assert "v1.0.78" in output
         # Ensure author and license are NOT shown
         assert "Author:" not in output
         assert "License:" not in output
@@ -1406,12 +1468,14 @@ class TestVersionFunctionality:
 
             # Check for version in help text
             assert "Batch Linter - Help Menu" in output
-            assert "Version: 1.0.77" in output
+            assert "Version: 1.0.78" in output
 
     def test_version_in_normal_run(self) -> None:
         """Test that version is displayed when script runs normally."""
         # Create a temporary batch file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
             temp_file.write("@echo off\n")
             temp_file.write("echo Hello World\n")
             temp_path = temp_file.name
@@ -1424,7 +1488,7 @@ class TestVersionFunctionality:
                         output = captured.getvalue()
 
                     # Check that version is displayed at the start
-                    assert "Blinter v1.0.77 - Batch File Linter" in output
+                    assert "Blinter v1.0.78 - Batch File Linter" in output
         finally:
             os.unlink(temp_path)
 
@@ -1450,7 +1514,9 @@ class TestFollowCallsCLI:
                 bat_file.write("EXIT /b 0\n")
 
             # Test via CLI
-            with patch.object(sys, "argv", ["blinter.py", main_script, "--follow-calls"]):
+            with patch.object(
+                sys, "argv", ["blinter.py", main_script, "--follow-calls"]
+            ):
                 with pytest.raises(SystemExit) as exc_info:
                     main()
                 # Exit code 0 means success
@@ -1474,7 +1540,9 @@ class TestFollowCallsCLI:
                 bat_file.write("EXIT /b 0\n")
 
             # Test via CLI - should exit with error code
-            with patch.object(sys, "argv", ["blinter.py", main_script, "--follow-calls"]):
+            with patch.object(
+                sys, "argv", ["blinter.py", main_script, "--follow-calls"]
+            ):
                 with pytest.raises(SystemExit) as exc_info:
                     main()
                 # Should exit with error code due to errors

@@ -18,7 +18,9 @@ class TestFileEncodingDetection:
         """Test reading a UTF-8 encoded file."""
         content = "This is a test file\nwith multiple lines\n"
 
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", delete=False
+        ) as temp_file:
             temp_file.write(content)
             temp_file_path = temp_file.name
 
@@ -34,7 +36,9 @@ class TestFileEncodingDetection:
         """Test reading a UTF-8 with BOM file."""
         content = "This is a test file\nwith BOM\n"
 
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8-sig", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8-sig", delete=False
+        ) as temp_file:
             temp_file.write(content)
             temp_file_path = temp_file.name
 
@@ -49,7 +53,9 @@ class TestFileEncodingDetection:
         """Test reading a Latin-1 encoded file."""
         content = "CafÃ© franÃ§ais\nwith special chars\n"
 
-        with tempfile.NamedTemporaryFile(mode="w", encoding="latin-1", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="latin-1", delete=False
+        ) as temp_file:
             temp_file.write(content)
             temp_file_path = temp_file.name
 
@@ -60,7 +66,13 @@ class TestFileEncodingDetection:
                 assert len(lines) == 2
                 # Allow various encodings - chardet may detect utf-8 on modern systems
                 # for content that's compatible with both encodings
-                assert encoding.lower() in ["latin1", "latin-1", "cp1252", "iso-8859-1", "utf-8"]
+                assert encoding.lower() in [
+                    "latin1",
+                    "latin-1",
+                    "cp1252",
+                    "iso-8859-1",
+                    "utf-8",
+                ]
                 # Verify content is correctly read regardless of detected encoding
                 assert "CafÃ©" in lines[0] or "Café" in lines[0]
         finally:
@@ -102,15 +114,21 @@ class TestFileEncodingDetection:
 
     @patch("chardet.detect")
     @patch("builtins.open")
-    def test_chardet_detection_success(self, mock_file: MagicMock, mock_detect: MagicMock) -> None:
+    def test_chardet_detection_success(
+        self, mock_file: MagicMock, mock_detect: MagicMock
+    ) -> None:
         """Test successful chardet encoding detection."""
         # Mock chardet detection
         mock_detect.return_value = {"encoding": "cp1252", "confidence": 0.8}
 
         # Mock file operations
         mock_file.side_effect = [
-            mock_open(read_data=b"test content").return_value,  # Binary read for chardet
-            mock_open(read_data="test content\n").return_value,  # Text read with detected encoding
+            mock_open(
+                read_data=b"test content"
+            ).return_value,  # Binary read for chardet
+            mock_open(
+                read_data="test content\n"
+            ).return_value,  # Text read with detected encoding
         ]
 
         lines, encoding = read_file_with_encoding("test.bat")
@@ -140,7 +158,9 @@ class TestFileEncodingDetection:
         """Test fallback when chardet is not available."""
         # Test the actual ImportError scenario by mocking the import inside the function
         content = "test content\n"
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", delete=False
+        ) as temp_file:
             temp_file.write(content)
             temp_file_path = temp_file.name
 
@@ -148,7 +168,9 @@ class TestFileEncodingDetection:
             # Mock the chardet import to fail
             with patch("builtins.__import__") as mock_import:
 
-                def import_side_effect(name: str, *args: object, **kwargs: object) -> object:
+                def import_side_effect(
+                    name: str, *args: object, **kwargs: object
+                ) -> object:
                     if name == "chardet":
                         raise ImportError("No module named chardet")
                     return __import__(name, *args, **kwargs)
@@ -186,7 +208,9 @@ class TestFileEncodingDetection:
 
     def test_empty_file(self) -> None:
         """Test reading an empty file."""
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", delete=False
+        ) as temp_file:
             temp_file_path = temp_file.name
 
         try:
@@ -209,7 +233,13 @@ class TestFileEncodingDetection:
             lines, encoding = read_file_with_encoding(temp_file_path)
             assert len(lines) == 1
             # May be detected as ASCII first if it's simple content
-            assert encoding.lower() in ["latin1", "latin-1", "ascii", "iso-8859-1", "cp1252"]
+            assert encoding.lower() in [
+                "latin1",
+                "latin-1",
+                "ascii",
+                "iso-8859-1",
+                "cp1252",
+            ]
         finally:
             os.unlink(temp_file_path)
 
@@ -227,8 +257,12 @@ class TestFileEncodingDetection:
 
         # Mock file operations
         mock_file.side_effect = [
-            mock_open(read_data=b"test content").return_value,  # Binary read for chardet
-            mock_open(read_data="test content\n").return_value,  # Text read with detected encoding
+            mock_open(
+                read_data=b"test content"
+            ).return_value,  # Binary read for chardet
+            mock_open(
+                read_data="test content\n"
+            ).return_value,  # Text read with detected encoding
         ]
 
         lines, encoding = read_file_with_encoding("test.bat")
@@ -249,8 +283,12 @@ class TestFileEncodingDetection:
 
         # Mock file operations
         mock_file.side_effect = [
-            mock_open(read_data=b"test content").return_value,  # Binary read for chardet
-            mock_open(read_data="test content\n").return_value,  # Text read with detected encoding
+            mock_open(
+                read_data=b"test content"
+            ).return_value,  # Binary read for chardet
+            mock_open(
+                read_data="test content\n"
+            ).return_value,  # Text read with detected encoding
         ]
 
         lines, encoding = read_file_with_encoding("test.bat")
@@ -294,12 +332,16 @@ class TestFileEncodingDetection:
                 ) from last_exception
 
             # This is the fallback error path
-            raise OSError(f"Could not read file '{file_path}' with any supported encoding")
+            raise OSError(
+                f"Could not read file '{file_path}' with any supported encoding"
+            )
 
         with pytest.raises(OSError) as exc_info:
             simulate_fallback_error()
 
-        assert "Could not read file 'test.bat' with any supported encoding" in str(exc_info.value)
+        assert "Could not read file 'test.bat' with any supported encoding" in str(
+            exc_info.value
+        )
 
     def test_unicode_decode_error_with_last_exception(self) -> None:
         """Test encoding failure handling with a last_exception."""
@@ -316,7 +358,9 @@ class TestFileEncodingDetection:
                     f"Last error: {last_exception}"
                 ) from last_exception
 
-            raise OSError(f"Could not read file '{file_path}' with any supported encoding")
+            raise OSError(
+                f"Could not read file '{file_path}' with any supported encoding"
+            )
 
         with pytest.raises(OSError) as exc_info:
             simulate_with_last_exception()
@@ -340,10 +384,20 @@ class TestEncodingEdgeCases:
 
         try:
             # Mock chardet ImportError
-            with patch("builtins.__import__", side_effect=ImportError("No module named chardet")):
+            with patch(
+                "builtins.__import__",
+                side_effect=ImportError("No module named chardet"),
+            ):
                 lines, encoding = read_file_with_encoding(temp_file)
                 assert len(lines) == 2
-                assert encoding in ["utf-8", "utf-8-sig", "latin1", "cp1252", "iso-8859-1", "ascii"]
+                assert encoding in [
+                    "utf-8",
+                    "utf-8-sig",
+                    "latin1",
+                    "cp1252",
+                    "iso-8859-1",
+                    "ascii",
+                ]
         finally:
             os.unlink(temp_file)
 
@@ -361,7 +415,14 @@ class TestEncodingEdgeCases:
             with patch("chardet.detect", side_effect=ValueError("Detection failed")):
                 lines, encoding = read_file_with_encoding(temp_file)
                 assert len(lines) == 2
-                assert encoding in ["utf-8", "utf-8-sig", "latin1", "cp1252", "iso-8859-1", "ascii"]
+                assert encoding in [
+                    "utf-8",
+                    "utf-8-sig",
+                    "latin1",
+                    "cp1252",
+                    "iso-8859-1",
+                    "ascii",
+                ]
         finally:
             os.unlink(temp_file)
 
@@ -370,7 +431,8 @@ class TestEncodingEdgeCases:
         # This is very hard to trigger in practice since latin1 can decode any byte sequence
         # We'll mock the open function to always fail
         with patch(
-            "builtins.open", side_effect=UnicodeDecodeError("test", b"", 0, 1, "test error")
+            "builtins.open",
+            side_effect=UnicodeDecodeError("test", b"", 0, 1, "test error"),
         ):
             with pytest.raises(OSError, match="All encoding attempts failed"):
                 read_file_with_encoding("nonexistent.bat")
@@ -423,12 +485,22 @@ class TestEncodingFallbackScenarios:
 
         try:
             # Mock chardet.detect to return low confidence
-            mock_result = {"encoding": "utf-8", "confidence": 0.5}  # Below 0.7 threshold
+            mock_result = {
+                "encoding": "utf-8",
+                "confidence": 0.5,
+            }  # Below 0.7 threshold
             with patch("chardet.detect", return_value=mock_result):
                 lines, encoding = read_file_with_encoding(temp_file)
                 assert len(lines) == 2
                 # Should fall back to standard encoding list
-                assert encoding in ["utf-8", "utf-8-sig", "latin1", "cp1252", "iso-8859-1", "ascii"]
+                assert encoding in [
+                    "utf-8",
+                    "utf-8-sig",
+                    "latin1",
+                    "cp1252",
+                    "iso-8859-1",
+                    "ascii",
+                ]
         finally:
             os.unlink(temp_file)
 
@@ -446,7 +518,14 @@ class TestEncodingFallbackScenarios:
             with patch("chardet.detect", return_value=None):
                 lines, encoding = read_file_with_encoding(temp_file)
                 assert len(lines) == 2
-                assert encoding in ["utf-8", "utf-8-sig", "latin1", "cp1252", "iso-8859-1", "ascii"]
+                assert encoding in [
+                    "utf-8",
+                    "utf-8-sig",
+                    "latin1",
+                    "cp1252",
+                    "iso-8859-1",
+                    "ascii",
+                ]
         finally:
             os.unlink(temp_file)
 
@@ -506,7 +585,14 @@ class TestAdditionalFileEncodingScenarios:
             patch("chardet.detect", side_effect=OSError("Test OSError")),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
-            assert encoding in ["utf-8", "utf-8-sig", "latin1", "cp1252", "iso-8859-1", "ascii"]
+            assert encoding in [
+                "utf-8",
+                "utf-8-sig",
+                "latin1",
+                "cp1252",
+                "iso-8859-1",
+                "ascii",
+            ]
             assert len(lines) > 0
 
     def test_chardet_valueerror_handling(self) -> None:
@@ -517,7 +603,14 @@ class TestAdditionalFileEncodingScenarios:
             patch("chardet.detect", side_effect=ValueError("Test ValueError")),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
-            assert encoding in ["utf-8", "utf-8-sig", "latin1", "cp1252", "iso-8859-1", "ascii"]
+            assert encoding in [
+                "utf-8",
+                "utf-8-sig",
+                "latin1",
+                "cp1252",
+                "iso-8859-1",
+                "ascii",
+            ]
             assert len(lines) > 0
 
     def test_chardet_typeerror_handling(self) -> None:
@@ -528,7 +621,14 @@ class TestAdditionalFileEncodingScenarios:
             patch("chardet.detect", side_effect=TypeError("Test TypeError")),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
-            assert encoding in ["utf-8", "utf-8-sig", "latin1", "cp1252", "iso-8859-1", "ascii"]
+            assert encoding in [
+                "utf-8",
+                "utf-8-sig",
+                "latin1",
+                "cp1252",
+                "iso-8859-1",
+                "ascii",
+            ]
             assert len(lines) > 0
 
     def test_encoding_lookup_error_fallback(self) -> None:

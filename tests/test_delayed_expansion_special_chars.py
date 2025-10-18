@@ -97,7 +97,9 @@ def test_no_delayed_expand_needed(tmp_path: pathlib.Path) -> None:
     issues = lint_batch_file(str(script))
     # SHOULD have P004 error because delayed expansion is not actually used
     p004_issues = [issue for issue in issues if issue.rule.code == "P004"]
-    assert len(p004_issues) == 1, "Should flag P004 when ENABLEDELAYEDEXPANSION is unused"
+    assert (
+        len(p004_issues) == 1
+    ), "Should flag P004 when ENABLEDELAYEDEXPANSION is unused"
 
 
 def test_p008_with_special_chars(tmp_path: pathlib.Path) -> None:
@@ -161,7 +163,9 @@ def test_complex_delayed_exprs(tmp_path: pathlib.Path) -> None:
     issues = lint_batch_file(str(script))
     # Should NOT have P004 error
     p004_issues = [issue for issue in issues if issue.rule.code == "P004"]
-    assert len(p004_issues) == 0, "Should detect delayed expansion in array syntax !arr[0]!"
+    assert (
+        len(p004_issues) == 0
+    ), "Should detect delayed expansion in array syntax !arr[0]!"
 
 
 def test_nested_delayed_expansion(tmp_path: pathlib.Path) -> None:
@@ -198,4 +202,6 @@ def test_multi_special_chars_var(tmp_path: pathlib.Path) -> None:
     issues = lint_batch_file(str(script))
     # Should NOT have P004 error
     p004_issues = [issue for issue in issues if issue.rule.code == "P004"]
-    assert len(p004_issues) == 0, "Should detect !@VAR_NAME-123#! with multiple special chars"
+    assert (
+        len(p004_issues) == 0
+    ), "Should detect !@VAR_NAME-123#! with multiple special chars"

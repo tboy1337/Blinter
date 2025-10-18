@@ -479,7 +479,9 @@ class TestCollectionProperties:
 
     @given(lines=st.lists(batch_line_strategy(), max_size=50))
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_parse_suppression_comments_returns_valid_dict(self, lines: List[str]) -> None:
+    def test_parse_suppression_comments_returns_valid_dict(
+        self, lines: List[str]
+    ) -> None:
         """_parse_suppression_comments should return a dict of line numbers to rule codes."""
         suppressions = _parse_suppression_comments(lines)
         assert isinstance(suppressions, dict)
@@ -550,7 +552,9 @@ class TestCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_if_statement_formatting_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_if_statement_formatting_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_if_statement_formatting should return a list of LintIssue."""
         result = _check_if_statement_formatting(stripped, line_num)
         assert isinstance(result, list)
@@ -576,7 +580,9 @@ class TestCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_unquoted_variables_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_unquoted_variables_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_unquoted_variables should return a list of LintIssue."""
         result = _check_unquoted_variables(stripped, line_num)
         assert isinstance(result, list)
@@ -593,7 +599,11 @@ class TestCheckingFunctionProperties:
         for issue in result:
             assert isinstance(issue, LintIssue)
 
-    @given(indented_lines=st.lists(st.tuples(st.integers(min_value=1), st.text()), max_size=50))
+    @given(
+        indented_lines=st.lists(
+            st.tuples(st.integers(min_value=1), st.text()), max_size=50
+        )
+    )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
     def test_find_single_line_mixed_indent_returns_list(
         self, indented_lines: List[tuple[int, str]]
@@ -646,7 +656,9 @@ class TestFileOperationProperties:
         line_endings = ["\r\n", "\n", "\r"]
 
         for ending in line_endings:
-            with tempfile.NamedTemporaryFile(mode="wb", suffix=".bat", delete=False) as tmp:
+            with tempfile.NamedTemporaryFile(
+                mode="wb", suffix=".bat", delete=False
+            ) as tmp:
                 content = f"@ECHO OFF{ending}ECHO test{ending}".encode("utf-8")
                 tmp.write(content)
                 tmp_path = tmp.name
@@ -673,7 +685,11 @@ class TestFileOperationProperties:
 class TestConfigurationProperties:
     """Property-based tests for configuration functions."""
 
-    @given(severity_str=st.sampled_from(["ERROR", "WARNING", "STYLE", "SECURITY", "PERFORMANCE"]))
+    @given(
+        severity_str=st.sampled_from(
+            ["ERROR", "WARNING", "STYLE", "SECURITY", "PERFORMANCE"]
+        )
+    )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
     def test_set_min_severity_valid(self, severity_str: str) -> None:
         """_set_min_severity should handle valid severity strings."""
@@ -684,13 +700,17 @@ class TestConfigurationProperties:
 
     @given(
         severity_str=st.text().filter(
-            lambda x: x.upper() not in ["ERROR", "WARNING", "STYLE", "SECURITY", "PERFORMANCE"]
+            lambda x: x.upper()
+            not in ["ERROR", "WARNING", "STYLE", "SECURITY", "PERFORMANCE"]
         )
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
     def test_set_min_severity_invalid(self, severity_str: str) -> None:
         """_set_min_severity should not crash on invalid severity strings."""
-        assume(severity_str.upper() not in ["ERROR", "WARNING", "STYLE", "SECURITY", "PERFORMANCE"])
+        assume(
+            severity_str.upper()
+            not in ["ERROR", "WARNING", "STYLE", "SECURITY", "PERFORMANCE"]
+        )
         config = BlinterConfig()
         # Should not raise an exception, just log a warning
         _set_min_severity(config, severity_str)
@@ -710,8 +730,12 @@ class TestIntegrationProperties:
         lines=st.lists(batch_line_strategy(), min_size=1, max_size=20),
         extension=st.sampled_from([".bat", ".cmd"]),
     )
-    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
-    def test_lint_batch_file_with_generated_content(self, lines: List[str], extension: str) -> None:
+    @settings(
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20
+    )
+    def test_lint_batch_file_with_generated_content(
+        self, lines: List[str], extension: str
+    ) -> None:
         """lint_batch_file should handle generated batch file content."""
         content = "\r\n".join(lines)
 
@@ -751,7 +775,11 @@ class TestIntegrationProperties:
 class TestEdgeCaseProperties:
     """Property-based tests for edge cases."""
 
-    @given(line=st.text(alphabet=st.characters(blacklist_categories=("Cs",)), max_size=1000))
+    @given(
+        line=st.text(
+            alphabet=st.characters(blacklist_categories=("Cs",)), max_size=1000
+        )
+    )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
     def test_parsing_functions_handle_unicode(self, line: str) -> None:
         """Parsing functions should handle unicode without crashing."""
@@ -805,7 +833,9 @@ class TestEdgeCaseProperties:
             max_size=20,
         )
     )
-    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=10)
+    @settings(
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=10
+    )
     def test_lint_batch_file_handles_various_content(self, lines: List[str]) -> None:
         """lint_batch_file should handle various content without crashing."""
         content = "\r\n".join(lines)
@@ -834,7 +864,9 @@ class TestInvariantProperties:
 
     @given(config=blinter_config_strategy(), rule_code=rule_code_strategy())
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_disabled_rules_always_disabled(self, config: BlinterConfig, rule_code: str) -> None:
+    def test_disabled_rules_always_disabled(
+        self, config: BlinterConfig, rule_code: str
+    ) -> None:
         """If a rule is in disabled_rules, it should always return False."""
         if config.disabled_rules is None:
             config.disabled_rules = set()
@@ -843,7 +875,9 @@ class TestInvariantProperties:
 
     @given(config=blinter_config_strategy(), rule_code=rule_code_strategy())
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_enabled_rules_override_disabled(self, config: BlinterConfig, rule_code: str) -> None:
+    def test_enabled_rules_override_disabled(
+        self, config: BlinterConfig, rule_code: str
+    ) -> None:
         """Disabled rules should take precedence over enabled rules."""
         if config.disabled_rules is None:
             config.disabled_rules = set()
@@ -925,7 +959,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_errorlevel_syntax_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_errorlevel_syntax_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_errorlevel_syntax should return a list of LintIssue."""
         result = _check_errorlevel_syntax(stripped, line_num)
         assert isinstance(result, list)
@@ -938,7 +974,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_if_exist_mixing_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_if_exist_mixing_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_if_exist_mixing should return a list of LintIssue."""
         result = _check_if_exist_mixing(stripped, line_num)
         assert isinstance(result, list)
@@ -964,7 +1002,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_for_loop_syntax_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_for_loop_syntax_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_for_loop_syntax should return a list of LintIssue."""
         result = _check_for_loop_syntax(stripped, line_num)
         assert isinstance(result, list)
@@ -977,7 +1017,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_variable_expansion_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_variable_expansion_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_variable_expansion should return a list of LintIssue."""
         result = _check_variable_expansion(stripped, line_num)
         assert isinstance(result, list)
@@ -990,7 +1032,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_subroutine_call_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_subroutine_call_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_subroutine_call should return a list of LintIssue."""
         labels: Dict[str, int] = {}
         result = _check_subroutine_call(stripped, line_num, labels)
@@ -1004,7 +1048,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_command_typos_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_command_typos_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_command_typos should return a list of LintIssue."""
         result = _check_command_typos(stripped, line_num)
         assert isinstance(result, list)
@@ -1017,7 +1063,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_parameter_modifiers_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_parameter_modifiers_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_parameter_modifiers should return a list of LintIssue."""
         result = _check_parameter_modifiers(stripped, line_num)
         assert isinstance(result, list)
@@ -1043,7 +1091,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_quote_escaping_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_quote_escaping_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_quote_escaping should return a list of LintIssue."""
         result = _check_quote_escaping(stripped, line_num)
         assert isinstance(result, list)
@@ -1056,7 +1106,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_set_a_expression_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_set_a_expression_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_set_a_expression should return a list of LintIssue."""
         result = _check_set_a_expression(stripped, line_num)
         assert isinstance(result, list)
@@ -1082,7 +1134,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_non_ascii_chars_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_non_ascii_chars_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_non_ascii_chars should return a list of LintIssue."""
         result = _check_non_ascii_chars(stripped, line_num)
         assert isinstance(result, list)
@@ -1095,7 +1149,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_errorlevel_comparison_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_errorlevel_comparison_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_errorlevel_comparison should return a list of LintIssue."""
         result = _check_errorlevel_comparison(stripped, line_num)
         assert isinstance(result, list)
@@ -1108,7 +1164,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_inefficient_modifiers_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_inefficient_modifiers_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_inefficient_modifiers should return a list of LintIssue."""
         result = _check_inefficient_modifiers(stripped, line_num)
         assert isinstance(result, list)
@@ -1121,7 +1179,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_extended_non_ascii_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_extended_non_ascii_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_extended_non_ascii should return a list of LintIssue."""
         result = _check_extended_non_ascii(stripped, line_num)
         assert isinstance(result, list)
@@ -1134,7 +1194,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_unicode_filenames_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_unicode_filenames_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_unicode_filenames should return a list of LintIssue."""
         result = _check_unicode_filenames(stripped, line_num)
         assert isinstance(result, list)
@@ -1147,7 +1209,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_call_ambiguity_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_call_ambiguity_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_call_ambiguity should return a list of LintIssue."""
         result = _check_call_ambiguity(stripped, line_num)
         assert isinstance(result, list)
@@ -1160,7 +1224,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_timeout_ping_numbers_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_timeout_ping_numbers_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_timeout_ping_numbers should return a list of LintIssue."""
         result = _check_timeout_ping_numbers(stripped, line_num)
         assert isinstance(result, list)
@@ -1173,7 +1239,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_info_disclosure_sec_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_info_disclosure_sec_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_info_disclosure_sec should return a list of LintIssue."""
         result = _check_info_disclosure_sec(stripped, line_num)
         assert isinstance(result, list)
@@ -1186,7 +1254,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_num=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_malware_security_returns_list(self, stripped: str, line_num: int) -> None:
+    def test_check_malware_security_returns_list(
+        self, stripped: str, line_num: int
+    ) -> None:
         """_check_malware_security should return a list of LintIssue."""
         result = _check_malware_security(stripped, line_num)
         assert isinstance(result, list)
@@ -1226,7 +1296,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_number=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_multilevel_escaping_returns_list(self, stripped: str, line_number: int) -> None:
+    def test_check_multilevel_escaping_returns_list(
+        self, stripped: str, line_number: int
+    ) -> None:
         """_check_multilevel_escaping should return a list of LintIssue."""
         result = _check_multilevel_escaping(stripped, line_number)
         assert isinstance(result, list)
@@ -1239,7 +1311,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_number=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_continuation_spaces_returns_list(self, line: str, line_number: int) -> None:
+    def test_check_continuation_spaces_returns_list(
+        self, line: str, line_number: int
+    ) -> None:
         """_check_continuation_spaces should return a list of LintIssue."""
         stripped = line.strip()
         result = _check_continuation_spaces(line, stripped, line_number)
@@ -1268,7 +1342,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_number=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_advanced_escaping_rules_returns_list(self, line: str, line_number: int) -> None:
+    def test_check_advanced_escaping_rules_returns_list(
+        self, line: str, line_number: int
+    ) -> None:
         """_check_advanced_escaping_rules should return a list of LintIssue."""
         result = _check_advanced_escaping_rules(line, line_number)
         assert isinstance(result, list)
@@ -1280,7 +1356,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_number=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_advanced_for_rules_returns_list(self, line: str, line_number: int) -> None:
+    def test_check_advanced_for_rules_returns_list(
+        self, line: str, line_number: int
+    ) -> None:
         """_check_advanced_for_rules should return a list of LintIssue."""
         result = _check_advanced_for_rules(line, line_number)
         assert isinstance(result, list)
@@ -1292,7 +1370,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_number=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_advanced_process_mgmt_returns_list(self, line: str, line_number: int) -> None:
+    def test_check_advanced_process_mgmt_returns_list(
+        self, line: str, line_number: int
+    ) -> None:
         """_check_advanced_process_mgmt should return a list of LintIssue."""
         result = _check_advanced_process_mgmt(line, line_number)
         assert isinstance(result, list)
@@ -1304,7 +1384,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_number=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_percent_tilde_syntax_returns_list(self, stripped: str, line_number: int) -> None:
+    def test_check_percent_tilde_syntax_returns_list(
+        self, stripped: str, line_number: int
+    ) -> None:
         """_check_percent_tilde_syntax should return a list of LintIssue."""
         result = _check_percent_tilde_syntax(stripped, line_number)
         assert isinstance(result, list)
@@ -1317,7 +1399,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_number=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_for_loop_var_syntax_returns_list(self, stripped: str, line_number: int) -> None:
+    def test_check_for_loop_var_syntax_returns_list(
+        self, stripped: str, line_number: int
+    ) -> None:
         """_check_for_loop_var_syntax should return a list of LintIssue."""
         result = _check_for_loop_var_syntax(stripped, line_number)
         assert isinstance(result, list)
@@ -1345,7 +1429,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_number=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_set_a_quoting_returns_list(self, stripped: str, line_number: int) -> None:
+    def test_check_set_a_quoting_returns_list(
+        self, stripped: str, line_number: int
+    ) -> None:
         """_check_set_a_quoting should return a list of LintIssue."""
         result = _check_set_a_quoting(stripped, line_number)
         assert isinstance(result, list)
@@ -1358,7 +1444,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_number=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_deprecated_commands_returns_list(self, stripped: str, line_number: int) -> None:
+    def test_check_deprecated_commands_returns_list(
+        self, stripped: str, line_number: int
+    ) -> None:
         """_check_deprecated_commands should return a list of LintIssue."""
         result = _check_deprecated_commands(stripped, line_number)
         assert isinstance(result, list)
@@ -1371,7 +1459,9 @@ class TestAdditionalCheckingFunctionProperties:
         line_number=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_magic_numbers_returns_list(self, line: str, line_number: int) -> None:
+    def test_check_magic_numbers_returns_list(
+        self, line: str, line_number: int
+    ) -> None:
         """_check_magic_numbers should return a list of LintIssue."""
         result = _check_magic_numbers(line, line_number)
         assert isinstance(result, list)
@@ -1450,7 +1540,9 @@ class TestOptionalReturnFunctionProperties:
         line_number=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_for_f_options_returns_optional(self, stripped: str, line_number: int) -> None:
+    def test_check_for_f_options_returns_optional(
+        self, stripped: str, line_number: int
+    ) -> None:
         """_check_for_f_options should return Optional[LintIssue]."""
         result = _check_for_f_options(stripped, line_number)
         assert result is None or isinstance(result, LintIssue)
@@ -1662,7 +1754,9 @@ class TestGlobalCheckingFunctionProperties:
         ending_type=st.sampled_from(["CRLF", "LF", "CR", "MIXED"]),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_multibyte_risks_returns_list(self, lines: List[str], ending_type: str) -> None:
+    def test_check_multibyte_risks_returns_list(
+        self, lines: List[str], ending_type: str
+    ) -> None:
         """_check_multibyte_risks should return a list of LintIssue."""
         result = _check_multibyte_risks(lines, ending_type)
         assert isinstance(result, list)
@@ -1674,7 +1768,9 @@ class TestGlobalCheckingFunctionProperties:
         ending_type=st.sampled_from(["CRLF", "LF", "CR", "MIXED"]),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_goto_call_risks_returns_list(self, lines: List[str], ending_type: str) -> None:
+    def test_check_goto_call_risks_returns_list(
+        self, lines: List[str], ending_type: str
+    ) -> None:
         """_check_goto_call_risks should return a list of LintIssue."""
         result = _check_goto_call_risks(lines, ending_type)
         assert isinstance(result, list)
@@ -1686,7 +1782,9 @@ class TestGlobalCheckingFunctionProperties:
         ending_type=st.sampled_from(["CRLF", "LF", "CR", "MIXED"]),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_doublecolon_risks_returns_list(self, lines: List[str], ending_type: str) -> None:
+    def test_check_doublecolon_risks_returns_list(
+        self, lines: List[str], ending_type: str
+    ) -> None:
         """_check_doublecolon_risks should return a list of LintIssue."""
         result = _check_doublecolon_risks(lines, ending_type)
         assert isinstance(result, list)
@@ -1703,7 +1801,9 @@ class TestFilePathDependentFunctionProperties:
     """Property-based tests for functions that require file paths."""
 
     @given(lines=st.lists(batch_line_strategy(), max_size=50))
-    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
+    @settings(
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20
+    )
     def test_check_line_ending_rules_with_temp_file(self, lines: List[str]) -> None:
         """_check_line_ending_rules should return a list of LintIssue."""
         with tempfile.NamedTemporaryFile(
@@ -1722,7 +1822,9 @@ class TestFilePathDependentFunctionProperties:
             Path(tmp_path).unlink()
 
     @given(lines=st.lists(batch_line_strategy(), max_size=50))
-    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
+    @settings(
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20
+    )
     def test_check_global_style_rules_with_temp_file(self, lines: List[str]) -> None:
         """_check_global_style_rules should return a list of LintIssue."""
         with tempfile.NamedTemporaryFile(
@@ -1741,7 +1843,9 @@ class TestFilePathDependentFunctionProperties:
             Path(tmp_path).unlink()
 
     @given(lines=st.lists(batch_line_strategy(), max_size=50))
-    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
+    @settings(
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20
+    )
     def test_check_new_global_rules_with_temp_file(self, lines: List[str]) -> None:
         """_check_new_global_rules should return a list of LintIssue."""
         with tempfile.NamedTemporaryFile(
@@ -1760,7 +1864,9 @@ class TestFilePathDependentFunctionProperties:
             Path(tmp_path).unlink()
 
     @given(lines=st.lists(batch_line_strategy(), max_size=50))
-    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
+    @settings(
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20
+    )
     def test_check_bat_cmd_differences_with_temp_file(self, lines: List[str]) -> None:
         """_check_bat_cmd_differences should return a list of LintIssue."""
         with tempfile.NamedTemporaryFile(
@@ -1779,8 +1885,12 @@ class TestFilePathDependentFunctionProperties:
             Path(tmp_path).unlink()
 
     @given(lines=st.lists(batch_line_strategy(), max_size=50))
-    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
-    def test_check_advanced_global_patterns_with_temp_file(self, lines: List[str]) -> None:
+    @settings(
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20
+    )
+    def test_check_advanced_global_patterns_with_temp_file(
+        self, lines: List[str]
+    ) -> None:
         """_check_advanced_global_patterns should return a list of LintIssue."""
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".bat", delete=False, encoding="utf-8", newline=""
@@ -1798,7 +1908,9 @@ class TestFilePathDependentFunctionProperties:
             Path(tmp_path).unlink()
 
     @given(lines=st.lists(batch_line_strategy(), max_size=50))
-    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
+    @settings(
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20
+    )
     def test_check_self_modification_with_temp_file(self, lines: List[str]) -> None:
         """_check_self_modification should return a list of LintIssue."""
         with tempfile.NamedTemporaryFile(
@@ -1826,7 +1938,9 @@ class TestFileEncodingProperties:  # pylint: disable=too-few-public-methods
     """Property-based tests for file encoding functions."""
 
     @given(lines=st.lists(batch_line_strategy(), min_size=1, max_size=50))
-    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20)
+    @settings(
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=20
+    )
     def test_read_file_with_encoding(self, lines: List[str]) -> None:
         """read_file_with_encoding should handle various encodings."""
         content = "\r\n".join(lines)
@@ -1896,7 +2010,9 @@ class TestComplexSignatureFunctionProperties:
     ) -> None:
         """_check_warning_issues should return a list of LintIssue."""
         set_vars: Set[str] = set()
-        result = _check_warning_issues(line, line_num, set_vars, delayed_expansion_enabled)
+        result = _check_warning_issues(
+            line, line_num, set_vars, delayed_expansion_enabled
+        )
         assert isinstance(result, list)
         for issue in result:
             assert isinstance(issue, LintIssue)
@@ -2028,7 +2144,9 @@ class TestComplexSignatureFunctionProperties:
         line_number=st.integers(min_value=1, max_value=10000),
     )
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_variable_naming_returns_list(self, line: str, line_number: int) -> None:
+    def test_check_variable_naming_returns_list(
+        self, line: str, line_number: int
+    ) -> None:
         """_check_variable_naming should return a list of LintIssue."""
         variables_seen: Dict[str, str] = {}
         result = _check_variable_naming(line, line_number, variables_seen)
@@ -2066,7 +2184,9 @@ class TestComplexSignatureFunctionProperties:
 
     @given(lines=st.lists(batch_line_strategy(), max_size=50))
     @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_inconsistent_indentation_returns_list(self, lines: List[str]) -> None:
+    def test_check_inconsistent_indentation_returns_list(
+        self, lines: List[str]
+    ) -> None:
         """_check_inconsistent_indentation should return a list of LintIssue."""
         result = _check_inconsistent_indentation(lines)
         assert isinstance(result, list)

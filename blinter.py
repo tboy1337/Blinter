@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.77
+Version: 1.0.78
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.77"
+__version__ = "1.0.78"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -100,7 +100,7 @@ class BlinterConfig:
     # General settings
     recursive: bool = True
     show_summary: bool = False
-    max_line_length: int = 150
+    max_line_length: int = 88
     follow_calls: bool = False
 
     # Rule enablement - all rules enabled by default
@@ -144,7 +144,9 @@ class BlinterConfig:
             RuleSeverity.ERROR: 5,
         }
 
-        return severity_order.get(severity, 0) >= severity_order.get(self.min_severity, 0)
+        return severity_order.get(severity, 0) >= severity_order.get(
+            self.min_severity, 0
+        )
 
 
 # Helper functions for reducing code duplication
@@ -420,7 +422,8 @@ RULES: Dict[str, Rule] = {
         code="E004",
         name="IF EXIST syntax mixing",
         severity=RuleSeverity.ERROR,
-        explanation="Mixing IF EXIST syntax with comparison operators " "creates invalid syntax",
+        explanation="Mixing IF EXIST syntax with comparison operators "
+        "creates invalid syntax",
         recommendation="Use either 'IF EXIST filename' or "
         '\'IF "variable"=="value"\' but not both together',
     ),
@@ -428,7 +431,8 @@ RULES: Dict[str, Rule] = {
         code="E005",
         name="Invalid path syntax",
         severity=RuleSeverity.ERROR,
-        explanation="Path contains invalid characters or exceeds " "system length limits",
+        explanation="Path contains invalid characters or exceeds "
+        "system length limits",
         recommendation='Remove invalid characters (<>|"*?) and ensure '
         "path length is under 260 characters",
     ),
@@ -451,7 +455,8 @@ RULES: Dict[str, Rule] = {
         severity=RuleSeverity.ERROR,
         explanation="Incorrect syntax for checking if variables are empty "
         "will cause comparison errors",
-        recommendation='Use proper syntax: IF "%%VAR%%"=="" for ' "empty variable checks",
+        recommendation='Use proper syntax: IF "%%VAR%%"=="" for '
+        "empty variable checks",
     ),
     "E008": Rule(
         code="E008",
@@ -501,7 +506,8 @@ RULES: Dict[str, Rule] = {
         name="Invalid command syntax detected",
         severity=RuleSeverity.ERROR,
         explanation=(
-            "Command appears to have typos or invalid syntax that will cause " "execution errors"
+            "Command appears to have typos or invalid syntax that will cause "
+            "execution errors"
         ),
         recommendation="Check command spelling and syntax: IF not IFF, ECHO not ECKO, FOR not FORx",
     ),
@@ -629,7 +635,8 @@ RULES: Dict[str, Rule] = {
         name="Missing PAUSE for user interaction",
         severity=RuleSeverity.WARNING,
         explanation=(
-            "Interactive scripts should include PAUSE to prevent window from " "closing immediately"
+            "Interactive scripts should include PAUSE to prevent window from "
+            "closing immediately"
         ),
         recommendation="Add PAUSE before EXIT to allow user to see script output",
     ),
@@ -689,7 +696,8 @@ RULES: Dict[str, Rule] = {
             "Windows batch parser bugs"
         ),
         recommendation=(
-            "Ensure file uses CRLF line endings, or duplicate critical labels " "as a workaround"
+            "Ensure file uses CRLF line endings, or duplicate critical labels "
+            "as a workaround"
         ),
     ),
     # Style Level Rules (S001-S999)
@@ -748,7 +756,8 @@ RULES: Dict[str, Rule] = {
             "parsing inconsistencies"
         ),
         recommendation=(
-            "Use consistent CRLF line endings throughout the file " "for Windows batch files"
+            "Use consistent CRLF line endings throughout the file "
+            "for Windows batch files"
         ),
     ),
     "S006": Rule(
@@ -794,7 +803,7 @@ RULES: Dict[str, Rule] = {
         code="S011",
         name="Line exceeds maximum length",
         severity=RuleSeverity.STYLE,
-        explanation="Lines longer than 150 characters are hard to read and maintain",
+        explanation="Lines longer than 88 characters are hard to read and maintain",
         recommendation="Break long lines into multiple shorter lines for better readability",
     ),
     "S012": Rule(
@@ -1021,7 +1030,8 @@ RULES: Dict[str, Rule] = {
             "(%1-%9) and FOR loop variables"
         ),
         recommendation=(
-            "Use percent-tilde only with %1-%9 parameters or FOR loop " "variables like %%i"
+            "Use percent-tilde only with %1-%9 parameters or FOR loop "
+            "variables like %%i"
         ),
     ),
     "E020": Rule(
@@ -1053,10 +1063,12 @@ RULES: Dict[str, Rule] = {
         name="Missing quotes in SET /A with special characters",
         severity=RuleSeverity.ERROR,
         explanation=(
-            "Special characters in SET /A expressions need quoting to " "prevent parsing errors"
+            "Special characters in SET /A expressions need quoting to "
+            "prevent parsing errors"
         ),
         recommendation=(
-            'Quote expressions with special chars: SET /A "result=5^2" ' "not SET /A result=5^2"
+            'Quote expressions with special chars: SET /A "result=5^2" '
+            "not SET /A result=5^2"
         ),
     ),
     # Enhanced Command Validation Rules (W020-W035)
@@ -1064,9 +1076,12 @@ RULES: Dict[str, Rule] = {
         code="W020",
         name="FOR loop missing /F options for complex parsing",
         severity=RuleSeverity.WARNING,
-        explanation=("FOR /F should specify tokens and delims options for reliable parsing"),
+        explanation=(
+            "FOR /F should specify tokens and delims options for reliable parsing"
+        ),
         recommendation=(
-            'Use explicit options: FOR /F "tokens=1,2 delims=," ' "instead of default behavior"
+            'Use explicit options: FOR /F "tokens=1,2 delims=," '
+            "instead of default behavior"
         ),
     ),
     "W021": Rule(
@@ -1176,7 +1191,9 @@ RULES: Dict[str, Rule] = {
         name="Command injection via variable substitution",
         severity=RuleSeverity.SECURITY,
         explanation="Variables containing user input used in commands may allow code injection",
-        recommendation=("Validate and sanitize variables before use in command execution"),
+        recommendation=(
+            "Validate and sanitize variables before use in command execution"
+        ),
     ),
     # Performance Enhancement Rules (P012-P020)
     "P012": Rule(
@@ -1184,7 +1201,9 @@ RULES: Dict[str, Rule] = {
         name="Inefficient string operations",
         severity=RuleSeverity.PERFORMANCE,
         explanation="Multiple string operations on same variable can be combined",
-        recommendation=("Combine operations: %var:~0,5:old=new% instead of multiple assignments"),
+        recommendation=(
+            "Combine operations: %var:~0,5:old=new% instead of multiple assignments"
+        ),
     ),
     "P013": Rule(
         code="P013",
@@ -1406,7 +1425,9 @@ RULES: Dict[str, Rule] = {
         code="W039",
         name="Nested FOR loops without call optimization",
         severity=RuleSeverity.WARNING,
-        explanation=("Complex nested FOR loops should use CALL :subroutine for maintainability"),
+        explanation=(
+            "Complex nested FOR loops should use CALL :subroutine for maintainability"
+        ),
         recommendation="Move inner loop logic to separate subroutine using CALL :label",
     ),
     "W040": Rule(
@@ -1479,7 +1500,9 @@ RULES: Dict[str, Rule] = {
         explanation=(
             "Redirecting sensitive output to world-readable locations exposes information"
         ),
-        recommendation=("Redirect to secure user directories or use appropriate file permissions"),
+        recommendation=(
+            "Redirect to secure user directories or use appropriate file permissions"
+        ),
     ),
     "SEC019": Rule(
         code="SEC019",
@@ -1761,7 +1784,9 @@ def _has_multibyte_chars(lines: List[str]) -> Tuple[bool, List[int]]:
     return has_multibyte, affected_lines
 
 
-def _detect_encoding_with_chardet(file_path: str, encodings_list: List[str]) -> List[str]:
+def _detect_encoding_with_chardet(
+    file_path: str, encodings_list: List[str]
+) -> List[str]:
     """
     Detect file encoding using chardet library if available.
 
@@ -1835,7 +1860,9 @@ def _try_read_with_encoding(file_path: str, encoding: str) -> Optional[List[str]
         logger.debug("Attempting to read file with encoding: %s", encoding)
         with open(file_path, "r", encoding=encoding, errors="strict") as file_handle:
             lines = file_handle.readlines()
-        logger.debug("Successfully read %d lines using %s encoding", len(lines), encoding)
+        logger.debug(
+            "Successfully read %d lines using %s encoding", len(lines), encoding
+        )
         return lines
     except (UnicodeDecodeError, LookupError, ValueError) as error:
         logger.debug("Failed to read with %s: %s", encoding, error)
@@ -1919,7 +1946,9 @@ _DANGEROUS_CMDS_REGEX: str = "|".join(DANGEROUS_COMMAND_NAMES)
 # Pre-compiled regex patterns for performance optimization
 # These patterns are used multiple times throughout the codebase
 _COMPILED_IF_PATTERN = re.compile(r"if\s+(.+)", re.IGNORECASE)
-_COMPILED_SETLOCAL_DISABLE = re.compile(r"setlocal\s+disabledelayedexpansion", re.IGNORECASE)
+_COMPILED_SETLOCAL_DISABLE = re.compile(
+    r"setlocal\s+disabledelayedexpansion", re.IGNORECASE
+)
 _COMPILED_SET_PATTERN = re.compile(r"\bset\s+", re.IGNORECASE)
 _COMPILED_GOTO_PATTERN = re.compile(r"goto\s+(:?\S+)", re.IGNORECASE)
 _COMPILED_VAR_EXPANSION = re.compile(r"%[^%]+%|!\w+!")
@@ -1930,7 +1959,10 @@ _COMPILED_NET_COMMAND = re.compile(r"\bnet\s+", re.IGNORECASE)
 _COMPILED_DELAYED_VAR = re.compile(r"![^!]+!")
 
 DANGEROUS_COMMAND_PATTERNS: List[Tuple[str, str]] = [
-    (r"del\s+(?:[/-]\w+\s+)*[\"']?\*\.\*[\"']?(\s|$)", "SEC003"),  # del *.* with optional flags
+    (
+        r"del\s+(?:[/-]\w+\s+)*[\"']?\*\.\*[\"']?(\s|$)",
+        "SEC003",
+    ),  # del *.* with optional flags
     (
         r"del\s+(?:[/-]\w+\s+)*[\"']?\*/\*[\"']?(\s|$)",
         "SEC003",
@@ -1939,7 +1971,10 @@ DANGEROUS_COMMAND_PATTERNS: List[Tuple[str, str]] = [
         r"del\s+(?:[/-]\w+\s+)*[\"']?[a-z]:\\\*[\"']?(\s|$)",
         "SEC003",
     ),  # del c:\* type commands with optional flags
-    (r"format\s+(?:[/-]\w+\s+)*[a-z]:", "SEC003"),  # format c: type commands with optional flags
+    (
+        r"format\s+(?:[/-]\w+\s+)*[a-z]:",
+        "SEC003",
+    ),  # format c: type commands with optional flags
     (r"\b(ps)?shutdown\s+[/-]", "SEC003"),  # shutdown/psshutdown commands with flags
     (r"rmdir\s+/s\s+/q\s+", "SEC003"),  # rmdir /s /q commands
     (r"reg\s+delete\s+.*\s+/f", "SEC004"),  # forced registry deletions
@@ -2055,7 +2090,9 @@ SENSITIVE_KEYWORDS: List[str] = [
 ]
 
 # Build credential patterns dynamically from sensitive keywords
-CREDENTIAL_PATTERNS = [rf"{keyword}\s*=\s*[\"']?[^\s\"']+[\"']?" for keyword in SENSITIVE_KEYWORDS]
+CREDENTIAL_PATTERNS = [
+    rf"{keyword}\s*=\s*[\"']?[^\s\"']+[\"']?" for keyword in SENSITIVE_KEYWORDS
+]
 
 # Build sensitive echo patterns dynamically from sensitive keywords
 SENSITIVE_ECHO_PATTERNS = [rf"echo.*{keyword}" for keyword in SENSITIVE_KEYWORDS]
@@ -2271,7 +2308,9 @@ BATCH_INDICATORS: List[str] = [
 ]
 
 
-def _load_general_settings(config: BlinterConfig, parser: configparser.ConfigParser) -> None:
+def _load_general_settings(
+    config: BlinterConfig, parser: configparser.ConfigParser
+) -> None:
     """Load general settings from config parser."""
     if not parser.has_section("general"):
         return
@@ -2280,7 +2319,7 @@ def _load_general_settings(config: BlinterConfig, parser: configparser.ConfigPar
 
     config.recursive = general.getboolean("recursive", fallback=True)
     config.show_summary = general.getboolean("show_summary", fallback=False)
-    config.max_line_length = general.getint("max_line_length", fallback=150)
+    config.max_line_length = general.getint("max_line_length", fallback=88)
     config.follow_calls = general.getboolean("follow_calls", fallback=False)
 
     severity_str = general.get("min_severity", "").strip()
@@ -2304,7 +2343,9 @@ def _set_min_severity(config: BlinterConfig, severity_str: str) -> None:
         logger.warning("Invalid min_severity value: %s", severity_str)
 
 
-def _load_rule_settings(config: BlinterConfig, parser: configparser.ConfigParser) -> None:
+def _load_rule_settings(
+    config: BlinterConfig, parser: configparser.ConfigParser
+) -> None:
     """Load rule settings from config parser."""
     if not parser.has_section("rules"):
         return
@@ -2314,7 +2355,9 @@ def _load_rule_settings(config: BlinterConfig, parser: configparser.ConfigParser
     # Handle enabled_rules
     enabled_str = rules.get("enabled_rules", "").strip()
     if enabled_str:
-        config.enabled_rules = set(rule.strip() for rule in enabled_str.split(",") if rule.strip())
+        config.enabled_rules = set(
+            rule.strip() for rule in enabled_str.split(",") if rule.strip()
+        )
 
     # Handle disabled_rules
     disabled_str = rules.get("disabled_rules", "").strip()
@@ -2324,7 +2367,9 @@ def _load_rule_settings(config: BlinterConfig, parser: configparser.ConfigParser
         )
 
 
-def load_config(config_path: Optional[str] = None, use_config: bool = True) -> BlinterConfig:
+def load_config(
+    config_path: Optional[str] = None, use_config: bool = True
+) -> BlinterConfig:
     """
     Load configuration from blinter.ini file.
 
@@ -2360,7 +2405,9 @@ def load_config(config_path: Optional[str] = None, use_config: bool = True) -> B
 
     except (configparser.Error, OSError, ValueError) as error:
         logger.warning(
-            "Error loading configuration from %s: %s. Using defaults.", config_file, error
+            "Error loading configuration from %s: %s. Using defaults.",
+            config_file,
+            error,
         )
 
     return config
@@ -2384,8 +2431,8 @@ recursive = true
 # Whether to show summary statistics at the end (default: false)  
 show_summary = false
 
-# Maximum line length before triggering S011 rule (default: 150)
-max_line_length = 150
+# Maximum line length before triggering S011 rule (default: 88)
+max_line_length = 88
 
 # Whether to automatically scan scripts called by CALL statements (default: false)
 # This helps analyze centralized configuration scripts that set variables
@@ -2499,7 +2546,11 @@ def _is_comment_line(line: str) -> bool:
         True if the line is a comment
     """
     stripped = line.strip().lower()
-    return stripped.startswith("rem ") or stripped.startswith("rem\t") or stripped.startswith("::")
+    return (
+        stripped.startswith("rem ")
+        or stripped.startswith("rem\t")
+        or stripped.startswith("::")
+    )
 
 
 def _is_command_in_safe_context(line: str) -> bool:
@@ -2648,7 +2699,9 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
         # Handle dynamic variable assignments in FOR loops: set "%%~b=value"
         # This pattern is commonly used to dynamically create variables based on loop iteration
         # Example: for %%a in (list) do (set "%%~a=value")
-        dynamic_set_match = re.search(r'\bset\s+"%%~[a-zA-Z]=', line.strip(), re.IGNORECASE)
+        dynamic_set_match = re.search(
+            r'\bset\s+"%%~[a-zA-Z]=', line.strip(), re.IGNORECASE
+        )
         if dynamic_set_match:
             # When we see dynamic variable assignment, we need to look for what values
             # the FOR loop might iterate over to determine variable names
@@ -2713,7 +2766,9 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
     return set_vars
 
 
-def _check_goto_labels(stripped: str, line_num: int, labels: Dict[str, int]) -> List[LintIssue]:
+def _check_goto_labels(
+    stripped: str, line_num: int, labels: Dict[str, int]
+) -> List[LintIssue]:
     """Check for GOTO label issues (E002, E015)."""
     issues: List[LintIssue] = []
     goto_match = re.match(r"goto\s+(:?\S+)", stripped, re.IGNORECASE)
@@ -2818,7 +2873,9 @@ def _check_if_statement_formatting(stripped: str, line_num: int) -> List[LintIss
     )
 
     # If it doesn't match any valid pattern and seems incomplete, flag it
-    if not is_valid_if and not re.search(r"[&|()]", if_content):  # Not a complex conditional
+    if not is_valid_if and not re.search(
+        r"[&|()]", if_content
+    ):  # Not a complex conditional
         # Only flag if it looks like an incomplete comparison (has words but no operators)
         if re.match(r"[\"']?%?\w+%?[\"']?\s*$", if_content):
             issues.append(
@@ -2826,7 +2883,8 @@ def _check_if_statement_formatting(stripped: str, line_num: int) -> List[LintIss
                     line_number=line_num,
                     rule=RULES["E003"],
                     context=(
-                        "IF statement appears to be missing comparison operator " "or condition"
+                        "IF statement appears to be missing comparison operator "
+                        "or condition"
                     ),
                 )
             )
@@ -2853,12 +2911,15 @@ def _check_errorlevel_syntax(stripped: str, line_num: int) -> List[LintIssue]:
                 line_number=line_num,
                 rule=RULES["E016"],
                 context=(
-                    "Invalid 'IF NOT %ERRORLEVEL% number' syntax - " "missing comparison operator"
+                    "Invalid 'IF NOT %ERRORLEVEL% number' syntax - "
+                    "missing comparison operator"
                 ),
             )
         )
     # Check for other invalid errorlevel patterns
-    elif re.match(r"not\s+%errorlevel%\s+[^\s]+(?:\s|$)", errorlevel_content, re.IGNORECASE):
+    elif re.match(
+        r"not\s+%errorlevel%\s+[^\s]+(?:\s|$)", errorlevel_content, re.IGNORECASE
+    ):
         issues.append(
             LintIssue(
                 line_number=line_num,
@@ -2944,7 +3005,9 @@ def _check_path_syntax(stripped: str, line_num: int) -> List[LintIssue]:
             escaped_content = re.sub(r"\^[<>|]", "", path_content)
             # Skip if this looks like a PowerShell or script command string
             # (contains :: for regex, scriptblock syntax, etc.)
-            if re.search(r"(::|scriptblock|split\s|regex)", escaped_content, re.IGNORECASE):
+            if re.search(
+                r"(::|scriptblock|split\s|regex)", escaped_content, re.IGNORECASE
+            ):
                 continue
             # Wildcards (* and ?) are VALID in file paths for pattern matching
             # Only flag < > | as truly invalid
@@ -3032,7 +3095,9 @@ def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
     if quote_count % 2 != 0 and not line_continues:
         # Additional check: verify this isn't a special case like delayed expansion
         # or variable substitution that might have intentional single quotes
-        has_delayed_expansion = "!" in line and re.search(r"\bset\s", stripped, re.IGNORECASE)
+        has_delayed_expansion = "!" in line and re.search(
+            r"\bset\s", stripped, re.IGNORECASE
+        )
         has_call_substitution = re.search(r"call\s+:[^:]+", stripped, re.IGNORECASE)
         # Check for string replacement syntax like !VAR:"=! or %VAR:"=%
         # Delayed expansion: !VAR:"=! or !VAR:searchString=replaceString!
@@ -3063,7 +3128,10 @@ def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
 def _check_for_loop_syntax(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for malformed FOR loop (E010)."""
     issues: List[LintIssue] = []
-    if re.match(r"for\s+.*", stripped, re.IGNORECASE) and " do " not in stripped.lower():
+    if (
+        re.match(r"for\s+.*", stripped, re.IGNORECASE)
+        and " do " not in stripped.lower()
+    ):
         # Don't flag multiline FOR loops (those ending with opening parenthesis)
         # or those that appear to continue on next line
         if not re.search(r"\(\s*$", stripped):
@@ -3121,8 +3189,12 @@ def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
     )
 
     # Remove all valid variable expansion patterns (including @ prefix)
-    temp_no_percent = re.sub(r"%[A-Z0-9_~@]+[^%]*%", "", temp_stripped, flags=re.IGNORECASE)
-    temp_no_exclaim = re.sub(r"![A-Z0-9_@]+[^!]*!", "", temp_stripped, flags=re.IGNORECASE)
+    temp_no_percent = re.sub(
+        r"%[A-Z0-9_~@]+[^%]*%", "", temp_stripped, flags=re.IGNORECASE
+    )
+    temp_no_exclaim = re.sub(
+        r"![A-Z0-9_@]+[^!]*!", "", temp_stripped, flags=re.IGNORECASE
+    )
 
     # Look for incomplete variable patterns that suggest mismatched delimiters
     if re.search(r"%[A-Z0-9_@]+(?:[^%]|$)", temp_no_percent, re.IGNORECASE):
@@ -3145,7 +3217,9 @@ def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
     return issues
 
 
-def _check_subroutine_call(stripped: str, line_num: int, labels: Dict[str, int]) -> List[LintIssue]:
+def _check_subroutine_call(
+    stripped: str, line_num: int, labels: Dict[str, int]
+) -> List[LintIssue]:
     """Check for missing CALL for subroutine invocation (E012).
 
     Detects when a user tries to invoke a defined label/subroutine without using
@@ -3294,7 +3368,8 @@ def _is_legitimate_quote_pattern(stripped: str) -> bool:
         re.match(r"\s*echo\s+.*\.\.\.\.", stripped, re.IGNORECASE) is not None,
         re.match(r"\s*echo\s+.*represents", stripped, re.IGNORECASE) is not None,
         # Comparisons with empty string: neq "", equ "", == "", != ""
-        re.search(r'\b(neq|equ|==|!=|lss|leq|gtr|geq)\s+""', stripped, re.IGNORECASE) is not None,
+        re.search(r'\b(neq|equ|==|!=|lss|leq|gtr|geq)\s+""', stripped, re.IGNORECASE)
+        is not None,
         # START command with triple-quote escaping: start ... /c ""!var!" ...
         re.search(r'\bstart\b.*\s+/c\s+""[^"]+!"', stripped, re.IGNORECASE) is not None,
         # START command with empty window title: start "" command
@@ -3326,7 +3401,9 @@ def _check_quote_escaping(stripped: str, line_num: int) -> List[LintIssue]:
     elif re.search(r'["\s]""[^"]', stripped):
         quote_context = "Complex quote escaping detected"
 
-    issues.append(LintIssue(line_number=line_num, rule=RULES["E028"], context=quote_context))
+    issues.append(
+        LintIssue(line_number=line_num, rule=RULES["E028"], context=quote_context)
+    )
     return issues
 
 
@@ -3370,7 +3447,9 @@ def _check_set_a_expression(stripped: str, line_num: int) -> List[LintIssue]:
     return issues
 
 
-def _check_syntax_errors(line: str, line_num: int, labels: Dict[str, int]) -> List[LintIssue]:
+def _check_syntax_errors(
+    line: str, line_num: int, labels: Dict[str, int]
+) -> List[LintIssue]:
     """Check for syntax error level issues."""
     issues: List[LintIssue] = []
     stripped = line.strip()
@@ -3456,7 +3535,9 @@ def _check_echo_unicode_risk(stripped: str) -> bool:
 
     # Check if this is safe file redirection (output to files, not complex shell operations)
     has_safe_redirection = bool(
-        re.search(r">\s*(nul|\"[^\"]*\"|[^\s&|<>]+)(\s*2>&1)?\s*$", stripped, re.IGNORECASE)
+        re.search(
+            r">\s*(nul|\"[^\"]*\"|[^\s&|<>]+)(\s*2>&1)?\s*$", stripped, re.IGNORECASE
+        )
     )
 
     # Check for escaped angle brackets (^< or ^>) which are safe
@@ -3473,7 +3554,9 @@ def _check_echo_unicode_risk(stripped: str) -> bool:
             and not has_escaped_brackets
         )  # Has unsafe redirection (not escaped)
         or len(complex_vars) > 0  # Has truly complex variable expansion
-        or bool(re.search(r"[\x00-\x1f\x7f-\xff]", echo_content))  # Control chars in content
+        or bool(
+            re.search(r"[\x00-\x1f\x7f-\xff]", echo_content)
+        )  # Control chars in content
     )
 
 
@@ -3481,7 +3564,9 @@ def _check_search_unicode_risk(stripped: str) -> bool:
     """Check for Unicode risks in findstr/find commands."""
     return (
         not all(ord(c) < 128 for c in stripped)  # Contains non-ASCII
-        or bool(re.search(r"/[a-z]", stripped, re.IGNORECASE))  # Uses flags affecting Unicode
+        or bool(
+            re.search(r"/[a-z]", stripped, re.IGNORECASE)
+        )  # Uses flags affecting Unicode
         or ">" in stripped
         or "<" in stripped  # File redirection
     )
@@ -3545,7 +3630,9 @@ def _check_compatibility_warnings(  # pylint: disable=unused-argument
     # Only match .COM files being executed as commands, not domain names
     # Match patterns like: command.com, call something.com, start program.com
     # But not: ping google.com, http://site.com, etc.
-    if re.search(r"^\s*(?:call\s+|start\s+)?[\w-]+\.com(?:\s|$)", stripped, re.IGNORECASE):
+    if re.search(
+        r"^\s*(?:call\s+|start\s+)?[\w-]+\.com(?:\s|$)", stripped, re.IGNORECASE
+    ):
         issues.append(
             LintIssue(
                 line_number=line_num,
@@ -3577,7 +3664,9 @@ def _check_command_warnings(  # pylint: disable=unused-argument
     if re.match(r"setx\s+path", stripped, re.IGNORECASE):
         issues.append(
             LintIssue(
-                line_number=line_num, rule=RULES["W008"], context="SETX modifies PATH permanently"
+                line_number=line_num,
+                rule=RULES["W008"],
+                context="SETX modifies PATH permanently",
             )
         )
 
@@ -3597,10 +3686,14 @@ def _check_unquoted_variables(stripped: str, line_num: int) -> List[LintIssue]:
 
     # Only check IF string comparisons with == operator
     # These are the most common source of issues with unquoted variables
-    if_string_comp = re.search(r"\bif\s+(?:not\s+)?%[A-Z0-9_]+%\s*==\s*", stripped, re.IGNORECASE)
+    if_string_comp = re.search(
+        r"\bif\s+(?:not\s+)?%[A-Z0-9_]+%\s*==\s*", stripped, re.IGNORECASE
+    )
     if if_string_comp:
         # Don't flag if already quoted properly elsewhere in the comparison
-        if not re.search(r'\bif\s+(?:not\s+)?"[^"]*%[A-Z0-9_]+%[^"]*"', stripped, re.IGNORECASE):
+        if not re.search(
+            r'\bif\s+(?:not\s+)?"[^"]*%[A-Z0-9_]+%[^"]*"', stripped, re.IGNORECASE
+        ):
             issues.append(
                 LintIssue(
                     line_number=line_num,
@@ -3650,7 +3743,8 @@ def _check_errorlevel_comparison(stripped: str, line_num: int) -> List[LintIssue
                     line_number=line_num,
                     rule=RULES["W017"],
                     context=(
-                        "IF %ERRORLEVEL% NEQ 1 behaves differently than " "IF NOT ERRORLEVEL 1"
+                        "IF %ERRORLEVEL% NEQ 1 behaves differently than "
+                        "IF NOT ERRORLEVEL 1"
                     ),
                 )
             )
@@ -3716,7 +3810,9 @@ def _check_call_ambiguity(stripped: str, line_num: int) -> List[LintIssue]:
     if call_match:
         call_target: str = call_match.group(1)
         # Check if it's a filename without extension
-        if not re.search(r"\.[a-z]{1,4}$", call_target.lower()) and not call_target.startswith(":"):
+        if not re.search(
+            r"\.[a-z]{1,4}$", call_target.lower()
+        ) and not call_target.startswith(":"):
             issues.append(
                 LintIssue(
                     line_number=line_num,
@@ -3799,7 +3895,8 @@ def _check_timeout_ping_numbers(stripped: str, line_num: int) -> List[LintIssue]
                         line_number=line_num,
                         rule=RULES["S009"],
                         context=(
-                            f"Magic number '{number_result}' should be defined " f"as a variable"
+                            f"Magic number '{number_result}' should be defined "
+                            f"as a variable"
                         ),
                     )
                 )
@@ -3810,7 +3907,7 @@ def _check_timeout_ping_numbers(stripped: str, line_num: int) -> List[LintIssue]
 def _check_style_issues(
     line: str,
     line_num: int,
-    max_line_length: int = 150,
+    max_line_length: int = 88,
 ) -> List[LintIssue]:
     """Check for style level issues."""
     issues: List[LintIssue] = []
@@ -3822,7 +3919,9 @@ def _check_style_issues(
     if line.rstrip("\n") != line.rstrip():
         issues.append(
             LintIssue(
-                line_number=line_num, rule=RULES["S004"], context="Line has trailing spaces or tabs"
+                line_number=line_num,
+                rule=RULES["S004"],
+                context="Line has trailing spaces or tabs",
             )
         )
 
@@ -3846,7 +3945,9 @@ def _check_style_issues(
         param_string: str = call_match.group(1)
         separator_pos: int = _find_unquoted_separator(param_string)
         param_string_before_chain: str = param_string[:separator_pos].strip()
-        params: list[str] = param_string_before_chain.split() if param_string_before_chain else []
+        params: list[str] = (
+            param_string_before_chain.split() if param_string_before_chain else []
+        )
 
         if len(params) > 5:  # More than 5 parameters
             issues.append(
@@ -3860,7 +3961,9 @@ def _check_style_issues(
     return issues
 
 
-def _check_input_validation_sec(line: str, line_num: int, stripped: str) -> List[LintIssue]:
+def _check_input_validation_sec(
+    line: str, line_num: int, stripped: str
+) -> List[LintIssue]:
     """Check for input validation and command security issues (SEC001-SEC003)."""
     issues: List[LintIssue] = []
 
@@ -3888,10 +3991,14 @@ def _check_input_validation_sec(line: str, line_num: int, stripped: str) -> List
             or "COLOR" in var_name.upper()
             or "%ESC%" in var_val
             or var_val.startswith("(")  # Skip tuple/list definitions like colors=(...)
-            or re.match(r"^[\w.]+$", var_val)  # Skip simple constants like filename.ext, VARNAME
+            or re.match(
+                r"^[\w.]+$", var_val
+            )  # Skip simple constants like filename.ext, VARNAME
         )
 
-        if not is_ansi_or_color and not (var_val.startswith('"') and var_val.endswith('"')):
+        if not is_ansi_or_color and not (
+            var_val.startswith('"') and var_val.endswith('"')
+        ):
             issues.append(
                 LintIssue(
                     line_number=line_num,
@@ -3917,7 +4024,9 @@ def _check_input_validation_sec(line: str, line_num: int, stripped: str) -> List
     # This checks for dangerous command existence and should be flagged
     # But skip if it's in a comment line
     if not _is_comment_line(line):
-        where_match = re.search(rf"where\s+({_DANGEROUS_CMDS_REGEX})", stripped, re.IGNORECASE)
+        where_match = re.search(
+            rf"where\s+({_DANGEROUS_CMDS_REGEX})", stripped, re.IGNORECASE
+        )
         if where_match:
             cmd = str(where_match.group(1)).upper()
             issues.append(
@@ -3977,7 +4086,8 @@ def _check_privilege_security(
     # Use word boundary to match "net" as a command, not as part of words like "internet"
     if re.search(r"\bnet\s+", stripped.lower()):
         is_privilege_check = any(
-            re.search(pattern, stripped.lower()) for pattern in net_privilege_check_patterns
+            re.search(pattern, stripped.lower())
+            for pattern in net_privilege_check_patterns
         )
         if not is_privilege_check:
             # Check if there's already a privilege check earlier in the script
@@ -4166,7 +4276,10 @@ def _check_temp_file_usage(stripped: str, line_num: int) -> List[LintIssue]:
     issues: List[LintIssue] = []
     temp_patterns = [r"temp\.txt", r"tmp\.txt", r"temp\.log"]
     for pattern in temp_patterns:
-        if re.search(pattern, stripped, re.IGNORECASE) and "random" not in stripped.lower():
+        if (
+            re.search(pattern, stripped, re.IGNORECASE)
+            and "random" not in stripped.lower()
+        ):
             issues.append(
                 LintIssue(
                     line_number=line_num,
@@ -4181,7 +4294,9 @@ def _check_temp_file_usage(stripped: str, line_num: int) -> List[LintIssue]:
 def _check_for_loop_optimization(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for P009: Inefficient FOR loop pattern."""
     issues: List[LintIssue] = []
-    for_match = re.match(r"for\s+/f\s+[\"']([^\"']*)[\"']\s+%%\w+\s+in", stripped, re.IGNORECASE)
+    for_match = re.match(
+        r"for\s+/f\s+[\"']([^\"']*)[\"']\s+%%\w+\s+in", stripped, re.IGNORECASE
+    )
     if for_match:
         for_options: str = for_match.group(1).lower()
         if "tokens=*" not in for_options:
@@ -4221,7 +4336,8 @@ def _check_delay_implementation(stripped: str, line_num: int) -> List[LintIssue]
                     line_number=line_num,
                     rule=RULES["P015"],
                     context=(
-                        "Using CHOICE for delays is inefficient - " "use TIMEOUT command for Vista+"
+                        "Using CHOICE for delays is inefficient - "
+                        "use TIMEOUT command for Vista+"
                     ),
                 )
             )
@@ -4251,7 +4367,11 @@ def _check_redundant_disable_delay(
     # Check the previous 3 lines for ENDLOCAL to identify genuine toggling
     start_check = max(0, line_num - 4)  # Check up to 3 lines back
     recent_lines = _lines[start_check : line_num - 1]
-    if any("endlocal" in prev_line.lower() for prev_line in recent_lines if prev_line.strip()):
+    if any(
+        "endlocal" in prev_line.lower()
+        for prev_line in recent_lines
+        if prev_line.strip()
+    ):
         is_redundant = False
 
     # Don't flag if combined with enableextensions (common pattern)
@@ -4350,7 +4470,9 @@ def _check_performance_issues(  # pylint: disable=too-many-arguments,too-many-po
 
     # P026: Redundant DISABLEDELAYEDEXPANSION
     issues.extend(
-        _check_redundant_disable_delay(stripped, line_num, _lines, has_literal_exclamations)
+        _check_redundant_disable_delay(
+            stripped, line_num, _lines, has_literal_exclamations
+        )
     )
 
     return issues
@@ -4431,7 +4553,9 @@ def _check_undefined_variables(
     """
     issues: List[LintIssue] = []
     uses_dynamic_vars = "__DYNAMIC_VARS__" in set_vars
-    var_usage_pattern = re.compile(r"%([A-Z][A-Z0-9_]*)%|!([A-Z][A-Z0-9_]*)!", re.IGNORECASE)
+    var_usage_pattern = re.compile(
+        r"%([A-Z][A-Z0-9_]*)%|!([A-Z][A-Z0-9_]*)!", re.IGNORECASE
+    )
     string_op_pattern = re.compile(r"%[A-Z]+:[^%]*%", re.IGNORECASE)
 
     for i, line in enumerate(lines, start=1):
@@ -4623,7 +4747,9 @@ def _process_script_blocks(
     # Handle block starts for each script type
     for script_type, is_script_line in script_patterns.items():
         other_blocks = any(
-            ctx.block_states[other] for other in ctx.block_states if other != script_type
+            ctx.block_states[other]
+            for other in ctx.block_states
+            if other != script_type
         )
         ctx.block_states[script_type], start = _handle_script_block_start(
             ScriptBlockState(
@@ -4645,7 +4771,10 @@ def _process_script_blocks(
         for script_type in ctx.block_states:
             if ctx.block_states[script_type]:
                 ended = _handle_script_block_end(
-                    is_batch_line, script_type.capitalize(), ctx.line_num, ctx.block_start_line
+                    is_batch_line,
+                    script_type.capitalize(),
+                    ctx.line_num,
+                    ctx.block_start_line,
                 )
                 ctx.block_states[script_type] = not ended
         if not is_batch_line:
@@ -4685,12 +4814,18 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals
         stripped = line.strip()
 
         # Skip empty lines and batch comments
-        if not stripped or stripped.startswith("::") or stripped.upper().startswith("REM "):
+        if (
+            not stripped
+            or stripped.startswith("::")
+            or stripped.upper().startswith("REM ")
+        ):
             continue
 
         # Handle heredoc blocks
-        in_powershell_heredoc, block_start_line, should_continue = _process_heredoc_block(
-            stripped, i, in_powershell_heredoc, block_start_line, skip_lines
+        in_powershell_heredoc, block_start_line, should_continue = (
+            _process_heredoc_block(
+                stripped, i, in_powershell_heredoc, block_start_line, skip_lines
+            )
         )
         if should_continue:
             continue
@@ -4704,7 +4839,13 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals
         # Process script blocks
         block_states, block_start_line, should_continue = _process_script_blocks(
             ScriptProcessingContext(
-                line, stripped, i, last_label_line, block_states, block_start_line, skip_lines
+                line,
+                stripped,
+                i,
+                last_label_line,
+                block_states,
+                block_start_line,
+                skip_lines,
             )
         )
         if should_continue:
@@ -4749,7 +4890,9 @@ def _parse_suppression_comments(lines: List[str]) -> Dict[int, Set[str]]:
         if stripped.startswith("REM ") or stripped.startswith("::"):
             # Remove REM or :: prefix
             comment_text = (
-                stripped[3:].strip() if stripped.startswith("REM") else stripped[2:].strip()
+                stripped[3:].strip()
+                if stripped.startswith("REM")
+                else stripped[2:].strip()
             )
 
             # Check for LINT:IGNORE-LINE (same line suppression)
@@ -4797,7 +4940,8 @@ def _validate_and_read_file(file_path: str) -> Tuple[List[str], str]:
     file_size = file_obj.stat().st_size
     if file_size > 10 * 1024 * 1024:  # 10MB
         logger.warning(
-            "Large file detected (%dMB). Processing may take longer.", file_size // 1024 // 1024
+            "Large file detected (%dMB). Processing may take longer.",
+            file_size // 1024 // 1024,
         )
 
     lines, encoding_used = read_file_with_encoding(file_path)
@@ -4835,16 +4979,21 @@ def _analyze_script_structure(
                   has_disable_delayed_expansion, has_literal_exclamations, disable_expansion_lines)
     """
     has_setlocal = any("setlocal" in line.lower() for line in lines)
-    has_set_commands = any(re.match(r"\s*set\s+[^=]+=.*", line, re.IGNORECASE) for line in lines)
+    has_set_commands = any(
+        re.match(r"\s*set\s+[^=]+=.*", line, re.IGNORECASE) for line in lines
+    )
     has_delayed_expansion = any(
-        re.search(r"setlocal\s+enabledelayedexpansion", line, re.IGNORECASE) for line in lines
+        re.search(r"setlocal\s+enabledelayedexpansion", line, re.IGNORECASE)
+        for line in lines
     )
     # Match any content between exclamation marks, including special chars like @, -, #, $, etc.
     # that are commonly used in batch variable names (e.g., !@DEBUG_MODE!, !@CRLF-%~1!)
     uses_delayed_vars = any(re.search(r"![^!]+!", line) for line in lines)
 
     # Check for SETLOCAL DISABLEDELAYEDEXPANSION usage
-    has_disable_delayed_expansion = any(_COMPILED_SETLOCAL_DISABLE.search(line) for line in lines)
+    has_disable_delayed_expansion = any(
+        _COMPILED_SETLOCAL_DISABLE.search(line) for line in lines
+    )
 
     # Check for literal ! characters in strings (not delayed expansion variables)
     # Look for ! characters that are NOT part of delayed expansion !var! patterns
@@ -4863,7 +5012,9 @@ def _analyze_script_structure(
     for i, line in enumerate(lines, start=1):
         if _COMPILED_SETLOCAL_DISABLE.search(line):
             # Check if there's an ENDLOCAL in previous lines
-            is_after_endlocal = any("endlocal" in prev_line.lower() for prev_line in lines[: i - 1])
+            is_after_endlocal = any(
+                "endlocal" in prev_line.lower() for prev_line in lines[: i - 1]
+            )
             disable_expansion_lines[i] = is_after_endlocal
 
     return (
@@ -4873,7 +5024,9 @@ def _analyze_script_structure(
         uses_delayed_vars,
         has_disable_delayed_expansion,
         has_literal_exclamations,
-        bool(disable_expansion_lines),  # Convert dict to bool for now to maintain simpler interface
+        bool(
+            disable_expansion_lines
+        ),  # Convert dict to bool for now to maintain simpler interface
     )
 
 
@@ -4897,7 +5050,9 @@ def _check_line_ending_rules(lines: List[str], file_path: str) -> List[LintIssue
     try:
         return _analyze_line_endings(lines, file_path)
     except OSError as line_ending_error:
-        logger.warning("Could not analyze line endings for %s: %s", file_path, line_ending_error)
+        logger.warning(
+            "Could not analyze line endings for %s: %s", file_path, line_ending_error
+        )
         return []
 
 
@@ -4994,7 +5149,9 @@ def _check_goto_call_risks(lines: List[str], ending_type: str) -> List[LintIssue
 def _check_doublecolon_risks(lines: List[str], ending_type: str) -> List[LintIssue]:
     """Check for S016 double-colon comment risks."""
     doublecolon_lines = [
-        line_num for line_num, line in enumerate(lines, start=1) if line.strip().startswith("::")
+        line_num
+        for line_num, line in enumerate(lines, start=1)
+        if line.strip().startswith("::")
     ]
 
     if doublecolon_lines:
@@ -5021,7 +5178,9 @@ def _check_global_style_rules(lines: List[str], file_path: str) -> List[LintIssu
     if not lines[0].strip().lower().startswith("@echo off"):
         issues.append(
             LintIssue(
-                line_number=1, rule=RULES["S001"], context="Script should start with @ECHO OFF"
+                line_number=1,
+                rule=RULES["S001"],
+                context="Script should start with @ECHO OFF",
             )
         )
 
@@ -5030,7 +5189,9 @@ def _check_global_style_rules(lines: List[str], file_path: str) -> List[LintIssu
     if first_line.startswith("echo off") and not first_line.startswith("@echo off"):
         issues.append(
             LintIssue(
-                line_number=1, rule=RULES["S002"], context="Use @ECHO OFF instead of ECHO OFF"
+                line_number=1,
+                rule=RULES["S002"],
+                context="Use @ECHO OFF instead of ECHO OFF",
             )
         )
 
@@ -5283,7 +5444,9 @@ def _check_multilevel_escaping(stripped: str, line_number: int) -> List[LintIssu
     return issues
 
 
-def _check_continuation_spaces(line: str, stripped: str, line_number: int) -> List[LintIssue]:
+def _check_continuation_spaces(
+    line: str, stripped: str, line_number: int
+) -> List[LintIssue]:
     """Check for E032: Continuation character with trailing spaces."""
     issues: List[LintIssue] = []
     # Check if line ends with ^ followed by spaces/tabs (before the line ending)
@@ -5294,7 +5457,9 @@ def _check_continuation_spaces(line: str, stripped: str, line_number: int) -> Li
         # then there are trailing spaces after ^
         if not line_no_newline.endswith("^"):
             issues.append(
-                LintIssue(line_number, RULES["E032"], context="Caret with trailing spaces")
+                LintIssue(
+                    line_number, RULES["E032"], context="Caret with trailing spaces"
+                )
             )
     return issues
 
@@ -5311,7 +5476,11 @@ def _check_double_percent_escaping(stripped: str, line_number: int) -> List[Lint
         line_without_vars = re.sub(r"%[A-Za-z_][A-Za-z0-9_]*%", "", stripped)
         if re.search(r"\b\d+%(?!%)\b", line_without_vars):
             issues.append(
-                LintIssue(line_number, RULES["E033"], context="Percentage needs double escaping")
+                LintIssue(
+                    line_number,
+                    RULES["E033"],
+                    context="Percentage needs double escaping",
+                )
             )
     return issues
 
@@ -5347,7 +5516,9 @@ def _check_advanced_for_rules(line: str, line_number: int) -> List[LintIssue]:
 
     # W034: FOR /F missing usebackq option
     if "/f" in stripped and " " in stripped and '"' in stripped:
-        if "usebackq" not in stripped and ("(" in stripped.split('"')[0] or "`" in stripped):
+        if "usebackq" not in stripped and (
+            "(" in stripped.split('"')[0] or "`" in stripped
+        ):
             issues.append(
                 LintIssue(
                     line_number,
@@ -5366,7 +5537,9 @@ def _check_advanced_for_rules(line: str, line_number: int) -> List[LintIssue]:
     ):
         issues.append(
             LintIssue(
-                line_number, RULES["W035"], context="FOR /F tokenizing should specify delimiters"
+                line_number,
+                RULES["W035"],
+                context="FOR /F tokenizing should specify delimiters",
             )
         )
 
@@ -5416,7 +5589,11 @@ def _check_advanced_process_mgmt(line: str, line_number: int) -> List[LintIssue]
     stripped = line.strip().lower()
 
     # W042: Timeout command without /NOBREAK option
-    if stripped.startswith("timeout") and "/nobreak" not in stripped and "/t" in stripped:
+    if (
+        stripped.startswith("timeout")
+        and "/nobreak" not in stripped
+        and "/t" in stripped
+    ):
         issues.append(
             LintIssue(
                 line_number,
@@ -5429,7 +5606,9 @@ def _check_advanced_process_mgmt(line: str, line_number: int) -> List[LintIssue]
     if stripped.startswith("taskkill") and "tasklist" not in stripped:
         issues.append(
             LintIssue(
-                line_number, RULES["W043"], context="TASKKILL should verify process existence first"
+                line_number,
+                RULES["W043"],
+                context="TASKKILL should verify process existence first",
             )
         )
 
@@ -5483,7 +5662,11 @@ def _check_advanced_security(
             )
 
     # SEC018: Command output redirection to insecure location
-    redirection_patterns = [r">\s*c:\\temp", r">\s*c:\\windows\\temp", r">\s*\\\\.*\\share"]
+    redirection_patterns = [
+        r">\s*c:\\temp",
+        r">\s*c:\\windows\\temp",
+        r">\s*\\\\.*\\share",
+    ]
     for pattern in redirection_patterns:
         if re.search(pattern, stripped.lower()):
             issues.append(
@@ -5497,7 +5680,9 @@ def _check_advanced_security(
     return issues
 
 
-def _check_advanced_performance(lines: List[str], line_number: int, line: str) -> List[LintIssue]:
+def _check_advanced_performance(
+    lines: List[str], line_number: int, line: str
+) -> List[LintIssue]:
     """Check for performance patterns."""
     issues: List[LintIssue] = []
     stripped = line.strip().lower()
@@ -5536,7 +5721,9 @@ def _check_advanced_performance(lines: List[str], line_number: int, line: str) -
     if stripped.startswith("tasklist") and "/fi" not in stripped:
         issues.append(
             LintIssue(
-                line_number, RULES["P021"], context="TASKLIST should use /FI filters for efficiency"
+                line_number,
+                RULES["P021"],
+                context="TASKLIST should use /FI filters for efficiency",
             )
         )
 
@@ -5699,12 +5886,14 @@ def lint_batch_file(  # pylint: disable=too-many-locals
 
     # Store original max_line_length for S011 rule
     original_s011_rule = RULES["S011"]
-    if config.max_line_length != 150:
+    if config.max_line_length != 88:
         RULES["S011"] = Rule(
             code="S011",
             name=original_s011_rule.name,
             severity=original_s011_rule.severity,
-            explanation=original_s011_rule.explanation.replace("150", str(config.max_line_length)),
+            explanation=original_s011_rule.explanation.replace(
+                "88", str(config.max_line_length)
+            ),
             recommendation=original_s011_rule.recommendation,
         )
 
@@ -5768,7 +5957,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     issues.extend(_check_new_global_rules(lines, file_path))
 
     # Restore original S011 rule if modified
-    if config.max_line_length != 150:
+    if config.max_line_length != 88:
         RULES["S011"] = original_s011_rule
 
     # Set file_path on all issues that don't have it
@@ -5792,7 +5981,9 @@ def lint_batch_file(  # pylint: disable=too-many-locals
         len([i for i in filtered_issues if i.rule.severity == RuleSeverity.WARNING]),
         len([i for i in filtered_issues if i.rule.severity == RuleSeverity.STYLE]),
         len([i for i in filtered_issues if i.rule.severity == RuleSeverity.SECURITY]),
-        len([i for i in filtered_issues if i.rule.severity == RuleSeverity.PERFORMANCE]),
+        len(
+            [i for i in filtered_issues if i.rule.severity == RuleSeverity.PERFORMANCE]
+        ),
     )
 
     return filtered_issues
@@ -5840,7 +6031,8 @@ def _check_global_priv_security(lines: List[str]) -> List[LintIssue]:
                     r"net\s+session\s*$",  # net session at end of line (used for checking)
                 ]
                 is_privilege_check = any(
-                    re.search(pattern, stripped) for pattern in net_privilege_check_patterns
+                    re.search(pattern, stripped)
+                    for pattern in net_privilege_check_patterns
                 )
                 if not is_privilege_check:
                     issues.append(
@@ -5919,7 +6111,9 @@ def _check_bat_cmd_differences(lines: List[str], file_path: str) -> List[LintIss
     return issues
 
 
-def _check_advanced_global_patterns(lines: List[str], file_path: str) -> List[LintIssue]:
+def _check_advanced_global_patterns(
+    lines: List[str], file_path: str
+) -> List[LintIssue]:
     """Check advanced patterns of Batch Scripting."""
     issues: List[LintIssue] = []
 
@@ -6055,7 +6249,9 @@ def _check_self_modification(lines: List[str], file_path: str) -> List[LintIssue
             and (">" in stripped or ">>" in stripped)
         ):
             # Check if writing to same file or generating batch files
-            if any(keyword in stripped for keyword in ["%~f0", "%0", file_path.lower()]):
+            if any(
+                keyword in stripped for keyword in ["%~f0", "%0", file_path.lower()]
+            ):
                 issues.append(
                     LintIssue(
                         line_number=i,
@@ -6147,7 +6343,8 @@ def _is_block_end_marker(
 
     # Check for significant distance from start (>15 lines) AND a clear boundary
     if i - block_start > 15 and (
-        line.strip() == "" or re.match(r"^(echo|set|if|for|call|rem)\b", stripped, re.IGNORECASE)
+        line.strip() == ""
+        or re.match(r"^(echo|set|if|for|call|rem)\b", stripped, re.IGNORECASE)
     ):
         return True
 
@@ -6240,7 +6437,9 @@ def _check_var_naming(lines: List[str]) -> List[LintIssue]:
     naming_styles: DefaultDict[str, int] = defaultdict(int)
 
     # Combined pattern for efficiency
-    set_pattern = re.compile(r'^\s*set\s+(?:")?([a-zA-Z_][a-zA-Z0-9_]*)\s*=', re.IGNORECASE)
+    set_pattern = re.compile(
+        r'^\s*set\s+(?:")?([a-zA-Z_][a-zA-Z0-9_]*)\s*=', re.IGNORECASE
+    )
 
     for line in lines:
         stripped = line.strip()
@@ -6307,14 +6506,18 @@ def _check_unreachable_code(lines: List[str]) -> List[LintIssue]:
                     LintIssue(
                         line_number=unreachable_line + 1,
                         rule=RULES["E008"],
-                        context=(f"Code after {command} on line {i + 1} will never execute"),
+                        context=(
+                            f"Code after {command} on line {i + 1} will never execute"
+                        ),
                     )
                 )
 
     return issues
 
 
-def _find_truly_unreachable_code(lines: List[str], exit_line_index: int) -> Optional[int]:
+def _find_truly_unreachable_code(
+    lines: List[str], exit_line_index: int
+) -> Optional[int]:
     """Find truly unreachable code, considering batch file control flow properly."""
     exit_paren_depth = _calculate_exit_paren_depth(lines, exit_line_index)
     return _scan_for_unreachable_code(lines, exit_line_index, exit_paren_depth)
@@ -6402,7 +6605,12 @@ def _is_truly_executable_command(line: str) -> bool:
     line = line.strip().lower()
 
     # Skip empty, comments, labels
-    if not line or line.startswith("rem") or line.startswith("::") or line.startswith(":"):
+    if (
+        not line
+        or line.startswith("rem")
+        or line.startswith("::")
+        or line.startswith(":")
+    ):
         return False
 
     # Skip pure structural elements
@@ -6483,7 +6691,9 @@ def _check_code_duplication(lines: List[str]) -> List[LintIssue]:
             normalized = re.sub(r"\S+\.(txt|log|bat|cmd)", "FILE", stripped)
             normalized = re.sub(r"%\w+%", "VAR", normalized)
 
-            if len(normalized) > 40:  # Only consider substantial commands (increased from 20)
+            if (
+                len(normalized) > 40
+            ):  # Only consider substantial commands (increased from 20)
                 command_blocks[normalized].append(i + 1)
 
     # Calculate appropriate threshold based on script size
@@ -6560,7 +6770,9 @@ def _collect_indented_lines(lines: List[str]) -> List[Tuple[int, str]]:
     return indented_lines
 
 
-def _find_single_line_mixed_indent(indented_lines: List[Tuple[int, str]]) -> List[LintIssue]:
+def _find_single_line_mixed_indent(
+    indented_lines: List[Tuple[int, str]],
+) -> List[LintIssue]:
     """Check for mixed tabs and spaces within single lines."""
     issues: List[LintIssue] = []
     for line_num, whitespace in indented_lines:
@@ -6575,7 +6787,9 @@ def _find_single_line_mixed_indent(indented_lines: List[Tuple[int, str]]) -> Lis
     return issues
 
 
-def _find_file_mixed_indent(indented_lines: List[Tuple[int, str]]) -> Optional[LintIssue]:
+def _find_file_mixed_indent(
+    indented_lines: List[Tuple[int, str]],
+) -> Optional[LintIssue]:
     """Check for inconsistent indentation across the entire file."""
     uses_tabs = False
     uses_spaces = False
@@ -6740,7 +6954,9 @@ def _collect_cmd_cases(lines: List[str]) -> Dict[str, List[Tuple[int, str]]]:
     return command_cases
 
 
-def _find_most_common_case(occurrences: List[Tuple[int, str]]) -> Tuple[str, Dict[str, List[int]]]:
+def _find_most_common_case(
+    occurrences: List[Tuple[int, str]],
+) -> Tuple[str, Dict[str, List[int]]]:
     """Find the most common case variant and return case counts."""
     case_counts: Dict[str, List[int]] = {}
     for line_num, actual_case in occurrences:
@@ -7135,7 +7351,10 @@ def _parse_regular_arguments() -> (
     # Argument handlers lookup table
     arg_handlers: Dict[
         str,
-        Callable[[], Tuple[None, Optional[bool], Optional[bool], Optional[bool], Optional[bool]]],
+        Callable[
+            [],
+            Tuple[None, Optional[bool], Optional[bool], Optional[bool], Optional[bool]],
+        ],
     ] = {
         "--summary": lambda: (
             None,
@@ -7185,7 +7404,9 @@ def _parse_cli_arguments() -> Optional[CliArguments]:
         print_help()
         return None
 
-    return CliArguments(target_path, use_config, cli_show_summary, cli_recursive, cli_follow_calls)
+    return CliArguments(
+        target_path, use_config, cli_show_summary, cli_recursive, cli_follow_calls
+    )
 
 
 @dataclass
@@ -7196,7 +7417,9 @@ class ProcessingResults:
     file_results: Dict[str, List[LintIssue]]
     total_files_processed: int
     files_with_errors: int
-    processed_file_paths: List[Tuple[str, Optional[str]]]  # (file_path, called_by_parent)
+    processed_file_paths: List[
+        Tuple[str, Optional[str]]
+    ]  # (file_path, called_by_parent)
 
 
 @dataclass
@@ -7249,7 +7472,9 @@ def _extract_called_scripts(batch_file: Path) -> List[Path]:
                         # Path is relative to batch file directory
                         script_path = batch_dir / script_path_str
                     elif "%~d0" in script_path_str:
-                        script_path_str = script_path_str.replace("%~d0", str(batch_dir.drive))
+                        script_path_str = script_path_str.replace(
+                            "%~d0", str(batch_dir.drive)
+                        )
                         script_path = Path(script_path_str)
                     else:
                         # Try to resolve the path
@@ -7301,7 +7526,9 @@ def _resolve_call_script_path(script_path_str: str, batch_dir: Path) -> Optional
     return script_path
 
 
-def _try_add_dependency(script_path: Path, batch_file_resolved: Path, deps: Set[Path]) -> None:
+def _try_add_dependency(
+    script_path: Path, batch_file_resolved: Path, deps: Set[Path]
+) -> None:
     """
     Try to add a dependency if the script path is valid.
 
@@ -7320,7 +7547,9 @@ def _try_add_dependency(script_path: Path, batch_file_resolved: Path, deps: Set[
         pass
 
 
-def _extract_direct_dependencies(batch_file: Path, batch_file_resolved: Path) -> Set[Path]:
+def _extract_direct_dependencies(
+    batch_file: Path, batch_file_resolved: Path
+) -> Set[Path]:
     """
     Extract direct dependencies from a batch file by parsing CALL statements.
 
@@ -7563,7 +7792,9 @@ def _collect_called_vars(
                     script_path = _resolve_script_path(script_path_str, batch_dir)
 
                     # Try to read the called script and collect its variables
-                    called_vars = _collect_vars_from_script(script_path, batch_file_resolved)
+                    called_vars = _collect_vars_from_script(
+                        script_path, batch_file_resolved
+                    )
                     if called_vars:
                         called_vars_by_line[line_num] = called_vars
 
@@ -7598,7 +7829,9 @@ def _process_single_called_script(
         all_issues.extend(called_issues)
         processed_files.add(called_script.resolve())
 
-        has_errors = any(issue.rule.severity == RuleSeverity.ERROR for issue in called_issues)
+        has_errors = any(
+            issue.rule.severity == RuleSeverity.ERROR for issue in called_issues
+        )
         return (1, 1 if has_errors else 0, str(called_script))
 
     except (
@@ -7610,7 +7843,8 @@ def _process_single_called_script(
         TypeError,
     ) as called_error:
         error_msg = (
-            f"Warning: Could not process called script " f"'{called_script}': {called_error}"
+            f"Warning: Could not process called script "
+            f"'{called_script}': {called_error}"
         )
         print(error_msg)
         return (0, 0, None)
@@ -7638,7 +7872,11 @@ def _process_called_scripts(
 
     for called_script in called_scripts:
         result = _process_single_called_script(
-            called_script, config, state.processed_files, state.all_issues, state.file_results
+            called_script,
+            config,
+            state.processed_files,
+            state.all_issues,
+            state.file_results,
         )
         files_processed += result[0]
         files_with_errors += result[1]
@@ -7676,7 +7914,9 @@ def _process_batch_files(
             state.all_issues.extend(issues)
             total_files_processed += 1
             state.processed_files.add(batch_file.resolve())
-            state.processed_file_paths.append((str(batch_file), None))  # Main file, no parent
+            state.processed_file_paths.append(
+                (str(batch_file), None)
+            )  # Main file, no parent
 
             if any(issue.rule.severity == RuleSeverity.ERROR for issue in issues):
                 files_with_errors += 1
@@ -7688,9 +7928,17 @@ def _process_batch_files(
                 files_with_errors += called_results[1]
 
         except UnicodeDecodeError as decode_error:
-            print(f"Warning: Could not read '{batch_file}' due to encoding issues: {decode_error}")
+            print(
+                f"Warning: Could not read '{batch_file}' due to encoding issues: {decode_error}"
+            )
             continue
-        except (FileNotFoundError, PermissionError, OSError, ValueError, TypeError) as file_error:
+        except (
+            FileNotFoundError,
+            PermissionError,
+            OSError,
+            ValueError,
+            TypeError,
+        ) as file_error:
             print(f"Warning: Could not process '{batch_file}': {file_error}")
             continue
 
@@ -7762,7 +8010,9 @@ def _display_results(
         print()
 
         # Show list of analyzed scripts
-        _display_analyzed_scripts(results.processed_file_paths, target_path, is_directory)
+        _display_analyzed_scripts(
+            results.processed_file_paths, target_path, is_directory
+        )
 
         # Show results for each file if there are multiple files
         if len(results.file_results) > 1:
@@ -7785,7 +8035,9 @@ def _display_results(
         print("=" * (25 + len(target_path)))
 
         # Show list of analyzed scripts
-        _display_analyzed_scripts(results.processed_file_paths, target_path, is_directory)
+        _display_analyzed_scripts(
+            results.processed_file_paths, target_path, is_directory
+        )
 
         print_detailed(results.all_issues)
 
@@ -8024,7 +8276,9 @@ def _check_advanced_vars(lines: List[str]) -> List[LintIssue]:
 
 def _check_for_f_options(stripped: str, line_number: int) -> Optional[LintIssue]:
     """Check FOR /F without proper options (W020)."""
-    if re.match(r'\s*for\s+/f\s+(?!.*"[^"]*tokens[^"]*")[^(]*\(', stripped, re.IGNORECASE):
+    if re.match(
+        r'\s*for\s+/f\s+(?!.*"[^"]*tokens[^"]*")[^(]*\(', stripped, re.IGNORECASE
+    ):
         return LintIssue(
             line_number=line_number,
             rule=RULES["W020"],
@@ -8038,7 +8292,9 @@ def _check_if_comparison_quotes(stripped: str, line_number: int) -> Optional[Lin
     if_pattern = r'\s*if\s+(?:not\s+)?%\w+%\s*==\s*[^"\']\w+'
     if re.search(if_pattern, stripped, re.IGNORECASE):
         return LintIssue(
-            line_number=line_number, rule=RULES["W021"], context="IF comparison should be quoted"
+            line_number=line_number,
+            rule=RULES["W021"],
+            context="IF comparison should be quoted",
         )
     return None
 
@@ -8148,7 +8404,8 @@ def _check_cmd_error_handling(
             # Check if next 3 lines have error handling
             for j in range(line_number, min(line_number + 3, len(lines) + 1)):
                 if j <= len(lines) and (
-                    "errorlevel" in lines[j - 1].lower() or "if " in lines[j - 1].lower()
+                    "errorlevel" in lines[j - 1].lower()
+                    or "if " in lines[j - 1].lower()
                 ):
                     return None
 
@@ -8191,7 +8448,8 @@ def _check_enhanced_commands(lines: List[str]) -> List[LintIssue]:
     # Check for missing SETLOCAL EnableDelayedExpansion (W022)
     if uses_delayed_expansion:
         has_setlocal = any(
-            re.search(r"setlocal.*enabledelayedexpansion", line, re.IGNORECASE) for line in lines
+            re.search(r"setlocal.*enabledelayedexpansion", line, re.IGNORECASE)
+            for line in lines
         )
         if not has_setlocal:
             issues.append(
@@ -8244,7 +8502,9 @@ def _check_variable_naming(
     return issues
 
 
-def _check_function_docs(line: str, line_number: int, lines: List[str]) -> List[LintIssue]:
+def _check_function_docs(
+    line: str, line_number: int, lines: List[str]
+) -> List[LintIssue]:
     """Check for function documentation (S018)."""
     issues: List[LintIssue] = []
 
@@ -8403,12 +8663,12 @@ def _check_line_length(line: str, line_number: int) -> List[LintIssue]:
     """Check for long lines (S020)."""
     issues: List[LintIssue] = []
 
-    if len(line) > 150 and "^" not in line:
+    if len(line) > 88 and "^" not in line:
         issues.append(
             LintIssue(
                 line_number=line_number,
                 rule=RULES["S020"],
-                context=f"Line length {len(line)} exceeds 150 characters",
+                context=f"Line length {len(line)} exceeds 88 characters",
             )
         )
 
@@ -8485,7 +8745,8 @@ def _is_safe_command_injection(stripped: str) -> bool:
         List[str], re.findall(r"%([a-zA-Z_][a-zA-Z0-9_()]*)%", stripped)
     )
     uses_only_system_vars = all(
-        var in system_variables or var.startswith("~") or var.isdigit() for var in variables_in_line
+        var in system_variables or var.startswith("~") or var.isdigit()
+        for var in variables_in_line
     )
 
     # If only system variables are used, be more lenient
@@ -8508,7 +8769,9 @@ def _is_safe_command_injection(stripped: str) -> bool:
             break
 
     is_file_operation = bool(
-        re.search(r"\b(del|copy|move|type|xcopy|rd|md|mkdir|rmdir)\b", stripped, re.IGNORECASE)
+        re.search(
+            r"\b(del|copy|move|type|xcopy|rd|md|mkdir|rmdir)\b", stripped, re.IGNORECASE
+        )
     )
     has_only_redirection = bool(re.search(r">.*$", stripped))
 
@@ -8523,7 +8786,9 @@ def _check_enhanced_security_rules(lines: List[str]) -> List[LintIssue]:
         stripped = line.strip()
 
         # Check for path traversal (SEC011)
-        if ".." in stripped and any(op in stripped for op in ["cd", "copy", "move", "del"]):
+        if ".." in stripped and any(
+            op in stripped for op in ["cd", "copy", "move", "del"]
+        ):
             issues.append(
                 LintIssue(
                     line_number=i,
@@ -8561,7 +8826,9 @@ def _check_enhanced_security_rules(lines: List[str]) -> List[LintIssue]:
     return issues
 
 
-def _check_unnecessary_output_p014(lines: List[str], i: int, stripped: str) -> Optional[LintIssue]:
+def _check_unnecessary_output_p014(
+    lines: List[str], i: int, stripped: str
+) -> Optional[LintIssue]:
     """Check for unnecessary output in non-interactive context (P014)."""
     # Only flag TYPE and DIR commands - ECHO is typically intentional user communication
     noisy_commands = ["type", "dir"]
@@ -8577,7 +8844,8 @@ def _check_unnecessary_output_p014(lines: List[str], i: int, stripped: str) -> O
                         line_number=i,
                         rule=RULES["P014"],
                         context=(
-                            f"{cmd.upper()} output may be unnecessary in " "non-interactive context"
+                            f"{cmd.upper()} output may be unnecessary in "
+                            "non-interactive context"
                         ),
                     )
     return None

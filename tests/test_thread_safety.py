@@ -30,7 +30,10 @@ class TestThreadSafety:
 
             # Test concurrent reading
             with ThreadPoolExecutor(max_workers=5) as executor:
-                futures = [executor.submit(read_file_worker, file_path) for file_path in test_files]
+                futures = [
+                    executor.submit(read_file_worker, file_path)
+                    for file_path in test_files
+                ]
                 results = [future.result() for future in as_completed(futures)]
 
             # All reads should succeed
@@ -72,7 +75,9 @@ class TestThreadSafety:
 
             # Test concurrent linting
             with ThreadPoolExecutor(max_workers=5) as executor:
-                futures = [executor.submit(lint_worker, file_path) for file_path in test_files]
+                futures = [
+                    executor.submit(lint_worker, file_path) for file_path in test_files
+                ]
                 results = [future.result() for future in as_completed(futures)]
 
             # All linting operations should succeed
@@ -89,7 +94,9 @@ class TestThreadSafety:
 
     def test_concurrent_same_file_access(self) -> None:
         """Test concurrent access to the same file."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
             temp_file.write("@ECHO OFF\necho test\nEXIT /B 0\n")
             temp_path = temp_file.name
 
@@ -158,7 +165,9 @@ class TestThreadSafety:
             # Results should be consistent (all workers see the same issues)
             first_result = results[0]
             for result in results[1:]:
-                assert result == first_result, f"Inconsistent results: {result} != {first_result}"
+                assert (
+                    result == first_result
+                ), f"Inconsistent results: {result} != {first_result}"
 
         finally:
             for file_path in test_files:
@@ -170,7 +179,9 @@ class TestThreadSafety:
     def test_race_condition_prevention(self) -> None:
         """Test that race conditions are prevented in data structures."""
         # Test concurrent access to shared data structures
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
             # Create a complex file that exercises many code paths
             content = """@ECHO OFF
 SETLOCAL ENABLEDELAYEDEXPANSION
@@ -254,7 +265,9 @@ class TestPerformance:
 
         content = "\n".join(lines)
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
             temp_file.write(content)
             temp_path = temp_file.name
 
@@ -266,7 +279,9 @@ class TestPerformance:
 
             # Should complete within reasonable time (adjust as needed)
             processing_time = end_time - start_time
-            assert processing_time < 10.0, f"Large file took too long: {processing_time}s"
+            assert (
+                processing_time < 10.0
+            ), f"Large file took too long: {processing_time}s"
 
             # Should find issues but not crash
             assert isinstance(issues, list)

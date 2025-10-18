@@ -99,8 +99,12 @@ class TestFormatLineNumbersWithFiles:
         )
 
         issues = [
-            LintIssue(line_number=10, rule=rule, file_path="C:\\Users\\test\\helper.bat"),
-            LintIssue(line_number=20, rule=rule, file_path="D:\\projects\\scripts\\main.bat"),
+            LintIssue(
+                line_number=10, rule=rule, file_path="C:\\Users\\test\\helper.bat"
+            ),
+            LintIssue(
+                line_number=20, rule=rule, file_path="D:\\projects\\scripts\\main.bat"
+            ),
         ]
 
         is_multi_file, result = _format_line_numbers_with_files(issues)
@@ -239,7 +243,9 @@ class TestFollowCallsOutputIntegration:
 
             # When follow_calls is enabled, issues from main should have main_script path
             undefined_issues = [i for i in issues if i.rule.code == "E006"]
-            main_undefined = [i for i in undefined_issues if "MAIN_UNDEFINED" in i.context]
+            main_undefined = [
+                i for i in undefined_issues if "MAIN_UNDEFINED" in i.context
+            ]
             assert len(main_undefined) > 0, "Should have E006 for MAIN_UNDEFINED"
             assert all(i.file_path == main_script for i in main_undefined)
 
