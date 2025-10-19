@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.81
+Version: 1.0.82
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.81"
+__version__ = "1.0.82"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -5418,7 +5418,9 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
     issues.extend(_check_inconsistent_indentation(lines))
     issues.extend(_check_missing_header_doc(lines))
     issues.extend(_check_cmd_case_consistency(lines))  # S003
-    issues.extend(_check_advanced_style_rules(lines))  # Style level S017-S020
+    issues.extend(
+        _check_advanced_style_rules(lines, config.max_line_length)
+    )  # Style level S017-S020
 
     # Performance-level global checks
     issues.extend(_check_enhanced_performance(lines))  # Performance level P012-P014
@@ -8766,24 +8768,28 @@ def _check_magic_numbers(line: str, line_number: int) -> List[LintIssue]:
     return issues
 
 
-def _check_line_length(line: str, line_number: int) -> List[LintIssue]:
+def _check_line_length(
+    line: str, line_number: int, max_line_length: int = 88
+) -> List[LintIssue]:
     """Check for long lines (S020)."""
     issues: List[LintIssue] = []
 
     line_length = len(line.rstrip("\n"))
-    if line_length > 88 and not line.rstrip().endswith("^"):
+    if line_length > max_line_length and not line.rstrip().endswith("^"):
         issues.append(
             LintIssue(
                 line_number=line_number,
                 rule=RULES["S020"],
-                context=f"Line length {line_length} exceeds 88 characters",
+                context=f"Line length {line_length} exceeds {max_line_length} characters",
             )
         )
 
     return issues
 
 
-def _check_advanced_style_rules(lines: List[str]) -> List[LintIssue]:
+def _check_advanced_style_rules(
+    lines: List[str], max_line_length: int = 88
+) -> List[LintIssue]:
     """Check for advanced style and best practice issues (S017-S020)."""
     issues: List[LintIssue] = []
     variables_seen: Dict[str, str] = {}  # var_name -> case_style
@@ -8792,7 +8798,7 @@ def _check_advanced_style_rules(lines: List[str]) -> List[LintIssue]:
         issues.extend(_check_variable_naming(line, i, variables_seen))
         issues.extend(_check_function_docs(line, i, lines))
         issues.extend(_check_magic_numbers(line, i))
-        issues.extend(_check_line_length(line, i))
+        issues.extend(_check_line_length(line, i, max_line_length))
 
     return issues
 
