@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.78
+Version: 1.0.79
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.78"
+__version__ = "1.0.79"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2601,6 +2601,61 @@ def _is_command_in_safe_context(line: str) -> bool:
     return False
 
 
+def _is_safe_ctx_for_privilege(line: str) -> bool:
+    """
+    Check if a command is in a safe context for privilege (SEC005) checks.
+
+    This is similar to _is_command_in_safe_context but EXCLUDES IF DEFINED
+    because privilege-requiring commands still need admin rights even when
+    wrapped in an IF DEFINED conditional.
+
+    For example:
+    - IF DEFINED @DLETTER NET USE %@DLETTER% /D /Y  <- Still needs admin rights
+    - IF DEFINED @MSSHUTDOWN echo Variable defined   <- Truly safe (just echo)
+
+    Safe contexts for privilege checks include REM comments, ECHO statements,
+    labels, GOTO statements, and SET statements (without dangerous commands).
+    IF DEFINED is NOT considered safe for privilege checks.
+
+    Args:
+        line: The line to check
+
+    Returns:
+        True if the command is in a safe context for privilege checks
+    """
+    stripped = line.strip().lower()
+
+    # Check if line is a comment (REM or ::)
+    if _is_comment_line(line):
+        return True
+
+    # Check if line is a label definition (starts with :)
+    if stripped.startswith(":"):
+        return True
+
+    # Check if line starts with ECHO or @ECHO (output statements)
+    if stripped.startswith(("echo ", "echo\t", "@echo ", "@echo\t")):
+        return True
+
+    # Check if line contains GOTO statement (navigation to labels)
+    # NOTE: IF DEFINED is NOT included here for privilege checks
+    if re.search(r"\bgoto\s+:", stripped):
+        return True
+
+    # Check if line is a SET statement (environment variable assignment)
+    # But NOT if it contains dangerous commands in command substitution
+    if stripped.startswith(("set ", "set\t")):
+        # Check for any dangerous command pattern in command substitution
+        # Common patterns: WHERE <dangerous_cmd>, or the dangerous command itself in quotes
+        dangerous_in_substitution = re.search(
+            rf"where\s+({_DANGEROUS_CMDS_REGEX})", stripped
+        ) or re.search(rf"['\(]\s*({_DANGEROUS_CMDS_REGEX})\s+", stripped)
+        if not dangerous_in_substitution:
+            return True
+
+    return False
+
+
 def _collect_labels(lines: List[str]) -> Tuple[Dict[str, int], List[LintIssue]]:
     """Collect all labels and detect duplicates."""
     labels: Dict[str, int] = {}
@@ -4056,7 +4111,8 @@ def _check_privilege_security(
     issues: List[LintIssue] = []
 
     # Skip commands in safe contexts (comments, ECHO, SET statements)
-    if line and _is_command_in_safe_context(line):
+    # Note: Uses privilege-specific safe context check that excludes IF DEFINED
+    if line and _is_safe_ctx_for_privilege(line):
         return issues
 
     # SEC005: Missing privilege check for admin operations
@@ -6005,7 +6061,8 @@ def _check_global_priv_security(lines: List[str]) -> List[LintIssue]:
     if not has_privilege_check:
         for i, line in enumerate(lines, start=1):
             # Skip commands in safe contexts (comments, ECHO, SET statements)
-            if _is_command_in_safe_context(line):
+            # Note: Uses privilege-specific safe context check that excludes IF DEFINED
+            if _is_safe_ctx_for_privilege(line):
                 continue
 
             stripped = line.strip().lower()

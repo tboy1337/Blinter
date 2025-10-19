@@ -2103,6 +2103,126 @@ ECHO Script completed
         finally:
             os.unlink(temp_file)
 
+    def test_net_command_with_if_defined_should_be_flagged(self) -> None:
+        """
+        Test that NET commands wrapped in IF DEFINED are still flagged for SEC005.
+
+        This is a regression test for GitHub issue where IF DEFINED was incorrectly
+        exempting privilege-requiring commands from SEC005 warnings.
+        Between v1.0.72 and v1.0.77, IF DEFINED was added to safe contexts,
+        which caused NET commands after IF DEFINED to be skipped.
+
+        IF DEFINED is just a conditional check - the actual command still needs
+        admin privileges regardless of whether it's wrapped in IF DEFINED.
+        """
+        content = """@ECHO OFF
+IF DEFINED @DLETTER NET USE %@DLETTER% /D /Y
+IF DEFINED @FOLDER NET USE %@FOLDER% /D /Y
+FOR /F "TOKENS=2" %%P IN ('NET USE * "!@PATH!" /PERSISTENT:NO ^| FIND /I "connected"') DO (
+    SET @LETTER=%%P
+)
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            sec005_issues = [i for i in issues if i.rule.code == "SEC005"]
+            # All three NET USE commands should trigger SEC005
+            # Line 2: IF DEFINED @DLETTER NET USE
+            # Line 3: IF DEFINED @FOLDER NET USE
+            # Line 4: FOR loop with NET USE
+            assert (
+                len(sec005_issues) >= 3
+            ), f"Expected at least 3 SEC005 issues, got {len(sec005_issues)}: {[(i.line_number, i.context) for i in sec005_issues]}"
+            # Verify specific lines are flagged
+            line_2_flagged = any(i.line_number == 2 for i in sec005_issues)
+            line_3_flagged = any(i.line_number == 3 for i in sec005_issues)
+            line_4_flagged = any(i.line_number == 4 for i in sec005_issues)
+            assert line_2_flagged, "Line 2 (IF DEFINED ... NET USE) should be flagged"
+            assert line_3_flagged, "Line 3 (IF DEFINED ... NET USE) should be flagged"
+            assert line_4_flagged, "Line 4 (FOR loop with NET USE) should be flagged"
+        finally:
+            os.unlink(temp_file)
+
+    def test_if_defined_with_safe_commands_not_flagged(self) -> None:
+        """
+        Test that IF DEFINED with truly safe commands (like ECHO) is not flagged.
+
+        This verifies that the fix for IF DEFINED+NET USE doesn't break the
+        original intent of preventing false positives for variable name checks
+        with dangerous-sounding names (e.g., @MSSHUTDOWN).
+        """
+        content = """@ECHO OFF
+REM Variable name contains "shutdown" but this is safe
+IF DEFINED @MSSHUTDOWN echo Variable defined
+IF DEFINED @MSFORMAT echo Another variable
+SET @MSSHUTDOWN=TRUE
+SET @MSFORMAT=C:\\\\Format\\\\Tool
+ECHO Script completed
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            # These should NOT trigger SEC003 (dangerous command without confirmation)
+            # because they're just variable checks and assignments
+            sec003_issues = [i for i in issues if i.rule.code == "SEC003"]
+            assert (
+                len(sec003_issues) == 0
+            ), f"IF DEFINED with variable names should NOT trigger SEC003, got: {[(i.line_number, i.context) for i in sec003_issues]}"
+        finally:
+            os.unlink(temp_file)
+
+    def test_net_use_github_issue_regression(self) -> None:
+        """
+        Regression test for specific GitHub issue scenario.
+
+        Original report showed:
+        v1.0.72 - Line 752, 752, 814, 814, 883, 883: Missing privilege check (SEC005)
+        v1.0.77 - Line 883, 883: Missing privilege check (SEC005)
+
+        Lines 752 and 814 were "IF DEFINED ... NET USE" and should still be flagged.
+        """
+        content = """@ECHO OFF
+SETLOCAL ENABLEDELAYEDEXPANSION
+
+REM Simulate line 752 scenario
+IF DEFINED @DLETTER NET USE %@DLETTER% /D /Y
+ECHO %@DIVIDER#%
+ECHO:
+
+REM Simulate line 814 scenario
+IF DEFINED @DLETTER NET USE %@D_FOLDER% /D /Y
+ECHO %@DIVIDER#%
+ECHO:
+
+REM Simulate line 883 scenario
+FOR /F "TOKENS=2" %%P IN ('NET USE * "!@FULLPATH!" /PERSISTENT:NO ^| FIND /I "is now connected to !@FULLPATH!" ') DO (
+    CALL SET %%1=%%P
+    SET @DLETTER=[%%P]
+)
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            sec005_issues = [i for i in issues if i.rule.code == "SEC005"]
+            # All three NET USE commands should be flagged
+            line_5_flagged = any(i.line_number == 5 for i in sec005_issues)
+            line_10_flagged = any(i.line_number == 10 for i in sec005_issues)
+            line_15_flagged = any(i.line_number == 15 for i in sec005_issues)
+            assert (
+                len(sec005_issues) >= 3
+            ), f"Expected at least 3 SEC005 issues, got {len(sec005_issues)}: {[(i.line_number, i.context) for i in sec005_issues]}"
+            assert (
+                line_5_flagged
+            ), "Line 5 (IF DEFINED @DLETTER NET USE) should be flagged like in v1.0.72"
+            assert (
+                line_10_flagged
+            ), "Line 10 (IF DEFINED @DLETTER NET USE) should be flagged like in v1.0.72"
+            assert (
+                line_15_flagged
+            ), "Line 15 (FOR loop with NET USE) should be flagged (was always flagged)"
+        finally:
+            os.unlink(temp_file)
+
     def test_deprecated_and_removed_commands_comprehensive(self) -> None:
         """Test comprehensive check of multiple deprecated and removed commands in one file."""
         content = """@ECHO OFF

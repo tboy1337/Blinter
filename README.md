@@ -63,7 +63,7 @@ cd Blinter
 2. (Optional) Create a virtual environment:
 ```cmd
 python -m venv venv
-venv\Scripts\Activate.ps1
+venv\Scripts\activate.bat
 ```
 
 3. (Optional but recommended) Install dependencies:
