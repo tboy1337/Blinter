@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.80
+Version: 1.0.81
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.80"
+__version__ = "1.0.81"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -8770,12 +8770,13 @@ def _check_line_length(line: str, line_number: int) -> List[LintIssue]:
     """Check for long lines (S020)."""
     issues: List[LintIssue] = []
 
-    if len(line) > 88 and "^" not in line:
+    line_length = len(line.rstrip("\n"))
+    if line_length > 88 and not line.rstrip().endswith("^"):
         issues.append(
             LintIssue(
                 line_number=line_number,
                 rule=RULES["S020"],
-                context=f"Line length {len(line)} exceeds 88 characters",
+                context=f"Line length {line_length} exceeds 88 characters",
             )
         )
 
