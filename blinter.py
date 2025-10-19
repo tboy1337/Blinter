@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.79
+Version: 1.0.80
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.79"
+__version__ = "1.0.80"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2491,6 +2491,7 @@ Arguments:
 Options:
   --summary           Show a summary section with total errors and most common error.
   --severity          Show error severity levels and their meaning.
+  --max-line-length <n>  Set maximum line length for S011 rule (default: 88).
   --no-recursive      When processing directories, don't search subdirectories (default: recursive).
   --follow-calls      Automatically scan scripts called by CALL statements (one level deep).
                      This helps analyze centralized configuration scripts that set variables.
@@ -2526,6 +2527,9 @@ Examples:
 
   python blinter.py myscript.bat --follow-calls
       Analyze script and any scripts it calls (e.g., configuration scripts).
+
+  python blinter.py myscript.bat --max-line-length 120
+      Analyze with custom maximum line length of 120 characters.
 
   python blinter.py /project/scripts --summary --severity
       Shows summary, detailed errors and severity info for all batch files in directory.
@@ -7366,6 +7370,7 @@ class CliArguments:
     cli_show_summary: Optional[bool]
     cli_recursive: Optional[bool]
     cli_follow_calls: Optional[bool]
+    cli_max_line_length: Optional[int]
 
 
 def _handle_special_cli_flags() -> Optional[bool]:
@@ -7390,20 +7395,26 @@ def _handle_special_cli_flags() -> Optional[bool]:
     return None
 
 
-def _parse_regular_arguments() -> (
-    Tuple[Optional[str], bool, Optional[bool], Optional[bool], Optional[bool]]
-):
+def _parse_regular_arguments() -> Tuple[
+    Optional[str],
+    bool,
+    Optional[bool],
+    Optional[bool],
+    Optional[bool],
+    Optional[int],
+]:
     """
     Parse regular command-line arguments using a lookup table.
 
     Returns:
-        Tuple of (target_path, use_config, cli_show_summary, cli_recursive, cli_follow_calls)
+        Tuple of (target_path, use_config, cli_show_summary, cli_recursive, cli_follow_calls, cli_max_line_length)
     """
     target_path: Optional[str] = None
     use_config = True
     cli_show_summary = None
     cli_recursive = None
     cli_follow_calls = None
+    cli_max_line_length = None
 
     # Argument handlers lookup table
     arg_handlers: Dict[
@@ -7426,10 +7437,29 @@ def _parse_regular_arguments() -> (
         "--follow-calls": lambda: (None, None, None, None, True),
     }
 
-    for arg in sys.argv[1:]:
+    i = 1
+    while i < len(sys.argv):
+        arg = sys.argv[i]
         if not arg.startswith("--"):
             if target_path is None:
                 target_path = arg
+        elif arg == "--max-line-length":
+            # Parse the next argument as the line length value
+            if i + 1 >= len(sys.argv):
+                print("Error: --max-line-length requires a value.\n")
+                print_help()
+                sys.exit(1)
+            try:
+                cli_max_line_length = int(sys.argv[i + 1])
+                if cli_max_line_length <= 0:
+                    print("Error: --max-line-length must be a positive integer.\n")
+                    sys.exit(1)
+                i += 1  # Skip the next argument since we've consumed it
+            except ValueError:
+                print(
+                    f"Error: --max-line-length requires a numeric value, got '{sys.argv[i + 1]}'.\n"
+                )
+                sys.exit(1)
         elif arg in arg_handlers:
             _, config, summary, recursive, follow = arg_handlers[arg]()
             if config is not None:
@@ -7440,8 +7470,16 @@ def _parse_regular_arguments() -> (
                 cli_recursive = recursive
             if follow is not None:
                 cli_follow_calls = follow
+        i += 1
 
-    return target_path, use_config, cli_show_summary, cli_recursive, cli_follow_calls
+    return (
+        target_path,
+        use_config,
+        cli_show_summary,
+        cli_recursive,
+        cli_follow_calls,
+        cli_max_line_length,
+    )
 
 
 def _parse_cli_arguments() -> Optional[CliArguments]:
@@ -7452,9 +7490,14 @@ def _parse_cli_arguments() -> Optional[CliArguments]:
         return None
 
     # Parse regular arguments
-    target_path, use_config, cli_show_summary, cli_recursive, cli_follow_calls = (
-        _parse_regular_arguments()
-    )
+    (
+        target_path,
+        use_config,
+        cli_show_summary,
+        cli_recursive,
+        cli_follow_calls,
+        cli_max_line_length,
+    ) = _parse_regular_arguments()
 
     if not target_path:
         print("Error: No batch file or directory provided.\n")
@@ -7462,7 +7505,12 @@ def _parse_cli_arguments() -> Optional[CliArguments]:
         return None
 
     return CliArguments(
-        target_path, use_config, cli_show_summary, cli_recursive, cli_follow_calls
+        target_path,
+        use_config,
+        cli_show_summary,
+        cli_recursive,
+        cli_follow_calls,
+        cli_max_line_length,
     )
 
 
@@ -8188,6 +8236,8 @@ def main() -> None:
         config.recursive = cli_args.cli_recursive
     if cli_args.cli_follow_calls is not None:
         config.follow_calls = cli_args.cli_follow_calls
+    if cli_args.cli_max_line_length is not None:
+        config.max_line_length = cli_args.cli_max_line_length
 
     # Find all batch files to process
     try:
