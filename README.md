@@ -72,7 +72,7 @@ pip install -r requirements.txt
 ```
 
 ### Prerequisites
-- **Python 3.9+** (required for pip installation and development)
+- **Python 3.10+** (required for pip installation and development)
 - **Windows OS** (required for standalone executable)
 
 ## Usage 📟
