@@ -290,8 +290,8 @@ SET @HASREG=& FOR /F %%V IN ('WHERE REG 2^>NUL') DO SET @HASREG=TRUE
             os.unlink(temp_file)
 
     def test_long_lines(self) -> None:
-        """Test detection of lines exceeding 88 characters."""
-        long_line = "echo " + "x" * 93  # Exceed 88 character limit
+        """Test detection of lines exceeding 100 characters."""
+        long_line = "echo " + "x" * 105  # Exceed 100 character limit
         content = f"""@echo off
 {long_line}
 echo Normal line

@@ -35,7 +35,7 @@ def test_s020_long_caret_escape() -> None:
         # Should trigger S020 because line is long and doesn't END with ^
         assert len(s020_issues) == 1
         assert s020_issues[0].line_number == 2
-        assert "exceeds 88 characters" in s020_issues[0].context
+        assert "exceeds 100 characters" in s020_issues[0].context
     finally:
         temp_path.unlink()
 
@@ -138,9 +138,10 @@ def test_s020_trailing_ws_caret() -> None:
 
 def test_s020_multiple_carets() -> None:
     """S020 should trigger if line has multiple ^ but doesn't end with one."""
+    # Create a line with multiple ^ but doesn't end with one, and is over 100 chars
     content = (
         "@ECHO OFF\n"
-        'FOR /F "TOKENS=*" %%i IN (\'TYPE file.txt 2^>NUL ^| FINDSTR /I "test"\') DO ECHO Long line here %%i\n'
+        'FOR /F "TOKENS=*" %%i IN (\'TYPE file.txt 2^>NUL ^| FINDSTR /I "test"\') DO ECHO Long line here with extra text %%i\n'
     )
 
     with tempfile.NamedTemporaryFile(
@@ -162,10 +163,10 @@ def test_s020_multiple_carets() -> None:
 
 
 def test_s020_exactly_88_chars() -> None:
-    """S020 should NOT trigger for lines exactly at 88 characters."""
-    # Create a line that's exactly 88 characters (excluding newline)
+    """S020 should NOT trigger for lines exactly at 100 characters."""
+    # Create a line that's exactly 100 characters (excluding newline)
     content = "@ECHO OFF\n"
-    content += "REM " + "x" * 84 + "\n"  # REM + space + 84 chars = 88 total
+    content += "REM " + "x" * 96 + "\n"  # REM + space + 96 chars = 100 total
 
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".bat", delete=False, encoding="utf-8"
@@ -178,17 +179,17 @@ def test_s020_exactly_88_chars() -> None:
         issues = blinter.lint_batch_file(str(temp_path))
         s020_issues = [issue for issue in issues if issue.rule.code == "S020"]
 
-        # Should NOT trigger S020 because line is exactly 88 characters
+        # Should NOT trigger S020 because line is exactly 100 characters
         assert len(s020_issues) == 0
     finally:
         temp_path.unlink()
 
 
 def test_s020_89_chars_triggers() -> None:
-    """S020 should trigger for lines at 89 characters (just over limit)."""
-    # Create a line that's exactly 89 characters
+    """S020 should trigger for lines at 101 characters (just over limit)."""
+    # Create a line that's exactly 101 characters
     content = "@ECHO OFF\n"
-    content += "REM " + "x" * 85 + "\n"  # REM + space + 85 chars = 89 total
+    content += "REM " + "x" * 97 + "\n"  # REM + space + 97 chars = 101 total
 
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".bat", delete=False, encoding="utf-8"
@@ -201,7 +202,7 @@ def test_s020_89_chars_triggers() -> None:
         issues = blinter.lint_batch_file(str(temp_path))
         s020_issues = [issue for issue in issues if issue.rule.code == "S020"]
 
-        # Should trigger S020 because line is 89 characters (over limit)
+        # Should trigger S020 because line is 101 characters (over limit)
         assert len(s020_issues) == 1
         assert s020_issues[0].line_number == 2
     finally:
@@ -382,8 +383,8 @@ def test_s020_context_custom_len() -> None:
         issues = blinter.lint_batch_file(str(temp_path), config=config)
         s020_issues = [issue for issue in issues if issue.rule.code == "S020"]
         assert len(s020_issues) == 1
-        # Context should mention the custom limit (95), not the default (88)
+        # Context should mention the custom limit (95), not the default (100)
         assert "95 characters" in s020_issues[0].context
-        assert "88 characters" not in s020_issues[0].context
+        assert "100 characters" not in s020_issues[0].context
     finally:
         temp_path.unlink()

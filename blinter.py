@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.84
+Version: 1.0.85
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.84"
+__version__ = "1.0.85"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -100,7 +100,7 @@ class BlinterConfig:
     # General settings
     recursive: bool = True
     show_summary: bool = False
-    max_line_length: int = 88
+    max_line_length: int = 100
     follow_calls: bool = False
 
     # Rule enablement - all rules enabled by default
@@ -803,7 +803,7 @@ RULES: Dict[str, Rule] = {
         code="S011",
         name="Line exceeds maximum length",
         severity=RuleSeverity.STYLE,
-        explanation="Lines longer than 88 characters are hard to read and maintain",
+        explanation="Lines longer than 100 characters are hard to read and maintain",
         recommendation="Break long lines into multiple shorter lines for better readability",
     ),
     "S012": Rule(
@@ -2319,7 +2319,7 @@ def _load_general_settings(
 
     config.recursive = general.getboolean("recursive", fallback=True)
     config.show_summary = general.getboolean("show_summary", fallback=False)
-    config.max_line_length = general.getint("max_line_length", fallback=88)
+    config.max_line_length = general.getint("max_line_length", fallback=100)
     config.follow_calls = general.getboolean("follow_calls", fallback=False)
 
     severity_str = general.get("min_severity", "").strip()
@@ -2431,8 +2431,8 @@ recursive = true
 # Whether to show summary statistics at the end (default: false)  
 show_summary = false
 
-# Maximum line length before triggering S011 rule (default: 88)
-max_line_length = 88
+# Maximum line length before triggering S011 rule (default: 100)
+max_line_length = 100
 
 # Whether to automatically scan scripts called by CALL statements (default: false)
 # This helps analyze centralized configuration scripts that set variables
@@ -2491,7 +2491,7 @@ Arguments:
 Options:
   --summary           Show a summary section with total errors and most common error.
   --severity          Show error severity levels and their meaning.
-  --max-line-length <n>  Set maximum line length for S011 rule (default: 88).
+  --max-line-length <n>  Set maximum line length for S011 rule (default: 100).
   --no-recursive      When processing directories, don't search subdirectories (default: recursive).
   --follow-calls      Automatically scan scripts called by CALL statements (one level deep).
                      This helps analyze centralized configuration scripts that set variables.
@@ -3985,7 +3985,7 @@ def _check_timeout_ping_numbers(stripped: str, line_num: int) -> List[LintIssue]
 def _check_style_issues(
     line: str,
     line_num: int,
-    max_line_length: int = 88,
+    max_line_length: int = 100,
 ) -> List[LintIssue]:
     """Check for style level issues."""
     issues: List[LintIssue] = []
@@ -5967,13 +5967,13 @@ def lint_batch_file(  # pylint: disable=too-many-locals
 
     # Store original max_line_length for S011 rule
     original_s011_rule = RULES["S011"]
-    if config.max_line_length != 88:
+    if config.max_line_length != 100:
         RULES["S011"] = Rule(
             code="S011",
             name=original_s011_rule.name,
             severity=original_s011_rule.severity,
             explanation=original_s011_rule.explanation.replace(
-                "88", str(config.max_line_length)
+                "100", str(config.max_line_length)
             ),
             recommendation=original_s011_rule.recommendation,
         )
@@ -6038,7 +6038,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     issues.extend(_check_new_global_rules(lines, file_path))
 
     # Restore original S011 rule if modified
-    if config.max_line_length != 88:
+    if config.max_line_length != 100:
         RULES["S011"] = original_s011_rule
 
     # Set file_path on all issues that don't have it
@@ -8788,7 +8788,7 @@ def _check_magic_numbers(line: str, line_number: int) -> List[LintIssue]:
 
 
 def _check_line_length(
-    line: str, line_number: int, max_line_length: int = 88
+    line: str, line_number: int, max_line_length: int = 100
 ) -> List[LintIssue]:
     """Check for long lines (S020)."""
     issues: List[LintIssue] = []
@@ -8807,7 +8807,7 @@ def _check_line_length(
 
 
 def _check_advanced_style_rules(
-    lines: List[str], max_line_length: int = 88
+    lines: List[str], max_line_length: int = 100
 ) -> List[LintIssue]:
     """Check for advanced style and best practice issues (S017-S020)."""
     issues: List[LintIssue] = []

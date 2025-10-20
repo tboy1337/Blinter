@@ -224,9 +224,9 @@ max_line_length = 100
                 pass
 
     def test_cli_max_line_length_default_value(self) -> None:
-        """Test that default max_line_length is 88."""
+        """Test that default max_line_length is 100."""
         config = BlinterConfig()
-        assert config.max_line_length == 88
+        assert config.max_line_length == 100
 
     def test_cli_max_line_length_with_other_flags(self) -> None:
         """Test --max-line-length with other CLI flags."""
@@ -449,7 +449,7 @@ max_line_length = 120
                 pass
 
     def test_config_file_max_line_length_default(self) -> None:
-        """Test that max_line_length defaults to 88 when not in config."""
+        """Test that max_line_length defaults to 100 when not in config."""
         config_content = """
 [general]
 recursive = true
@@ -463,7 +463,7 @@ recursive = true
 
         try:
             config = load_config(config_file_path)
-            assert config.max_line_length == 88
+            assert config.max_line_length == 100
         finally:
             try:
                 os.unlink(config_file_path)

@@ -177,7 +177,7 @@ python blinter.py --version
 - `<path>`: Path to a batch file (`.bat` or `.cmd`) OR directory containing batch files
 - `--summary`: Display summary statistics of issues found
 - `--severity`: Show detailed severity level breakdown (always included)
-- `--max-line-length <n>`: Set maximum line length for S011 rule (default: 88)
+- `--max-line-length <n>`: Set maximum line length for S011 rule (default: 100)
 - `--no-recursive`: When processing directories, only analyze files in the specified directory (not subdirectories)
 - `--follow-calls`: Automatically analyze scripts called by CALL statements and merge their variable context. When enabled, variables defined in called scripts are recognized as "defined" in the calling script (position-aware: only after the CALL statement). This eliminates false positive undefined variable errors for configuration scripts
 - `--no-config`: Don't use configuration file (blinter.ini) even if it exists
@@ -193,7 +193,7 @@ python blinter.py --version
 |---------|---------|-------------|---------|
 | `[general]` | `recursive` | Search subdirectories when analyzing folders | `true` |
 | `[general]` | `show_summary` | Display summary statistics after analysis | `false` |
-| `[general]` | `max_line_length` | Maximum line length for S011 rule | `88` |
+| `[general]` | `max_line_length` | Maximum line length for S011 rule | `100` |
 | `[general]` | `follow_calls` | Analyze scripts called by CALL statements with shared variable context | `false` |
 | `[general]` | `min_severity` | Minimum severity level to report | None (all) |
 | `[rules]` | `enabled_rules` | Comma-separated list of rules to enable exclusively | None (all enabled) |
@@ -302,7 +302,7 @@ with ThreadPoolExecutor(max_workers=4) as executor:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `file_path` | `str` | Required | Path to batch file to analyze |
-| `max_line_length` | `int` | `88` | Maximum line length for S011 rule |
+| `max_line_length` | `int` | `100` | Maximum line length for S011 rule |
 | `enable_style_rules` | `bool` | `True` | Enable/disable style-related rules |
 | `enable_performance_rules` | `bool` | `True` | Enable/disable performance rules |
 

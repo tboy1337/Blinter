@@ -24,7 +24,7 @@ class TestBlinterConfig:
 
         assert config.recursive is True
         assert config.show_summary is False
-        assert config.max_line_length == 88
+        assert config.max_line_length == 100
         assert config.enabled_rules == set()
         assert config.disabled_rules == set()
         assert config.min_severity is None
@@ -127,7 +127,7 @@ class TestConfigurationLoading:
             # Should return default config
             assert config.recursive is True
             assert config.show_summary is False
-            assert config.max_line_length == 88
+            assert config.max_line_length == 100
             assert config.enabled_rules == set()
             assert config.disabled_rules == set()
             assert config.min_severity is None
@@ -139,7 +139,7 @@ class TestConfigurationLoading:
         # Should return default config regardless of file existence
         assert config.recursive is True
         assert config.show_summary is False
-        assert config.max_line_length == 88
+        assert config.max_line_length == 100
 
     def test_load_config_with_general_settings(self) -> None:
         """Test loading configuration with general settings."""
@@ -327,7 +327,7 @@ disabled_rules = S001
 
             # Unspecified settings should use defaults
             assert config.recursive is True
-            assert config.max_line_length == 88
+            assert config.max_line_length == 100
             assert config.enabled_rules == set()
         finally:
             try:
@@ -386,8 +386,8 @@ class TestConfigurationIntegration:
         ) as batch_file:
             batch_file.write("@echo off\n")
             batch_file.write(
-                "echo " + "x" * 88 + "\n"
-            )  # Create a line longer than 88 chars
+                "echo " + "x" * 100 + "\n"
+            )  # Create a line longer than 100 chars
             batch_file.flush()
             batch_file.close()  # Close file before reading on Windows
 
