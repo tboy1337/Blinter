@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.83
+Version: 1.0.84
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.83"
+__version__ = "1.0.84"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2616,10 +2616,13 @@ def _is_safe_ctx_for_privilege(line: str) -> bool:
     For example:
     - IF DEFINED @DLETTER NET USE %@DLETTER% /D /Y  <- Still needs admin rights
     - IF DEFINED @MSSHUTDOWN echo Variable defined   <- Truly safe (just echo)
+    - IF DEFINED @MORECMDS ECHO Other NET USER Options <- Truly safe (just echo)
+    - IF DEFINED *SERVICE_SC (                         <- Truly safe (just variable check)
 
     Safe contexts for privilege checks include REM comments, ECHO statements,
     labels, GOTO statements, and SET statements (without dangerous commands).
-    IF DEFINED is NOT considered safe for privilege checks.
+    IF DEFINED is NOT considered safe for privilege checks UNLESS the actual
+    command after the condition is ECHO or there's just a variable name check.
 
     Args:
         line: The line to check
@@ -2629,17 +2632,33 @@ def _is_safe_ctx_for_privilege(line: str) -> bool:
     """
     stripped = line.strip().lower()
 
-    # Check if line is a comment (REM or ::)
-    if _is_comment_line(line):
-        return True
-
-    # Check if line is a label definition (starts with :)
-    if stripped.startswith(":"):
+    # Check if line is a comment (REM or ::) or label definition (starts with :)
+    if _is_comment_line(line) or stripped.startswith(":"):
         return True
 
     # Check if line starts with ECHO or @ECHO (output statements)
     if stripped.startswith(("echo ", "echo\t", "@echo ", "@echo\t")):
         return True
+
+    # Check if line contains IF/IF DEFINED with ECHO as the actual command
+    # Pattern: IF [/I] [NOT] [DEFINED] <condition> ECHO <text>
+    # Examples:
+    #   IF DEFINED @VAR ECHO text with NET USER <- ECHO is the command (SAFE)
+    #   IF DEFINED @VAR NET USE <- NET USE is the command (NOT SAFE)
+    if_match = re.match(
+        r"^@?if\s+(?:/i\s+)?(?:not\s+)?(?:defined\s+\S+\s+)?(.+)", stripped
+    )
+    if if_match:
+        # Extract the command portion after the condition
+        command_portion: str = cast(str, if_match.group(1)).strip()
+        # Check if the command is ECHO or if it's IF DEFINED with just a variable check
+        # Pattern: IF DEFINED <varname> ( or IF DEFINED <varname> THEN or just IF DEFINED <varname>
+        is_echo_command: bool = command_portion.startswith(("echo ", "echo\t"))
+        is_variable_check: bool = bool(
+            re.match(r"^@?if\s+(?:/i\s+)?defined\s+\S+\s*(?:\(|then)?$", stripped)
+        )
+        if is_echo_command or is_variable_check:
+            return True
 
     # Check if line contains GOTO statement (navigation to labels)
     # NOTE: IF DEFINED is NOT included here for privilege checks

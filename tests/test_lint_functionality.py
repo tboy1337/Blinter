@@ -2223,6 +2223,113 @@ FOR /F "TOKENS=2" %%P IN ('NET USE * "!@FULLPATH!" /PERSISTENT:NO ^| FIND /I "is
         finally:
             os.unlink(temp_file)
 
+    def test_sec005_if_defined_with_echo_not_flagged(self) -> None:
+        """
+        Test SEC005: IF DEFINED with ECHO containing command-like text should NOT be flagged.
+
+        This is a regression test for GitHub issue where lines like:
+        "IF DEFINED @MORECMDS ECHO  Other NET USER Options ... %@MORECMDS%"
+        were incorrectly flagged because "NET USER" appeared in the ECHO text.
+
+        The ECHO command is the actual command here, not NET USER, so it should be safe.
+        """
+        content = """@ECHO OFF
+REM These should NOT trigger SEC005 - ECHO is the actual command
+IF DEFINED @MORECMDS ECHO  Other NET USER Options ... %@MORECMDS%
+IF DEFINED @VAR ECHO Text with SC command mentioned
+IF DEFINED @TEST ECHO NET USE information here
+IF /I DEFINED @DATA ECHO REG ADD details
+IF NOT DEFINED @FLAG ECHO net session check info
+
+REM These SHOULD trigger SEC005 - actual privileged commands
+IF DEFINED @DLETTER NET USE %@DLETTER% /D /Y
+IF DEFINED @KEY REG ADD HKLM\\Software\\Test
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            sec005_issues = [i for i in issues if i.rule.code == "SEC005"]
+
+            # Lines 3-7 should NOT be flagged (ECHO statements)
+            echo_lines_flagged = [
+                i.line_number for i in sec005_issues if i.line_number in [3, 4, 5, 6, 7]
+            ]
+            assert (
+                len(echo_lines_flagged) == 0
+            ), f"ECHO statements should NOT trigger SEC005, but these lines were flagged: {echo_lines_flagged}"
+
+            # Lines 10-11 SHOULD be flagged (actual privileged commands)
+            line_10_flagged = any(i.line_number == 10 for i in sec005_issues)
+            line_11_flagged = any(i.line_number == 11 for i in sec005_issues)
+            assert (
+                line_10_flagged
+            ), "Line 10 (IF DEFINED with NET USE command) should still be flagged"
+            assert (
+                line_11_flagged
+            ), "Line 11 (IF DEFINED with REG ADD command) should still be flagged"
+        finally:
+            os.unlink(temp_file)
+
+    def test_sec005_if_defined_var_cmd_text_not_flagged(
+        self,
+    ) -> None:
+        """
+        Test SEC005: IF DEFINED with variable names containing command-like text should NOT be flagged.
+
+        This is a regression test for GitHub issue where lines like:
+        "IF DEFINED *SERVICE_SC (" were incorrectly flagged because "SC" appeared
+        in the variable name.
+
+        When IF DEFINED is followed by just a variable name and opening paren/nothing,
+        it's just a variable existence check, not executing any command.
+        """
+        content = """@ECHO OFF
+REM These should NOT trigger SEC005 - just variable name checks
+IF DEFINED *SERVICE_SC (
+    ECHO Service check enabled
+)
+IF DEFINED @NET_STATUS (
+    ECHO Status available
+)
+IF DEFINED REG_BACKUP ECHO Backup defined
+IF DEFINED NET_CONFIGURED (
+    ECHO Network is configured
+)
+
+REM These SHOULD trigger SEC005 - actual privileged commands
+IF DEFINED @VAR SC query service
+IF DEFINED @FLAG NET USE Z: \\\\server\\share
+IF DEFINED @KEY REG DELETE HKLM\\Software\\Test /f
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            sec005_issues = [i for i in issues if i.rule.code == "SEC005"]
+
+            # Lines 3, 6, 9, 10 should NOT be flagged (just variable checks)
+            var_check_lines_flagged = [
+                i.line_number for i in sec005_issues if i.line_number in [3, 6, 9, 10]
+            ]
+            assert (
+                len(var_check_lines_flagged) == 0
+            ), f"IF DEFINED variable checks should NOT trigger SEC005, but these lines were flagged: {var_check_lines_flagged}"
+
+            # Lines 15-17 SHOULD be flagged (actual privileged commands)
+            line_15_flagged = any(i.line_number == 15 for i in sec005_issues)
+            line_16_flagged = any(i.line_number == 16 for i in sec005_issues)
+            line_17_flagged = any(i.line_number == 17 for i in sec005_issues)
+            assert (
+                line_15_flagged
+            ), "Line 15 (IF DEFINED with SC command) should still be flagged"
+            assert (
+                line_16_flagged
+            ), "Line 16 (IF DEFINED with NET USE command) should still be flagged"
+            assert (
+                line_17_flagged
+            ), "Line 17 (IF DEFINED with REG DELETE command) should still be flagged"
+        finally:
+            os.unlink(temp_file)
+
     def test_deprecated_and_removed_commands_comprehensive(self) -> None:
         """Test comprehensive check of multiple deprecated and removed commands in one file."""
         content = """@ECHO OFF
