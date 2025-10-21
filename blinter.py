@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.85
+Version: 1.0.86
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.85"
+__version__ = "1.0.86"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -1152,9 +1152,9 @@ RULES: Dict[str, Rule] = {
         code="S018",
         name="Missing subroutine documentation",
         severity=RuleSeverity.STYLE,
-        explanation="Subroutines (callable labels) should have documentation comments",
+        explanation="Subroutines (callable labels) should have documentation comments explaining their purpose, parameters, and return behavior",
         recommendation=(
-            "Add REM comments describing subroutine purpose, parameters, and return values"
+            "Add REM comments before subroutines describing what they do, parameters, and return values"
         ),
     ),
     "S019": Rule(
@@ -1511,20 +1511,7 @@ RULES: Dict[str, Rule] = {
         explanation="Scripts that modify themselves can be exploited to execute malicious code",
         recommendation="Avoid self-modifying scripts or validate all modifications carefully",
     ),
-    # Advanced Style Rules (S021-S030)
-    "S021": Rule(
-        code="S021",
-        name="Missing subroutine documentation",
-        severity=RuleSeverity.STYLE,
-        explanation=(
-            "Subroutines (callable labels) should have descriptive comments "
-            "explaining their purpose"
-        ),
-        recommendation=(
-            "Add REM comments before subroutines describing what they do, "
-            "parameters, and return behavior"
-        ),
-    ),
+    # Advanced Style Rules (S022-S030)
     "S022": Rule(
         code="S022",
         name="Inconsistent variable naming convention",
@@ -5392,7 +5379,7 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
         style_issues = _check_style_issues(line, i, config.max_line_length)
         issues.extend(style_issues)
 
-        # Advanced style patterns (S021-S028)
+        # Advanced style patterns (S022-S028)
         issues.extend(_check_advanced_style_patterns(line, i, lines))
 
         # Security level checks (always enabled for safety)
@@ -6349,122 +6336,8 @@ def _check_code_documentation(lines: List[str]) -> List[LintIssue]:
     """Check for code documentation and style issues."""
     issues: List[LintIssue] = []
 
-    # S021: Missing code block documentation
-    issues.extend(_check_missing_documentation(lines))
-
     # S022: Inconsistent variable naming convention
     issues.extend(_check_var_naming(lines))
-
-    return issues
-
-
-def _is_complex_block_start(stripped: str, line: str) -> bool:
-    """
-    Check if a line starts a complex code block.
-
-    Args:
-        stripped: Stripped and lowercased line
-        line: Original line with casing
-
-    Returns:
-        True if the line starts a complex block
-    """
-    return (
-        stripped.startswith("for ")
-        or (stripped.startswith("if ") and "(" in line)
-        or (stripped.startswith(":") and len(stripped) > 5)
-    )
-
-
-def _has_preceding_documentation(lines: List[str], line_index: int) -> bool:
-    """
-    Check if there's documentation in the 3 lines before the current line.
-
-    Args:
-        lines: All lines in the file
-        line_index: Current line index (1-based)
-
-    Returns:
-        True if documentation is found
-    """
-    for j in range(max(0, line_index - 3), line_index):
-        if j < len(lines) and _is_comment_line(lines[j]):
-            return True
-    return False
-
-
-def _is_block_end_marker(
-    stripped: str, line: str, i: int, lines: List[str], block_start: int
-) -> bool:
-    """
-    Check if current line marks the end of a complex block.
-
-    Args:
-        stripped: Stripped and lowercased line
-        line: Original line with casing
-        i: Current line number (1-based)
-        lines: All lines in the file
-        block_start: Line where the block started
-
-    Returns:
-        True if this line ends the block
-    """
-    # Check for new label (starts a new section/subroutine) or control flow
-    if (
-        (stripped.startswith(":") and not stripped.startswith("::"))
-        or re.match(r"^(goto|exit)\b", stripped, re.IGNORECASE)
-        or re.match(r"^call\s+:", stripped, re.IGNORECASE)
-    ):
-        return True
-
-    # Check for closing parenthesis or consecutive empty lines (paragraph break)
-    if line.count(")") > line.count("(") or (
-        line.strip() == "" and i < len(lines) and lines[i].strip() == ""
-    ):
-        return True
-
-    # Check for significant distance from start (>15 lines) AND a clear boundary
-    if i - block_start > 15 and (
-        line.strip() == ""
-        or re.match(r"^(echo|set|if|for|call|rem)\b", stripped, re.IGNORECASE)
-    ):
-        return True
-
-    return False
-
-
-def _check_missing_documentation(
-    lines: List[str],
-) -> List[LintIssue]:
-    """Check for missing code block documentation."""
-    issues: List[LintIssue] = []
-    in_complex_block = False
-    complex_block_start = 0
-
-    for i, line in enumerate(lines, start=1):
-        stripped = line.strip().lower()
-
-        # Identify complex code blocks
-        if _is_complex_block_start(stripped, line) and not in_complex_block:
-            in_complex_block = True
-            complex_block_start = i
-
-            # Check for documentation in previous 3 lines
-            has_doc = _has_preceding_documentation(lines, i)
-
-            if not has_doc and ":" in stripped:
-                issues.append(
-                    LintIssue(
-                        line_number=i,
-                        rule=RULES["S021"],
-                        context="Complex code block or subroutine needs documentation",
-                    )
-                )
-
-        # Comprehensive end of block detection
-        if in_complex_block:
-            if _is_block_end_marker(stripped, line, i, lines, complex_block_start):
-                in_complex_block = False
 
     return issues
 
@@ -8633,17 +8506,20 @@ def _check_variable_naming(
 def _check_function_docs(
     line: str, line_number: int, lines: List[str]
 ) -> List[LintIssue]:
-    """Check for function documentation (S018)."""
+    """Check for function documentation (S018) - hybrid implementation."""
     issues: List[LintIssue] = []
 
-    if re.match(r"\s*:[a-zA-Z_][a-zA-Z0-9_]*\s*$", line.strip()):
-        # Found a label that might be a function
-        # Check if previous lines have documentation
+    stripped = line.strip()
+    # Match all labels (subroutines) - pattern: :LabelName
+    if re.match(r"\s*:[a-zA-Z_][a-zA-Z0-9_]*\s*$", stripped):
+        # Found a label that might be a subroutine
+        # Check if previous 3 lines have documentation (more focused than 5)
         doc_found = False
-        for j in range(max(0, line_number - 5), line_number - 1):
-            if j < len(lines) and re.match(r"\s*rem\s+", lines[j], re.IGNORECASE):
+        for j in range(max(0, line_number - 3), line_number - 1):
+            if j < len(lines) and _is_comment_line(lines[j]):
                 doc_found = True
                 break
+
         if not doc_found:
             issues.append(
                 LintIssue(

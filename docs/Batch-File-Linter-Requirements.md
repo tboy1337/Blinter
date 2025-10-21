@@ -96,10 +96,9 @@
 - **S011**: Line exceeds maximum length
 - **S016**: Potentially unsafe double-colon comment
 - **S017**: Inconsistent variable naming convention
-- **S018**: Missing function documentation
+- **S018**: Missing subroutine documentation
 - **S019**: Magic numbers in code
 - **S020**: Long line without continuation
-- **S021**: Missing code block documentation
 - **S022**: Inconsistent variable naming convention
 - **S023**: Magic timeout values without explanation
 - **S024**: Complex one-liner should be split

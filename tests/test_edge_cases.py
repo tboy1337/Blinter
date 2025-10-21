@@ -2661,11 +2661,11 @@ SET VAR=value
         temp_file = self.create_temp_batch_file(content)
         try:
             issues = lint_batch_file(temp_file)
-            # Check for S021 (missing code block documentation) specifically
+            # Check for S018 (missing subroutine documentation) specifically
             # S013 (file header documentation) is a different check
-            s021_issues = [issue for issue in issues if issue.rule.code == "S021"]
-            # Should handle long blocks properly and not flag S021
-            assert len(s021_issues) == 0
+            s018_issues = [issue for issue in issues if issue.rule.code == "S018"]
+            # Should handle long blocks properly and not flag S018
+            assert len(s018_issues) == 0
         finally:
             os.unlink(temp_file)
 

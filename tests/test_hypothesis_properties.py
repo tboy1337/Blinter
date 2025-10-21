@@ -73,7 +73,6 @@ from blinter import (
     _check_line_length,
     _check_magic_numbers,
     _check_malware_security,
-    _check_missing_documentation,
     _check_missing_header_doc,
     _check_missing_pause,
     _check_multibyte_risks,
@@ -2189,15 +2188,6 @@ class TestComplexSignatureFunctionProperties:
     ) -> None:
         """_check_inconsistent_indentation should return a list of LintIssue."""
         result = _check_inconsistent_indentation(lines)
-        assert isinstance(result, list)
-        for issue in result:
-            assert isinstance(issue, LintIssue)
-
-    @given(lines=st.lists(batch_line_strategy(), max_size=50))
-    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
-    def test_check_missing_documentation_returns_list(self, lines: List[str]) -> None:
-        """_check_missing_documentation should return a list of LintIssue."""
-        result = _check_missing_documentation(lines)
         assert isinstance(result, list)
         for issue in result:
             assert isinstance(issue, LintIssue)
