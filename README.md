@@ -376,3 +376,5 @@ python blinter.py ./scripts --summary     # With summary statistics
 ## License 📄
 
 This project is licensed under the CRL License - see [LICENSE.md](https://github.com/tboy1337/Blinter/blob/main/LICENSE.md) for details.
+
+[Letter b icons created by Acidmit - Flaticon](https://www.flaticon.com/free-icons/letter-b)
