@@ -32,10 +32,48 @@ jobs:
           python -m pip install --upgrade pyinstaller
           python -m pip install --upgrade -r requirements.txt
         shell: pwsh
+      - name: Generate version info file
+        run: |
+          $versionLine = Select-String -Path blinter.py -Pattern '__version__ = "(.+)"'
+          $version = $versionLine.Matches.Groups[1].Value
+          $versionParts = $version.Split('.')
+          $major = $versionParts[0]
+          $minor = $versionParts[1]
+          $patch = $versionParts[2]
+          @"
+          VSVersionInfo(
+            ffi=FixedFileInfo(
+              filevers=($major, $minor, $patch, 0),
+              prodvers=($major, $minor, $patch, 0),
+              mask=0x3f,
+              flags=0x0,
+              OS=0x40004,
+              fileType=0x1,
+              subtype=0x0,
+              date=(0, 0)
+            ),
+            kids=[
+              StringFileInfo([
+                StringTable(
+                  u'040904B0',
+                  [StringStruct(u'CompanyName', u'tboy1337'),
+                  StringStruct(u'FileDescription', u'Blinter - Professional Batch File Linter for Windows'),
+                  StringStruct(u'FileVersion', u'$version'),
+                  StringStruct(u'InternalName', u'Blinter'),
+                  StringStruct(u'LegalCopyright', u'\xa9 2025 tboy1337. Licensed under CRL.'),
+                  StringStruct(u'OriginalFilename', u'Blinter.exe'),
+                  StringStruct(u'ProductName', u'Blinter'),
+                  StringStruct(u'ProductVersion', u'$version')])
+              ]),
+              VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+            ]
+          )
+          "@ | Out-File -FilePath file_version_info.txt -Encoding utf8
+        shell: pwsh
       - name: Build executable
         run: |
           .\venv\Scripts\Activate.ps1
-          pyinstaller --onefile --name Blinter blinter.py
+          pyinstaller Blinter.spec
         shell: pwsh
       - name: Rename executable
         run: |

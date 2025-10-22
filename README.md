@@ -44,13 +44,14 @@
 
 ### 🚀 Quick Start (Recommended)
 
-**Option 1: Install via pip**
+**Option 1: Install via pip (Recommended)**
 ```cmd
 pip install Blinter
 ```
 
 **Option 2: Download standalone executable**
 - Download the latest `Blinter-v1.0.x-windows.zip` from [GitHub Releases](https://github.com/tboy1337/Blinter/releases)
+- ⚠️ **Note**: Some antivirus software may flag the executable as a false positive due to PyInstaller's runtime unpacking behavior. The executable is completely safe (all source code is open for inspection). **We recommend using pip installation to avoid this issue.**
 
 ### 🔧 Manual Installation
 
