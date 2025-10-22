@@ -86,7 +86,7 @@ class TestMainFunction:
             main()
             output = captured.getvalue()
 
-        assert "Batch Linter - Help Menu" in output
+        assert "Blinter - Help Menu" in output
         assert "Usage:" in output
 
     @patch("sys.argv", ["blinter.py", "--help"])
@@ -96,7 +96,7 @@ class TestMainFunction:
             main()
             output = captured.getvalue()
 
-        assert "Batch Linter - Help Menu" in output
+        assert "Blinter - Help Menu" in output
         assert "Usage:" in output
 
     def test_main_nonexistent_file(self) -> None:
@@ -347,7 +347,7 @@ echo %var%
 
                         # Should process successfully without showing help
                         assert "DETAILED ISSUES:" in output
-                        assert "Batch Linter - Help Menu" not in output
+                        assert "Blinter - Help Menu" not in output
         finally:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
@@ -964,7 +964,7 @@ class TestCLIMainFunctionScenarios:
             main()
 
         captured = capsys.readouterr()
-        assert "Batch Linter - Help Menu" in captured.out
+        assert "Blinter - Help Menu" in captured.out
 
     def test_main_with_no_arguments(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test main function with no arguments."""
@@ -972,7 +972,7 @@ class TestCLIMainFunctionScenarios:
             main()
 
         captured = capsys.readouterr()
-        assert "Batch Linter - Help Menu" in captured.out
+        assert "Blinter - Help Menu" in captured.out
 
     def test_main_with_nonexistent_file(
         self, capsys: pytest.CaptureFixture[str]
@@ -1454,7 +1454,7 @@ class TestVersionFunctionality:
                 output = captured.getvalue()
 
         # Check for version information in output (just the version number)
-        assert "v1.0.89" in output
+        assert "v1.0.90" in output
         # Ensure author and license are NOT shown
         assert "Author:" not in output
         assert "License:" not in output
@@ -1467,8 +1467,8 @@ class TestVersionFunctionality:
                 output = captured.getvalue()
 
             # Check for version in help text
-            assert "Batch Linter - Help Menu" in output
-            assert "Version: 1.0.89" in output
+            assert "Blinter - Help Menu" in output
+            assert "Version: 1.0.90" in output
 
     def test_version_in_normal_run(self) -> None:
         """Test that version is displayed when script runs normally."""
@@ -1488,7 +1488,7 @@ class TestVersionFunctionality:
                         output = captured.getvalue()
 
                     # Check that version is displayed at the start
-                    assert "Blinter v1.0.89 - Batch File Linter" in output
+                    assert "Blinter v1.0.90 - Batch File Linter" in output
         finally:
             os.unlink(temp_path)
 

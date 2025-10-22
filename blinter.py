@@ -16,7 +16,7 @@ Usage:
     issues = blinter.lint_batch_file("script.bat")
 
 Author: tboy1337
-Version: 1.0.89
+Version: 1.0.90
 License: CRL
 """
 
@@ -33,7 +33,7 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.89"
+__version__ = "1.0.90"
 __author__ = "tboy1337"
 __license__ = "CRL"
 
@@ -2465,7 +2465,7 @@ def print_version() -> None:
 def print_help() -> None:
     """Print help information for the blinter command."""
     help_text = f"""
-Batch Linter - Help Menu
+Blinter - Help Menu
 Version: {__version__}
 
 Usage:

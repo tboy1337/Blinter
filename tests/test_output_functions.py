@@ -107,7 +107,7 @@ class TestPrintFunctions:
         """Test help function output."""
         output = self.capture_stdout(print_help)
 
-        assert "Batch Linter - Help Menu" in output
+        assert "Blinter - Help Menu" in output
         assert "Usage:" in output
         assert "python blinter.py <path>" in output
         assert "--summary" in output

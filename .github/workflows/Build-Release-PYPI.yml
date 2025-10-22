@@ -77,17 +77,17 @@ jobs:
         shell: pwsh
       - name: Rename executable
         run: |
-          Rename-Item -Path dist/Blinter.exe -NewName Blinter-v1.0.${{ github.run_number }}-windows.exe
+          Rename-Item -Path dist/Blinter.exe -NewName Blinter-v1.0.${{ github.run_number }}.exe
         shell: pwsh
       - name: Zip the exe
         run: |
-          Compress-Archive -Path "dist/Blinter-v1.0.${{ github.run_number }}-windows.exe" -DestinationPath "dist/Blinter-v1.0.${{ github.run_number }}-windows.zip"
+          Compress-Archive -Path "dist/Blinter-v1.0.${{ github.run_number }}.exe" -DestinationPath "dist/Blinter-v1.0.${{ github.run_number }}.zip"
         shell: pwsh
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: dist/Blinter-v1.0.${{ github.run_number }}-windows.zip
+          path: dist/Blinter-v1.0.${{ github.run_number }}.zip
 
   build-wheels:
     name: Build Python wheels
@@ -130,7 +130,7 @@ jobs:
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: ./build/Blinter-v1.0.${{ github.run_number }}-windows.zip
+          artifacts: ./build/Blinter-v1.0.${{ github.run_number }}.zip
           tag: v1.0.${{ github.run_number }}
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true

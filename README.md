@@ -50,7 +50,7 @@ pip install Blinter
 ```
 
 **Option 2: Download standalone executable**
-- Download the latest `Blinter-v1.0.x-windows.zip` from [GitHub Releases](https://github.com/tboy1337/Blinter/releases)
+- Download the latest `Blinter-v1.0.x.zip` from [GitHub Releases](https://github.com/tboy1337/Blinter/releases)
 - ⚠️ **Note**: Some antivirus software may flag the executable as a false positive due to PyInstaller's runtime unpacking behavior. The executable is completely safe (all source code is open for inspection). **We recommend using pip installation to avoid this issue.**
 
 ### 🔧 Manual Installation
@@ -116,28 +116,28 @@ python -m blinter --version
 **If using standalone executable:**
 ```cmd
 # Analyze a single batch file
-Blinter-v1.0.x-windows.exe script.bat
+Blinter-v1.0.x.exe script.bat
 
 # Analyze all batch files in a directory (recursive)
-Blinter-v1.0.x-windows.exe /path/to/batch/files
+Blinter-v1.0.x.exe /path/to/batch/files
 
 # Analyze batch files in directory only (non-recursive)
-Blinter-v1.0.x-windows.exe /path/to/batch/files --no-recursive
+Blinter-v1.0.x.exe /path/to/batch/files --no-recursive
 
 # Analyze with summary
-Blinter-v1.0.x-windows.exe script.bat --summary
+Blinter-v1.0.x.exe script.bat --summary
 
 # Analyze script and scripts it calls with shared variable context
-Blinter-v1.0.x-windows.exe script.bat --follow-calls
+Blinter-v1.0.x.exe script.bat --follow-calls
 
 # Analyze with custom maximum line length
-Blinter-v1.0.x-windows.exe script.bat --max-line-length 120
+Blinter-v1.0.x.exe script.bat --max-line-length 120
 
 # Get help
-Blinter-v1.0.x-windows.exe --help
+Blinter-v1.0.x.exe --help
 
 # Get version
-Blinter-v1.0.x-windows.exe --version
+Blinter-v1.0.x.exe --version
 ```
 
 **If using manual installation:**
@@ -333,9 +333,9 @@ python -m blinter . --no-recursive                   # Current directory only
 python -m blinter ./scripts --summary               # With summary statistics
 
 # Standalone executable:
-Blinter-v1.0.x-windows.exe ./my-batch-scripts            # Analyze all files recursively
-Blinter-v1.0.x-windows.exe . --no-recursive             # Current directory only
-Blinter-v1.0.x-windows.exe ./scripts --summary          # With summary statistics
+Blinter-v1.0.x.exe ./my-batch-scripts            # Analyze all files recursively
+Blinter-v1.0.x.exe . --no-recursive             # Current directory only
+Blinter-v1.0.x.exe ./scripts --summary          # With summary statistics
 
 # Manual installation:
 python blinter.py ./my-batch-scripts      # Analyze all files recursively
