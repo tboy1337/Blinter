@@ -7,7 +7,7 @@ name = "Blinter"
 dynamic = ["version"]
 description = "Blinter is a linter for Windows batch files. It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems."
 readme = "README.md"
-license = {text = "AGPL-3.0-or-later"}
+license = "AGPL-3.0-or-later"
 license-files = ["COPYING"]
 authors = [
     {name = "tboy1337", email = "tboy1337@proton.me"}
@@ -19,7 +19,6 @@ keywords = ["lint", "python", "windows", "analysis", "script", "linting", "linte
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3",

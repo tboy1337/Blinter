@@ -1,6 +1,6 @@
 include py.typed
 include README.md
-include LICENSE.md
+include COPYING
 include mypy.ini
 include pylintrc
 include pytest.ini
