@@ -52,7 +52,7 @@
                 "guid": "active-development",
                 "status": "active",
                 "name": "Active Development",
-                "description": "This plan enables significant feature development and ecosystem expansion:\n\n• New linting rules development and validation\n• Major features (VSCode/editor extensions, GUI interface)\n• Advanced analysis capabilities (cross-script analysis, call graph generation)\n• Performance optimization and scalability improvements\n• Integration with popular CI/CD platforms (GitHub Actions, GitLab CI, Azure Pipelines)\n• Comprehensive documentation and tutorial content\n• Community engagement and outreach\n• Research into AI-assisted batch script analysis\n\nThis funding would allow dedicated time for ambitious improvements that significantly enhance Blinter's capabilities and reach.",
+                "description": "Enables significant feature development and ecosystem expansion:\n\n• New linting rules and advanced analysis (cross-script analysis, call graphs)\n• Major features: editor extensions, GUI interface\n• Performance optimization and CI/CD platform integrations\n• Comprehensive documentation and community engagement\n• AI-assisted batch script analysis research\n\nAllows dedicated time for ambitious improvements that enhance Blinter's capabilities and reach.",
                 "amount": 2000,
                 "currency": "USD",
                 "frequency": "monthly",
