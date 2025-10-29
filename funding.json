@@ -1,0 +1,83 @@
+{
+    "$schema": "https://floss.fund/schema/v1.0.0/funding.schema.json#",
+    "version": "v1.0.0",
+    "entity": {
+        "type": "individual",
+        "role": "maintainer",
+        "name": "tboy1337",
+        "email": "tboy1337@proton.me",
+        "phone": "",
+        "description": "Independent software developer passionate about code quality tools and Windows batch script automation. I believe even legacy technologies like batch files deserve professional-grade tooling.\n\nBlinter was born from the frustration of debugging complex batch scripts without proper linting support. It's now a comprehensive static analysis tool with 159 rules across 5 severity levels, helping developers write safer and more maintainable batch files.\n\nI'm committed to keeping Blinter free and open source under the AGPL-3.0 license, ensuring it remains accessible to everyone while protecting the community's contributions.",
+        "webpageUrl": {
+            "url": "https://github.com/tboy1337",
+            "wellKnown": ""
+        }
+    },
+    "projects": [{
+        "guid": "blinter",
+        "name": "Blinter",
+        "description": "Blinter is a professional-grade linter for Windows batch files (.bat and .cmd). It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues, and style problems.\n\nKey Features:\n• 159 built-in rules across 5 severity levels (Error, Warning, Style, Security, Performance)\n• Advanced variable tracking and expansion validation\n• Security scanning for command injection, path traversal, and unsafe operations\n• Performance optimization suggestions\n• Thread-safe design for concurrent processing\n• Robust encoding detection (UTF-8, UTF-16, Latin-1, and more)\n• Large file handling (10MB+)\n• CLI and programmatic Python API\n• Inline suppression comments for fine-grained control\n• Configuration file support\n\nEven in 2025, batch files are still widely used for system administration, automation, CI/CD pipelines, and legacy systems. Blinter fills a critical gap by providing modern tooling for this often-overlooked technology.\n\nThe project is actively maintained with comprehensive test coverage (>90%), full type annotations, and professional development practices.",
+        "webpageUrl": {
+            "url": "https://github.com/tboy1337/Blinter",
+            "wellKnown": "https://raw.githubusercontent.com/tboy1337/Blinter/main/.well-known/funding-manifest-urls"
+        },
+        "repositoryUrl": {
+            "url": "https://github.com/tboy1337/Blinter",
+            "wellKnown": "https://raw.githubusercontent.com/tboy1337/Blinter/main/.well-known/funding-manifest-urls"
+        },
+        "licenses": ["spdx:AGPL-3.0-or-later"],
+        "tags": ["linter", "static-analysis", "batch-file", "windows", "security", "code-quality", "python", "developer-tools", "automation", "ci-cd"]
+    }],
+    "funding": {
+        "channels": [
+            {
+                "guid": "email-contact",
+                "type": "other",
+                "address": "tboy1337@proton.me",
+                "description": "Contact me via email to discuss funding arrangements. I can accept bank transfers and various payment methods."
+            }
+        ],
+        "plans": [
+            {
+                "guid": "maintenance-support",
+                "status": "active",
+                "name": "Maintenance & Bug Fixes",
+                "description": "This plan covers ongoing maintenance and stability improvements:\n\n• Regular bug fixes and issue triage\n• Dependency updates and security patches\n• Test suite maintenance and expansion\n• Community support and issue responses\n• Minor feature improvements and rule additions\n• Documentation updates\n• Compatibility testing with new Python versions\n\nThis ensures Blinter remains reliable, secure, and compatible with evolving systems.",
+                "amount": 500,
+                "currency": "USD",
+                "frequency": "monthly",
+                "channels": ["email-contact"]
+            },
+            {
+                "guid": "active-development",
+                "status": "active",
+                "name": "Active Development",
+                "description": "This plan enables significant feature development and ecosystem expansion:\n\n• New linting rules development and validation\n• Major features (VSCode/editor extensions, GUI interface)\n• Advanced analysis capabilities (cross-script analysis, call graph generation)\n• Performance optimization and scalability improvements\n• Integration with popular CI/CD platforms (GitHub Actions, GitLab CI, Azure Pipelines)\n• Comprehensive documentation and tutorial content\n• Community engagement and outreach\n• Research into AI-assisted batch script analysis\n\nThis funding would allow dedicated time for ambitious improvements that significantly enhance Blinter's capabilities and reach.",
+                "amount": 2000,
+                "currency": "USD",
+                "frequency": "monthly",
+                "channels": ["email-contact"]
+            },
+            {
+                "guid": "one-time-support",
+                "status": "active",
+                "name": "One-Time Goodwill Support",
+                "description": "A flexible support option for anyone who wants to contribute to Blinter's development without ongoing commitment.\n\nAny amount is appreciated and helps cover:\n• Development time and effort\n• Infrastructure and tooling costs\n• Documentation and learning resources\n• General project sustainability\n\nThis is perfect for users who have benefited from Blinter and want to show their appreciation.",
+                "amount": 0,
+                "currency": "USD",
+                "frequency": "one-time",
+                "channels": ["email-contact"]
+            }
+        ],
+        "history": [
+            {
+                "year": 2025,
+                "income": 0,
+                "expenses": 0,
+                "taxes": 0,
+                "currency": "USD",
+                "description": "Initial development year. Applied to FLOSS/fund and established funding.json manifest. Actively seeking sustainable funding to dedicate more time to development."
+            }
+        ]
+    }
+}

@@ -60,7 +60,7 @@ jobs:
                   StringStruct(u'FileDescription', u'Blinter - Professional Batch File Linter for Windows'),
                   StringStruct(u'FileVersion', u'$version'),
                   StringStruct(u'InternalName', u'Blinter'),
-                  StringStruct(u'LegalCopyright', u'\xa9 2025 tboy1337. Licensed under CRL.'),
+                  StringStruct(u'LegalCopyright', u'\xa9 2025 tboy1337. Licensed under AGPL-3.0-or-later.'),
                   StringStruct(u'OriginalFilename', u'Blinter.exe'),
                   StringStruct(u'ProductName', u'Blinter'),
                   StringStruct(u'ProductVersion', u'$version')])

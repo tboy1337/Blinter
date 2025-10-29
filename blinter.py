@@ -15,9 +15,26 @@ Usage:
     import blinter
     issues = blinter.lint_batch_file("script.bat")
 
+Copyright (C) 2025 tboy1337
+
+This file is part of Blinter.
+
+Blinter is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+Blinter is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with Blinter. If not, see <https://www.gnu.org/licenses/>.
+
 Author: tboy1337
-Version: 1.0.90
-License: CRL
+Version: 1.0.91
+License: AGPL-3.0
 """
 
 # pylint: disable=too-many-lines
@@ -33,9 +50,9 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.90"
+__version__ = "1.0.91"
 __author__ = "tboy1337"
-__license__ = "CRL"
+__license__ = "AGPL-3.0"
 
 # Configure module-level logging
 logger = logging.getLogger(__name__)
