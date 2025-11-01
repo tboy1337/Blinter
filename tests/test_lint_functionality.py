@@ -1687,7 +1687,7 @@ call :function
             os.unlink(temp_file)
 
     def test_sec014_unc_without_elevation(self) -> None:
-        """Test SEC014: UNC path without UAC elevation check."""
+        """Test SEC020: UNC path without UAC elevation check."""
         content = """@ECHO OFF
 copy file.txt \\\\server\\share\\
 pushd \\\\server\\share\\folder
@@ -1696,12 +1696,12 @@ pushd \\\\server\\share\\folder
         try:
             issues = lint_batch_file(temp_file)
             rule_codes = [issue.rule.code for issue in issues]
-            assert "SEC014" in rule_codes
+            assert "SEC020" in rule_codes
         finally:
             os.unlink(temp_file)
 
     def test_sec015_fork_bomb_detection(self) -> None:
-        """Test SEC015: Fork bomb pattern detected."""
+        """Test SEC021: Fork bomb pattern detected."""
         content = """@ECHO OFF
 :loop
 start "" %0
@@ -1711,12 +1711,12 @@ goto loop
         try:
             issues = lint_batch_file(temp_file)
             rule_codes = [issue.rule.code for issue in issues]
-            assert "SEC015" in rule_codes
+            assert "SEC021" in rule_codes
         finally:
             os.unlink(temp_file)
 
     def test_sec016_hosts_file_modification(self) -> None:
-        """Test SEC016: Potential hosts file modification."""
+        """Test SEC022: Potential hosts file modification."""
         content = """@ECHO OFF
 echo 127.0.0.1 badsite.com >> %SYSTEMROOT%\\System32\\drivers\\etc\\hosts
 """
@@ -1724,12 +1724,12 @@ echo 127.0.0.1 badsite.com >> %SYSTEMROOT%\\System32\\drivers\\etc\\hosts
         try:
             issues = lint_batch_file(temp_file)
             rule_codes = [issue.rule.code for issue in issues]
-            assert "SEC016" in rule_codes
+            assert "SEC022" in rule_codes
         finally:
             os.unlink(temp_file)
 
     def test_sec017_autorun_creation(self) -> None:
-        """Test SEC017: Autorun.inf creation detected."""
+        """Test SEC023: Autorun.inf creation detected."""
         content = """@ECHO OFF
 echo [Autorun] > E:\\autorun.inf
 echo open=malware.exe >> E:\\autorun.inf
@@ -1738,12 +1738,12 @@ echo open=malware.exe >> E:\\autorun.inf
         try:
             issues = lint_batch_file(temp_file)
             rule_codes = [issue.rule.code for issue in issues]
-            assert "SEC017" in rule_codes
+            assert "SEC023" in rule_codes
         finally:
             os.unlink(temp_file)
 
     def test_sec018_self_copying(self) -> None:
-        """Test SEC018: Batch file copying itself to removable media."""
+        """Test SEC024: Batch file copying itself to removable media."""
         content = """@ECHO OFF
 copy %0 E:\\
 xcopy %0 F:\\ /Y
@@ -1752,7 +1752,7 @@ xcopy %0 F:\\ /Y
         try:
             issues = lint_batch_file(temp_file)
             rule_codes = [issue.rule.code for issue in issues]
-            assert "SEC018" in rule_codes
+            assert "SEC024" in rule_codes
         finally:
             os.unlink(temp_file)
 

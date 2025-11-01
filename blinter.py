@@ -33,7 +33,7 @@ You should have received a copy of the GNU Affero General Public License
 along with Blinter. If not, see <https://www.gnu.org/licenses/>.
 
 Author: tboy1337
-Version: 1.0.95
+Version: 1.0.96
 License: AGPL-3.0
 """
 
@@ -50,7 +50,7 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.95"
+__version__ = "1.0.96"
 __author__ = "tboy1337"
 __license__ = "AGPL-3.0"
 
@@ -1527,6 +1527,41 @@ RULES: Dict[str, Rule] = {
         severity=RuleSeverity.SECURITY,
         explanation="Scripts that modify themselves can be exploited to execute malicious code",
         recommendation="Avoid self-modifying scripts or validate all modifications carefully",
+    ),
+    "SEC020": Rule(
+        code="SEC020",
+        name="UNC path without UAC elevation check",
+        severity=RuleSeverity.SECURITY,
+        explanation="UNC path operations may fail under UAC without proper elevation checks",
+        recommendation="Check for administrator privileges before UNC operations using NET SESSION",
+    ),
+    "SEC021": Rule(
+        code="SEC021",
+        name="Fork bomb pattern detected",
+        severity=RuleSeverity.SECURITY,
+        explanation="Recursive self-execution patterns can crash the system",
+        recommendation="Remove fork bomb patterns that recursively start copies of the script",
+    ),
+    "SEC022": Rule(
+        code="SEC022",
+        name="Potential hosts file modification",
+        severity=RuleSeverity.SECURITY,
+        explanation="Modifying the hosts file can redirect DNS for malicious purposes",
+        recommendation="Avoid hosts file modification or require explicit administrator confirmation",
+    ),
+    "SEC023": Rule(
+        code="SEC023",
+        name="Autorun.inf creation detected",
+        severity=RuleSeverity.SECURITY,
+        explanation="Creating autorun.inf files is a common malware vector",
+        recommendation="Remove autorun.inf creation - this is blocked on modern Windows",
+    ),
+    "SEC024": Rule(
+        code="SEC024",
+        name="Batch file copying itself to removable media",
+        severity=RuleSeverity.SECURITY,
+        explanation="Self-replicating batch files exhibit virus-like behavior",
+        recommendation="Remove self-copying logic or limit to specific controlled directories",
     ),
     # Advanced Style Rules (S022-S030)
     "S022": Rule(
@@ -4224,7 +4259,7 @@ def _check_path_security(line: str, stripped: str, line_num: int) -> List[LintIs
             )
             break
 
-    # SEC014: UNC path without UAC elevation check
+    # SEC020: UNC path without UAC elevation check
     unc_operations = ["pushd", "copy", "xcopy", "robocopy", "move"]
     first_word = stripped.split()[0].lower() if stripped.split() else ""
     if first_word in unc_operations or re.search(r"\\\\[^\\]+\\", stripped):
@@ -4232,7 +4267,7 @@ def _check_path_security(line: str, stripped: str, line_num: int) -> List[LintIs
             issues.append(
                 LintIssue(
                     line_number=line_num,
-                    rule=RULES["SEC014"],
+                    rule=RULES["SEC020"],
                     context="UNC path operation may fail under UAC without elevation check",
                 )
             )
@@ -4282,10 +4317,10 @@ def _check_info_disclosure_sec(stripped: str, line_num: int) -> List[LintIssue]:
 
 
 def _check_malware_security(stripped: str, line_num: int) -> List[LintIssue]:
-    """Check for malware-like behavior security issues (SEC015-SEC018)."""
+    """Check for malware-like behavior security issues (SEC021-SEC024)."""
     issues: List[LintIssue] = []
 
-    # SEC015: Fork bomb pattern detected
+    # SEC021: Fork bomb pattern detected
     if (
         re.search(r'start\s+""\s*%0', stripped, re.IGNORECASE)
         or re.search(r"start\s+%0", stripped, re.IGNORECASE)
@@ -4294,43 +4329,43 @@ def _check_malware_security(stripped: str, line_num: int) -> List[LintIssue]:
         issues.append(
             LintIssue(
                 line_number=line_num,
-                rule=RULES["SEC015"],
+                rule=RULES["SEC021"],
                 context="Fork bomb pattern detected: recursive self-execution",
             )
         )
 
-    # SEC016: Potential hosts file modification
+    # SEC022: Potential hosts file modification
     if re.search(r">>.*hosts", stripped, re.IGNORECASE) or re.search(
         r"echo.*>>.*drivers.*etc.*hosts", stripped, re.IGNORECASE
     ):
         issues.append(
             LintIssue(
                 line_number=line_num,
-                rule=RULES["SEC016"],
+                rule=RULES["SEC022"],
                 context="Hosts file modification detected - potential DNS poisoning",
             )
         )
 
-    # SEC017: Autorun.inf creation detected
+    # SEC023: Autorun.inf creation detected
     if re.search(r"echo.*>.*autorun\.inf", stripped, re.IGNORECASE) or re.search(
         r"copy.*autorun\.inf", stripped, re.IGNORECASE
     ):
         issues.append(
             LintIssue(
                 line_number=line_num,
-                rule=RULES["SEC017"],
+                rule=RULES["SEC023"],
                 context="Autorun.inf creation detected - potential malware vector",
             )
         )
 
-    # SEC018: Batch file copying itself to removable media
+    # SEC024: Batch file copying itself to removable media
     if re.search(r"copy\s+%0\s+[a-z]:", stripped, re.IGNORECASE) or re.search(
         r"xcopy.*%0.*[a-z]:", stripped, re.IGNORECASE
     ):
         issues.append(
             LintIssue(
                 line_number=line_num,
-                rule=RULES["SEC018"],
+                rule=RULES["SEC024"],
                 context="Batch file copying itself to other drives - potential virus behavior",
             )
         )
