@@ -19,6 +19,11 @@ from blinter import (
     LintIssue,
     Rule,
     RuleSeverity,
+    ScriptBlockState,
+    _add_issue,
+    _calculate_exit_paren_depth,
+    _can_main_execution_reach_eof,
+    _categorize_variable_style,
     _check_advanced_escaping_rules,
     _check_advanced_for_rules,
     _check_advanced_global_patterns,
@@ -112,19 +117,38 @@ from blinter import (
     _check_variable_expansion,
     _check_variable_naming,
     _check_warning_issues,
+    _collect_cmd_cases,
     _collect_indented_lines,
     _collect_labels,
     _collect_set_variables,
+    _create_rule,
+    _detect_encoding_charset_norm,
     _detect_line_endings,
+    _find_most_common_case,
     _find_single_line_mixed_indent,
+    _find_unquoted_separator,
+    _get_available_vars_at_line,
+    _handle_script_block_end,
+    _handle_script_block_start,
     _has_multibyte_chars,
+    _has_priv_check_before,
+    _has_special_variable_patterns,
+    _is_batch_code_line,
     _is_command_in_safe_context,
     _is_comment_line,
+    _is_legitimate_quote_pattern,
+    _is_safe_ctx_for_privilege,
+    _is_script_language_line,
     _is_truly_executable_command,
     _line_makes_code_reachable,
     _parse_suppression_comments,
+    _scan_for_unreachable_code,
     _set_min_severity,
+    _should_flag_caret_escape,
+    _should_skip_line_for_var_check,
+    _try_read_with_encoding,
     _update_paren_depth,
+    _validate_and_read_file,
     find_batch_files,
     group_issues,
     lint_batch_file,
@@ -2244,3 +2268,425 @@ class TestComplexSignatureFunctionProperties:
         assert isinstance(result, list)
         for issue in result:
             assert isinstance(issue, LintIssue)
+
+
+# ============================================================================
+# Helper Function Property Tests
+# ============================================================================
+
+
+class TestHelperFunctionProperties:
+    """Property-based tests for helper utility functions."""
+
+    @given(
+        line_number=st.integers(min_value=1, max_value=10000),
+        rule_code=st.sampled_from(list(RULES.keys())),
+        context=st.text(max_size=200),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_add_issue_appends_correctly(
+        self, line_number: int, rule_code: str, context: str
+    ) -> None:
+        """_add_issue should append a valid LintIssue to the issues list."""
+        issues: List[LintIssue] = []
+        initial_length = len(issues)
+
+        _add_issue(issues, line_number, rule_code, context)
+
+        assert len(issues) == initial_length + 1
+        assert isinstance(issues[0], LintIssue)
+        assert issues[0].line_number == line_number
+        assert issues[0].rule.code == rule_code
+        assert issues[0].context == context
+
+    @given(rule=rule_strategy())
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_create_rule_returns_valid_rule(self, rule: Rule) -> None:
+        """_create_rule should return a valid Rule object."""
+        result = _create_rule(
+            code=rule.code,
+            name=rule.name,
+            severity=rule.severity,
+            explanation=rule.explanation,
+            recommendation=rule.recommendation,
+        )
+        assert isinstance(result, Rule)
+        assert result.code == rule.code
+        assert result.name == rule.name
+        assert result.severity == rule.severity
+        assert result.explanation == rule.explanation
+        assert result.recommendation == rule.recommendation
+
+
+# ============================================================================
+# Boolean Predicate Property Tests
+# ============================================================================
+
+
+class TestBooleanPredicateProperties:
+    """Property-based tests for boolean predicate functions."""
+
+    @given(line=st.text(max_size=300))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_is_safe_ctx_for_privilege_deterministic(self, line: str) -> None:
+        """_is_safe_ctx_for_privilege should be deterministic."""
+        result1 = _is_safe_ctx_for_privilege(line)
+        result2 = _is_safe_ctx_for_privilege(line)
+        assert result1 == result2
+        assert isinstance(result1, bool)
+
+    @given(stripped=st.text(max_size=300))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_has_special_variable_patterns_deterministic(self, stripped: str) -> None:
+        """_has_special_variable_patterns should be deterministic."""
+        result1 = _has_special_variable_patterns(stripped)
+        result2 = _has_special_variable_patterns(stripped)
+        assert result1 == result2
+        assert isinstance(result1, bool)
+
+    @given(stripped=st.text(max_size=300))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_is_legitimate_quote_pattern_deterministic(self, stripped: str) -> None:
+        """_is_legitimate_quote_pattern should be deterministic."""
+        result1 = _is_legitimate_quote_pattern(stripped)
+        result2 = _is_legitimate_quote_pattern(stripped)
+        assert result1 == result2
+        assert isinstance(result1, bool)
+
+    @given(
+        stripped=st.text(max_size=300),
+        caret_pos=st.integers(min_value=0, max_value=299),
+        line=st.text(max_size=300),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_should_flag_caret_escape_deterministic(
+        self, stripped: str, caret_pos: int, line: str
+    ) -> None:
+        """_should_flag_caret_escape should be deterministic."""
+        assume(caret_pos < len(stripped))
+        result1 = _should_flag_caret_escape(stripped, caret_pos, line)
+        result2 = _should_flag_caret_escape(stripped, caret_pos, line)
+        assert result1 == result2
+        assert isinstance(result1, bool)
+
+
+# ============================================================================
+# String Analysis Property Tests
+# ============================================================================
+
+
+class TestStringAnalysisProperties:
+    """Property-based tests for string analysis and parsing functions."""
+
+    @given(param_string=st.text(max_size=300))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_find_unquoted_separator_deterministic(self, param_string: str) -> None:
+        """_find_unquoted_separator should be deterministic."""
+        result1 = _find_unquoted_separator(param_string)
+        result2 = _find_unquoted_separator(param_string)
+        assert result1 == result2
+        assert isinstance(result1, int)
+        # Result should be within valid range
+        assert 0 <= result1 <= len(param_string)
+
+    @given(var_name=st.text(min_size=1, max_size=100).filter(lambda x: x.strip()))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_categorize_variable_style_deterministic(self, var_name: str) -> None:
+        """_categorize_variable_style should be deterministic."""
+        result1 = _categorize_variable_style(var_name)
+        result2 = _categorize_variable_style(var_name)
+        assert result1 == result2
+        assert isinstance(result1, str)
+        # Result should be one of the known style names
+        assert result1 in {
+            "snake_case",
+            "PascalCase",
+            "camelCase",
+            "UPPERCASE",
+            "lowercase",
+            "mixed",
+            "unknown",
+        }
+
+    @given(stripped=st.text(max_size=300))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_should_skip_line_for_var_check_deterministic(self, stripped: str) -> None:
+        """_should_skip_line_for_var_check should be deterministic."""
+        result1 = _should_skip_line_for_var_check(stripped)
+        result2 = _should_skip_line_for_var_check(stripped)
+        assert result1 == result2
+        assert isinstance(result1, bool)
+
+
+# ============================================================================
+# Script Block Processing Property Tests
+# ============================================================================
+
+
+class TestScriptBlockProperties:
+    """Property-based tests for script block processing functions."""
+
+    @given(state=st.builds(ScriptBlockState))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_handle_script_block_start_returns_tuple(
+        self, state: ScriptBlockState
+    ) -> None:
+        """_handle_script_block_start should return a tuple."""
+        result = _handle_script_block_start(state)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        assert isinstance(result[0], bool)
+        assert isinstance(result[1], int)
+
+    @given(
+        is_batch_line=st.booleans(),
+        block_type=st.text(max_size=20),
+        line_num=st.integers(min_value=1, max_value=1000),
+        block_start=st.integers(min_value=1, max_value=1000),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_handle_script_block_end_returns_bool(
+        self, is_batch_line: bool, block_type: str, line_num: int, block_start: int
+    ) -> None:
+        """_handle_script_block_end should return a boolean."""
+        result = _handle_script_block_end(
+            is_batch_line, block_type, line_num, block_start
+        )
+        assert isinstance(result, bool)
+
+    @given(line=st.text(max_size=200))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_is_script_language_line_deterministic(self, line: str) -> None:
+        """_is_script_language_line should be deterministic with valid patterns."""
+        # Use valid regex patterns
+        patterns = [r"^\s*python", r"^\s*node", r"^\s*perl"]
+        result1 = _is_script_language_line(line, patterns)
+        result2 = _is_script_language_line(line, patterns)
+        assert result1 == result2
+        assert isinstance(result1, bool)
+
+    @given(line=st.text(max_size=200), stripped=st.text(max_size=200))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_is_batch_code_line_deterministic(self, line: str, stripped: str) -> None:
+        """_is_batch_code_line should be deterministic."""
+        result1 = _is_batch_code_line(line, stripped)
+        result2 = _is_batch_code_line(line, stripped)
+        assert result1 == result2
+        assert isinstance(result1, bool)
+
+
+# ============================================================================
+# Code Analysis Property Tests
+# ============================================================================
+
+
+class TestCodeAnalysisProperties:
+    """Property-based tests for code flow analysis functions."""
+
+    @given(
+        lines=st.lists(batch_line_strategy(), max_size=50),
+        target_line_num=st.integers(min_value=1, max_value=50),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_has_priv_check_before_deterministic(
+        self, lines: List[str], target_line_num: int
+    ) -> None:
+        """_has_priv_check_before should be deterministic."""
+        assume(target_line_num <= len(lines))
+        result1 = _has_priv_check_before(lines, target_line_num)
+        result2 = _has_priv_check_before(lines, target_line_num)
+        assert result1 == result2
+        assert isinstance(result1, bool)
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_can_main_execution_reach_eof_deterministic(self, lines: List[str]) -> None:
+        """_can_main_execution_reach_eof should be deterministic."""
+        result1 = _can_main_execution_reach_eof(lines)
+        result2 = _can_main_execution_reach_eof(lines)
+        assert result1 == result2
+        assert isinstance(result1, bool)
+
+    @given(
+        lines=st.lists(batch_line_strategy(), min_size=1, max_size=50),
+        exit_line_index=st.integers(min_value=0),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_calculate_exit_paren_depth_deterministic(
+        self, lines: List[str], exit_line_index: int
+    ) -> None:
+        """_calculate_exit_paren_depth should be deterministic."""
+        assume(exit_line_index < len(lines))
+        result1 = _calculate_exit_paren_depth(lines, exit_line_index)
+        result2 = _calculate_exit_paren_depth(lines, exit_line_index)
+        assert result1 == result2
+        assert isinstance(result1, int)
+        # Depth should be reasonable
+        assert result1 >= 0
+
+    @given(
+        lines=st.lists(batch_line_strategy(), min_size=2, max_size=50),
+        exit_line_index=st.integers(min_value=0),
+        exit_paren_depth=st.integers(min_value=0, max_value=10),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_scan_for_unreachable_code_returns_optional_int(
+        self, lines: List[str], exit_line_index: int, exit_paren_depth: int
+    ) -> None:
+        """_scan_for_unreachable_code should return Optional[int]."""
+        assume(exit_line_index < len(lines) - 1)
+        result = _scan_for_unreachable_code(lines, exit_line_index, exit_paren_depth)
+        assert result is None or isinstance(result, int)
+
+
+# ============================================================================
+# Collection/Extraction Property Tests
+# ============================================================================
+
+
+class TestCollectionExtractionProperties:
+    """Property-based tests for collection and extraction functions."""
+
+    @given(lines=st.lists(batch_line_strategy(), max_size=50))
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_collect_cmd_cases_returns_dict(self, lines: List[str]) -> None:
+        """_collect_cmd_cases should return a dict mapping command names to cases."""
+        result = _collect_cmd_cases(lines)
+        assert isinstance(result, dict)
+
+        # All keys should be strings (command names)
+        for key in result:
+            assert isinstance(key, str)
+
+        # All values should be lists of tuples
+        for value in result.values():
+            assert isinstance(value, list)
+            for item in value:
+                assert isinstance(item, tuple)
+                assert len(item) == 2
+                assert isinstance(item[0], int)
+                assert isinstance(item[1], str)
+
+    @given(
+        occurrences=st.lists(
+            st.tuples(st.integers(min_value=1), st.text()), min_size=1, max_size=50
+        )
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_find_most_common_case_returns_tuple(
+        self, occurrences: List[tuple[int, str]]
+    ) -> None:
+        """_find_most_common_case should return a tuple of (str, dict)."""
+        result = _find_most_common_case(occurrences)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        assert isinstance(result[0], str)
+        assert isinstance(result[1], dict)
+
+    @given(
+        line_num=st.integers(min_value=0, max_value=49),
+        set_vars=st.sets(
+            st.text(min_size=1, max_size=20).filter(lambda x: x.isalnum()), max_size=20
+        ),
+    )
+    @settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+    def test_get_available_vars_at_line_returns_set(
+        self, line_num: int, set_vars: Set[str]
+    ) -> None:
+        """_get_available_vars_at_line should return a set of variable names."""
+        result = _get_available_vars_at_line(line_num, set_vars, None)
+        assert isinstance(result, set)
+        # All elements should be strings
+        for var in result:
+            assert isinstance(var, str)
+
+
+# ============================================================================
+# Encoding Detection Property Tests
+# ============================================================================
+
+
+class TestEncodingDetectionProperties:
+    """Property-based tests for encoding detection functions."""
+
+    @given(lines=st.lists(batch_line_strategy(), min_size=1, max_size=20))
+    @settings(
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=10
+    )
+    def test_detect_encoding_charset_norm_returns_list(self, lines: List[str]) -> None:
+        """_detect_encoding_charset_norm should return a list of encodings."""
+        content = "\r\n".join(lines)
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8", newline=""
+        ) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            encodings_list = ["utf-8", "cp1252", "latin-1"]
+            result = _detect_encoding_charset_norm(tmp_path, encodings_list)
+            assert isinstance(result, list)
+            for encoding in result:
+                assert isinstance(encoding, str)
+        finally:
+            Path(tmp_path).unlink()
+
+    @given(
+        lines=st.lists(
+            st.text(
+                alphabet=st.characters(min_codepoint=32, max_codepoint=126), max_size=50
+            ),
+            min_size=1,
+            max_size=20,
+        ),
+        encoding=st.sampled_from(["utf-8", "latin-1"]),
+    )
+    @settings(
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=10
+    )
+    def test_try_read_with_encoding_with_temp_file(
+        self, lines: List[str], encoding: str
+    ) -> None:
+        """_try_read_with_encoding should return Optional[List[str]]."""
+        content = "\r\n".join(lines)
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding=encoding, newline=""
+        ) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            result = _try_read_with_encoding(tmp_path, encoding)
+            if result is not None:
+                assert isinstance(result, list)
+                for line in result:
+                    assert isinstance(line, str)
+        finally:
+            Path(tmp_path).unlink()
+
+    @given(lines=st.lists(batch_line_strategy(), min_size=1, max_size=20))
+    @settings(
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=10
+    )
+    def test_validate_and_read_file_with_temp_file(self, lines: List[str]) -> None:
+        """_validate_and_read_file should return a tuple."""
+        content = "\r\n".join(lines)
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8", newline=""
+        ) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            result = _validate_and_read_file(tmp_path)
+            assert isinstance(result, tuple)
+            assert len(result) == 2
+            assert isinstance(result[0], list)
+            assert isinstance(result[1], str)
+            for line in result[0]:
+                assert isinstance(line, str)
+        finally:
+            Path(tmp_path).unlink()
