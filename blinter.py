@@ -33,7 +33,7 @@ You should have received a copy of the GNU Affero General Public License
 along with Blinter. If not, see <https://www.gnu.org/licenses/>.
 
 Author: tboy1337
-Version: 1.0.96
+Version: 1.0.97
 License: AGPL-3.0
 """
 
@@ -50,7 +50,7 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.96"
+__version__ = "1.0.97"
 __author__ = "tboy1337"
 __license__ = "AGPL-3.0"
 
@@ -1823,11 +1823,11 @@ def _has_multibyte_chars(lines: List[str]) -> Tuple[bool, List[int]]:
     return has_multibyte, affected_lines
 
 
-def _detect_encoding_with_chardet(
+def _detect_encoding_charset_norm(
     file_path: str, encodings_list: List[str]
 ) -> List[str]:
     """
-    Detect file encoding using chardet library if available.
+    Detect file encoding using charset_normalizer library if available.
 
     Thread-safe: Yes - uses only local variables
     Performance: Single file read operation
@@ -1840,24 +1840,21 @@ def _detect_encoding_with_chardet(
         Updated list of encodings with detected encoding moved to front
     """
     try:
-        import chardet  # pylint: disable=import-outside-toplevel  # isort: skip
+        # pylint: disable=import-outside-toplevel  # isort: skip
+        from charset_normalizer import from_bytes
 
         with open(file_path, "rb") as file_handle:
             raw_data = file_handle.read()
 
-        detected = chardet.detect(raw_data)  # type: ignore[misc]
-        if (
-            not detected  # type: ignore[misc]
-            or not detected["encoding"]  # type: ignore[misc]
-            or detected["confidence"] <= 0.7  # type: ignore[misc]
-        ):
+        detected = from_bytes(raw_data).best()
+        if not detected or not detected.encoding or detected.coherence <= 0.7:
             return encodings_list
 
-        detected_encoding: str = detected["encoding"].lower()  # type: ignore[misc]
+        detected_encoding: str = detected.encoding.lower()
         logger.debug(
-            "Chardet detected encoding: %s (confidence: %.2f)",
+            "charset_normalizer detected encoding: %s (coherence: %.2f)",
             detected_encoding,
-            detected["confidence"],  # type: ignore[misc]
+            detected.coherence,
         )
 
         # Add detected encoding to the front if not already there
@@ -1874,7 +1871,9 @@ def _detect_encoding_with_chardet(
         return encodings_list
 
     except ImportError:
-        logger.debug("chardet not available, using fallback encoding detection")
+        logger.debug(
+            "charset_normalizer not available, using fallback encoding detection"
+        )
         return encodings_list
     except (OSError, ValueError, TypeError) as detection_error:
         logger.debug("Encoding detection failed: %s, using fallback", detection_error)
@@ -1913,7 +1912,7 @@ def read_file_with_encoding(file_path: str) -> Tuple[List[str], str]:
     Reads a file with robust encoding detection and fallback mechanisms.
 
     This function implements a comprehensive encoding detection strategy:
-    1. Attempts to use chardet for automatic detection (if available)
+    1. Attempts to use charset_normalizer for automatic detection (if available)
     2. Falls back to a prioritized list of common encodings
     3. Provides detailed error messages for troubleshooting
 
@@ -1951,8 +1950,8 @@ def read_file_with_encoding(file_path: str) -> Tuple[List[str], str]:
         "utf-32",  # UTF-32 with BOM detection
     ]
 
-    # Try to detect encoding using chardet if available
-    encodings_to_try = _detect_encoding_with_chardet(file_path, encodings_to_try)
+    # Try to detect encoding using charset_normalizer if available
+    encodings_to_try = _detect_encoding_charset_norm(file_path, encodings_to_try)
 
     # Try each encoding until one works
     for encoding in encodings_to_try:

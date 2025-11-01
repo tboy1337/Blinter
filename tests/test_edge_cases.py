@@ -7,7 +7,7 @@
 import os
 import tempfile
 from typing import Dict, Set
-from unittest.mock import mock_open, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
@@ -41,11 +41,11 @@ from blinter import (
 class TestFileEncodingEdgeCases:
     """Test edge cases in file encoding detection and handling."""
 
-    def test_chardet_oserror_handling(self) -> None:
-        """Test handling of OSError during chardet detection."""
+    def test_charset_normalizer_oserror_handling(self) -> None:
+        """Test handling of OSError during charset_normalizer detection."""
         with (
             patch("builtins.open", mock_open(read_data=b"test content")),
-            patch("chardet.detect", side_effect=OSError("Test OSError")),
+            patch("charset_normalizer.from_bytes", side_effect=OSError("Test OSError")),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
             assert encoding in [
@@ -58,11 +58,14 @@ class TestFileEncodingEdgeCases:
             ]
             assert len(lines) > 0
 
-    def test_chardet_valueerror_handling(self) -> None:
-        """Test handling of ValueError during chardet detection."""
+    def test_charset_normalizer_valueerror_handling(self) -> None:
+        """Test handling of ValueError during charset_normalizer detection."""
         with (
             patch("builtins.open", mock_open(read_data=b"test content")),
-            patch("chardet.detect", side_effect=ValueError("Test ValueError")),
+            patch(
+                "charset_normalizer.from_bytes",
+                side_effect=ValueError("Test ValueError"),
+            ),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
             assert encoding in [
@@ -75,11 +78,13 @@ class TestFileEncodingEdgeCases:
             ]
             assert len(lines) > 0
 
-    def test_chardet_typeerror_handling(self) -> None:
-        """Test handling of TypeError during chardet detection."""
+    def test_charset_normalizer_typeerror_handling(self) -> None:
+        """Test handling of TypeError during charset_normalizer detection."""
         with (
             patch("builtins.open", mock_open(read_data=b"test content")),
-            patch("chardet.detect", side_effect=TypeError("Test TypeError")),
+            patch(
+                "charset_normalizer.from_bytes", side_effect=TypeError("Test TypeError")
+            ),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
             assert encoding in [
@@ -147,13 +152,17 @@ class TestFileEncodingEdgeCases:
             with pytest.raises(OSError, match="All encoding attempts failed"):
                 read_file_with_encoding("test.bat")
 
-    def test_chardet_detected_encoding_already_in_list(self) -> None:
-        """Test when chardet detects an encoding already in our list."""
-        mock_detected = {"encoding": "utf-8", "confidence": 0.8}
+    def test_charset_normalizer_detected_encoding_already_in_list(self) -> None:
+        """Test when charset_normalizer detects an encoding already in our list."""
+        mock_result = MagicMock()
+        mock_result.encoding = "utf-8"
+        mock_result.coherence = 0.8
+        mock_from_bytes = MagicMock()
+        mock_from_bytes.best.return_value = mock_result
 
         with (
             patch("builtins.open", mock_open(read_data=b"test content")),
-            patch("chardet.detect", return_value=mock_detected),
+            patch("charset_normalizer.from_bytes", return_value=mock_from_bytes),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
             assert encoding == "utf-8"  # Should use detected encoding
@@ -793,15 +802,19 @@ class TestAdditionalEdgeCaseScenarios:
         # Test non-safe context
         assert _is_command_in_safe_context("del *.* /q") is False
 
-    def test_chardet_detected_encoding_not_in_list(self) -> None:
-        """Test chardet detecting encoding not in our default list."""
+    def test_charset_normalizer_detected_encoding_not_in_list(self) -> None:
+        """Test charset_normalizer detecting encoding not in our default list."""
         from blinter import read_file_with_encoding
 
-        mock_detected = {"encoding": "iso-2022-jp", "confidence": 0.85}
+        mock_result = MagicMock()
+        mock_result.encoding = "iso-2022-jp"
+        mock_result.coherence = 0.85
+        mock_from_bytes = MagicMock()
+        mock_from_bytes.best.return_value = mock_result
 
         with (
             patch("builtins.open", mock_open(read_data="test content")),
-            patch("chardet.detect", return_value=mock_detected),
+            patch("charset_normalizer.from_bytes", return_value=mock_from_bytes),
         ):
             # Should succeed by adding the detected encoding to the front
             lines, encoding = read_file_with_encoding("test.bat")
