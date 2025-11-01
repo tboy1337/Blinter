@@ -385,16 +385,74 @@ Line 5: Missing '@ECHO OFF' at top of file (S001)
 *Issues that are bad practice but won't necessarily break the script*
 
 ### Missing Error Handling
-- **Exit codes**: Warn when scripts don't set appropriate exit codes
-  ```batch
-  # Bad
-  COPY file1.txt file2.txt
-  # Script ends without exit code
+- **Exit codes (W001)**: Warn when scripts can reach end-of-file without an explicit EXIT statement
   
-  # Good
+  The linter performs intelligent control flow analysis to detect if the main execution path can fall through to EOF without encountering an EXIT statement. This rule uses smart detection logic that:
+  
+  - **Flags**: Scripts where main execution can reach EOF without EXIT
+  - **Flags**: Scripts relying on implicit exit (using the last command's exit code)
+  - **Allows**: Scripts where all execution paths lead to EXIT or GOTO :EOF
+  - **Allows**: Pure subroutine libraries (scripts starting with a label before any executable code)
+  - **Allows**: Scripts with only @ECHO OFF and comments (setup-only scripts)
+  - **Understands**: GOTO statements, labels, and conditional branches
+  
+  ```batch
+  # Bad - Can reach EOF without EXIT
+  @echo off
+  echo Starting script
+  echo Doing some work
+  # Script ends without EXIT - relies on implicit exit
+  
+  # Bad - One branch can reach EOF
+  @echo off
+  IF "%1"=="test" (
+      echo Test mode
+      EXIT /b 0
+  )
+  echo Continuing after IF
+  # Falls through to EOF if not in test mode
+  
+  # Good - Explicit EXIT at end
+  @echo off
   COPY file1.txt file2.txt
   IF ERRORLEVEL 1 EXIT /b 1
   EXIT /b 0
+  
+  # Good - GOTO :EOF is equivalent to EXIT
+  @echo off
+  echo Starting script
+  echo Doing work
+  GOTO :EOF
+  
+  # Good - Main code jumps to label with EXIT
+  @echo off
+  echo Starting
+  GOTO end
+  :end
+  echo Ending
+  EXIT /b 0
+  
+  # Good - Subroutine library (label before any code)
+  @echo off
+  GOTO :EOF
+  
+  :subroutine1
+  echo In subroutine 1
+  GOTO :EOF
+  
+  :subroutine2
+  echo In subroutine 2
+  GOTO :EOF
+  
+  # Good - Main code then subroutines with EXIT before subroutines
+  @echo off
+  echo Main script execution
+  echo Doing main work
+  GOTO :EOF
+  
+  :subroutine
+  echo This is a subroutine
+  GOTO :EOF
   ```
 
 - **Error checking**: Suggest checking `%ERRORLEVEL%` after critical operations

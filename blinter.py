@@ -33,7 +33,7 @@ You should have received a copy of the GNU Affero General Public License
 along with Blinter. If not, see <https://www.gnu.org/licenses/>.
 
 Author: tboy1337
-Version: 1.0.94
+Version: 1.0.95
 License: AGPL-3.0
 """
 
@@ -50,7 +50,7 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.94"
+__version__ = "1.0.95"
 __author__ = "tboy1337"
 __license__ = "AGPL-3.0"
 
@@ -5425,6 +5425,7 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
 
     # Global checks (across all lines)
     issues.extend(_check_undefined_variables(lines, set_vars, called_scripts_vars))
+    issues.extend(_check_missing_exit_statement(lines))
     issues.extend(_check_unreachable_code(lines))
     issues.extend(_check_redundant_operations(lines))
     issues.extend(_check_code_duplication(lines))
@@ -6461,6 +6462,142 @@ def _check_setlocal_redundancy(lines: List[str]) -> List[LintIssue]:
                 break
 
     return issues
+
+
+def _check_missing_exit_statement(  # pylint: disable=too-many-branches
+    lines: List[str],
+) -> List[LintIssue]:
+    """Check if script can reach EOF without an explicit EXIT statement (W001).
+
+    This function performs control flow analysis to determine if the main execution
+    path can fall through to end-of-file without encountering an EXIT statement.
+
+    Smart detection includes:
+    - Allows scripts where all paths lead to EXIT or GOTO :EOF
+    - Allows pure subroutine libraries (scripts that start with a label before any executable code)
+    - Allows scripts with only @echo off and comments (essentially setup-only scripts)
+    - Flags scripts where main execution can fall through to EOF
+    - Understands GOTO, labels, and conditional branches
+    """
+    issues: List[LintIssue] = []
+
+    # Empty script or comments-only script doesn't need exit
+    has_meaningful_code = False
+    first_executable_line = -1
+    first_label_line = -1
+
+    # Find first executable code and first label
+    for i, line in enumerate(lines):
+        stripped = line.strip().lower()
+
+        # Skip empty lines and comments
+        if not stripped or stripped.startswith("rem") or stripped.startswith("::"):
+            continue
+
+        # Check for labels (but not comment-style labels)
+        if stripped.startswith(":") and not stripped.startswith("::"):
+            if first_label_line == -1:
+                first_label_line = i
+            continue
+
+        # Check for executable code
+        if _is_truly_executable_command(stripped):
+            if first_executable_line == -1:
+                first_executable_line = i
+            # @echo off is a setup command, not meaningful executable code
+            # Only count as meaningful if it's not just @echo off/on
+            if not re.match(r"^@?echo\s+(off|on)$", stripped):
+                has_meaningful_code = True
+
+    # If no meaningful executable code, no issue
+    if not has_meaningful_code:
+        return issues
+
+    # If first label comes before first executable code, this is a subroutine library
+    # These scripts are meant to be CALLed, not executed directly
+    if (
+        first_label_line != -1
+        and first_executable_line != -1
+        and first_label_line < first_executable_line
+    ):
+        return issues
+
+    # Now check if the main execution path reaches EOF without EXIT
+    # Scan backwards from end of file to find if we can reach EOF
+    can_reach_eof = _can_main_execution_reach_eof(lines)
+
+    if can_reach_eof:
+        # Find the last line of executable code to report the issue there
+        last_executable_line = -1
+        for i in range(len(lines) - 1, -1, -1):
+            stripped = lines[i].strip().lower()
+            if _is_truly_executable_command(stripped):
+                last_executable_line = i + 1  # Convert to 1-indexed
+                break
+
+        if last_executable_line > 0:
+            issues.append(
+                LintIssue(
+                    line_number=last_executable_line,
+                    rule=RULES["W001"],
+                    context="Script can reach end of file without explicit EXIT statement",
+                )
+            )
+
+    return issues
+
+
+def _can_main_execution_reach_eof(lines: List[str]) -> bool:
+    """Determine if the main execution path can reach end-of-file without EXIT.
+
+    This performs a forward scan through the script tracking whether we can
+    reach EOF. It considers:
+    - EXIT statements (blocks path to EOF)
+    - GOTO statements (may redirect control flow)
+    - Labels (can be jumped to)
+    - Conditional blocks (IF/FOR with parentheses)
+    """
+    # Track whether we're in reachable code
+    reachable = True
+    paren_depth = 0
+
+    for line in lines:
+        stripped = line.strip().lower()
+
+        # Skip empty lines and comments
+        if not stripped or stripped.startswith("rem") or stripped.startswith("::"):
+            continue
+
+        # Labels make code reachable again
+        if stripped.startswith(":") and not stripped.startswith("::"):
+            reachable = True
+            continue
+
+        # Update parentheses depth for IF/FOR blocks
+        paren_depth = _update_paren_depth(stripped, paren_depth)
+
+        # Check for EXIT statements
+        if re.match(r"exit\b", stripped):
+            # EXIT makes code unreachable
+            # But only if we're at the top level (not inside IF/FOR blocks)
+            if paren_depth == 0:
+                reachable = False
+                continue
+
+        # Check for unconditional GOTO (not inside IF statement)
+        # GOTO at top level redirects control flow
+        if paren_depth == 0 and re.match(r"goto\s+", stripped):
+            # Check if it's GOTO :EOF (which is like EXIT)
+            if re.match(r"goto\s+:eof\b", stripped):
+                reachable = False
+                continue
+            # Other GOTO statements redirect flow, making subsequent code unreachable
+            # until we hit a label
+            reachable = False
+            continue
+
+    # If we finished the scan and code is still reachable, we can reach EOF
+    return reachable
 
 
 def _check_unreachable_code(lines: List[str]) -> List[LintIssue]:
