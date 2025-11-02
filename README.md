@@ -1,4 +1,4 @@
-# Blinter 🚀
+# Blinter
 
 **Blinter** is a linter for Windows batch files (`.bat` and `.cmd`). It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems. Blinter helps you write safer, more reliable and maintainable batch scripts. Even in 2025, batch files deserve professional tooling! 💻
 
@@ -372,6 +372,8 @@ python blinter.py ./scripts --summary     # With summary statistics
 - 📖 Improve documentation
 - 🧪 Add test cases
 - 🔧 Submit bug fixes or enhancements
+
+**Special thanks goes out to [BrainWaveCC](https://github.com/BrainWaveCC) for all the help bug hunting.**
 
 ## License 📄
 

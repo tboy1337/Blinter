@@ -33,7 +33,7 @@ You should have received a copy of the GNU Affero General Public License
 along with Blinter. If not, see <https://www.gnu.org/licenses/>.
 
 Author: tboy1337
-Version: 1.0.101
+Version: 1.0.102
 License: AGPL-3.0
 """
 
@@ -50,7 +50,7 @@ import sys
 from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
 import warnings
 
-__version__ = "1.0.101"
+__version__ = "1.0.102"
 __author__ = "tboy1337"
 __license__ = "AGPL-3.0"
 
