@@ -10,7 +10,7 @@
         "description": "Independent software developer passionate about code quality tools and Windows batch script automation. I believe even legacy technologies like batch files deserve professional-grade tooling.\n\nBlinter was born from the frustration of debugging complex batch scripts without proper linting support. It's now a comprehensive static analysis tool with 159 rules across 5 severity levels, helping developers write safer and more maintainable batch files.\n\nI'm committed to keeping Blinter free and open source under the AGPL-3.0 license, ensuring it remains accessible to everyone while protecting the community's contributions.",
         "webpageUrl": {
             "url": "https://github.com/tboy1337",
-            "wellKnown": ""
+            "wellKnown": "https://raw.githubusercontent.com/tboy1337/Blinter/main/.well-known/funding-manifest-urls"
         }
     },
     "projects": [{
