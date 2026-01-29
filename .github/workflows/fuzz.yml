@@ -52,8 +52,7 @@ jobs:
         continue-on-error: true
         run: |
           timeout --preserve-status 5.5h \
-            hypothesis fuzz tests/ \
-              -k "test_hypothesis"
+            hypothesis fuzz tests/ -- -k "test_hypothesis"
 
       - name: "Upload patch files"
         uses: actions/upload-artifact@v6
