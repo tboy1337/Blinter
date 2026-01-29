@@ -16,7 +16,7 @@ except ImportError:
 # Configure hypothesis settings globally
 settings.register_profile(
     "default",
-    max_examples=100,
+    max_examples=1000,
     deadline=None,
     suppress_health_check=[HealthCheck.too_slow],
     verbosity=Verbosity.normal,
@@ -24,7 +24,7 @@ settings.register_profile(
 
 settings.register_profile(
     "ci",
-    max_examples=200,
+    max_examples=1000,
     deadline=None,
     suppress_health_check=[HealthCheck.too_slow],
     verbosity=Verbosity.verbose,

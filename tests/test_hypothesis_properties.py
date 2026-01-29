@@ -817,7 +817,7 @@ class TestIntegrationProperties:
         extension=st.sampled_from([".bat", ".cmd"]),
     )
     @settings(
-        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=200
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=1000
     )
     def test_lint_batch_file_with_generated_content(
         self, lines: List[str], extension: str
@@ -928,7 +928,7 @@ class TestEdgeCaseProperties:
         )
     )
     @settings(
-        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=100
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=1000
     )
     def test_lint_batch_file_handles_various_content(self, lines: List[str]) -> None:
         """lint_batch_file should handle various content without crashing."""
@@ -2034,7 +2034,7 @@ class TestFilePathDependentFunctionProperties:
 
     @given(lines=st.lists(batch_line_strategy(), max_size=50))
     @settings(
-        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=200
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=1000
     )
     def test_check_line_ending_rules_with_temp_file(self, lines: List[str]) -> None:
         """_check_line_ending_rules should return a list of LintIssue."""
@@ -2055,7 +2055,7 @@ class TestFilePathDependentFunctionProperties:
 
     @given(lines=st.lists(batch_line_strategy(), max_size=50))
     @settings(
-        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=200
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=1000
     )
     def test_check_global_style_rules_with_temp_file(self, lines: List[str]) -> None:
         """_check_global_style_rules should return a list of LintIssue."""
@@ -2076,7 +2076,7 @@ class TestFilePathDependentFunctionProperties:
 
     @given(lines=st.lists(batch_line_strategy(), max_size=50))
     @settings(
-        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=200
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=1000
     )
     def test_check_new_global_rules_with_temp_file(self, lines: List[str]) -> None:
         """_check_new_global_rules should return a list of LintIssue."""
@@ -2097,7 +2097,7 @@ class TestFilePathDependentFunctionProperties:
 
     @given(lines=st.lists(batch_line_strategy(), max_size=50))
     @settings(
-        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=200
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=1000
     )
     def test_check_bat_cmd_differences_with_temp_file(self, lines: List[str]) -> None:
         """_check_bat_cmd_differences should return a list of LintIssue."""
@@ -2118,7 +2118,7 @@ class TestFilePathDependentFunctionProperties:
 
     @given(lines=st.lists(batch_line_strategy(), max_size=50))
     @settings(
-        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=200
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=1000
     )
     def test_check_advanced_global_patterns_with_temp_file(
         self, lines: List[str]
@@ -2141,7 +2141,7 @@ class TestFilePathDependentFunctionProperties:
 
     @given(lines=st.lists(batch_line_strategy(), max_size=50))
     @settings(
-        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=200
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=1000
     )
     def test_check_self_modification_with_temp_file(self, lines: List[str]) -> None:
         """_check_self_modification should return a list of LintIssue."""
@@ -2171,7 +2171,7 @@ class TestFileEncodingProperties:  # pylint: disable=too-few-public-methods
 
     @given(lines=st.lists(batch_line_strategy(), min_size=1, max_size=50))
     @settings(
-        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=200
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=1000
     )
     def test_read_file_with_encoding(self, lines: List[str]) -> None:
         """read_file_with_encoding should handle various encodings."""
@@ -2894,7 +2894,7 @@ class TestEncodingDetectionProperties:
 
     @given(lines=st.lists(batch_line_strategy(), min_size=1, max_size=20))
     @settings(
-        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=100
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=1000
     )
     def test_detect_encoding_charset_norm_returns_list(self, lines: List[str]) -> None:
         """_detect_encoding_charset_norm should return a list of encodings."""
@@ -2926,7 +2926,7 @@ class TestEncodingDetectionProperties:
         encoding=st.sampled_from(["utf-8", "latin-1"]),
     )
     @settings(
-        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=100
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=1000
     )
     def test_try_read_with_encoding_with_temp_file(
         self, lines: List[str], encoding: str
@@ -2951,7 +2951,7 @@ class TestEncodingDetectionProperties:
 
     @given(lines=st.lists(batch_line_strategy(), min_size=1, max_size=20))
     @settings(
-        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=100
+        suppress_health_check=[HealthCheck.too_slow], deadline=None, max_examples=1000
     )
     def test_validate_and_read_file_with_temp_file(self, lines: List[str]) -> None:
         """_validate_and_read_file should return a tuple."""

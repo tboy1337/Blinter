@@ -1,0 +1,71 @@
+name: Fuzzing
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: "read"
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: "Setup Python"
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: "Restore cache"
+        uses: actions/cache@v5
+        with:
+          path: |
+            .hypothesis/examples
+          key: fuzz-${{ runner.os }}-${{ hashFiles('requirements-dev.txt') }}
+          restore-keys: |
+            fuzz-${{ runner.os }}-
+
+      - name: "Download example database"
+        uses: dawidd6/action-download-artifact@v12
+        with:
+          name: blinter-hypothesis-db
+          path: .hypothesis/examples
+          if_no_artifact_found: warn
+          workflow_conclusion: completed
+
+      - name: "Install dependencies"
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements-dev.txt
+          pip install hypofuzz
+
+      - name: "Run hypofuzz"
+        continue-on-error: true
+        run: |
+          timeout --preserve-status 5.5h \
+            hypothesis fuzz tests/ \
+              -k "test_hypothesis"
+
+      - name: "Upload patch files"
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: blinter-hypofuzz-patches
+          path: .hypothesis/patches/latest_hypofuzz_*.patch
+          if-no-files-found: ignore
+
+      - name: "Upload example database"
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: blinter-hypothesis-db
+          path: .hypothesis/examples
