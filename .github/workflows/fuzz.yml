@@ -50,9 +50,11 @@ jobs:
 
       - name: "Run hypofuzz"
         continue-on-error: true
+        env:
+          HYPOTHESIS_PROFILE: fuzzing
         run: |
           timeout --preserve-status 5.5h \
-            hypothesis fuzz tests/test_hypothesis_properties.py -- -p no:timeout -p no:cov -p no:xdist -p no:benchmark -p no:html -p no:json-report --override-ini="addopts=" -o python_files=test_hypothesis_properties.py
+            hypothesis fuzz tests/test_hypothesis_properties.py -- -p no:timeout -p no:cov -p no:xdist -p no:benchmark -p no:html -p no:json-report --override-ini="addopts="
 
       - name: "Upload patch files"
         uses: actions/upload-artifact@v6

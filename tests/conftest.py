@@ -38,6 +38,14 @@ settings.register_profile(
     verbosity=Verbosity.normal,
 )
 
+settings.register_profile(
+    "fuzzing",
+    max_examples=1000,
+    deadline=None,
+    # Note: No suppress_health_check for fuzzing - hypofuzz needs full control
+    verbosity=Verbosity.normal,
+)
+
 # Load default profile
 settings.load_profile("default")
 
