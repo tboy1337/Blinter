@@ -1,4 +1,12 @@
 """Tests for output and utility functions."""
+
+from collections import defaultdict
+import io
+import queue
+import sys
+import threading
+from typing import Callable, List, Optional, Tuple, Union
+
 from blinter import (
     LintIssue,
     RuleSeverity,
@@ -13,15 +21,6 @@ from blinter.output.formatters import (
     print_summary,
 )
 from blinter.rules.registry import RULES
-
-
-from collections import defaultdict
-import io
-import queue
-import sys
-import threading
-from typing import Callable, List, Optional, Tuple, Union
-
 
 
 class TestGroupIssues:

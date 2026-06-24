@@ -2,7 +2,7 @@
 
 ## Rule Categories Summary
 
-**Blinter** provides comprehensive static analysis with **100 Built-in Rules** across 5 severity levels:
+**Blinter** provides comprehensive static analysis with **151 Built-in Rules** across 5 severity levels:
 
 ### Error Level Rules (E001-E999)
 **Critical issues that will cause script failure**
@@ -12,11 +12,16 @@
 - **E003**: IF statement improper formatting
 - **E004**: IF EXIST syntax mixing
 - **E005**: Invalid path syntax
-- **E006**: Undefined variable reference
+- **E006**: Potentially undefined variable reference (Warning severity despite E-prefix)
 - **E007**: Empty variable check syntax error
 - **E008**: Unreachable code after EXIT or GOTO
 - **E009**: Mismatched quotes
 - **E010**: Malformed FOR loop missing DO
+- **E011**: Invalid variable expansion syntax
+- **E012**: Missing CALL for subroutine invocation
+- **E013**: Invalid command syntax detected
+- **E014**: Missing colon in CALL statement
+- **E015**: Missing colon in GOTO :EOF statement
 - **E016**: Invalid errorlevel comparison syntax
 - **E017**: Invalid percent-tilde syntax
 - **E018**: Unix line endings detected  
@@ -52,6 +57,8 @@
 - **W011**: Unicode handling issue
 - **W012**: Non-ASCII characters detected
 - **W013**: Duplicate label
+- **W014**: Missing PAUSE for user interaction
+- **W015**: Deprecated command usage
 - **W017**: Errorlevel comparison semantic difference
 - **W018**: Multi-byte characters with potential line ending risks
 - **W019**: GOTO/CALL with potential line ending risks
@@ -94,6 +101,10 @@
 - **S009**: Magic numbers used
 - **S010**: Dead code detected
 - **S011**: Line exceeds maximum length
+- **S012**: Inconsistent indentation
+- **S013**: Missing file header documentation
+- **S014**: Long parameter list affects readability
+- **S015**: Inconsistent colon usage in GOTO statements
 - **S016**: Potentially unsafe double-colon comment
 - **S017**: Inconsistent variable naming convention
 - **S018**: Missing subroutine documentation
@@ -117,6 +128,9 @@
 - **SEC005**: Missing privilege check
 - **SEC006**: Hardcoded absolute path
 - **SEC007**: Hardcoded temporary directory
+- **SEC008**: Plain text credentials detected
+- **SEC009**: PowerShell execution policy bypass
+- **SEC010**: Sensitive information in ECHO output
 - **SEC011**: Unvalidated path traversal
 - **SEC012**: Unsafe temporary file creation
 - **SEC013**: Command injection via variable substitution
@@ -143,6 +157,8 @@
 - **P006**: Missing ENDLOCAL before exit
 - **P007**: Temporary file without random name
 - **P008**: Delayed expansion without enablement
+- **P009**: Inefficient FOR loop pattern
+- **P010**: Missing optimization flags for directory operations
 - **P012**: Inefficient string operations
 - **P013**: Missing /B flag for large DIR operations
 - **P014**: Unnecessary command output

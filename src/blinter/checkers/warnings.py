@@ -1,4 +1,5 @@
 """Warning-level line checks (W-prefix rules)."""
+
 import re
 from typing import (
     List,
@@ -6,16 +7,16 @@ from typing import (
     Set,
     Tuple,
 )
+
 from blinter.models import LintIssue
 from blinter.patterns import (
+    _COMPILED_IF_PATTERN,
     ARCHITECTURE_SPECIFIC_PATTERNS,
     OLDER_WINDOWS_COMMANDS,
     UNICODE_PROBLEMATIC_COMMANDS,
 )
 from blinter.rules.registry import RULES
-from blinter.patterns import (
-    _COMPILED_IF_PATTERN,
-)
+
 
 def _check_unicode_handling_issue(stripped: str, line_num: int) -> Optional[LintIssue]:
     """Check for Unicode handling issues in commands (W011)."""
@@ -39,6 +40,7 @@ def _check_unicode_handling_issue(stripped: str, line_num: int) -> Optional[Lint
                 )
             break
     return None
+
 
 def _check_echo_unicode_risk(stripped: str) -> bool:
     """Check for Unicode risks in echo commands."""
@@ -101,6 +103,7 @@ def _check_echo_unicode_risk(stripped: str) -> bool:
         )  # Control chars in content
     )
 
+
 def _check_search_unicode_risk(stripped: str) -> bool:
     """Check for Unicode risks in findstr/find commands."""
     return (
@@ -112,11 +115,13 @@ def _check_search_unicode_risk(stripped: str) -> bool:
         or "<" in stripped  # File redirection
     )
 
+
 def _check_general_unicode_risk(stripped: str) -> bool:
     """Check for general Unicode risks in other commands."""
     return not all(ord(c) < 128 for c in stripped) or bool(
         re.search(r"[\x00-\x1f\x7f-\xff]", stripped)  # Contains non-ASCII
     )
+
 
 def _check_compatibility_warnings(  # pylint: disable=unused-argument
     line: str, line_num: int, stripped: str
@@ -182,6 +187,7 @@ def _check_compatibility_warnings(  # pylint: disable=unused-argument
 
     return issues
 
+
 def _check_command_warnings(  # pylint: disable=unused-argument
     line: str, line_num: int, stripped: str
 ) -> List[LintIssue]:
@@ -212,6 +218,7 @@ def _check_command_warnings(  # pylint: disable=unused-argument
     # (Removed duplicate check - W024 provides more comprehensive deprecated command detection)
 
     return issues
+
 
 def _check_unquoted_variables(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for unquoted variables with spaces (W005).
@@ -244,6 +251,7 @@ def _check_unquoted_variables(stripped: str, line_num: int) -> List[LintIssue]:
 
     return issues
 
+
 def _check_non_ascii_chars(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for non-ASCII characters (W012)."""
     issues: List[LintIssue] = []
@@ -256,6 +264,7 @@ def _check_non_ascii_chars(stripped: str, line_num: int) -> List[LintIssue]:
             )
         )
     return issues
+
 
 def _check_errorlevel_comparison(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for errorlevel comparison semantic difference (W017)."""
@@ -285,6 +294,7 @@ def _check_errorlevel_comparison(stripped: str, line_num: int) -> List[LintIssue
             )
     return issues
 
+
 def _check_inefficient_modifiers(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for inefficient parameter modifier usage (W026)."""
     issues: List[LintIssue] = []
@@ -300,6 +310,7 @@ def _check_inefficient_modifiers(stripped: str, line_num: int) -> List[LintIssue
             )
         )
     return issues
+
 
 def _check_extended_non_ascii(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for extended non-ASCII characters (W030)."""
@@ -317,6 +328,7 @@ def _check_extended_non_ascii(stripped: str, line_num: int) -> List[LintIssue]:
             )
     return issues
 
+
 def _check_unicode_filenames(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for Unicode filename in batch operation (W031)."""
     issues: List[LintIssue] = []
@@ -333,6 +345,7 @@ def _check_unicode_filenames(stripped: str, line_num: int) -> List[LintIssue]:
                 )
             )
     return issues
+
 
 def _check_call_ambiguity(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for command execution ambiguity (W033)."""
@@ -352,6 +365,7 @@ def _check_call_ambiguity(stripped: str, line_num: int) -> List[LintIssue]:
                 )
             )
     return issues
+
 
 def _check_warning_issues(  # pylint: disable=unused-argument
     line: str, line_num: int, set_vars: Set[str], delayed_expansion_enabled: bool

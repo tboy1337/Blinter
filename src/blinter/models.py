@@ -1,4 +1,5 @@
 """Core data models: rules, lint issues, and configuration."""
+
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import (
     Tuple,
 )
 
+
 class RuleSeverity(Enum):
     """Rule severity levels."""
 
@@ -18,6 +20,7 @@ class RuleSeverity(Enum):
     STYLE = "Style"
     SECURITY = "Security"
     PERFORMANCE = "Performance"
+
 
 @dataclass
 class Rule:
@@ -42,6 +45,7 @@ class Rule:
         if not self.recommendation or not isinstance(self.recommendation, str):
             raise ValueError("Rule recommendation must be a non-empty string")
 
+
 @dataclass
 class LintIssue:
     """Represents a linting issue found in a batch file."""
@@ -57,6 +61,7 @@ class LintIssue:
             raise ValueError("Line number must be positive")
         if not isinstance(self.rule, Rule):
             raise ValueError("Rule must be a Rule instance")
+
 
 @dataclass
 class BlinterConfig:
@@ -118,6 +123,7 @@ class BlinterConfig:
             self.min_severity, 0
         )
 
+
 @dataclass
 class CliArguments:
     """Parsed CLI arguments."""
@@ -128,6 +134,7 @@ class CliArguments:
     cli_recursive: Optional[bool]
     cli_follow_calls: Optional[bool]
     cli_max_line_length: Optional[int]
+
 
 @dataclass
 class ProcessingResults:
@@ -140,6 +147,7 @@ class ProcessingResults:
     processed_file_paths: List[
         Tuple[str, Optional[str]]
     ]  # (file_path, called_by_parent)
+
 
 @dataclass
 class ProcessingState:

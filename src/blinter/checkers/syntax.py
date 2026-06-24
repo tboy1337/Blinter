@@ -1,4 +1,5 @@
 """Syntax error checks (E-prefix rules)."""
+
 import re
 from typing import (
     Dict,
@@ -6,13 +7,15 @@ from typing import (
     Set,
     Tuple,
 )
+
 from blinter.models import LintIssue
 from blinter.patterns import (
+    _COMPILED_IF_PATTERN,
     BUILTIN_COMMANDS,
     COMMON_COMMAND_TYPOS,
-    _COMPILED_IF_PATTERN,
 )
 from blinter.rules.registry import RULES
+
 
 def _check_goto_labels(
     stripped: str, line_num: int, labels: Dict[str, int]
@@ -57,6 +60,7 @@ def _check_goto_labels(
             )
     return issues
 
+
 def _check_call_labels(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for CALL label issues (E014)."""
     issues: List[LintIssue] = []
@@ -89,6 +93,7 @@ def _check_call_labels(stripped: str, line_num: int) -> List[LintIssue]:
             )
         )
     return issues
+
 
 def _check_if_statement_formatting(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for IF statement formatting issues (E003)."""
@@ -136,6 +141,7 @@ def _check_if_statement_formatting(stripped: str, line_num: int) -> List[LintIss
             )
     return issues
 
+
 def _check_errorlevel_syntax(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for invalid errorlevel comparison syntax (E016)."""
     issues: List[LintIssue] = []
@@ -177,6 +183,7 @@ def _check_errorlevel_syntax(stripped: str, line_num: int) -> List[LintIssue]:
         )
     return issues
 
+
 def _check_if_exist_mixing(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for IF EXIST syntax mixing (E004)."""
     issues: List[LintIssue] = []
@@ -197,6 +204,7 @@ def _check_if_exist_mixing(stripped: str, line_num: int) -> List[LintIssue]:
                 )
             )
     return issues
+
 
 def _check_path_syntax(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for invalid path syntax (E005)."""
@@ -264,6 +272,7 @@ def _check_path_syntax(stripped: str, line_num: int) -> List[LintIssue]:
                 )
                 break
     return issues
+
 
 def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
     """Check for mismatched quotes (E009)."""
@@ -366,6 +375,7 @@ def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
             )
     return issues
 
+
 def _check_for_loop_syntax(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for malformed FOR loop (E010)."""
     issues: List[LintIssue] = []
@@ -384,6 +394,7 @@ def _check_for_loop_syntax(stripped: str, line_num: int) -> List[LintIssue]:
                 )
             )
     return issues
+
 
 def _has_special_variable_patterns(stripped: str) -> bool:
     """Check if line contains special variable patterns that should skip E011 checks."""
@@ -409,6 +420,7 @@ def _has_special_variable_patterns(stripped: str) -> bool:
         or bool(re.search(r"%%?[A-Z0-9_@-]+:.+=.+%%?", stripped, re.IGNORECASE))
         or bool(re.search(r"%[A-Z0-9_@-]+%[\w.*\\/:]+", stripped, re.IGNORECASE))
     )
+
 
 def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for invalid variable expansion syntax (E011)."""
@@ -454,6 +466,7 @@ def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
             )
         )
     return issues
+
 
 def _check_subroutine_call(
     stripped: str, line_num: int, labels: Dict[str, int]
@@ -508,6 +521,7 @@ def _check_subroutine_call(
 
     return issues
 
+
 def _check_command_typos(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for invalid command syntax / typos (E013)."""
     issues: List[LintIssue] = []
@@ -525,6 +539,7 @@ def _check_command_typos(stripped: str, line_num: int) -> List[LintIssue]:
             )
         )
     return issues
+
 
 def _check_parameter_modifiers(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for invalid parameter modifier combinations (E024, E025)."""
@@ -572,6 +587,7 @@ def _check_parameter_modifiers(stripped: str, line_num: int) -> List[LintIssue]:
         )
     return issues
 
+
 def _check_unc_path(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for UNC path used as working directory (E027)."""
     issues: List[LintIssue] = []
@@ -584,6 +600,7 @@ def _check_unc_path(stripped: str, line_num: int) -> List[LintIssue]:
             )
         )
     return issues
+
 
 def _is_legitimate_quote_pattern(stripped: str) -> bool:
     """
@@ -618,6 +635,7 @@ def _is_legitimate_quote_pattern(stripped: str) -> bool:
 
     return any(legitimate_patterns)
 
+
 def _check_quote_escaping(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for complex quote escaping errors (E028)."""
     issues: List[LintIssue] = []
@@ -638,6 +656,7 @@ def _check_quote_escaping(stripped: str, line_num: int) -> List[LintIssue]:
         LintIssue(line_number=line_num, rule=RULES["E028"], context=quote_context)
     )
     return issues
+
 
 def _check_set_a_expression(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for complex SET /A expression errors (E029)."""
@@ -677,6 +696,7 @@ def _check_set_a_expression(stripped: str, line_num: int) -> List[LintIssue]:
                 )
             )
     return issues
+
 
 def _check_syntax_errors(
     line: str, line_num: int, labels: Dict[str, int]

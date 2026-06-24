@@ -1,11 +1,4 @@
 """Tests for main function and command-line interface."""
-from blinter import (
-    find_batch_files,
-    main,
-)
-
-
-# pylint: disable=too-many-lines,import-outside-toplevel,redefined-outer-name,reimported
 
 import io
 import os
@@ -19,8 +12,15 @@ from typing import TYPE_CHECKING, Optional, Protocol, TextIO
 from unittest.mock import patch
 
 import pytest
-
 from tests.conftest import get_project_version
+
+from blinter import (
+    find_batch_files,
+    main,
+)
+
+# pylint: disable=too-many-lines,import-outside-toplevel,redefined-outer-name,reimported
+
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -45,15 +45,19 @@ class StdoutCaptureProtocol(Protocol):
 
 
 class StdoutCapture:
-    """Context manager for capturing stdout output during tests."""
+    """Context manager for capturing stdout and stderr output during tests."""
 
     def __init__(self) -> None:
         self.captured_output: Optional[io.StringIO] = None
+        self.captured_stderr: Optional[io.StringIO] = None
         self.old_stdout: Optional[TextIO] = None
+        self.old_stderr: Optional[TextIO] = None
 
     def __enter__(self) -> "StdoutCapture":
         self.old_stdout = sys.stdout
+        self.old_stderr = sys.stderr
         sys.stdout = self.captured_output = io.StringIO()
+        sys.stderr = self.captured_stderr = io.StringIO()
         return self
 
     def __exit__(
@@ -62,11 +66,16 @@ class StdoutCapture:
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        sys.stdout = self.old_stdout
+        if self.old_stdout is not None:
+            sys.stdout = self.old_stdout
+        if self.old_stderr is not None:
+            sys.stderr = self.old_stderr
 
     def getvalue(self) -> str:
-        """Get the captured stdout output."""
-        return self.captured_output.getvalue() if self.captured_output else ""
+        """Get captured stdout and stderr combined."""
+        stdout_value = self.captured_output.getvalue() if self.captured_output else ""
+        stderr_value = self.captured_stderr.getvalue() if self.captured_stderr else ""
+        return stdout_value + stderr_value
 
 
 class TestMainFunction:
@@ -269,7 +278,7 @@ echo %var%
                         output = captured.getvalue()
 
                     assert (
-                        "Warning: Could not process" in output
+                        "Could not process" in output
                         and "Permission denied" in output
                     )
         finally:
@@ -295,7 +304,7 @@ echo %var%
                         output = captured.getvalue()
 
                     assert (
-                        "Warning: Could not read" in output
+                        "Could not read" in output
                         and "encoding issues" in output
                     )
         finally:
@@ -320,7 +329,7 @@ echo %var%
                             assert sys_exit.code in [0, 1]
                         output = captured.getvalue()
 
-                    assert "Warning: Could not process" in output
+                    assert "Could not process" in output
                     assert "Something went wrong" in output
         finally:
             if os.path.exists(temp_file):
@@ -623,14 +632,17 @@ class TestCommandLineIntegration:
             for _error_name, error_obj in test_scenarios:
                 with patch("blinter.cli.main.lint_batch_file", side_effect=error_obj):
                     with patch("sys.argv", ["blinter.py", temp_file]):
-                        with patch(
-                            "sys.stdout", new_callable=io.StringIO
-                        ) as mock_stdout:
+                        with StdoutCapture() as captured:
                             with pytest.raises(SystemExit) as exit_info:
                                 main()
-                            output = mock_stdout.getvalue()
+                            output = captured.getvalue()
                             assert exit_info.value.code == 1
-                            assert "Warning:" in output or "Error:" in output
+                            assert (
+                                "Could not process" in output
+                                or "Could not read" in output
+                                or "Error: No batch files could be processed"
+                                in output
+                            )
         finally:
             if temp_file and os.path.exists(temp_file):
                 os.unlink(temp_file)
@@ -1004,7 +1016,8 @@ class TestCLIMainFunctionScenarios:
         import blinter
 
         with patch("sys.argv", ["blinter.py", "protected.bat"]):
-            with patch("blinter.cli.main.find_batch_files",
+            with patch(
+                "blinter.cli.main.find_batch_files",
                 side_effect=PermissionError("Access denied"),
             ):
                 with pytest.raises(SystemExit) as exit_info:
@@ -1029,7 +1042,8 @@ class TestCLIMainFunctionScenarios:
 
         try:
             with patch("sys.argv", ["blinter.py", temp_file]):
-                with patch("blinter.cli.main.lint_batch_file",
+                with patch(
+                    "blinter.cli.main.lint_batch_file",
                     side_effect=UnicodeDecodeError("test", b"", 0, 1, "test"),
                 ):
                     with pytest.raises(SystemExit) as exit_info:
@@ -1037,8 +1051,9 @@ class TestCLIMainFunctionScenarios:
 
             assert exit_info.value.code == 1
             captured = capsys.readouterr()
-            assert "Warning: Could not read" in captured.out
-            assert "due to encoding issues" in captured.out
+            combined_output = captured.out + captured.err
+            assert "Could not read" in combined_output
+            assert "due to encoding issues" in combined_output
         finally:
             os.unlink(temp_file)
 
@@ -1057,7 +1072,8 @@ class TestCLIMainFunctionScenarios:
 
         try:
             with patch("sys.argv", ["blinter.py", temp_file]):
-                with patch("blinter.cli.main.lint_batch_file",
+                with patch(
+                    "blinter.cli.main.lint_batch_file",
                     side_effect=OSError("Generic file error"),
                 ):
                     with pytest.raises(SystemExit) as exit_info:
@@ -1065,7 +1081,8 @@ class TestCLIMainFunctionScenarios:
 
             assert exit_info.value.code == 1
             captured = capsys.readouterr()
-            assert "Warning: Could not process" in captured.out
+            combined_output = captured.out + captured.err
+            assert "Could not process" in combined_output
         finally:
             os.unlink(temp_file)
 
@@ -1084,7 +1101,8 @@ class TestCLIMainFunctionScenarios:
 
         try:
             with patch("sys.argv", ["blinter.py", temp_file]):
-                with patch("blinter.cli.main.lint_batch_file",
+                with patch(
+                    "blinter.cli.main.lint_batch_file",
                     side_effect=ValueError("Processing error"),
                 ):
                     with pytest.raises(SystemExit) as exit_info:

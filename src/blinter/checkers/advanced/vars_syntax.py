@@ -1,15 +1,11 @@
 """FOR-loop, variable, and string-operation syntax checks."""
 
 import re
-from typing import (
-    Dict,
-    List,
-    Optional,
-    Tuple,
-    cast,
-)
+from typing import List
+
 from blinter.models import LintIssue
 from blinter.rules.registry import RULES
+
 
 def _check_advanced_for_rules(line: str, line_number: int) -> List[LintIssue]:
     """Check for advanced FOR command patterns."""
@@ -87,6 +83,7 @@ def _check_advanced_for_rules(line: str, line_number: int) -> List[LintIssue]:
 
     return issues
 
+
 def _check_advanced_process_mgmt(line: str, line_number: int) -> List[LintIssue]:
     """Check for process management best practices."""
     issues: List[LintIssue] = []
@@ -128,6 +125,7 @@ def _check_advanced_process_mgmt(line: str, line_number: int) -> List[LintIssue]
 
     return issues
 
+
 def _check_percent_tilde_syntax(stripped: str, line_number: int) -> List[LintIssue]:
     """Check for percent-tilde syntax issues (E017, E019)."""
     issues: List[LintIssue] = []
@@ -160,6 +158,7 @@ def _check_percent_tilde_syntax(stripped: str, line_number: int) -> List[LintIss
 
     return issues
 
+
 def _check_for_loop_var_syntax(stripped: str, line_number: int) -> List[LintIssue]:
     """Check FOR loop variable syntax (E020)."""
     issues: List[LintIssue] = []
@@ -178,6 +177,7 @@ def _check_for_loop_var_syntax(stripped: str, line_number: int) -> List[LintIssu
             )
 
     return issues
+
 
 def _check_string_operation_syntax(stripped: str, line_number: int) -> List[LintIssue]:
     """Check string operations syntax (E021)."""
@@ -205,6 +205,7 @@ def _check_string_operation_syntax(stripped: str, line_number: int) -> List[Lint
 
     return issues
 
+
 def _check_set_a_quoting(stripped: str, line_number: int) -> List[LintIssue]:
     """Check SET /A syntax (E023)."""
     issues: List[LintIssue] = []
@@ -222,6 +223,7 @@ def _check_set_a_quoting(stripped: str, line_number: int) -> List[LintIssue]:
                 )
 
     return issues
+
 
 def _check_advanced_vars(lines: List[str]) -> List[LintIssue]:
     """Check for advanced variable expansion syntax issues (E017-E022)."""

@@ -1,13 +1,12 @@
 """Tests for Rule and LintIssue data classes validation."""
+
+import pytest
+
 from blinter import (
     LintIssue,
     Rule,
     RuleSeverity,
 )
-
-
-import pytest
-
 
 
 class TestRuleValidation:

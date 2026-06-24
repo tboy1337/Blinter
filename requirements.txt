@@ -1,2 +1,2 @@
-# For enhanced encoding detection (recommended but not required)
+# Required runtime dependency for encoding detection
 charset_normalizer

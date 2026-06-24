@@ -7,9 +7,11 @@ from typing import (
     Optional,
     Tuple,
 )
+
 from blinter.config.loader import create_default_config_file
 from blinter.models import CliArguments
 from blinter.output.formatters import print_help, print_version
+
 
 def _handle_special_cli_flags() -> Optional[bool]:
     """
@@ -31,6 +33,7 @@ def _handle_special_cli_flags() -> Optional[bool]:
         return False
 
     return None
+
 
 def _parse_regular_arguments() -> Tuple[
     Optional[str],
@@ -121,6 +124,7 @@ def _parse_regular_arguments() -> Tuple[
         cli_follow_calls,
         cli_max_line_length,
     )
+
 
 def _parse_cli_arguments() -> Optional[CliArguments]:
     """Parse command line arguments."""

@@ -9,7 +9,7 @@
 ## Features ✨
 
 ### 🔍 **Rule Categories**
-- **100 Built-in Rules** across 5 severity levels
+- **151 Built-in Rules** across 5 severity levels
 - **Error Level (E001-E999)**: Critical syntax errors that prevent execution
 - **Warning Level (W001-W999)**: Potential runtime issues and bad practices
 - **Style Level (S001-S999)**: Code formatting and readability improvements
@@ -344,16 +344,20 @@ flowchart BT
   io --> engine
 ```
 
-### 🔧 **Configuration Options**
+### 🔧 **Configuration Options (`BlinterConfig`)**
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `file_path` | `str` | Required | Path to batch file to analyze |
+| `recursive` | `bool` | `True` | Search subdirectories when linting a folder |
+| `show_summary` | `bool` | `False` | Show summary statistics in CLI output |
 | `max_line_length` | `int` | `100` | Maximum line length for S011 rule |
-| `enable_style_rules` | `bool` | `True` | Enable/disable style-related rules |
-| `enable_performance_rules` | `bool` | `True` | Enable/disable performance rules |
+| `follow_calls` | `bool` | `False` | Lint scripts referenced by `CALL` statements |
+| `scan_root` | `str` \| `None` | `None` | Root path for `--follow-calls` containment (CLI sets automatically) |
+| `enabled_rules` | `Set[str]` | empty | If non-empty, only these rule codes run |
+| `disabled_rules` | `Set[str]` | empty | Rule codes to skip |
+| `min_severity` | `RuleSeverity` \| `None` | `None` | Minimum severity to report (via `blinter.ini`; no dedicated CLI flag) |
 
-*Note: Security rules are always enabled for safety.*
+*Note: E006 uses an `E` prefix but reports as **Warning** severity (intentional — environment variables may be set externally).*
 
 ### Supported File Types
 - `.bat` files (traditional batch files)
@@ -413,9 +417,11 @@ blinter ./scripts --summary     # With summary statistics
 Install development dependencies and run the quality gate locally before releasing:
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -e ".[dev]"
+# Or: pip install -e . && pip install -r requirements-dev.txt
 py -m pytest
 py -m mypy
+py -m mypy tests
 py -m pylint src/blinter --output-format=text > pylint-report.txt
 ```
 

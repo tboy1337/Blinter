@@ -1,10 +1,12 @@
 """Comment detection and safe-context helpers for checkers."""
+
 import re
 from typing import cast
 
 from blinter.patterns import (
     _DANGEROUS_CMDS_REGEX,
 )
+
 
 def _is_comment_line(line: str) -> bool:
     """
@@ -22,6 +24,7 @@ def _is_comment_line(line: str) -> bool:
         or stripped.startswith("rem\t")
         or stripped.startswith("::")
     )
+
 
 def _is_command_in_safe_context(line: str) -> bool:
     """
@@ -69,6 +72,7 @@ def _is_command_in_safe_context(line: str) -> bool:
             return True
 
     return False
+
 
 def _is_safe_ctx_for_privilege(line: str) -> bool:
     """

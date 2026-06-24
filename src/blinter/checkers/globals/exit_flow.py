@@ -2,14 +2,13 @@
 
 import re
 from typing import (
-    Dict,
     List,
     Optional,
-    Tuple,
 )
+
 from blinter.models import LintIssue
-from blinter.rules.helpers import _add_issue
 from blinter.rules.registry import RULES
+
 
 def _check_missing_exit_statement(  # pylint: disable=too-many-branches
     lines: List[str],
@@ -93,6 +92,7 @@ def _check_missing_exit_statement(  # pylint: disable=too-many-branches
 
     return issues
 
+
 def _can_main_execution_reach_eof(lines: List[str]) -> bool:
     """Determine if the main execution path can reach end-of-file without EXIT.
 
@@ -145,6 +145,7 @@ def _can_main_execution_reach_eof(lines: List[str]) -> bool:
     # If we finished the scan and code is still reachable, we can reach EOF
     return reachable
 
+
 def _check_unreachable_code(lines: List[str]) -> List[LintIssue]:
     """Check for unreachable code after EXIT or GOTO statements."""
     issues: List[LintIssue] = []
@@ -168,12 +169,14 @@ def _check_unreachable_code(lines: List[str]) -> List[LintIssue]:
 
     return issues
 
+
 def _find_truly_unreachable_code(
     lines: List[str], exit_line_index: int
 ) -> Optional[int]:
     """Find truly unreachable code, considering batch file control flow properly."""
     exit_paren_depth = _calculate_exit_paren_depth(lines, exit_line_index)
     return _scan_for_unreachable_code(lines, exit_line_index, exit_paren_depth)
+
 
 def _calculate_exit_paren_depth(lines: List[str], exit_line_index: int) -> int:
     """Calculate the parentheses depth at the EXIT statement."""
@@ -184,6 +187,7 @@ def _calculate_exit_paren_depth(lines: List[str], exit_line_index: int) -> int:
         current_paren_depth = _update_paren_depth(line, current_paren_depth)
 
     return current_paren_depth
+
 
 def _scan_for_unreachable_code(
     lines: List[str], exit_line_index: int, exit_paren_depth: int
@@ -223,6 +227,7 @@ def _scan_for_unreachable_code(
 
     return None
 
+
 def _update_paren_depth(line: str, current_depth: int) -> int:
     """Update parentheses depth based on the line content."""
     # Match IF or FOR statements with opening parentheses
@@ -236,6 +241,7 @@ def _update_paren_depth(line: str, current_depth: int) -> int:
         return current_depth - 1
     return current_depth
 
+
 def _line_makes_code_reachable(line: str) -> bool:
     """Check if a line makes code reachable again."""
     # Labels make code reachable
@@ -247,6 +253,7 @@ def _line_makes_code_reachable(line: str) -> bool:
         return True
 
     return False
+
 
 def _is_truly_executable_command(line: str) -> bool:
     """Check if a line is truly executable code (not structural)."""

@@ -1,10 +1,12 @@
 """Coordinates all checker categories for a parsed script."""
+
 from typing import (
     Dict,
     List,
     Optional,
     Set,
 )
+
 from blinter.checkers.advanced import (
     _check_advanced_escaping_rules,
     _check_advanced_for_rules,
@@ -35,6 +37,7 @@ from blinter.checkers.syntax import _check_syntax_errors
 from blinter.checkers.vars import _check_undefined_variables
 from blinter.checkers.warnings import _check_warning_issues
 from blinter.models import BlinterConfig, LintIssue
+
 
 def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     lines: List[str],
@@ -139,6 +142,7 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
     issues.extend(_check_enhanced_performance(lines))  # Performance level P012-P014
 
     return issues
+
 
 def _filter_issues_by_config(
     issues: List[LintIssue],

@@ -1,4 +1,11 @@
 """Tests for --max-line-length CLI parameter."""
+
+import os
+import tempfile
+from unittest.mock import patch
+
+import pytest
+
 from blinter import (
     BlinterConfig,
     lint_batch_file,
@@ -7,14 +14,6 @@ from blinter import (
 )
 from blinter.cli.args import _parse_cli_arguments
 from blinter.output.formatters import print_help
-
-
-import os
-import tempfile
-from unittest.mock import patch
-
-import pytest
-
 
 
 class TestMaxLineLengthCLI:

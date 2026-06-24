@@ -5,17 +5,16 @@ from pathlib import Path
 import re
 from typing import (
     DefaultDict,
-    Dict,
     List,
     Optional,
     Tuple,
 )
+
 from blinter.models import LintIssue
-from blinter.patterns import COMMAND_CASING_KEYWORDS
-from blinter.parsing.context import _is_comment_line
+from blinter.parsing.context import _is_safe_ctx_for_privilege
 from blinter.rules.helpers import _add_issue
 from blinter.rules.registry import RULES
-from blinter.parsing.context import _is_safe_ctx_for_privilege
+
 
 def _check_global_style_rules(lines: List[str], file_path: str) -> List[LintIssue]:
     """Check global style rules that apply to the entire file."""
@@ -59,6 +58,7 @@ def _check_global_style_rules(lines: List[str], file_path: str) -> List[LintIssu
     issues.extend(_check_goto_colon_consistency(lines))
 
     return issues
+
 
 def _check_goto_colon_consistency(  # pylint: disable=too-many-locals
     lines: List[str],
@@ -110,6 +110,7 @@ def _check_goto_colon_consistency(  # pylint: disable=too-many-locals
         )
 
     return issues
+
 
 def _check_global_priv_security(lines: List[str]) -> List[LintIssue]:
     """Check for SEC005 privilege issues globally across the entire script."""
@@ -168,6 +169,7 @@ def _check_global_priv_security(lines: List[str]) -> List[LintIssue]:
 
     return issues
 
+
 def _check_new_global_rules(lines: List[str], file_path: str) -> List[LintIssue]:
     """Check for new global rules that require full file context."""
     issues: List[LintIssue] = []
@@ -182,6 +184,7 @@ def _check_new_global_rules(lines: List[str], file_path: str) -> List[LintIssue]
     issues.extend(_check_global_priv_security(lines))
 
     return issues
+
 
 def _check_bat_cmd_differences(lines: List[str], file_path: str) -> List[LintIssue]:
     """Check for .bat/.cmd specific issues."""
@@ -231,6 +234,7 @@ def _check_bat_cmd_differences(lines: List[str], file_path: str) -> List[LintIss
 
     return issues
 
+
 def _check_advanced_global_patterns(
     lines: List[str], file_path: str
 ) -> List[LintIssue]:
@@ -251,6 +255,7 @@ def _check_advanced_global_patterns(
 
     return issues
 
+
 def _check_nested_for_loops(lines: List[str]) -> List[LintIssue]:
     """Check for nested FOR loops that should use CALL optimization."""
     issues: List[LintIssue] = []
@@ -266,6 +271,7 @@ def _check_nested_for_loops(lines: List[str]) -> List[LintIssue]:
             issues.append(nested_for_issue)
 
     return issues
+
 
 def _find_nested_for_issue(lines: List[str], start_line: int) -> Optional[LintIssue]:
     """Find nested FOR loop issues starting from given line."""
@@ -295,6 +301,7 @@ def _find_nested_for_issue(lines: List[str], start_line: int) -> Optional[LintIs
 
     return None
 
+
 def _check_external_error_handling(lines: List[str]) -> List[LintIssue]:
     """Check for missing error handling on external commands."""
     issues: List[LintIssue] = []
@@ -321,6 +328,7 @@ def _check_external_error_handling(lines: List[str]) -> List[LintIssue]:
                 break
 
     return issues
+
 
 def _check_restart_limits(lines: List[str]) -> List[LintIssue]:
     """Check for restart patterns without proper limits."""
@@ -352,6 +360,7 @@ def _check_restart_limits(lines: List[str]) -> List[LintIssue]:
 
     return issues
 
+
 def _check_self_modification(lines: List[str], file_path: str) -> List[LintIssue]:
     """Check for batch self-modification vulnerabilities."""
     issues: List[LintIssue] = []
@@ -377,6 +386,7 @@ def _check_self_modification(lines: List[str], file_path: str) -> List[LintIssue
 
     return issues
 
+
 def _check_code_documentation(lines: List[str]) -> List[LintIssue]:
     """Check for code documentation and style issues."""
     issues: List[LintIssue] = []
@@ -385,6 +395,7 @@ def _check_code_documentation(lines: List[str]) -> List[LintIssue]:
     issues.extend(_check_var_naming(lines))
 
     return issues
+
 
 def _categorize_variable_style(var_name: str) -> str:
     """
@@ -408,6 +419,7 @@ def _categorize_variable_style(var_name: str) -> str:
         return "lowercase"
     return "unknown"
 
+
 def _should_skip_line_for_var_check(stripped: str) -> bool:
     """
     Check if line should be skipped for variable name checking.
@@ -426,6 +438,7 @@ def _should_skip_line_for_var_check(stripped: str) -> bool:
     if any(char in stripped for char in skip_chars):
         return True
     return False
+
 
 def _check_var_naming(lines: List[str]) -> List[LintIssue]:
     """Check for inconsistent variable naming conventions."""
@@ -465,6 +478,7 @@ def _check_var_naming(lines: List[str]) -> List[LintIssue]:
             )
 
     return issues
+
 
 def _check_setlocal_redundancy(lines: List[str]) -> List[LintIssue]:
     """Check for redundant SETLOCAL/ENDLOCAL pairs."""

@@ -1,47 +1,47 @@
 """Advanced checker subpackage."""
 
+from blinter.checkers.advanced.enhanced import (
+    _check_cmd_error_handling,
+    _check_deprecated_commands,
+    _check_enhanced_commands,
+    _check_for_f_options,
+    _check_if_comparison_quotes,
+)
 from blinter.checkers.advanced.escaping import (
-    _should_flag_caret_escape,
-    _check_improper_caret_escape,
-    _check_multilevel_escaping,
+    _check_advanced_escaping_rules,
     _check_continuation_spaces,
     _check_double_percent_escaping,
-    _check_advanced_escaping_rules,
+    _check_improper_caret_escape,
+    _check_multilevel_escaping,
+    _should_flag_caret_escape,
+)
+from blinter.checkers.advanced.style_security_perf import (
+    _check_advanced_performance,
+    _check_advanced_security,
+    _check_advanced_style_patterns,
+    _check_advanced_style_rules,
+    _check_enhanced_performance,
+    _check_enhanced_security_rules,
+    _check_function_docs,
+    _check_line_length,
+    _check_magic_numbers,
+    _check_unnecessary_output_p014,
+    _check_variable_naming,
+    _find_set_exclusion_ranges,
+    _get_safe_command_patterns,
+    _get_safe_system_variables,
+    _has_nearby_interactive_cmds,
+    _is_number_in_special_context,
+    _is_safe_command_injection,
 )
 from blinter.checkers.advanced.vars_syntax import (
     _check_advanced_for_rules,
     _check_advanced_process_mgmt,
-    _check_percent_tilde_syntax,
-    _check_for_loop_var_syntax,
-    _check_string_operation_syntax,
-    _check_set_a_quoting,
     _check_advanced_vars,
-)
-from blinter.checkers.advanced.enhanced import (
-    _check_for_f_options,
-    _check_if_comparison_quotes,
-    _check_deprecated_commands,
-    _check_cmd_error_handling,
-    _check_enhanced_commands,
-)
-from blinter.checkers.advanced.style_security_perf import (
-    _check_advanced_security,
-    _check_advanced_performance,
-    _check_advanced_style_patterns,
-    _check_variable_naming,
-    _check_function_docs,
-    _find_set_exclusion_ranges,
-    _is_number_in_special_context,
-    _check_magic_numbers,
-    _check_line_length,
-    _check_advanced_style_rules,
-    _get_safe_system_variables,
-    _get_safe_command_patterns,
-    _is_safe_command_injection,
-    _check_enhanced_security_rules,
-    _check_unnecessary_output_p014,
-    _has_nearby_interactive_cmds,
-    _check_enhanced_performance,
+    _check_for_loop_var_syntax,
+    _check_percent_tilde_syntax,
+    _check_set_a_quoting,
+    _check_string_operation_syntax,
 )
 
 __all__ = [

@@ -1,7 +1,10 @@
 """Shared helpers for constructing LintIssue instances."""
+
 from typing import List, Optional
+
 from blinter.models import LintIssue, Rule, RuleSeverity
 from blinter.rules.registry import RULES
+
 
 def _s011_rule(max_line_length: int) -> Rule:
     """Return the S011 rule, with explanation adjusted for custom line length."""
@@ -15,6 +18,7 @@ def _s011_rule(max_line_length: int) -> Rule:
         explanation=base_rule.explanation.replace("100", str(max_line_length)),
         recommendation=base_rule.recommendation,
     )
+
 
 def _add_issue(
     issues: List[LintIssue],
@@ -46,6 +50,7 @@ def _add_issue(
             file_path=file_path,
         )
     )
+
 
 def _create_rule(
     code: str,

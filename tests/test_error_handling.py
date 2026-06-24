@@ -1,4 +1,13 @@
 """Tests for error handling and edge cases in real-world usage scenarios."""
+
+import os
+import tempfile
+from typing import List
+from unittest.mock import mock_open, patch
+import warnings
+
+import pytest
+
 from blinter import (
     LintIssue,
     find_batch_files,
@@ -10,16 +19,6 @@ from blinter.checkers.security import _check_security_issues
 from blinter.checkers.syntax import _check_syntax_errors
 from blinter.checkers.warnings import _check_warning_issues
 from blinter.io.encoding import _detect_line_endings
-
-
-import os
-import tempfile
-from typing import List
-from unittest.mock import mock_open, patch
-import warnings
-
-import pytest
-
 
 
 class TestRealWorldErrorHandling:

@@ -1,4 +1,9 @@
 """Tests for the main batch file linting functionality."""
+
+import os
+import re
+import tempfile
+
 from blinter import (
     RuleSeverity,
     lint_batch_file,
@@ -6,13 +11,7 @@ from blinter import (
 from blinter.patterns import DANGEROUS_COMMAND_PATTERNS
 from blinter.rules.registry import RULES
 
-
 # pylint: disable=too-many-lines
-
-import os
-import re
-import tempfile
-
 
 
 class TestLintBatchFile:
@@ -902,7 +901,7 @@ echo Done
 
         # Test RULES structure
         assert isinstance(RULES, dict)
-        assert len(RULES) > 0
+        assert len(RULES) == 151
 
         for rule_code, rule in RULES.items():
             assert isinstance(rule_code, str)

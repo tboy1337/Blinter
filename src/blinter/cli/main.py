@@ -11,6 +11,7 @@ from typing import (
     Set,
     Tuple,
 )
+
 from blinter._version import __version__
 from blinter.cli.args import _parse_cli_arguments
 from blinter.config.loader import load_config
@@ -35,21 +36,34 @@ from blinter.output.formatters import (
     print_summary,
 )
 
+
 def _configure_cli_logging() -> None:
     """Attach a stderr handler when no logging is configured by the host app."""
     blinter_logger = logging.getLogger("blinter")
-    if not blinter_logger.handlers:
-        handler = logging.StreamHandler(sys.stderr)
-        handler.setLevel(logging.WARNING)
-        handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
-        blinter_logger.addHandler(handler)
-        blinter_logger.setLevel(logging.WARNING)
+
+    for handler in list(blinter_logger.handlers):
+        if not isinstance(handler, logging.StreamHandler):
+            continue
+        stream = handler.stream
+        if stream is None or getattr(stream, "closed", False):
+            blinter_logger.removeHandler(handler)
+            handler.close()
+            continue
+        handler.setStream(sys.stderr)
+        return
+
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setLevel(logging.WARNING)
+    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    blinter_logger.addHandler(handler)
+    blinter_logger.setLevel(logging.WARNING)
 
 
 def _cli_error(message: str) -> NoReturn:
     """Print an error message and exit with status code 1."""
     print(message)
     raise SystemExit(1)
+
 
 def _process_single_called_script(
     called_script: Path,
@@ -72,9 +86,7 @@ def _process_single_called_script(
     if config.scan_root is not None and not is_path_under_root(
         called_script, Path(config.scan_root)
     ):
-        logger.debug(
-            "Skipping called script outside scan root: %s", called_script
-        )
+        logger.debug("Skipping called script outside scan root: %s", called_script)
         return (0, 0, None)
 
     try:
@@ -100,8 +112,9 @@ def _process_single_called_script(
             f"Warning: Could not process called script "
             f"'{called_script}': {called_error}"
         )
-        print(error_msg)
+        logger.warning(error_msg)
         return (0, 0, None)
+
 
 def _process_called_scripts(
     batch_file: Path,
@@ -121,9 +134,7 @@ def _process_called_scripts(
     """
     files_processed = 0
     files_with_errors = 0
-    called_scripts = _extract_called_scripts(
-        batch_file, scan_root=config.scan_root
-    )
+    called_scripts = _extract_called_scripts(batch_file, scan_root=config.scan_root)
 
     for called_script in called_scripts:
         result = _process_single_called_script(
@@ -139,6 +150,7 @@ def _process_called_scripts(
             state.processed_file_paths.append((result[2], str(batch_file)))
 
     return files_processed, files_with_errors
+
 
 def _process_batch_files(
     batch_files: List[Path], config: BlinterConfig
@@ -184,8 +196,10 @@ def _process_batch_files(
                 files_with_errors += called_results[1]
 
         except UnicodeDecodeError as decode_error:
-            print(
-                f"Warning: Could not read '{batch_file}' due to encoding issues: {decode_error}"
+            logger.warning(
+                "Could not read '%s' due to encoding issues: %s",
+                batch_file,
+                decode_error,
             )
             continue
         except (
@@ -195,7 +209,7 @@ def _process_batch_files(
             ValueError,
             TypeError,
         ) as file_error:
-            print(f"Warning: Could not process '{batch_file}': {file_error}")
+            logger.warning("Could not process '%s': %s", batch_file, file_error)
             continue
 
     if total_files_processed == 0:
@@ -209,6 +223,7 @@ def _process_batch_files(
         files_with_errors,
         state.processed_file_paths,
     )
+
 
 def _display_analyzed_scripts(
     processed_file_paths: List[Tuple[str, Optional[str]]],
@@ -247,6 +262,7 @@ def _display_analyzed_scripts(
             print(f"  {idx}. {display_path}")
 
     print()
+
 
 def _display_results(
     results: ProcessingResults,
@@ -308,6 +324,7 @@ def _display_results(
 
     print_severity_info(results.all_issues)
 
+
 def _exit_with_results(results: ProcessingResults, target_path: str) -> None:
     """Exit with appropriate code based on results."""
     is_directory = Path(target_path).is_dir()
@@ -358,6 +375,7 @@ def _exit_with_results(results: ProcessingResults, target_path: str) -> None:
             print("\nNo issues found! Your batch file looks great!")
             sys.exit(0)
 
+
 def _apply_cli_config_overrides(
     cli_args: CliArguments,
     config: BlinterConfig,
@@ -405,9 +423,7 @@ def main() -> None:
 
     # Find all batch files to process
     try:
-        batch_files = find_batch_files(
-            cli_args.target_path, recursive=config.recursive
-        )
+        batch_files = find_batch_files(cli_args.target_path, recursive=config.recursive)
     except FileNotFoundError:
         _cli_error(f"Error: Path '{cli_args.target_path}' not found.")
     except ValueError as value_error:

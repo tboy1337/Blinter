@@ -1,11 +1,4 @@
 """Tests for thread safety and concurrent operations."""
-from blinter import (
-    BlinterConfig,
-    LintIssue,
-    lint_batch_file,
-    read_file_with_encoding,
-)
-
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import gc
@@ -14,6 +7,12 @@ import tempfile
 import time
 from typing import List
 
+from blinter import (
+    BlinterConfig,
+    LintIssue,
+    lint_batch_file,
+    read_file_with_encoding,
+)
 
 
 class TestThreadSafety:

@@ -1,4 +1,5 @@
 """Main lint orchestration entry point for single batch files."""
+
 from pathlib import Path
 from typing import (
     Dict,
@@ -6,6 +7,7 @@ from typing import (
     Optional,
     Set,
 )
+
 from blinter.checkers.globals import (
     _check_global_style_rules,
     _check_new_global_rules,
@@ -27,6 +29,7 @@ from blinter.parsing.structure import (
     _parse_suppression_comments,
 )
 
+
 def lint_batch_file(  # pylint: disable=too-many-locals
     file_path: str,
     config: Optional[BlinterConfig] = None,
@@ -40,7 +43,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     and performance optimization suggestions.
 
     Thread-safe: Yes - uses only local variables and immutable global rules
-    Performance: Optimized for files up to 10MB, handles larger files gracefully
+    Performance: Optimized for files up to 10MB; files above 50MB are rejected
 
     Args:
         file_path: Path to the batch file (.bat or .cmd) to lint.
@@ -74,8 +77,12 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     if config is None:
         config = BlinterConfig()
 
+    scan_root = config.scan_root
+    if scan_root is None:
+        scan_root = str(Path(file_path).parent.resolve())
+
     # Read and validate file
-    lines, _encoding_used = _validate_and_read_file(file_path)
+    lines, _encoding_used, line_ending_info = _validate_and_read_file(file_path)
 
     if not lines:
         return []  # Empty file, no issues
@@ -98,7 +105,9 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     ) = structure_data
 
     # Critical line ending checks (includes ERROR level E018)
-    issues.extend(_check_line_ending_rules(lines, file_path))
+    issues.extend(
+        _check_line_ending_rules(lines, file_path, ending_info=line_ending_info)
+    )
 
     # Style rules that apply globally
     issues.extend(_check_global_style_rules(lines, file_path))
@@ -118,7 +127,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
             called_scripts_vars = _collect_called_vars(
                 batch_path,
                 dependency_graph,
-                scan_root=config.scan_root,
+                scan_root=scan_root,
             )
         except (OSError, ValueError) as collect_error:
             logger.warning(

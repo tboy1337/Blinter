@@ -1,4 +1,5 @@
 """CLI output formatting: summaries, grouping, and help text."""
+
 from collections import defaultdict
 from pathlib import Path
 from typing import (
@@ -9,13 +10,16 @@ from typing import (
     Tuple,
     Union,
 )
+
 from blinter._version import __version__
 from blinter.models import LintIssue, RuleSeverity
 from blinter.rules.registry import RULES
 
+
 def print_version() -> None:
     """Print version information."""
     print(f"v{__version__}")
+
 
 def print_help() -> None:
     """Print help information for the blinter command."""
@@ -35,8 +39,9 @@ Options:
   --severity          Accepted for compatibility; severity breakdown is always shown.
   --max-line-length <n>  Set maximum line length for S011 rule (default: 100).
   --no-recursive      When processing directories, don't search subdirectories (default: recursive).
-  --follow-calls      Automatically scan scripts called by CALL statements (one level deep).
-                     This helps analyze centralized configuration scripts that set variables.
+  --follow-calls      Scan scripts called by CALL statements from each seed file.
+                     Variable context may be collected transitively; each seed file
+                     lints its direct CALL targets only.
   --no-config         Don't use configuration file (blinter.ini) even if it exists.
   --create-config     Create a default blinter.ini configuration file and exit.
   --help              Display this help menu and exit.
@@ -80,6 +85,7 @@ If no <path> is specified or '--help' is passed, this help menu will be displaye
 """
     print(help_text.strip())
 
+
 def group_issues(issues: List[LintIssue]) -> DefaultDict[RuleSeverity, List[LintIssue]]:
     """Group issues by severity level.
 
@@ -93,6 +99,7 @@ def group_issues(issues: List[LintIssue]) -> DefaultDict[RuleSeverity, List[Lint
     for issue in issues:
         grouped[issue.rule.severity].append(issue)
     return grouped
+
 
 def print_summary(issues: List[LintIssue]) -> None:
     """Print summary statistics of linting issues.
@@ -146,6 +153,7 @@ def print_summary(issues: List[LintIssue]) -> None:
         if count > 0:
             print(f"  {severity.value}: {count}")
 
+
 def _format_line_numbers_with_files(
     issues: List[LintIssue],
 ) -> Tuple[bool, Union[str, Dict[str, List[int]]]]:
@@ -184,6 +192,7 @@ def _format_line_numbers_with_files(
 
     return (True, dict(file_lines))
 
+
 def _get_unique_contexts(rule_issues: List[LintIssue]) -> List[str]:
     """Extract unique contexts from rule issues, preserving order.
 
@@ -206,6 +215,7 @@ def _get_unique_contexts(rule_issues: List[LintIssue]) -> List[str]:
             seen.add(context)
     return unique_contexts
 
+
 def _print_rule_group(rule_code: str, rule_issues: List[LintIssue]) -> None:
     """Print a group of issues for a single rule.
 
@@ -221,16 +231,16 @@ def _print_rule_group(rule_code: str, rule_issues: List[LintIssue]) -> None:
     if is_multi_file:
         # Hierarchical format for multiple files
         print(f"\n{rule.name} ({rule_code})")
-        # line_data is Dict[str, List[int]]
-        assert isinstance(line_data, dict)
+        if not isinstance(line_data, dict):
+            raise TypeError("Expected dict line data for multi-file output")
         for filename in sorted(line_data.keys()):
             line_nums = line_data[filename]
             line_str = ", ".join(map(str, line_nums))
             print(f"  [{filename}] Line {line_str}")
     else:
         # Simple format for single file
-        # line_data is str like "Line 296, 303, 4709"
-        assert isinstance(line_data, str)
+        if not isinstance(line_data, str):
+            raise TypeError("Expected str line data for single-file output")
         print(f"\n{line_data}: {rule.name} ({rule_code})")
 
     print(f"- Explanation: {rule.explanation}")
@@ -240,6 +250,7 @@ def _print_rule_group(rule_code: str, rule_issues: List[LintIssue]) -> None:
     unique_contexts = _get_unique_contexts(rule_issues)
     for context in unique_contexts:
         print(f"- Context: {context}")
+
 
 def print_detailed(issues: List[LintIssue]) -> None:
     """Print detailed issue information in the new format.
@@ -284,6 +295,7 @@ def print_detailed(issues: List[LintIssue]) -> None:
             _print_rule_group(rule_code, rule_groups[rule_code])
 
         print()  # Extra spacing between severity levels
+
 
 def print_severity_info(issues: List[LintIssue]) -> None:
     """Print severity level information.

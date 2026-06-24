@@ -1,16 +1,27 @@
 """Line ending and multibyte character checks."""
+
 import re
 from typing import (
     List,
+    Optional,
     Tuple,
 )
-from blinter.io.encoding import _has_multibyte_chars
+
+from blinter.io.encoding import (
+    LineEndingInfo,
+    _detect_line_endings,
+    _has_multibyte_chars,
+)
 from blinter.logging_config import logger
 from blinter.models import LintIssue
 from blinter.rules.registry import RULES
-from blinter.io.encoding import _detect_line_endings
 
-def _check_line_ending_rules(lines: List[str], file_path: str) -> List[LintIssue]:
+
+def _check_line_ending_rules(
+    lines: List[str],
+    file_path: str,
+    ending_info: Optional[LineEndingInfo] = None,
+) -> List[LintIssue]:
     """
     Check for line ending related issues (E018, S005, W018, W019, S016).
 
@@ -28,17 +39,23 @@ def _check_line_ending_rules(lines: List[str], file_path: str) -> List[LintIssue
         return []
 
     try:
-        return _analyze_line_endings(lines, file_path)
+        return _analyze_line_endings(lines, file_path, ending_info=ending_info)
     except OSError as line_ending_error:
         logger.warning(
             "Could not analyze line endings for %s: %s", file_path, line_ending_error
         )
         return []
 
-def _analyze_line_endings(lines: List[str], file_path: str) -> List[LintIssue]:
+
+def _analyze_line_endings(
+    lines: List[str],
+    file_path: str,
+    ending_info: Optional[LineEndingInfo] = None,
+) -> List[LintIssue]:
     """Analyze line endings and return related issues."""
     issues: List[LintIssue] = []
-    ending_info = _detect_line_endings(file_path)
+    if ending_info is None:
+        ending_info = _detect_line_endings(file_path)
     ending_type = ending_info[0]
 
     # Check basic line ending issues
@@ -51,6 +68,7 @@ def _analyze_line_endings(lines: List[str], file_path: str) -> List[LintIssue]:
         issues.extend(_check_doublecolon_risks(lines, ending_type))
 
     return issues
+
 
 def _check_basic_line_ending_issues(
     ending_info: Tuple[str, bool, int, int, int],
@@ -84,6 +102,7 @@ def _check_basic_line_ending_issues(
 
     return issues
 
+
 def _check_multibyte_risks(lines: List[str], ending_type: str) -> List[LintIssue]:
     """Check for W018 multi-byte character risks."""
     has_multibyte, affected_lines = _has_multibyte_chars(lines)
@@ -99,6 +118,7 @@ def _check_multibyte_risks(lines: List[str], ending_type: str) -> List[LintIssue
             )
         ]
     return []
+
 
 def _check_goto_call_risks(lines: List[str], ending_type: str) -> List[LintIssue]:
     """Check for W019 GOTO/CALL risks."""
@@ -120,6 +140,7 @@ def _check_goto_call_risks(lines: List[str], ending_type: str) -> List[LintIssue
             )
         ]
     return []
+
 
 def _check_doublecolon_risks(lines: List[str], ending_type: str) -> List[LintIssue]:
     """Check for S016 double-colon comment risks."""

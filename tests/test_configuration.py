@@ -1,13 +1,4 @@
 """Tests for blinter configuration functionality."""
-from blinter import (
-    BlinterConfig,
-    RuleSeverity,
-    __version__,
-    create_default_config_file,
-    lint_batch_file,
-    load_config,
-)
-
 
 import configparser
 import os
@@ -16,6 +7,15 @@ from typing import Set
 from unittest.mock import patch
 
 from tests.conftest import get_project_version
+
+from blinter import (
+    BlinterConfig,
+    RuleSeverity,
+    __version__,
+    create_default_config_file,
+    lint_batch_file,
+    load_config,
+)
 
 
 class TestBlinterConfig:

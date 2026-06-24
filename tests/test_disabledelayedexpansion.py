@@ -5,11 +5,10 @@ SETLOCAL DISABLEDELAYEDEXPANSION usage while recognizing legitimate use cases
 such as toggling after ENDLOCAL, protecting literal ! characters, and defensive
 programming at script start.
 """
-from blinter import lint_batch_file
-
 
 import pathlib
 
+from blinter import lint_batch_file
 
 
 def test_redundant_disable_mid(tmp_path: pathlib.Path) -> None:

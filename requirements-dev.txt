@@ -12,6 +12,7 @@ pytest-cov
 pylint
 mypy
 autopep8
+bandit
 
 # Code Formatting
 black

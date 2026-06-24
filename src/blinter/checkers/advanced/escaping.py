@@ -1,15 +1,11 @@
 """Advanced caret and percent escaping rules (E030-E033)."""
 
 import re
-from typing import (
-    Dict,
-    List,
-    Optional,
-    Tuple,
-    cast,
-)
+from typing import List
+
 from blinter.models import LintIssue
 from blinter.rules.registry import RULES
+
 
 def _should_flag_caret_escape(stripped: str, caret_pos: int, line: str = "") -> bool:
     """Check if a caret escape sequence should be flagged as improper."""
@@ -56,6 +52,7 @@ def _should_flag_caret_escape(stripped: str, caret_pos: int, line: str = "") -> 
 
     return True
 
+
 def _check_improper_caret_escape(
     stripped: str, line_number: int, line: str = ""
 ) -> List[LintIssue]:
@@ -70,6 +67,7 @@ def _check_improper_caret_escape(
             issues.append(LintIssue(line_number, RULES["E030"], context=stripped))
     return issues
 
+
 def _check_multilevel_escaping(stripped: str, line_number: int) -> List[LintIssue]:
     """Check for E031: Invalid multilevel escaping."""
     issues: List[LintIssue] = []
@@ -82,6 +80,7 @@ def _check_multilevel_escaping(stripped: str, line_number: int) -> List[LintIssu
         if caret_count > 0 and caret_count not in valid_counts:
             issues.append(LintIssue(line_number, RULES["E031"], context=seq))
     return issues
+
 
 def _check_continuation_spaces(
     line: str, stripped: str, line_number: int
@@ -102,6 +101,7 @@ def _check_continuation_spaces(
             )
     return issues
 
+
 def _check_double_percent_escaping(stripped: str, line_number: int) -> List[LintIssue]:
     """Check for E033: Double percent escaping error."""
     issues: List[LintIssue] = []
@@ -121,6 +121,7 @@ def _check_double_percent_escaping(stripped: str, line_number: int) -> List[Lint
                 )
             )
     return issues
+
 
 def _check_advanced_escaping_rules(line: str, line_number: int) -> List[LintIssue]:
     """Check for advanced escaping technique issues."""

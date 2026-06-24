@@ -1,4 +1,5 @@
 """Embedded script block detection within batch files."""
+
 from dataclasses import dataclass
 import re
 from typing import (
@@ -7,6 +8,7 @@ from typing import (
     Set,
     Tuple,
 )
+
 from blinter.logging_config import logger
 from blinter.patterns import (
     BATCH_INDICATORS,
@@ -14,6 +16,7 @@ from blinter.patterns import (
     POWERSHELL_PATTERNS,
     VBSCRIPT_PATTERNS,
 )
+
 
 def _is_script_language_line(line: str, patterns: List[str]) -> bool:
     """
@@ -30,6 +33,7 @@ def _is_script_language_line(line: str, patterns: List[str]) -> bool:
         if re.search(pattern, line, re.IGNORECASE):
             return True
     return False
+
 
 def _is_batch_code_line(line: str, stripped: str) -> bool:
     """
@@ -49,6 +53,7 @@ def _is_batch_code_line(line: str, stripped: str) -> bool:
                 return True
     return False
 
+
 @dataclass
 class ScriptBlockState:
     """State information for script block detection."""
@@ -59,6 +64,7 @@ class ScriptBlockState:
     script_type: str
     line_num: int
     last_label_line: int
+
 
 def _handle_script_block_start(state: ScriptBlockState) -> Tuple[bool, int]:
     """
@@ -80,6 +86,7 @@ def _handle_script_block_start(state: ScriptBlockState) -> Tuple[bool, int]:
             )
             return True, state.line_num
     return state.in_current_block, 0
+
 
 def _handle_script_block_end(
     is_batch_line: bool,
@@ -108,6 +115,7 @@ def _handle_script_block_end(
         )
         return False
     return True
+
 
 def _process_heredoc_block(
     stripped: str,
@@ -142,6 +150,7 @@ def _process_heredoc_block(
 
     return False, block_start, False
 
+
 @dataclass
 class ScriptProcessingContext:
     """Context information for script block processing."""
@@ -153,6 +162,7 @@ class ScriptProcessingContext:
     block_states: Dict[str, bool]
     block_start_line: int
     skip_lines: Set[int]
+
 
 def _process_script_blocks(
     ctx: ScriptProcessingContext,
@@ -210,6 +220,7 @@ def _process_script_blocks(
             ctx.skip_lines.add(ctx.line_num)
 
     return ctx.block_states, ctx.block_start_line, False
+
 
 def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals
     lines: List[str],

@@ -1,12 +1,15 @@
 """Style and formatting line checks (S-prefix rules)."""
+
 import re
 from typing import (
     List,
     Optional,
 )
+
 from blinter.models import LintIssue
 from blinter.rules.helpers import _s011_rule
 from blinter.rules.registry import RULES
+
 
 def _find_unquoted_separator(param_string: str) -> int:
     """
@@ -33,6 +36,7 @@ def _find_unquoted_separator(param_string: str) -> int:
             return i
 
     return len(param_string)
+
 
 def _check_timeout_ping_numbers(stripped: str, line_num: int) -> List[LintIssue]:
     """
@@ -66,6 +70,7 @@ def _check_timeout_ping_numbers(stripped: str, line_num: int) -> List[LintIssue]
 
     return issues
 
+
 def _check_style_issues(
     line: str,
     line_num: int,
@@ -77,8 +82,9 @@ def _check_style_issues(
 
     # S003: Command capitalization consistency is now checked at file level
 
-    # S004: Trailing whitespace
-    if line.rstrip("\n") != line.rstrip():
+    # S004: Trailing whitespace (strip line endings before comparing)
+    line_content = line.rstrip("\r\n")
+    if line_content != line_content.rstrip():
         issues.append(
             LintIssue(
                 line_number=line_num,
@@ -91,7 +97,7 @@ def _check_style_issues(
     issues.extend(_check_timeout_ping_numbers(stripped, line_num))
 
     # S011: Line exceeds maximum length
-    line_length = len(line.rstrip("\n"))
+    line_length = len(line.rstrip("\r\n"))
     if line_length > max_line_length:
         issues.append(
             LintIssue(

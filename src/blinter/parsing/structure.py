@@ -1,4 +1,5 @@
 """Label collection, script structure, and subroutine detection."""
+
 import re
 from typing import (
     Dict,
@@ -6,11 +7,13 @@ from typing import (
     Set,
     Tuple,
 )
+
 from blinter.models import LintIssue
-from blinter.rules.helpers import _add_issue
 from blinter.patterns import (
     _COMPILED_SETLOCAL_DISABLE,
 )
+from blinter.rules.helpers import _add_issue
+
 
 def _collect_labels(lines: List[str]) -> Tuple[Dict[str, int], List[LintIssue]]:
     """Collect all labels and detect duplicates."""
@@ -44,6 +47,7 @@ def _collect_labels(lines: List[str]) -> Tuple[Dict[str, int], List[LintIssue]]:
                 labels[label] = i
 
     return labels, issues
+
 
 def _is_in_subroutine_context(  # pylint: disable=unused-argument
     lines: List[str], line_number: int, labels: Dict[str, int]
@@ -81,6 +85,7 @@ def _is_in_subroutine_context(  # pylint: disable=unused-argument
             return True
 
     return False
+
 
 def _collect_set_variables(lines: List[str]) -> Set[str]:
     """Collect all variables that are set in the script."""
@@ -174,6 +179,7 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
 
     return set_vars
 
+
 def _parse_suppression_comments(lines: List[str]) -> Dict[int, Set[str]]:
     """
     Parse inline suppression comments from batch file lines.
@@ -233,6 +239,7 @@ def _parse_suppression_comments(lines: List[str]) -> Dict[int, Set[str]]:
 
     return suppressions
 
+
 def _analyze_script_structure(
     lines: List[str],
 ) -> Tuple[bool, bool, bool, bool, bool, bool, bool]:
@@ -271,15 +278,10 @@ def _analyze_script_structure(
             has_literal_exclamations = True
             break
 
-    # Track which lines have disabledelayedexpansion and if they follow endlocal
-    disable_expansion_lines: Dict[int, bool] = {}  # line_num -> is_after_endlocal
-    for i, line in enumerate(lines, start=1):
-        if _COMPILED_SETLOCAL_DISABLE.search(line):
-            # Check if there's an ENDLOCAL in previous lines
-            is_after_endlocal = any(
-                "endlocal" in prev_line.lower() for prev_line in lines[: i - 1]
-            )
-            disable_expansion_lines[i] = is_after_endlocal
+    # Track whether any line uses disabledelayedexpansion
+    has_disable_expansion_lines = any(
+        _COMPILED_SETLOCAL_DISABLE.search(line) for line in lines
+    )
 
     return (
         has_setlocal,
@@ -288,7 +290,5 @@ def _analyze_script_structure(
         uses_delayed_vars,
         has_disable_delayed_expansion,
         has_literal_exclamations,
-        bool(
-            disable_expansion_lines
-        ),  # Convert dict to bool for now to maintain simpler interface
+        has_disable_expansion_lines,
     )

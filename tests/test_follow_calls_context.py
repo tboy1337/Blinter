@@ -5,17 +5,16 @@ This module tests that when --follow-calls is enabled, variables defined in call
 scripts are properly recognized as "defined" in the calling script, eliminating
 false positive E006 (undefined variable) errors.
 """
+
+import os
+from pathlib import Path
+import tempfile
+
 from blinter import (
     BlinterConfig,
     lint_batch_file,
 )
 from blinter.engine.dependencies import _extract_called_scripts
-
-
-import os
-import tempfile
-from pathlib import Path
-
 
 
 class TestFollowCallsVariableContext:

@@ -1,22 +1,25 @@
 """Security vulnerability line checks (SEC-prefix rules)."""
+
 import re
 from typing import (
     List,
     Optional,
 )
+
 from blinter.models import LintIssue
 from blinter.parsing.context import (
     _is_command_in_safe_context,
+    _is_comment_line,
     _is_safe_ctx_for_privilege,
 )
 from blinter.patterns import (
+    _DANGEROUS_CMDS_REGEX,
     CREDENTIAL_PATTERNS,
     DANGEROUS_COMMAND_PATTERNS,
     SENSITIVE_ECHO_PATTERNS,
-    _DANGEROUS_CMDS_REGEX,
 )
 from blinter.rules.registry import RULES
-from blinter.parsing.context import _is_comment_line
+
 
 def _check_input_validation_sec(
     line: str, line_num: int, stripped: str
@@ -96,6 +99,7 @@ def _check_input_validation_sec(
 
     return issues
 
+
 def _has_priv_check_before(lines: List[str], target_line_num: int) -> bool:
     """Check if there's a privilege check (net session) before the target line."""
     for _, line in enumerate(lines[: target_line_num - 1], start=1):
@@ -103,6 +107,7 @@ def _has_priv_check_before(lines: List[str], target_line_num: int) -> bool:
         if re.search(r"net\s+session\s*(>|$)", stripped):
             return True
     return False
+
 
 def _check_privilege_security(
     stripped: str, line_num: int, lines: Optional[List[str]] = None, line: str = ""
@@ -161,6 +166,7 @@ def _check_privilege_security(
 
     return issues
 
+
 def _check_path_security(line: str, stripped: str, line_num: int) -> List[LintIssue]:
     """Check for path-related security issues (SEC006-SEC007, SEC014)."""
     issues: List[LintIssue] = []
@@ -183,8 +189,8 @@ def _check_path_security(line: str, stripped: str, line_num: int) -> List[LintIs
             )
             break
 
-    # SEC007: Hardcoded temporary directory
-    temp_paths = [r"C:\temp", r"C:\tmp", r"/tmp"]
+    # SEC007: Hardcoded temporary directory (patterns scanned by this rule, not runtime paths)
+    temp_paths = [r"C:\temp", r"C:\tmp", r"/tmp"]  # nosec B108
     for temp_path in temp_paths:
         if temp_path in stripped:
             issues.append(
@@ -210,6 +216,7 @@ def _check_path_security(line: str, stripped: str, line_num: int) -> List[LintIs
             )
 
     return issues
+
 
 def _check_info_disclosure_sec(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for information disclosure security issues (SEC008-SEC010)."""
@@ -250,6 +257,7 @@ def _check_info_disclosure_sec(stripped: str, line_num: int) -> List[LintIssue]:
             break
 
     return issues
+
 
 def _check_malware_security(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for malware-like behavior security issues (SEC021-SEC024)."""
@@ -306,6 +314,7 @@ def _check_malware_security(stripped: str, line_num: int) -> List[LintIssue]:
         )
 
     return issues
+
 
 def _check_security_issues(line: str, line_num: int) -> List[LintIssue]:
     """Check for security level issues."""

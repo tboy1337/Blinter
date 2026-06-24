@@ -1,19 +1,18 @@
 """Tests for file encoding detection functionality."""
-from blinter import (
-    lint_batch_file,
-    read_file_with_encoding,
-)
-
 
 import os
-import tempfile
 from pathlib import Path
+import tempfile
 from typing import IO, Union
 from unittest.mock import MagicMock, mock_open, patch
 import warnings
 
 import pytest
 
+from blinter import (
+    lint_batch_file,
+    read_file_with_encoding,
+)
 
 
 class TestFileEncodingDetection:

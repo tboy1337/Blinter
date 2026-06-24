@@ -2,18 +2,14 @@
 
 import re
 from typing import (
-    Dict,
     List,
     Optional,
-    Tuple,
-    cast,
 )
-from blinter.constants import MAGIC_NUMBER_EXCEPTIONS
+
 from blinter.models import LintIssue
 from blinter.patterns import DEPRECATED_COMMANDS, REMOVED_COMMANDS
 from blinter.rules.registry import RULES
-from blinter.parsing.context import _is_comment_line
-from blinter.parsing.structure import _is_in_subroutine_context
+
 
 def _check_for_f_options(stripped: str, line_number: int) -> Optional[LintIssue]:
     """Check FOR /F without proper options (W020)."""
@@ -27,6 +23,7 @@ def _check_for_f_options(stripped: str, line_number: int) -> Optional[LintIssue]
         )
     return None
 
+
 def _check_if_comparison_quotes(stripped: str, line_number: int) -> Optional[LintIssue]:
     """Check IF comparisons without quotes (W021)."""
     if_pattern = r'\s*if\s+(?:not\s+)?%\w+%\s*==\s*[^"\']\w+'
@@ -37,6 +34,7 @@ def _check_if_comparison_quotes(stripped: str, line_number: int) -> Optional[Lin
             context="IF comparison should be quoted",
         )
     return None
+
 
 def _check_deprecated_commands(stripped: str, line_number: int) -> List[LintIssue]:
     """Check for deprecated commands (W024) and removed commands (E034)."""
@@ -131,6 +129,7 @@ def _check_deprecated_commands(stripped: str, line_number: int) -> List[LintIssu
 
     return issues
 
+
 def _check_cmd_error_handling(
     stripped: str, line_number: int, lines: List[str]
 ) -> Optional[LintIssue]:
@@ -154,6 +153,7 @@ def _check_cmd_error_handling(
             )
 
     return None
+
 
 def _check_enhanced_commands(lines: List[str]) -> List[LintIssue]:
     """Check for enhanced command validation issues (W020-W025)."""

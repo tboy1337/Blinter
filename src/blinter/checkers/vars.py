@@ -1,4 +1,5 @@
 """Undefined and unsafe variable usage checks."""
+
 import re
 from typing import (
     Dict,
@@ -6,9 +7,11 @@ from typing import (
     Optional,
     Set,
 )
+
 from blinter.constants import BUILTIN_VARS
 from blinter.models import LintIssue
 from blinter.rules.helpers import _add_issue
+
 
 def _get_available_vars_at_line(
     line_num: int,
@@ -34,6 +37,7 @@ def _get_available_vars_at_line(
                 available_vars.update(called_vars)
 
     return available_vars
+
 
 def _should_check_variable(
     var_name: str,
@@ -61,6 +65,7 @@ def _should_check_variable(
 
     # Only check if variable is not defined
     return var_name not in available_vars
+
 
 def _check_undefined_variables(
     lines: List[str],

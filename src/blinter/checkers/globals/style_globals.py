@@ -1,21 +1,19 @@
 """Global style rules: indentation, pause, duplication, and casing."""
 
 from collections import defaultdict
-from pathlib import Path
 import re
 from typing import (
-    DefaultDict,
     Dict,
     List,
     Optional,
     Tuple,
 )
+
 from blinter.models import LintIssue
-from blinter.patterns import COMMAND_CASING_KEYWORDS
 from blinter.parsing.context import _is_comment_line
-from blinter.rules.helpers import _add_issue
+from blinter.patterns import COMMAND_CASING_KEYWORDS
 from blinter.rules.registry import RULES
-from blinter.parsing.context import _is_safe_ctx_for_privilege
+
 
 def _check_redundant_operations(lines: List[str]) -> List[LintIssue]:
     """Check for redundant file operations."""
@@ -44,6 +42,7 @@ def _check_redundant_operations(lines: List[str]) -> List[LintIssue]:
                         break
 
     return issues
+
 
 def _check_code_duplication(lines: List[str]) -> List[LintIssue]:
     """Check for code duplication that could be refactored."""
@@ -112,6 +111,7 @@ def _check_code_duplication(lines: List[str]) -> List[LintIssue]:
 
     return issues
 
+
 def _check_missing_pause(lines: List[str]) -> List[LintIssue]:
     """Check for missing PAUSE in interactive scripts (W014)."""
     issues: List[LintIssue] = []
@@ -139,6 +139,7 @@ def _check_missing_pause(lines: List[str]) -> List[LintIssue]:
 
     return issues
 
+
 def _collect_indented_lines(lines: List[str]) -> List[Tuple[int, str]]:
     """Collect all indented lines with their leading whitespace."""
     indented_lines = []
@@ -152,6 +153,7 @@ def _collect_indented_lines(lines: List[str]) -> List[Tuple[int, str]]:
                     break
             indented_lines.append((i, leading_whitespace))
     return indented_lines
+
 
 def _find_single_line_mixed_indent(
     indented_lines: List[Tuple[int, str]],
@@ -168,6 +170,7 @@ def _find_single_line_mixed_indent(
                 )
             )
     return issues
+
 
 def _find_file_mixed_indent(
     indented_lines: List[Tuple[int, str]],
@@ -203,6 +206,7 @@ def _find_file_mixed_indent(
         return LintIssue(line_number=later_line, rule=RULES["S012"], context=context)
     return None
 
+
 def _check_inconsistent_indentation(
     lines: List[str],
 ) -> List[LintIssue]:
@@ -224,6 +228,7 @@ def _check_inconsistent_indentation(
             issues.append(file_issue)
 
     return issues
+
 
 def _check_missing_header_doc(lines: List[str]) -> List[LintIssue]:
     """Check for missing file header documentation (S013)."""
@@ -300,6 +305,7 @@ def _check_missing_header_doc(lines: List[str]) -> List[LintIssue]:
 
     return issues
 
+
 def _collect_cmd_cases(lines: List[str]) -> Dict[str, List[Tuple[int, str]]]:
     """Collect command casing patterns from file lines."""
     command_cases: Dict[str, List[Tuple[int, str]]] = {}
@@ -332,6 +338,7 @@ def _collect_cmd_cases(lines: List[str]) -> Dict[str, List[Tuple[int, str]]]:
 
     return command_cases
 
+
 def _find_most_common_case(
     occurrences: List[Tuple[int, str]],
 ) -> Tuple[str, Dict[str, List[int]]]:
@@ -347,6 +354,7 @@ def _find_most_common_case(
 
     most_common_case = max(case_counts.keys(), key=_get_count)
     return most_common_case, case_counts
+
 
 def _check_cmd_case_consistency(lines: List[str]) -> List[LintIssue]:
     """Check for consistent command capitalization within the file (S003)."""

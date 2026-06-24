@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Blinter"
-version = "1.0.120"
+version = "1.0.121"
 description = "Blinter is a linter for Windows batch files. It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -45,6 +45,7 @@ dev = [
     "pylint",
     "mypy",
     "autopep8",
+    "bandit",
     # Code Formatting
     "black",
     "isort",
@@ -125,15 +126,3 @@ color_output = false
 
 [tool.pylint]
 # Configuration is in pylintrc for full control and readability
-
-[tool.pytest.ini_options]
-# Configuration is in pytest.ini for compatibility
-
-[tool.coverage.run]
-# Configuration is in .coveragerc for full control
-
-[tool.coverage.report]
-# Configuration is in .coveragerc for full control
-
-[tool.coverage.html]
-# Configuration is in .coveragerc for full control

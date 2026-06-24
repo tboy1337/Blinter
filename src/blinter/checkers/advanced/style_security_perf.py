@@ -8,12 +8,13 @@ from typing import (
     Tuple,
     cast,
 )
+
 from blinter.constants import MAGIC_NUMBER_EXCEPTIONS
 from blinter.models import LintIssue
-from blinter.patterns import DEPRECATED_COMMANDS, REMOVED_COMMANDS
-from blinter.rules.registry import RULES
 from blinter.parsing.context import _is_comment_line
 from blinter.parsing.structure import _is_in_subroutine_context
+from blinter.rules.registry import RULES
+
 
 def _check_advanced_security(
     line: str, line_number: int, lines: List[str], labels: Dict[str, int]
@@ -69,6 +70,7 @@ def _check_advanced_security(
 
     return issues
 
+
 def _check_advanced_performance(
     lines: List[str], line_number: int, line: str
 ) -> List[LintIssue]:
@@ -117,6 +119,7 @@ def _check_advanced_performance(
         )
 
     return issues
+
 
 def _check_advanced_style_patterns(
     line: str, line_number: int, lines: List[str]
@@ -177,6 +180,7 @@ def _check_advanced_style_patterns(
 
     return issues
 
+
 def _check_variable_naming(
     line: str, line_number: int, variables_seen: Dict[str, str]
 ) -> List[LintIssue]:
@@ -215,6 +219,7 @@ def _check_variable_naming(
 
     return issues
 
+
 def _check_function_docs(
     line: str, line_number: int, lines: List[str]
 ) -> List[LintIssue]:
@@ -242,6 +247,7 @@ def _check_function_docs(
             )
 
     return issues
+
 
 def _find_set_exclusion_ranges(line: str) -> List[Tuple[int, int]]:
     """
@@ -290,6 +296,7 @@ def _find_set_exclusion_ranges(line: str) -> List[Tuple[int, int]]:
 
     return exclusion_ranges
 
+
 def _is_number_in_special_context(
     immediate_before: str, immediate_after: str, context_before: str, context_after: str
 ) -> bool:
@@ -326,6 +333,7 @@ def _is_number_in_special_context(
         or in_math_round
         or in_math_class
     )
+
 
 def _check_magic_numbers(line: str, line_number: int) -> List[LintIssue]:
     """Check for magic numbers (S019)."""
@@ -371,6 +379,7 @@ def _check_magic_numbers(line: str, line_number: int) -> List[LintIssue]:
 
     return issues
 
+
 def _check_line_length(
     line: str, line_number: int, max_line_length: int = 100
 ) -> List[LintIssue]:
@@ -389,6 +398,7 @@ def _check_line_length(
 
     return issues
 
+
 def _check_advanced_style_rules(
     lines: List[str], max_line_length: int = 100
 ) -> List[LintIssue]:
@@ -403,6 +413,7 @@ def _check_advanced_style_rules(
         issues.extend(_check_line_length(line, i, max_line_length))
 
     return issues
+
 
 def _get_safe_system_variables() -> List[str]:
     """Return list of safe system variables that don't pose injection risks."""
@@ -434,6 +445,7 @@ def _get_safe_system_variables() -> List[str]:
         "CommonProgramFiles(x86)",
     ]
 
+
 def _get_safe_command_patterns() -> List[str]:
     """Return list of safe command patterns for SEC013 rule."""
     return [
@@ -448,6 +460,7 @@ def _get_safe_command_patterns() -> List[str]:
         # Safe operations with multiple variables but no chaining
         r"^[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*>[^&|]*$",
     ]
+
 
 def _is_safe_command_injection(stripped: str) -> bool:
     """Check if a command with variables is safe from injection attacks."""
@@ -489,6 +502,7 @@ def _is_safe_command_injection(stripped: str) -> bool:
     has_only_redirection = bool(re.search(r">.*$", stripped))
 
     return is_file_operation and has_only_redirection and not has_command_chaining
+
 
 def _check_enhanced_security_rules(lines: List[str]) -> List[LintIssue]:
     """Check for enhanced security issues (SEC011-SEC013)."""
@@ -537,6 +551,7 @@ def _check_enhanced_security_rules(lines: List[str]) -> List[LintIssue]:
 
     return issues
 
+
 def _check_unnecessary_output_p014(
     lines: List[str], i: int, stripped: str
 ) -> Optional[LintIssue]:
@@ -561,6 +576,7 @@ def _check_unnecessary_output_p014(
                     )
     return None
 
+
 def _has_nearby_interactive_cmds(lines: List[str], line_index: int) -> bool:
     """Check if there are interactive commands near the given line."""
     interactive_keywords = ["pause", "timeout", "set /p", "choice"]
@@ -570,6 +586,7 @@ def _has_nearby_interactive_cmds(lines: List[str], line_index: int) -> bool:
         if any(keyword in nearby_line for keyword in interactive_keywords):
             return True
     return False
+
 
 def _check_enhanced_performance(lines: List[str]) -> List[LintIssue]:
     """Check for enhanced performance issues (P012-P014)."""

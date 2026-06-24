@@ -100,7 +100,7 @@ When adding or moving a checker function:
 
 ## `--follow-calls` and `scan_root`
 
-When `follow_calls` is enabled, Blinter resolves `CALL` targets to read variables and optionally lint called scripts. The CLI sets `BlinterConfig.scan_root` to the target directory (or the parent of a single file) so paths outside the scan root are not read or processed. Library callers may leave `scan_root` unset for legacy behavior.
+When `follow_calls` is enabled, Blinter resolves `CALL` targets to read variables and optionally lint called scripts. The CLI sets `BlinterConfig.scan_root` to the target directory (or the parent of a single file) so paths outside the scan root are not read or processed. `lint_batch_file()` defaults `scan_root` to the batch file's parent directory when unset, matching CLI containment for library callers.
 
 ## Configuration
 

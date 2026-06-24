@@ -1,4 +1,5 @@
 """CALL dependency graph and cross-script variable collection."""
+
 from pathlib import Path
 import re
 from typing import (
@@ -7,6 +8,7 @@ from typing import (
     Optional,
     Set,
 )
+
 from blinter.io.discovery import is_path_under_root
 from blinter.io.encoding import read_file_with_encoding
 from blinter.logging_config import logger
@@ -45,6 +47,7 @@ def _extract_called_scripts(
         List of Path objects for called scripts that exist
     """
     called_scripts: List[Path] = []
+    seen_scripts: Set[Path] = set()
     batch_dir = batch_file.parent
 
     lines = _read_batch_lines(batch_file)
@@ -66,20 +69,21 @@ def _extract_called_scripts(
             continue
 
         script_path_str = call_match.group(1) or call_match.group(2)
-        script_path = _resolve_call_script_path(script_path_str, batch_dir)
+        script_path = _resolve_script_path(
+            script_path_str, batch_dir, scan_root=scan_root
+        )
         if script_path is None:
             continue
 
         try:
             if not (script_path.exists() and script_path.is_file()):
                 continue
-            if script_path.resolve() == batch_file.resolve():
+            resolved_script = script_path.resolve()
+            if resolved_script == batch_file.resolve():
                 continue
-            if not _is_within_scan_root(script_path, scan_root):
-                logger.debug(
-                    "Skipping called script outside scan root: %s", script_path
-                )
+            if resolved_script in seen_scripts:
                 continue
+            seen_scripts.add(resolved_script)
             called_scripts.append(script_path)
         except (ValueError, OSError) as path_error:
             logger.debug("Skipping invalid called script path: %s", path_error)
@@ -88,28 +92,44 @@ def _extract_called_scripts(
     return called_scripts
 
 
-def _resolve_call_script_path(script_path_str: str, batch_dir: Path) -> Optional[Path]:
+def _resolve_script_path(
+    script_path_str: str,
+    batch_dir: Path,
+    scan_root: Optional[str] = None,
+) -> Optional[Path]:
     """
-    Resolve a CALL script path with batch parameter expansions.
+    Resolve a script path from a CALL statement.
 
     Args:
         script_path_str: The script path string from the CALL statement
-        batch_dir: The directory containing the batch file
+        batch_dir: The directory of the batch file containing the CALL
+        scan_root: Optional root directory; absolute paths outside it return None
 
     Returns:
-        Resolved Path object, or None if resolution fails
+        Resolved Path object, or None if resolution fails or path is outside scan_root
     """
     if "%~dp0" in script_path_str:
         script_path_str = script_path_str.replace("%~dp0", "")
-        return batch_dir / script_path_str
-    if "%~d0" in script_path_str:
+        resolved = batch_dir / script_path_str
+    elif "%~d0" in script_path_str:
         script_path_str = script_path_str.replace("%~d0", str(batch_dir.drive))
-        return Path(script_path_str)
+        resolved = Path(script_path_str)
+    else:
+        script_path = Path(script_path_str)
+        if not script_path.is_absolute():
+            resolved = batch_dir / script_path_str
+        else:
+            resolved = script_path
 
-    script_path = Path(script_path_str)
-    if not script_path.is_absolute():
-        return batch_dir / script_path_str
-    return script_path
+    try:
+        if scan_root is not None and not _is_within_scan_root(resolved, scan_root):
+            logger.debug("Skipping script path outside scan root: %s", resolved)
+            return None
+    except (ValueError, OSError) as path_error:
+        logger.debug("Skipping invalid script path: %s", path_error)
+        return None
+
+    return resolved
 
 
 def _try_add_dependency(
@@ -134,9 +154,7 @@ def _try_add_dependency(
         if resolved_script == batch_file_resolved:
             return
         if not _is_within_scan_root(resolved_script, scan_root):
-            logger.debug(
-                "Skipping dependency outside scan root: %s", resolved_script
-            )
+            logger.debug("Skipping dependency outside scan root: %s", resolved_script)
             return
         deps.add(resolved_script)
     except (ValueError, OSError) as dependency_error:
@@ -180,7 +198,9 @@ def _extract_direct_dependencies(
             continue
 
         script_path_str = call_match.group(1) or call_match.group(2)
-        script_path = _resolve_call_script_path(script_path_str, batch_dir)
+        script_path = _resolve_script_path(
+            script_path_str, batch_dir, scan_root=scan_root
+        )
 
         if script_path:
             _try_add_dependency(
@@ -276,30 +296,6 @@ def _collect_vars_from_dependencies(
     return {0: all_vars} if all_vars else {}
 
 
-def _resolve_script_path(script_path_str: str, batch_dir: Path) -> Path:
-    """
-    Resolve a script path from a CALL statement.
-
-    Args:
-        script_path_str: The script path string from the CALL statement
-        batch_dir: The directory of the batch file containing the CALL
-
-    Returns:
-        Resolved Path object for the script
-    """
-    if "%~dp0" in script_path_str:
-        script_path_str = script_path_str.replace("%~dp0", "")
-        return batch_dir / script_path_str
-    if "%~d0" in script_path_str:
-        script_path_str = script_path_str.replace("%~d0", str(batch_dir.drive))
-        return Path(script_path_str)
-
-    script_path = Path(script_path_str)
-    if not script_path.is_absolute():
-        return batch_dir / script_path_str
-    return script_path
-
-
 def _collect_vars_from_script(
     script_path: Path,
     batch_file_resolved: Path,
@@ -392,7 +388,11 @@ def _collect_called_vars(
             continue
 
         script_path_str = call_match.group(1) or call_match.group(2)
-        script_path = _resolve_script_path(script_path_str, batch_dir)
+        script_path = _resolve_script_path(
+            script_path_str, batch_dir, scan_root=scan_root
+        )
+        if script_path is None:
+            continue
 
         called_vars = _collect_vars_from_script(
             script_path, batch_file_resolved, scan_root=scan_root

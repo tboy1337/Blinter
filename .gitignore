@@ -212,10 +212,5 @@ config.ini
 .secrets
 secrets.json
 
-# Coverage reports
-htmlcov/
-.coverage
-coverage.xml
-
 # Pylint report
 pylint-report.txt

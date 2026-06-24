@@ -7,15 +7,14 @@ which were previously incorrectly flagged as mismatched quotes (E009).
 
 Tests added based on real-world batch script analysis from batch-script-examples folder.
 """
-from blinter import (
-    LintIssue,
-    lint_batch_file,
-)
-
 
 from pathlib import Path
 from typing import List
 
+from blinter import (
+    LintIssue,
+    lint_batch_file,
+)
 
 
 class TestStringReplacementSyntax:

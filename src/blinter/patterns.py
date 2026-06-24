@@ -1,4 +1,5 @@
 """Regex patterns for dangerous commands and deprecated syntax."""
+
 import re
 from typing import List, Set, Tuple
 

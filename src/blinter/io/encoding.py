@@ -1,4 +1,6 @@
 """File encoding detection and line-ending analysis."""
+
+from io import StringIO
 from pathlib import Path
 from typing import (
     List,
@@ -7,10 +9,43 @@ from typing import (
     cast,
 )
 import warnings
-from blinter.constants import MAX_FILE_SIZE_BYTES
+
+from blinter.constants import LARGE_FILE_WARNING_BYTES, MAX_FILE_SIZE_BYTES
 from blinter.logging_config import logger
 
-def _detect_line_endings(file_path: str) -> Tuple[str, bool, int, int, int]:
+LineEndingInfo = Tuple[str, bool, int, int, int]
+
+
+def _line_ending_stats_from_bytes(content: bytes) -> LineEndingInfo:
+    """Derive line-ending statistics from raw file bytes."""
+    crlf_count = content.count(b"\r\n")
+    lf_total = content.count(b"\n")
+    lf_only_count = lf_total - crlf_count
+    cr_total = content.count(b"\r")
+    cr_only_count = cr_total - crlf_count
+
+    ending_types: List[str] = []
+    if crlf_count > 0:
+        ending_types.append("CRLF")
+    if lf_only_count > 0:
+        ending_types.append("LF")
+    if cr_only_count > 0:
+        ending_types.append("CR")
+
+    if not ending_types:
+        dominant_type = "NONE"
+        has_mixed = False
+    elif len(ending_types) == 1:
+        dominant_type = ending_types[0]
+        has_mixed = False
+    else:
+        dominant_type = "MIXED"
+        has_mixed = True
+
+    return dominant_type, has_mixed, crlf_count, lf_only_count, cr_only_count
+
+
+def _detect_line_endings(file_path: str) -> LineEndingInfo:
     """
     Detect line ending types in a batch file.
 
@@ -48,35 +83,9 @@ def _detect_line_endings(file_path: str) -> Tuple[str, bool, int, int, int]:
     except (FileNotFoundError, PermissionError, OSError) as file_error:
         raise OSError(f"Cannot read file '{file_path}': {file_error}") from file_error
 
-    # Count different line ending types
-    crlf_count = content.count(b"\r\n")
-    # Count LF that are NOT part of CRLF
-    lf_total = content.count(b"\n")
-    lf_only_count = lf_total - crlf_count
-    # Count CR that are NOT part of CRLF
-    cr_total = content.count(b"\r")
-    cr_only_count = cr_total - crlf_count
-
-    # Determine the dominant type and if mixed
-    ending_types = []
-    if crlf_count > 0:
-        ending_types.append("CRLF")
-    if lf_only_count > 0:
-        ending_types.append("LF")
-    if cr_only_count > 0:
-        ending_types.append("CR")
-
-    if not ending_types:
-        # No line endings found (empty file or single line)
-        dominant_type = "NONE"
-        has_mixed = False
-    elif len(ending_types) == 1:
-        dominant_type = ending_types[0]
-        has_mixed = False
-    else:
-        # Multiple types found
-        dominant_type = "MIXED"
-        has_mixed = True
+    dominant_type, has_mixed, crlf_count, lf_only_count, cr_only_count = (
+        _line_ending_stats_from_bytes(content)
+    )
 
     logger.debug(
         "Line ending analysis for %s: %s (CRLF: %d, LF-only: %d, CR-only: %d)",
@@ -88,6 +97,7 @@ def _detect_line_endings(file_path: str) -> Tuple[str, bool, int, int, int]:
     )
 
     return dominant_type, has_mixed, crlf_count, lf_only_count, cr_only_count
+
 
 def _has_multibyte_chars(lines: List[str]) -> Tuple[bool, List[int]]:
     """
@@ -130,28 +140,18 @@ def _has_multibyte_chars(lines: List[str]) -> Tuple[bool, List[int]]:
 
     return has_multibyte, affected_lines
 
-def _detect_encoding_charset_norm(
-    file_path: str, encodings_list: List[str]
+
+def _detect_encoding_charset_norm_bytes(
+    raw_data: bytes, encodings_list: List[str]
 ) -> List[str]:
     """
-    Detect file encoding using charset_normalizer library if available.
+    Detect file encoding using charset_normalizer on pre-read bytes.
 
     Thread-safe: Yes - uses only local variables
-    Performance: Single file read operation
-
-    Args:
-        file_path: Path to the file to analyze
-        encodings_list: List of encodings to prioritize
-
-    Returns:
-        Updated list of encodings with detected encoding moved to front
     """
     try:
         # pylint: disable=import-outside-toplevel  # isort: skip
         from charset_normalizer import from_bytes
-
-        with open(file_path, "rb") as file_handle:
-            raw_data = file_handle.read()
 
         best_match = from_bytes(raw_data).best()  # type: ignore[misc]
         detected_match = cast(object, best_match)
@@ -174,12 +174,10 @@ def _detect_encoding_charset_norm(
             float(detected_coherence_raw),
         )
 
-        # Add detected encoding to the front if not already there
         if detected_encoding not in [enc.lower() for enc in encodings_list]:
             encodings_list.insert(0, detected_encoding)
             return encodings_list
 
-        # Move detected encoding to front if it exists in our list
         for i, enc in enumerate(encodings_list):
             if enc.lower() == detected_encoding:
                 encodings_list.insert(0, encodings_list.pop(i))
@@ -192,9 +190,52 @@ def _detect_encoding_charset_norm(
             "charset_normalizer not available, using fallback encoding detection"
         )
         return encodings_list
-    except (OSError, ValueError, TypeError) as detection_error:
+    except (ValueError, TypeError) as detection_error:
         logger.debug("Encoding detection failed: %s, using fallback", detection_error)
         return encodings_list
+
+
+def _detect_encoding_charset_norm(
+    file_path: str, encodings_list: List[str]
+) -> List[str]:
+    """
+    Detect file encoding using charset_normalizer library if available.
+
+    Thread-safe: Yes - uses only local variables
+    Performance: Single file read operation
+
+    Args:
+        file_path: Path to the file to analyze
+        encodings_list: List of encodings to prioritize
+
+    Returns:
+        Updated list of encodings with detected encoding moved to front
+    """
+    try:
+        with open(file_path, "rb") as file_handle:
+            raw_data = file_handle.read()
+        return _detect_encoding_charset_norm_bytes(raw_data, encodings_list)
+
+    except (OSError, ValueError) as detection_error:
+        logger.debug("Encoding detection failed: %s, using fallback", detection_error)
+        return encodings_list
+
+
+def _try_decode_bytes(raw_data: bytes, encoding: str) -> Optional[List[str]]:
+    """Attempt to decode bytes with a specific encoding."""
+    try:
+        logger.debug("Attempting to decode file with encoding: %s", encoding)
+        text = raw_data.decode(encoding, errors="strict")
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        lines = StringIO(text).readlines()
+        logger.debug(
+            "Successfully decoded %d lines using %s encoding", len(lines), encoding
+        )
+        return lines
+    except (UnicodeDecodeError, LookupError, ValueError) as error:
+        logger.debug("Failed to decode with %s: %s", encoding, error)
+        return None
+
 
 def _try_read_with_encoding(file_path: str, encoding: str) -> Optional[List[str]]:
     """
@@ -221,6 +262,33 @@ def _try_read_with_encoding(file_path: str, encoding: str) -> Optional[List[str]
     except (UnicodeDecodeError, LookupError, ValueError) as error:
         logger.debug("Failed to read with %s: %s", encoding, error)
         return None
+
+
+def _read_lines_from_bytes(file_path: str, raw_data: bytes) -> Tuple[List[str], str]:
+    """Decode pre-read file bytes using charset detection and fallbacks."""
+    encodings_to_try = [
+        "utf-8",
+        "utf-8-sig",
+        "latin1",
+        "cp1252",
+        "iso-8859-1",
+        "ascii",
+        "cp437",
+        "utf-16",
+        "utf-32",
+    ]
+    encodings_to_try = _detect_encoding_charset_norm_bytes(raw_data, encodings_to_try)
+
+    for encoding in encodings_to_try:
+        lines = _try_decode_bytes(raw_data, encoding)
+        if lines is not None:
+            return lines, encoding
+
+    raise OSError(
+        f"All encoding attempts failed for file '{file_path}'. "
+        f"Could not decode file with any supported encoding"
+    )
+
 
 def read_file_with_encoding(file_path: str) -> Tuple[List[str], str]:
     """
@@ -280,11 +348,14 @@ def read_file_with_encoding(file_path: str) -> Tuple[List[str], str]:
         f"Could not read file with any supported encoding"
     )
 
-def _validate_and_read_file(file_path: str) -> Tuple[List[str], str]:
-    """Validate file and read its contents.
+
+def _validate_and_read_file(
+    file_path: str,
+) -> Tuple[List[str], str, LineEndingInfo]:
+    """Validate file and read its contents in a single binary pass.
 
     Returns:
-        Tuple of (lines, encoding_used)
+        Tuple of (lines, encoding_used, line_ending_info)
     """
     if not file_path or not isinstance(file_path, str):
         raise ValueError("file_path must be a non-empty string")
@@ -298,7 +369,7 @@ def _validate_and_read_file(file_path: str) -> Tuple[List[str], str]:
 
     # Check file size for performance warning
     file_size = file_obj.stat().st_size
-    if file_size > 10 * 1024 * 1024:  # 10MB
+    if file_size > LARGE_FILE_WARNING_BYTES:
         logger.warning(
             "Large file detected (%dMB). Processing may take longer.",
             file_size // 1024 // 1024,
@@ -306,11 +377,11 @@ def _validate_and_read_file(file_path: str) -> Tuple[List[str], str]:
 
     if file_size > MAX_FILE_SIZE_BYTES:
         max_mb = MAX_FILE_SIZE_BYTES // 1024 // 1024
-        raise ValueError(
-            f"File exceeds maximum size of {max_mb}MB: {file_path}"
-        )
+        raise ValueError(f"File exceeds maximum size of {max_mb}MB: {file_path}")
 
-    lines, encoding_used = read_file_with_encoding(file_path)
+    raw_data = file_obj.read_bytes()
+    line_ending_info = _line_ending_stats_from_bytes(raw_data)
+    lines, encoding_used = _read_lines_from_bytes(file_path, raw_data)
 
     # Issue a warning if we had to fall back from UTF-8, but not for pure ASCII files
     if encoding_used.lower() not in ["utf-8", "utf-8-sig", "ascii"]:
@@ -332,4 +403,4 @@ def _validate_and_read_file(file_path: str) -> Tuple[List[str], str]:
                 stacklevel=3,
             )
 
-    return lines, encoding_used
+    return lines, encoding_used, line_ending_info

@@ -1,4 +1,12 @@
 """Tests for edge cases and specialized scenarios."""
+
+import os
+import tempfile
+from typing import Dict, Set
+from unittest.mock import MagicMock, mock_open, patch
+
+import pytest
+
 from blinter import (
     lint_batch_file,
     read_file_with_encoding,
@@ -33,18 +41,9 @@ from blinter.parsing.structure import (
     _collect_set_variables,
 )
 
-
 # pylint: disable=too-many-lines,import-outside-toplevel,redefined-outer-name,reimported
 # pylint: disable=unused-argument,invalid-name,missing-class-docstring,too-few-public-methods
 # pylint: disable=unused-variable,unused-import
-
-import os
-import tempfile
-from typing import Dict, Set
-from unittest.mock import MagicMock, mock_open, patch
-
-import pytest
-
 
 
 class TestFileEncodingEdgeCases:
@@ -344,6 +343,7 @@ class TestStyleIssueChecking:
 
         # Now check using the global function that detects inconsistencies
         from blinter.checkers.globals import _check_cmd_case_consistency
+
         consistency_issues = _check_cmd_case_consistency(test_lines)
 
         assert len(consistency_issues) >= 1
@@ -486,6 +486,7 @@ class TestGlobalFunctionChecking:
             "echo Processing...",
         ]
         from blinter.checkers.globals import _check_missing_pause
+
         issues = _check_missing_pause(lines)
         assert len(issues) == 1
         assert "W014" in issues[0].rule.code
@@ -497,6 +498,7 @@ class TestGlobalFunctionChecking:
             "echo Processing...",
         ]
         from blinter.checkers.globals import _check_missing_pause
+
         issues = _check_missing_pause(lines)
         assert len(issues) == 1
         assert "W014" in issues[0].rule.code
@@ -509,6 +511,7 @@ class TestGlobalFunctionChecking:
             "echo Done",
         ]
         from blinter.checkers.globals import _check_missing_pause
+
         issues = _check_missing_pause(lines)
         assert len(issues) == 0
 
@@ -520,6 +523,7 @@ class TestGlobalFunctionChecking:
             "  echo other indentation",  # Just spaces
         ]
         from blinter.checkers.globals import _check_inconsistent_indentation
+
         issues = _check_inconsistent_indentation(lines)
         assert len(issues) >= 1  # Should detect mixed indentation
         s012_issues = [i for i in issues if i.rule.code == "S012"]
@@ -534,6 +538,7 @@ class TestGlobalFunctionChecking:
             "echo end",
         ]
         from blinter.checkers.globals import _check_inconsistent_indentation
+
         issues = _check_inconsistent_indentation(lines)
         assert len(issues) == 1
         assert "S012" in issues[0].rule.code
@@ -574,6 +579,7 @@ class TestGlobalFunctionChecking:
             "echo line 31",  # Now 31 lines, should trigger S013 with new threshold of 30
         ]
         from blinter.checkers.globals import _check_missing_header_doc
+
         issues = _check_missing_header_doc(lines)
         assert len(issues) == 1
         assert "S013" in issues[0].rule.code
@@ -588,6 +594,7 @@ class TestGlobalFunctionChecking:
             "echo content",
         ]
         from blinter.checkers.globals import _check_missing_header_doc
+
         issues = _check_missing_header_doc(lines)
         assert len(issues) == 0
 
@@ -624,6 +631,7 @@ class TestMainFunctionEdgeCases:
     def test_validate_and_read_file_edge_cases(self) -> None:
         """Test _validate_and_read_file edge cases."""
         from blinter.io.encoding import _validate_and_read_file
+
         # Test empty file path
         with pytest.raises(ValueError, match="file_path must be a non-empty string"):
             _validate_and_read_file("")
@@ -635,6 +643,7 @@ class TestMainFunctionEdgeCases:
     def test_analyze_script_structure_edge_cases(self) -> None:
         """Test _analyze_script_structure edge cases."""
         from blinter.parsing.structure import _analyze_script_structure
+
         lines = [
             "setlocal",
             "set VAR=value",
@@ -689,6 +698,7 @@ class TestAdditionalEdgeCaseScenarios:
         import tempfile
 
         from blinter.io.encoding import _validate_and_read_file
+
         # Mock a large file
         def mock_stat(*args: object, **kwargs: object) -> object:
             class StatResult:
@@ -706,7 +716,7 @@ class TestAdditionalEdgeCaseScenarios:
                 with patch(
                     "builtins.open", mock_open(read_data="@echo off\necho test")
                 ):
-                    lines, encoding = _validate_and_read_file(temp_path)
+                    lines, encoding, _ending_info = _validate_and_read_file(temp_path)
                     assert len(lines) > 0
                     assert encoding in [
                         "utf-8",
@@ -721,6 +731,7 @@ class TestAdditionalEdgeCaseScenarios:
     def test_script_structure_analysis_edge_cases(self) -> None:
         """Test _analyze_script_structure with edge cases."""
         from blinter.parsing.structure import _analyze_script_structure
+
         # Empty lines
         lines: list[str] = []
         result = _analyze_script_structure(lines)
@@ -751,6 +762,7 @@ class TestAdditionalEdgeCaseScenarios:
     def test_missing_pause_edge_case(self) -> None:
         """Test _check_missing_pause with edge cases."""
         from blinter.checkers.globals import _check_missing_pause
+
         # Script with user input but already has pause - should not warn
         lines = [
             "set /p answer=Continue?",
@@ -786,6 +798,7 @@ class TestAdditionalEdgeCaseScenarios:
     def test_security_is_command_in_safe_context(self) -> None:
         """Test _is_command_in_safe_context function behavior."""
         from blinter.parsing.context import _is_command_in_safe_context
+
         # Test REM comment context
         assert _is_command_in_safe_context("rem del *.* is dangerous") is True
         assert _is_command_in_safe_context("REM	format c: is dangerous") is True
@@ -818,6 +831,7 @@ class TestAdditionalEdgeCaseScenarios:
     def test_style_issues_edge_cases(self) -> None:
         """Test style issue detection edge cases."""
         from blinter.checkers.style import _check_style_issues
+
         # Small number, should not trigger magic number rule
         issues = _check_style_issues("timeout /t 5", 1)
         # Should only trigger S003 (command casing), not S009 (magic number)
@@ -844,6 +858,7 @@ class TestAdditionalEdgeCaseScenarios:
     def test_performance_issue_edge_cases(self) -> None:
         """Test performance issue detection edge cases."""
         from blinter.checkers.performance import _check_performance_issues
+
         # Test temp file with random - should not trigger P007
         issues = _check_performance_issues(
             [""],
@@ -863,6 +878,7 @@ class TestAdditionalEdgeCaseScenarios:
     def test_missing_pause_reverse_line_order(self) -> None:
         """Test _check_missing_pause finding appropriate line number."""
         from blinter.checkers.globals import _check_missing_pause
+
         # Test finding the last executable line for warning
         lines = [
             "set /p answer=Continue?",
@@ -879,6 +895,7 @@ class TestAdditionalEdgeCaseScenarios:
     def test_inconsistent_indentation_few_indented_lines(self) -> None:
         """Test inconsistent indentation with less than 2 indented lines."""
         from blinter.checkers.globals import _check_inconsistent_indentation
+
         lines = [
             "echo start",
             "  echo only one indented line",
@@ -933,6 +950,7 @@ class TestAdditionalEdgeCaseScenarios:
     def test_security_admin_commands_edge_cases(self) -> None:
         """Test admin command detection edge cases."""
         from blinter.checkers.security import _check_security_issues
+
         # Test specific admin commands
         test_cases = [
             "reg add HKLM\\Software\\Test /v Value /d Data",
@@ -1132,6 +1150,7 @@ class TestStyleChecking:
             ]
 
             from blinter.checkers.globals import _check_cmd_case_consistency
+
             consistency_issues = _check_cmd_case_consistency(test_lines)
             casing_issues = [i for i in consistency_issues if i.rule.code == "S003"]
             assert (
@@ -2237,7 +2256,9 @@ class TestSpecializedEdgeCases:
         """Test _has_multibyte_chars handling of UnicodeEncodeError."""
         # Create a custom line that will trigger UnicodeEncodeError
         # We'll patch the function to directly simulate the error condition
-        with patch("blinter.checkers.line_endings._has_multibyte_chars") as mock_has_multibyte:
+        with patch(
+            "blinter.checkers.line_endings._has_multibyte_chars"
+        ) as mock_has_multibyte:
             mock_has_multibyte.return_value = (True, [1])
             lines = ["test line"]
             has_mb, affected_lines = mock_has_multibyte(lines)

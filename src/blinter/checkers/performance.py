@@ -1,13 +1,16 @@
 """Performance issue line checks (P-prefix rules)."""
+
 import re
 from typing import (
     List,
 )
+
 from blinter.models import LintIssue
-from blinter.rules.registry import RULES
 from blinter.patterns import (
     _COMPILED_SETLOCAL_DISABLE,
 )
+from blinter.rules.registry import RULES
+
 
 def _check_temp_file_usage(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for P007: Temporary file without random name."""
@@ -28,6 +31,7 @@ def _check_temp_file_usage(stripped: str, line_num: int) -> List[LintIssue]:
             break
     return issues
 
+
 def _check_for_loop_optimization(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for P009: Inefficient FOR loop pattern."""
     issues: List[LintIssue] = []
@@ -45,6 +49,7 @@ def _check_for_loop_optimization(stripped: str, line_num: int) -> List[LintIssue
                 )
             )
     return issues
+
 
 def _check_delay_implementation(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for P015: Inefficient delay implementation."""
@@ -78,6 +83,7 @@ def _check_delay_implementation(stripped: str, line_num: int) -> List[LintIssue]
                 )
             )
     return issues
+
 
 def _check_redundant_disable_delay(
     stripped: str, line_num: int, _lines: List[str], has_literal_exclamations: bool
@@ -125,6 +131,7 @@ def _check_redundant_disable_delay(
             )
         )
     return issues
+
 
 def _check_performance_issues(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     _lines: List[str],

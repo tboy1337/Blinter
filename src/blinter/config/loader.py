@@ -5,8 +5,10 @@ from pathlib import Path
 from typing import (
     Optional,
 )
+
 from blinter.logging_config import logger
 from blinter.models import BlinterConfig, RuleSeverity
+
 
 def _load_general_settings(
     config: BlinterConfig, parser: configparser.ConfigParser
@@ -26,6 +28,7 @@ def _load_general_settings(
     if severity_str:
         _set_min_severity(config, severity_str)
 
+
 def _set_min_severity(config: BlinterConfig, severity_str: str) -> None:
     """Set minimum severity from string value."""
     severity_map = {
@@ -40,6 +43,7 @@ def _set_min_severity(config: BlinterConfig, severity_str: str) -> None:
         config.min_severity = severity_map[severity_upper]
     else:
         logger.warning("Invalid min_severity value: %s", severity_str)
+
 
 def _load_rule_settings(
     config: BlinterConfig, parser: configparser.ConfigParser
@@ -63,6 +67,7 @@ def _load_rule_settings(
         config.disabled_rules = set(
             rule.strip() for rule in disabled_str.split(",") if rule.strip()
         )
+
 
 def load_config(
     config_path: Optional[str] = None, use_config: bool = True
@@ -108,6 +113,7 @@ def load_config(
         )
 
     return config
+
 
 def create_default_config_file(config_path: str = "blinter.ini") -> None:
     """
