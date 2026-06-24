@@ -1,5 +1,6 @@
 """CALL dependency graph and cross-script variable collection."""
 
+from dataclasses import dataclass
 from pathlib import Path
 import re
 from typing import (
@@ -15,6 +16,16 @@ from blinter.io.discovery import is_path_under_root
 from blinter.io.encoding import _validate_and_read_file
 from blinter.logging_config import logger
 from blinter.parsing.structure import _collect_set_variables
+
+
+@dataclass(frozen=True)
+class _CallLineContext:
+    """Shared path context for resolving CALL statements on a single line."""
+
+    batch_dir: Path
+    batch_file_resolved: Path
+    scan_root: Optional[str]
+    lines_cache: Optional[Dict[Path, List[str]]]
 
 
 def _is_within_scan_root(path: Path, scan_root: Optional[str]) -> bool:
@@ -397,10 +408,7 @@ def _collect_vars_from_script(
 def _vars_from_call_line(
     line: str,
     line_num: int,
-    batch_dir: Path,
-    batch_file_resolved: Path,
-    scan_root: Optional[str],
-    lines_cache: Optional[Dict[Path, List[str]]],
+    ctx: _CallLineContext,
 ) -> Optional[Tuple[int, Set[str]]]:
     """Return line number and variables when a line contains a resolvable CALL."""
     stripped = line.strip().lower()
@@ -416,15 +424,17 @@ def _vars_from_call_line(
         return None
 
     script_path_str = call_match.group(1) or call_match.group(2)
-    script_path = _resolve_script_path(script_path_str, batch_dir, scan_root=scan_root)
+    script_path = _resolve_script_path(
+        script_path_str, ctx.batch_dir, scan_root=ctx.scan_root
+    )
     if script_path is None:
         return None
 
     called_vars = _collect_vars_from_script(
         script_path,
-        batch_file_resolved,
-        scan_root=scan_root,
-        lines_cache=lines_cache,
+        ctx.batch_file_resolved,
+        scan_root=ctx.scan_root,
+        lines_cache=ctx.lines_cache,
     )
     if not called_vars:
         return None
@@ -472,21 +482,19 @@ def _collect_called_vars(
         )
 
     called_vars_by_line: Dict[int, Set[str]] = {}
-    batch_dir = batch_file.parent
+    call_ctx = _CallLineContext(
+        batch_dir=batch_file.parent,
+        batch_file_resolved=batch_file_resolved,
+        scan_root=scan_root,
+        lines_cache=lines_cache,
+    )
 
     file_lines = _read_batch_lines(batch_file, lines=lines)
     if file_lines is None:
         return called_vars_by_line
 
     for line_num, line in enumerate(file_lines, start=1):
-        call_vars = _vars_from_call_line(
-            line,
-            line_num,
-            batch_dir,
-            batch_file_resolved,
-            scan_root,
-            lines_cache,
-        )
+        call_vars = _vars_from_call_line(line, line_num, call_ctx)
         if call_vars is not None:
             called_vars_by_line[call_vars[0]] = call_vars[1]
 

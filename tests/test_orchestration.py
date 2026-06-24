@@ -56,7 +56,7 @@ class TestFilterIssuesByConfig:
     def test_inline_suppression_all_rules(self) -> None:
         config = BlinterConfig()
         issues = [_issue("E001", line=5), _issue("E002", line=6)]
-        suppressions = {5: set()}
+        suppressions: dict[int, set[str]] = {5: set()}
         filtered = _filter_issues_by_config(issues, config, suppressions)
         assert [issue.rule.code for issue in filtered] == ["E002"]
 
@@ -86,6 +86,6 @@ class TestFilterIssuesByConfig:
                 ),
             ),
         ]
-        suppressions = {1: set()}
+        suppressions: dict[int, set[str]] = {1: set()}
         filtered = _filter_issues_by_config(issues, config, suppressions)
         assert [issue.rule.code for issue in filtered] == []

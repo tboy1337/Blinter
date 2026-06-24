@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Blinter"
-version = "1.0.126"
+version = "1.0.127"
 description = "Blinter is a linter for Windows batch files. It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -17,7 +17,7 @@ maintainers = [
 ]
 keywords = ["lint", "python", "windows", "analysis", "script", "linting", "linter", "static-analysis", "static", "batch", "batch-file", "cmd", "batch-script", "batchfile", "bat", "script-analysis"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3 :: Only",

@@ -3,6 +3,8 @@
 from pathlib import Path
 from typing import List, Optional, Union
 
+from blinter.logging_config import logger
+
 
 def _resolved_is_under_root(resolved: Path, root_resolved: Path) -> bool:
     """Return True when resolved is inside root_resolved."""
@@ -35,7 +37,8 @@ def is_path_under_root(path: Path, root: Path) -> bool:
                     return False
 
         return _resolved_is_under_root(candidate.resolve(), root_resolved)
-    except (OSError, ValueError):
+    except (OSError, ValueError) as path_error:
+        logger.debug("Path %s is not under root %s: %s", path, root, path_error)
         return False
 
 

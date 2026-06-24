@@ -86,9 +86,6 @@ exclude_lines =
     # Don't complain about type checking imports
     if TYPE_CHECKING:
     
-    # Don't complain about platform specific code
-    pragma: no cover
-    
     # Don't complain about debug code  
     if DEBUG:
     

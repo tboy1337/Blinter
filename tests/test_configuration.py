@@ -375,13 +375,13 @@ class TestCreateDefaultConfigFile:
     def test_create_default_config_file_permission_error(self) -> None:
         """Test creating config file with permission error."""
         with patch("builtins.open", side_effect=PermissionError("Permission denied")):
-            with patch("builtins.print") as mock_print:
+            with patch("blinter.config.loader.logger.error") as mock_logger_error:
                 assert create_default_config_file("readonly.ini") is False
 
-                # Should print error message
-                mock_print.assert_called()
-                error_message = str(mock_print.call_args[0][0])
-                assert "Error creating configuration file" in error_message
+                mock_logger_error.assert_called_once()
+                logged_args = mock_logger_error.call_args[0]
+                assert logged_args[1] == "readonly.ini"
+                assert "Permission denied" in str(logged_args[2])
 
 
 class TestConfigurationIntegration:

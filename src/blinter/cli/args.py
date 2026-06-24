@@ -1,6 +1,8 @@
 """Command-line argument parsing for the Blinter CLI."""
 
+from dataclasses import dataclass, field
 import logging
+from pathlib import Path
 import sys
 from typing import (
     Callable,
@@ -14,6 +16,8 @@ from blinter.config.loader import create_default_config_file
 from blinter.constants import MAX_LINE_LENGTH
 from blinter.models import CliArguments
 from blinter.output.formatters import print_help, print_version
+
+_DEFAULT_CONFIG_PATH = "blinter.ini"
 
 _ArgHandlerResult = Tuple[
     None,
@@ -46,8 +50,19 @@ def _handle_special_cli_flags() -> Optional[bool]:
 
     if "--create-config" in sys.argv:
         force = "--force" in sys.argv
-        if not create_default_config_file(force=force):
+        if not create_default_config_file(_DEFAULT_CONFIG_PATH, force=force):
+            if Path(_DEFAULT_CONFIG_PATH).exists() and not force:
+                _print_cli_error(
+                    f"Configuration file already exists: {_DEFAULT_CONFIG_PATH}\n"
+                    "Use --create-config --force to overwrite, or edit the existing "
+                    "file.\n"
+                )
+            else:
+                _print_cli_error(
+                    f"Error creating configuration file: {_DEFAULT_CONFIG_PATH}\n"
+                )
             sys.exit(1)
+        print(f"Default configuration file created: {_DEFAULT_CONFIG_PATH}")
         return False
 
     return None
@@ -113,6 +128,87 @@ def _apply_handler_flags(
     return use_config, cli_show_summary, cli_recursive, cli_follow_calls
 
 
+@dataclass
+class _ArgParseState:  # pylint: disable=too-many-instance-attributes
+    """Mutable state while parsing CLI arguments."""
+
+    positional_paths: List[str] = field(default_factory=list)
+    use_config: bool = True
+    cli_show_summary: Optional[bool] = None
+    cli_recursive: Optional[bool] = None
+    cli_follow_calls: Optional[bool] = None
+    cli_max_line_length: Optional[int] = None
+    cli_verbose: bool = False
+    cli_quiet: bool = False
+    config_path: Optional[str] = None
+
+
+_ARG_HANDLERS: Dict[str, Callable[[], _ArgHandlerResult]] = {
+    "--summary": lambda: (None, None, True, None, None),
+    "--severity": lambda: (None, None, None, None, None),
+    "--no-recursive": lambda: (None, None, None, False, None),
+    "--no-config": lambda: (None, False, None, None, None),
+    "--follow-calls": lambda: (None, None, None, None, True),
+}
+
+
+def _resolve_cli_log_level(verbose: bool, quiet: bool) -> Optional[int]:
+    """Map verbose/quiet flags to a logging level."""
+    if verbose:
+        return logging.DEBUG
+    if quiet:
+        return logging.ERROR
+    return None
+
+
+def _process_dash_argument(
+    arg: str,
+    index: int,
+    state: _ArgParseState,
+) -> int:
+    """Handle a single ``--`` argument and return the next argv index."""
+    if arg == "--max-line-length":
+        parsed_length = _parse_max_line_length_arg(index)
+        if parsed_length is None:
+            sys.exit(1)
+        next_index, state.cli_max_line_length = parsed_length
+        return next_index
+
+    if arg == "--config":
+        parsed_config = _parse_config_arg(index)
+        if parsed_config is None:
+            sys.exit(1)
+        next_index, state.config_path = parsed_config
+        return next_index
+
+    if arg == "--verbose":
+        state.cli_verbose = True
+        return index
+
+    if arg == "--quiet":
+        state.cli_quiet = True
+        return index
+
+    if arg in _ARG_HANDLERS:
+        (
+            state.use_config,
+            state.cli_show_summary,
+            state.cli_recursive,
+            state.cli_follow_calls,
+        ) = _apply_handler_flags(
+            _ARG_HANDLERS[arg](),
+            use_config=state.use_config,
+            cli_show_summary=state.cli_show_summary,
+            cli_recursive=state.cli_recursive,
+            cli_follow_calls=state.cli_follow_calls,
+        )
+        return index
+
+    _print_cli_error(f"Error: Unknown option '{arg}'.\n")
+    print_help()
+    sys.exit(1)
+
+
 def _parse_regular_arguments() -> Tuple[
     Optional[str],
     bool,
@@ -130,86 +226,38 @@ def _parse_regular_arguments() -> Tuple[
         Tuple of (target_path, use_config, cli_show_summary, cli_recursive,
         cli_follow_calls, cli_max_line_length, cli_log_level, config_path)
     """
-    positional_paths: List[str] = []
-    use_config = True
-    cli_show_summary: Optional[bool] = None
-    cli_recursive: Optional[bool] = None
-    cli_follow_calls: Optional[bool] = None
-    cli_max_line_length: Optional[int] = None
-    cli_verbose = False
-    cli_quiet = False
-    config_path: Optional[str] = None
+    state = _ArgParseState()
 
-    arg_handlers: Dict[str, Callable[[], _ArgHandlerResult]] = {
-        "--summary": lambda: (None, None, True, None, None),
-        "--severity": lambda: (None, None, None, None, None),
-        "--no-recursive": lambda: (None, None, None, False, None),
-        "--no-config": lambda: (None, False, None, None, None),
-        "--follow-calls": lambda: (None, None, None, None, True),
-    }
-
-    i = 1
-    while i < len(sys.argv):
-        arg = sys.argv[i]
+    index = 1
+    while index < len(sys.argv):
+        arg = sys.argv[index]
         if not arg.startswith("--"):
-            positional_paths.append(arg)
-        elif arg == "--max-line-length":
-            parsed_length = _parse_max_line_length_arg(i)
-            if parsed_length is None:
-                sys.exit(1)
-            i, cli_max_line_length = parsed_length
-        elif arg == "--config":
-            parsed_config = _parse_config_arg(i)
-            if parsed_config is None:
-                sys.exit(1)
-            i, config_path = parsed_config
-        elif arg == "--verbose":
-            cli_verbose = True
-        elif arg == "--quiet":
-            cli_quiet = True
-        elif arg in arg_handlers:
-            use_config, cli_show_summary, cli_recursive, cli_follow_calls = (
-                _apply_handler_flags(
-                    arg_handlers[arg](),
-                    use_config=use_config,
-                    cli_show_summary=cli_show_summary,
-                    cli_recursive=cli_recursive,
-                    cli_follow_calls=cli_follow_calls,
-                )
-            )
-        elif arg.startswith("--"):
-            _print_cli_error(f"Error: Unknown option '{arg}'.\n")
-            print_help()
-            sys.exit(1)
-        i += 1
+            state.positional_paths.append(arg)
+        else:
+            index = _process_dash_argument(arg, index, state)
+        index += 1
 
-    if cli_verbose and cli_quiet:
+    if state.cli_verbose and state.cli_quiet:
         _print_cli_error("Error: --verbose and --quiet cannot be used together.\n")
         print_help()
         sys.exit(1)
 
-    if len(positional_paths) > 1:
+    if len(state.positional_paths) > 1:
         _print_cli_error("Error: Only one target path is allowed.\n")
         print_help()
         sys.exit(1)
 
-    cli_log_level: Optional[int] = None
-    if cli_verbose:
-        cli_log_level = logging.DEBUG
-    elif cli_quiet:
-        cli_log_level = logging.ERROR
-
-    target_path = positional_paths[0] if positional_paths else None
+    target_path = state.positional_paths[0] if state.positional_paths else None
 
     return (
         target_path,
-        use_config,
-        cli_show_summary,
-        cli_recursive,
-        cli_follow_calls,
-        cli_max_line_length,
-        cli_log_level,
-        config_path,
+        state.use_config,
+        state.cli_show_summary,
+        state.cli_recursive,
+        state.cli_follow_calls,
+        state.cli_max_line_length,
+        _resolve_cli_log_level(state.cli_verbose, state.cli_quiet),
+        state.config_path,
     )
 
 

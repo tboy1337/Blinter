@@ -160,9 +160,10 @@ def create_default_config_file(
     """
     config_file = Path(config_path)
     if config_file.exists() and not force:
-        print(
-            f"Configuration file already exists: {config_path}\n"
-            "Use --create-config --force to overwrite, or edit the existing file."
+        logger.warning(
+            "Configuration file already exists: %s. "
+            "Use --create-config --force to overwrite, or edit the existing file.",
+            config_path,
         )
         return False
 
@@ -211,8 +212,8 @@ follow_calls = false
     try:
         with open(config_path, "w", encoding="utf-8") as config_handle:
             config_handle.write(config_content)
-        print(f"Default configuration file created: {config_path}")
+        logger.info("Default configuration file created: %s", config_path)
         return True
     except OSError as error:
-        print(f"Error creating configuration file: {error}")
+        logger.error("Error creating configuration file %s: %s", config_path, error)
         return False

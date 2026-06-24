@@ -214,3 +214,4 @@ secrets.json
 
 # Pylint report
 pylint-report.txt
+pylint-output.txt
