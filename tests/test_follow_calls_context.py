@@ -14,7 +14,10 @@ from blinter import (
     BlinterConfig,
     lint_batch_file,
 )
-from blinter.engine.dependencies import _extract_called_scripts
+from blinter.engine.dependencies import (
+    _build_call_dependency_graph,
+    _extract_called_scripts,
+)
 
 
 class TestFollowCallsVariableContext:
@@ -554,3 +557,44 @@ class TestScanRootSandbox:
             )
             assert len(called_inside) == 1
             assert called_inside[0].name == "helper.bat"
+
+
+class TestCallDependencyGraph:  # pylint: disable=too-few-public-methods
+    """Test CALL dependency graph construction."""
+
+    def test_build_call_dependency_graph_includes_transitive_deps(self) -> None:
+        """Transitive CALL dependencies are included in the graph."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            helper_c = os.path.join(tmpdir, "helper_c.bat")
+            with open(helper_c, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\nSET C_VAR=value\n")
+
+            helper_b = os.path.join(tmpdir, "helper_b.bat")
+            with open(helper_b, "w", encoding="utf-8") as file_handle:
+                file_handle.write(f'CALL "{helper_c}"\n')
+
+            main_script = os.path.join(tmpdir, "main.bat")
+            with open(main_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write(f'CALL "{helper_b}"\n')
+
+            graph = _build_call_dependency_graph(
+                [Path(main_script), Path(helper_b), Path(helper_c)],
+                scan_root=tmpdir,
+            )
+            main_resolved = Path(main_script).resolve()
+            deps = graph.get(main_resolved, set())
+            dep_names = {path.name for path in deps}
+            assert "helper_b.bat" in dep_names
+            assert "helper_c.bat" in dep_names
+
+    def test_build_call_dependency_graph_handles_read_failure(self) -> None:
+        """Unreadable batch files produce empty dependency sets."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8"
+        ) as temp_file:
+            temp_file.write("@ECHO OFF\n")
+            temp_path = Path(temp_file.name)
+
+        temp_path.unlink()
+        graph = _build_call_dependency_graph([temp_path])
+        assert graph.get(temp_path.resolve(), set()) == set()

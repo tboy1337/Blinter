@@ -1,6 +1,7 @@
 """Tests for edge cases and specialized scenarios."""
 
 import os
+from pathlib import Path
 import sys
 import tempfile
 from typing import Dict, Set
@@ -56,6 +57,8 @@ from blinter.parsing.structure import (
 # pylint: disable=unused-argument,invalid-name,missing-class-docstring,too-few-public-methods
 # pylint: disable=unused-variable,unused-import
 
+from tests.conftest import patch_valid_encoding_path
+
 
 class TestFileEncodingEdgeCases:
     """Test edge cases in file encoding detection and handling."""
@@ -63,6 +66,7 @@ class TestFileEncodingEdgeCases:
     def test_charset_normalizer_oserror_handling(self) -> None:
         """Test handling of OSError during charset_normalizer detection."""
         with (
+            patch_valid_encoding_path(),
             patch("builtins.open", mock_open(read_data=b"test content")),
             patch("charset_normalizer.from_bytes", side_effect=OSError("Test OSError")),
         ):
@@ -80,6 +84,7 @@ class TestFileEncodingEdgeCases:
     def test_charset_normalizer_valueerror_handling(self) -> None:
         """Test handling of ValueError during charset_normalizer detection."""
         with (
+            patch_valid_encoding_path(),
             patch("builtins.open", mock_open(read_data=b"test content")),
             patch(
                 "charset_normalizer.from_bytes",
@@ -100,6 +105,7 @@ class TestFileEncodingEdgeCases:
     def test_charset_normalizer_typeerror_handling(self) -> None:
         """Test handling of TypeError during charset_normalizer detection."""
         with (
+            patch_valid_encoding_path(),
             patch("builtins.open", mock_open(read_data=b"test content")),
             patch(
                 "charset_normalizer.from_bytes", side_effect=TypeError("Test TypeError")
@@ -126,7 +132,10 @@ class TestFileEncodingEdgeCases:
                     raise LookupError("Unknown encoding")
             return mock_open(read_data="test content")(*args, **kwargs)
 
-        with patch("builtins.open", side_effect=mock_open_with_lookup_error):
+        with (
+            patch_valid_encoding_path(),
+            patch("builtins.open", side_effect=mock_open_with_lookup_error),
+        ):
             lines, encoding = read_file_with_encoding("test.bat")
             assert encoding != "utf-8"  # Should fall back to other encoding
             assert len(lines) > 0
@@ -141,7 +150,10 @@ class TestFileEncodingEdgeCases:
                     raise ValueError("Invalid encoding")
             return mock_open(read_data="test content")(*args, **kwargs)
 
-        with patch("builtins.open", side_effect=mock_open_with_value_error):
+        with (
+            patch_valid_encoding_path(),
+            patch("builtins.open", side_effect=mock_open_with_value_error),
+        ):
             lines, encoding = read_file_with_encoding("test.bat")
             assert encoding != "utf-8"  # Should fall back to other encoding
             assert len(lines) > 0
@@ -154,7 +166,10 @@ class TestFileEncodingEdgeCases:
                 raise UnicodeDecodeError("test", b"", 0, 1, "test error")
             return mock_open(read_data="test content")(*args, **kwargs)
 
-        with patch("builtins.open", side_effect=mock_open_always_fail):
+        with (
+            patch_valid_encoding_path(),
+            patch("builtins.open", side_effect=mock_open_always_fail),
+        ):
             with pytest.raises(OSError, match="All encoding attempts failed"):
                 read_file_with_encoding("test.bat")
 
@@ -167,7 +182,10 @@ class TestFileEncodingEdgeCases:
                 raise LookupError("Encoding not supported")
             return mock_open(read_data="test content")(*args, **kwargs)
 
-        with patch("builtins.open", side_effect=mock_open_no_exception):
+        with (
+            patch_valid_encoding_path(),
+            patch("builtins.open", side_effect=mock_open_no_exception),
+        ):
             with pytest.raises(OSError, match="All encoding attempts failed"):
                 read_file_with_encoding("test.bat")
 
@@ -180,6 +198,7 @@ class TestFileEncodingEdgeCases:
         mock_from_bytes.best.return_value = mock_result
 
         with (
+            patch_valid_encoding_path(),
             patch("builtins.open", mock_open(read_data=b"test content")),
             patch("charset_normalizer.from_bytes", return_value=mock_from_bytes),
         ):
@@ -679,7 +698,10 @@ class TestAdditionalEdgeCaseScenarios:
                 raise LookupError("Encoding not supported")
             raise UnicodeDecodeError("test", b"", 0, 1, "test error")
 
-        with patch("builtins.open", side_effect=mock_open_special):
+        with (
+            patch_valid_encoding_path(),
+            patch("builtins.open", side_effect=mock_open_special),
+        ):
             try:
                 read_file_with_encoding("test.bat")
                 assert False, "Should have raised OSError"
@@ -805,6 +827,7 @@ class TestAdditionalEdgeCaseScenarios:
         mock_from_bytes.best.return_value = mock_result
 
         with (
+            patch_valid_encoding_path(),
             patch("builtins.open", mock_open(read_data="test content")),
             patch("charset_normalizer.from_bytes", return_value=mock_from_bytes),
         ):

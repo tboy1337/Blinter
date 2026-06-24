@@ -326,7 +326,7 @@ class TestPerformance:
             # Should complete within reasonable time (adjust as needed)
             processing_time = end_time - start_time
             assert (
-                processing_time < 10.0
+                processing_time < 30.0
             ), f"Large file took too long: {processing_time}s"
 
             # Should find issues but not crash

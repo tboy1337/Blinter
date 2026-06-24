@@ -15,6 +15,16 @@ except ImportError:
     COVERAGE_AVAILABLE = False
 
 
+def patch_valid_encoding_path() -> "patch":
+    """Bypass filesystem checks for mocked encoding read tests."""
+    from unittest.mock import patch
+
+    return patch(
+        "blinter.io.encoding._validate_file_for_read",
+        return_value=Path("test.bat"),
+    )
+
+
 def get_project_version() -> str:
     """Return the package version from pyproject.toml."""
     project_root = Path(__file__).resolve().parent.parent

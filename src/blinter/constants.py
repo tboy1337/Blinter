@@ -4,6 +4,7 @@ from typing import Set
 
 MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 LARGE_FILE_WARNING_BYTES = 10 * 1024 * 1024
+MAX_LINE_LENGTH = 10_000
 
 BUILTIN_VARS: Set[str] = {
     "DATE",

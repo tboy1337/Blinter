@@ -19,6 +19,7 @@ from blinter import (
     find_batch_files,
     main,
 )
+from blinter.cli.args import _parse_cli_arguments
 from blinter.cli.main import _configure_cli_logging
 
 # pylint: disable=too-many-lines,redefined-outer-name,reimported
@@ -1609,6 +1610,48 @@ class TestCliLogging:  # pylint: disable=too-few-public-methods
         blinter_logger.handlers.clear()
         _configure_cli_logging()
         assert blinter_logger.handlers
+
+    def test_configure_cli_logging_verbose_level(self) -> None:
+        """Verbose mode should set DEBUG log level."""
+        blinter_logger = logging.getLogger("blinter")
+        blinter_logger.handlers.clear()
+        _configure_cli_logging(logging.DEBUG)
+        assert blinter_logger.level == logging.DEBUG
+
+    def test_configure_cli_logging_quiet_level(self) -> None:
+        """Quiet mode should set ERROR log level."""
+        blinter_logger = logging.getLogger("blinter")
+        blinter_logger.handlers.clear()
+        _configure_cli_logging(logging.ERROR)
+        assert blinter_logger.level == logging.ERROR
+
+
+class TestCliArgumentValidation:  # pylint: disable=too-few-public-methods
+    """Test CLI argument validation edge cases."""
+
+    def test_multiple_positional_paths_rejected(self) -> None:
+        """Only one target path is allowed."""
+        with patch.object(
+            sys,
+            "argv",
+            ["blinter.py", "first.bat", "second.bat"],
+        ):
+            with patch("blinter.cli.args.print_help"):
+                with pytest.raises(SystemExit) as exc_info:
+                    _parse_cli_arguments()
+                assert exc_info.value.code == 1
+
+    def test_verbose_and_quiet_mutually_exclusive(self) -> None:
+        """--verbose and --quiet cannot be used together."""
+        with patch.object(
+            sys,
+            "argv",
+            ["blinter.py", "test.bat", "--verbose", "--quiet"],
+        ):
+            with patch("blinter.cli.args.print_help"):
+                with pytest.raises(SystemExit) as exc_info:
+                    _parse_cli_arguments()
+                assert exc_info.value.code == 1
 
 
 class TestCLIEdgeCases:  # pylint: disable=too-few-public-methods

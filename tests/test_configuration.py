@@ -6,6 +6,8 @@ import tempfile
 from typing import Set
 from unittest.mock import patch
 
+import pytest
+
 from tests.conftest import get_project_version
 
 from blinter import (
@@ -31,6 +33,14 @@ class TestBlinterConfig:
         assert config.enabled_rules == set()
         assert config.disabled_rules == set()
         assert config.min_severity is None
+
+    def test_invalid_max_line_length_rejected(self) -> None:
+        """max_line_length must be positive and within bounds."""
+        with pytest.raises(ValueError, match="max_line_length"):
+            BlinterConfig(max_line_length=0)
+
+        with pytest.raises(ValueError, match="max_line_length"):
+            BlinterConfig(max_line_length=100_001)
 
     def test_config_with_custom_values(self) -> None:
         """Test configuration with custom values."""
@@ -347,7 +357,7 @@ class TestCreateDefaultConfigFile:
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = os.path.join(temp_dir, "test_blinter.ini")
 
-            create_default_config_file(config_path)
+            assert create_default_config_file(config_path) is True
 
             # File should exist
             assert os.path.exists(config_path)
@@ -369,7 +379,7 @@ class TestCreateDefaultConfigFile:
         """Test creating config file with permission error."""
         with patch("builtins.open", side_effect=PermissionError("Permission denied")):
             with patch("builtins.print") as mock_print:
-                create_default_config_file("readonly.ini")
+                assert create_default_config_file("readonly.ini") is False
 
                 # Should print error message
                 mock_print.assert_called()

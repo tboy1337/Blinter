@@ -34,6 +34,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     file_path: str,
     config: Optional[BlinterConfig] = None,
     dependency_graph: Optional[Dict[Path, Set[Path]]] = None,
+    lines_cache: Optional[Dict[Path, List[str]]] = None,
 ) -> List[LintIssue]:
     """
     Lint a batch file and return list of issues found.
@@ -83,6 +84,8 @@ def lint_batch_file(  # pylint: disable=too-many-locals
 
     # Read and validate file
     lines, _encoding_used, line_ending_info = _validate_and_read_file(file_path)
+    if lines_cache is not None:
+        lines_cache[Path(file_path).resolve()] = lines
 
     if not lines:
         return []  # Empty file, no issues
@@ -128,6 +131,8 @@ def lint_batch_file(  # pylint: disable=too-many-locals
                 batch_path,
                 dependency_graph,
                 scan_root=scan_root,
+                lines=lines,
+                lines_cache=lines_cache,
             )
         except (OSError, ValueError) as collect_error:
             logger.warning(

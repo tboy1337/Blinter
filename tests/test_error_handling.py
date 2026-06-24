@@ -1,6 +1,7 @@
 """Tests for error handling and edge cases in real-world usage scenarios."""
 
 import os
+from pathlib import Path
 import tempfile
 from typing import List
 from unittest.mock import mock_open, patch
@@ -18,6 +19,7 @@ from blinter import (
 from blinter.checkers.security import _check_security_issues
 from blinter.checkers.syntax import _check_syntax_errors
 from blinter.checkers.warnings import _check_warning_issues
+from tests.conftest import patch_valid_encoding_path
 from blinter.io.encoding import _detect_line_endings
 
 
@@ -40,7 +42,10 @@ class TestRealWorldErrorHandling:
                 raise LookupError("Unknown encoding")
             return mock_open(read_data="test")(*args, **kwargs)
 
-        with patch("builtins.open", side_effect=mock_open_that_always_fails):
+        with (
+            patch_valid_encoding_path(),
+            patch("builtins.open", side_effect=mock_open_that_always_fails),
+        ):
             with pytest.raises(OSError, match="All encoding attempts failed"):
                 read_file_with_encoding("test.bat")
 
@@ -506,3 +511,28 @@ class TestAdditionalErrorHandling:
                 assert isinstance(issues, list)
             finally:
                 os.unlink(temp_file_path)
+
+
+class TestDiscoverySandbox:  # pylint: disable=too-few-public-methods
+    """Test directory discovery containment."""
+
+    def test_find_batch_files_filters_outside_root(self, tmp_path: Path) -> None:
+        """Files outside the discovery root are excluded."""
+        scan_dir = tmp_path / "project"
+        scan_dir.mkdir()
+
+        inside_file = scan_dir / "inside.bat"
+        inside_file.write_text("@echo off\n", encoding="utf-8")
+
+        outside_file = tmp_path / "outside.bat"
+        outside_file.write_text("@echo off\n", encoding="utf-8")
+
+        inside_results = find_batch_files(
+            inside_file, root=scan_dir.resolve()
+        )
+        assert inside_results == [inside_file]
+
+        outside_results = find_batch_files(
+            outside_file, root=scan_dir.resolve()
+        )
+        assert outside_results == []

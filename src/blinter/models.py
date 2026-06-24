@@ -1,6 +1,6 @@
 """Core data models: rules, lint issues, and configuration."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import (
@@ -10,6 +10,8 @@ from typing import (
     Set,
     Tuple,
 )
+
+from blinter.constants import MAX_LINE_LENGTH
 
 
 class RuleSeverity(Enum):
@@ -92,6 +94,12 @@ class BlinterConfig:  # pylint: disable=too-many-instance-attributes
             if not isinstance(self.scan_root, str) or not self.scan_root.strip():
                 raise ValueError("scan_root must be a non-empty string path when set")
 
+        if self.max_line_length <= 0 or self.max_line_length > MAX_LINE_LENGTH:
+            raise ValueError(
+                f"max_line_length must be between 1 and {MAX_LINE_LENGTH}, "
+                f"got {self.max_line_length}"
+            )
+
     def is_rule_enabled(self, rule_code: str) -> bool:
         """Check if a rule is enabled based on configuration."""
         # If rule is explicitly disabled, return False
@@ -134,6 +142,7 @@ class CliArguments:
     cli_recursive: Optional[bool]
     cli_follow_calls: Optional[bool]
     cli_max_line_length: Optional[int]
+    cli_log_level: Optional[int]
 
 
 @dataclass
@@ -157,3 +166,4 @@ class ProcessingState:
     all_issues: List[LintIssue]
     file_results: Dict[str, List[LintIssue]]
     processed_file_paths: List[Tuple[str, Optional[str]]]
+    lines_cache: Dict[Path, List[str]] = field(default_factory=dict)

@@ -42,6 +42,8 @@ Options:
   --follow-calls      Scan scripts called by CALL statements from each seed file.
                      Variable context may be collected transitively; each seed file
                      lints its direct CALL targets only.
+  --verbose           Show detailed debug logging on stderr.
+  --quiet             Show only error-level logging on stderr.
   --no-config         Don't use configuration file (blinter.ini) even if it exists.
   --create-config     Create a default blinter.ini configuration file and exit.
   --help              Display this help menu and exit.

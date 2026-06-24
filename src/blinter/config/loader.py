@@ -6,6 +6,7 @@ from typing import (
     Optional,
 )
 
+from blinter.constants import MAX_LINE_LENGTH
 from blinter.logging_config import logger
 from blinter.models import BlinterConfig, RuleSeverity
 
@@ -21,7 +22,18 @@ def _load_general_settings(
 
     config.recursive = general.getboolean("recursive", fallback=True)
     config.show_summary = general.getboolean("show_summary", fallback=False)
-    config.max_line_length = general.getint("max_line_length", fallback=100)
+    try:
+        max_line_length = general.getint("max_line_length", fallback=100)
+        if 0 < max_line_length <= MAX_LINE_LENGTH:
+            config.max_line_length = max_line_length
+        else:
+            logger.warning(
+                "Invalid max_line_length %s in config (must be 1-%s), using default",
+                max_line_length,
+                MAX_LINE_LENGTH,
+            )
+    except ValueError:
+        logger.warning("Invalid max_line_length value in config, using default")
     config.follow_calls = general.getboolean("follow_calls", fallback=False)
 
     severity_str = general.get("min_severity", "").strip()
@@ -115,12 +127,15 @@ def load_config(
     return config
 
 
-def create_default_config_file(config_path: str = "blinter.ini") -> None:
+def create_default_config_file(config_path: str = "blinter.ini") -> bool:
     """
     Create a default configuration file with all available options documented.
 
     Args:
         config_path: Path where to create the config file
+
+    Returns:
+        True when the file was written successfully, False on failure.
     """
     config_content = """# Blinter Configuration File
 # This file configures the behavior of the blinter batch file linter.
@@ -168,5 +183,7 @@ follow_calls = false
         with open(config_path, "w", encoding="utf-8") as config_file:
             config_file.write(config_content)
         print(f"Default configuration file created: {config_path}")
+        return True
     except OSError as error:
         print(f"Error creating configuration file: {error}")
+        return False

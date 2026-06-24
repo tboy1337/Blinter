@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 
-from blinter.models import LintIssue, Rule, RuleSeverity
+from blinter.models import LintIssue, Rule
 from blinter.rules.registry import RULES
 
 
@@ -49,35 +49,4 @@ def _add_issue(
             context=context,
             file_path=file_path,
         )
-    )
-
-
-def _create_rule(
-    code: str,
-    name: str,
-    severity: RuleSeverity,
-    explanation: str,
-    recommendation: str,
-) -> Rule:
-    """
-    Create a Rule object with validation.
-
-    This helper centralizes rule creation and provides a consistent interface.
-
-    Args:
-        code: Rule code (e.g., "E001")
-        name: Short name of the rule
-        severity: Rule severity level
-        explanation: Detailed explanation of what the rule checks
-        recommendation: How to fix violations of this rule
-
-    Returns:
-        Rule: Validated Rule object
-    """
-    return Rule(
-        code=code,
-        name=name,
-        severity=severity,
-        explanation=explanation,
-        recommendation=recommendation,
     )

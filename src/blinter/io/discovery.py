@@ -1,7 +1,7 @@
 """Batch file discovery in directories and paths."""
 
 from pathlib import Path
-from typing import List, Union
+from typing import List, Optional, Union
 
 
 def is_path_under_root(path: Path, root: Path) -> bool:
@@ -13,13 +13,18 @@ def is_path_under_root(path: Path, root: Path) -> bool:
         return False
 
 
-def find_batch_files(path: Union[str, Path], recursive: bool = True) -> List[Path]:
+def find_batch_files(
+    path: Union[str, Path],
+    recursive: bool = True,
+    root: Optional[Path] = None,
+) -> List[Path]:
     """
     Find all batch files (.bat and .cmd) in a directory or return single file.
 
     Args:
         path: Path to file or directory to search
         recursive: Whether to search subdirectories recursively (default: True)
+        root: When set, only return files that resolve inside this directory
 
     Returns:
         List of Path objects representing batch files found
@@ -36,6 +41,8 @@ def find_batch_files(path: Union[str, Path], recursive: bool = True) -> List[Pat
     if path_obj.is_file():
         # Return single file if it's a batch file
         if path_obj.suffix.lower() in [".bat", ".cmd"]:
+            if root is not None and not is_path_under_root(path_obj, root):
+                return []
             return [path_obj]
         raise ValueError(f"File '{path}' is not a batch file (.bat or .cmd)")
 
@@ -51,6 +58,13 @@ def find_batch_files(path: Union[str, Path], recursive: bool = True) -> List[Pat
             # Non-recursive search
             for pattern in ["*.bat", "*.cmd"]:
                 batch_files.extend(path_obj.glob(pattern))
+
+        if root is not None:
+            batch_files = [
+                batch_file
+                for batch_file in batch_files
+                if is_path_under_root(batch_file, root)
+            ]
 
         # Sort for consistent output
         batch_files.sort()

@@ -43,7 +43,7 @@ def _stream_is_closed(stream: object) -> bool:
     return isinstance(closed_attr, bool) and closed_attr
 
 
-def _configure_cli_logging() -> None:
+def _configure_cli_logging(log_level: int = logging.WARNING) -> None:
     """Attach a stderr handler when no logging is configured by the host app."""
     blinter_logger = logging.getLogger("blinter")
 
@@ -56,13 +56,15 @@ def _configure_cli_logging() -> None:
             handler.close()
             continue
         handler.setStream(sys.stderr)
+        handler.setLevel(log_level)
+        blinter_logger.setLevel(log_level)
         return
 
     handler = logging.StreamHandler(sys.stderr)
-    handler.setLevel(logging.WARNING)
+    handler.setLevel(log_level)
     handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     blinter_logger.addHandler(handler)
-    blinter_logger.setLevel(logging.WARNING)
+    blinter_logger.setLevel(log_level)
 
 
 def _cli_error(message: str) -> NoReturn:
@@ -140,7 +142,11 @@ def _process_called_scripts(
     """
     files_processed = 0
     files_with_errors = 0
-    called_scripts = _extract_called_scripts(batch_file, scan_root=config.scan_root)
+    called_scripts = _extract_called_scripts(
+        batch_file,
+        scan_root=config.scan_root,
+        lines=state.lines_cache.get(batch_file.resolve()),
+    )
 
     for called_script in called_scripts:
         result = _process_single_called_script(
@@ -172,7 +178,9 @@ def _process_batch_files(
     dependency_graph: Optional[Dict[Path, Set[Path]]] = None
     if config.follow_calls:
         dependency_graph = _build_call_dependency_graph(
-            batch_files, scan_root=config.scan_root
+            batch_files,
+            scan_root=config.scan_root,
+            lines_cache=state.lines_cache,
         )
 
     for batch_file in batch_files:
@@ -182,7 +190,10 @@ def _process_batch_files(
 
         try:
             issues = lint_batch_file(
-                str(batch_file), config=config, dependency_graph=dependency_graph
+                str(batch_file),
+                config=config,
+                dependency_graph=dependency_graph,
+                lines_cache=state.lines_cache,
             )
             state.file_results[str(batch_file)] = issues
             state.all_issues.extend(issues)
@@ -413,12 +424,13 @@ def main() -> None:
         # Fallback for older Python versions or when reconfigure is not available
         pass
 
-    _configure_cli_logging()
-
-    # Parse CLI arguments
     cli_args = _parse_cli_arguments()
     if cli_args is None:
         return
+
+    _configure_cli_logging(
+        cli_args.cli_log_level if cli_args.cli_log_level is not None else logging.WARNING
+    )
 
     # Display version information
     print(f"Blinter v{__version__} - Batch File Linter\n")
@@ -428,8 +440,18 @@ def main() -> None:
     _apply_cli_config_overrides(cli_args, config)
 
     # Find all batch files to process
+    target_path_obj = Path(cli_args.target_path)
+    discovery_root = (
+        target_path_obj.resolve()
+        if target_path_obj.is_dir()
+        else target_path_obj.parent.resolve()
+    )
     try:
-        batch_files = find_batch_files(cli_args.target_path, recursive=config.recursive)
+        batch_files = find_batch_files(
+            cli_args.target_path,
+            recursive=config.recursive,
+            root=discovery_root,
+        )
     except FileNotFoundError:
         _cli_error(f"Error: Path '{cli_args.target_path}' not found.")
     except ValueError as value_error:

@@ -16,6 +16,31 @@ from blinter.logging_config import logger
 LineEndingInfo = Tuple[str, bool, int, int, int]
 
 
+def _validate_file_for_read(file_path: str) -> Path:
+    """Validate path string, existence, file type, and size before reading."""
+    if not file_path or not isinstance(file_path, str):
+        raise ValueError("file_path must be a non-empty string")
+
+    file_obj = Path(file_path)
+    if not file_obj.exists():
+        raise FileNotFoundError(f"File not found: {file_path}")
+    if not file_obj.is_file():
+        raise ValueError(f"Path is not a file: {file_path}")
+
+    file_size = file_obj.stat().st_size
+    if file_size > LARGE_FILE_WARNING_BYTES:
+        logger.warning(
+            "Large file detected (%dMB). Processing may take longer.",
+            file_size // 1024 // 1024,
+        )
+
+    if file_size > MAX_FILE_SIZE_BYTES:
+        max_mb = MAX_FILE_SIZE_BYTES // 1024 // 1024
+        raise ValueError(f"File exceeds maximum size of {max_mb}MB: {file_path}")
+
+    return file_obj
+
+
 def _line_ending_stats_from_bytes(content: bytes) -> LineEndingInfo:
     """Derive line-ending statistics from raw file bytes."""
     crlf_count = content.count(b"\r\n")
@@ -323,15 +348,17 @@ def read_file_with_encoding(file_path: str) -> Tuple[List[str], str]:
             - encoding_used: String indicating the encoding that was successful
 
     Raises:
-        UnicodeDecodeError: If all encoding attempts fail (extremely rare)
+        ValueError: If file_path is invalid or file exceeds maximum size
         FileNotFoundError: If the specified file doesn't exist
         PermissionError: If insufficient permissions to read the file
-        OSError: If file operation fails due to system issues
+        OSError: If file operation fails or all encoding attempts fail
 
     Example:
         >>> lines, encoding = read_file_with_encoding("script.bat")
         >>> print(f"Read {len(lines)} lines using {encoding} encoding")
     """
+    file_obj = _validate_file_for_read(file_path)
+
     # List of encodings to try in order of preference
     encodings_to_try = [
         "utf-8",  # Standard UTF-8
@@ -346,11 +373,11 @@ def read_file_with_encoding(file_path: str) -> Tuple[List[str], str]:
     ]
 
     # Try to detect encoding using charset_normalizer if available
-    encodings_to_try = _detect_encoding_charset_norm(file_path, encodings_to_try)
+    encodings_to_try = _detect_encoding_charset_norm(str(file_obj), encodings_to_try)
 
     # Try each encoding until one works
     for encoding in encodings_to_try:
-        lines = _try_read_with_encoding(file_path, encoding)
+        lines = _try_read_with_encoding(str(file_obj), encoding)
         if lines is not None:
             return lines, encoding
 
@@ -369,27 +396,7 @@ def _validate_and_read_file(
     Returns:
         Tuple of (lines, encoding_used, line_ending_info)
     """
-    if not file_path or not isinstance(file_path, str):
-        raise ValueError("file_path must be a non-empty string")
-
-    # Validate file exists and is accessible
-    file_obj = Path(file_path)
-    if not file_obj.exists():
-        raise FileNotFoundError(f"File not found: {file_path}")
-    if not file_obj.is_file():
-        raise ValueError(f"Path is not a file: {file_path}")
-
-    # Check file size for performance warning
-    file_size = file_obj.stat().st_size
-    if file_size > LARGE_FILE_WARNING_BYTES:
-        logger.warning(
-            "Large file detected (%dMB). Processing may take longer.",
-            file_size // 1024 // 1024,
-        )
-
-    if file_size > MAX_FILE_SIZE_BYTES:
-        max_mb = MAX_FILE_SIZE_BYTES // 1024 // 1024
-        raise ValueError(f"File exceeds maximum size of {max_mb}MB: {file_path}")
+    file_obj = _validate_file_for_read(file_path)
 
     raw_data = file_obj.read_bytes()
     line_ending_info = _line_ending_stats_from_bytes(raw_data)
