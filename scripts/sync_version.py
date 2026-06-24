@@ -1,4 +1,4 @@
-"""Sync __version__ in blinter.py from pyproject.toml [project].version."""
+"""Sync __version__ in src/blinter/_version.py from pyproject.toml [project].version."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import sys
 import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
-BLINTER_PATH = ROOT / "blinter.py"
+VERSION_PATH = ROOT / "src" / "blinter" / "_version.py"
 PYPROJECT_PATH = ROOT / "pyproject.toml"
 
 
@@ -27,9 +27,9 @@ def read_pyproject_version() -> str:
     return version_object
 
 
-def sync_version_to_blinter(version: str) -> None:
-    """Rewrite __version__ and docstring Version: line in blinter.py."""
-    text = BLINTER_PATH.read_text(encoding="utf-8")
+def sync_version_to_package(version: str) -> None:
+    """Rewrite __version__ in src/blinter/_version.py."""
+    text = VERSION_PATH.read_text(encoding="utf-8")
     text, version_assignments = re.subn(
         r'^__version__ = "[^"]+"',
         f'__version__ = "{version}"',
@@ -37,25 +37,16 @@ def sync_version_to_blinter(version: str) -> None:
         count=1,
         flags=re.MULTILINE,
     )
-    text, docstring_versions = re.subn(
-        r"^Version: [^\n]+",
-        f"Version: {version}",
-        text,
-        count=1,
-        flags=re.MULTILINE,
-    )
     if version_assignments != 1:
-        raise ValueError("Failed to update __version__ assignment in blinter.py")
-    if docstring_versions != 1:
-        raise ValueError("Failed to update docstring Version: line in blinter.py")
-    BLINTER_PATH.write_text(text, encoding="utf-8")
+        raise ValueError("Failed to update __version__ assignment in _version.py")
+    VERSION_PATH.write_text(text, encoding="utf-8")
 
 
 def main() -> None:
-    """Sync blinter.py version fields from pyproject.toml."""
+    """Sync package version fields from pyproject.toml."""
     version = read_pyproject_version()
-    sync_version_to_blinter(version)
-    print(f"Synced blinter.py to version {version}")
+    sync_version_to_package(version)
+    print(f"Synced src/blinter/_version.py to version {version}")
 
 
 if __name__ == "__main__":

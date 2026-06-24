@@ -1,4 +1,3 @@
-include py.typed
 include README.md
 include COPYING
 include funding.json
@@ -6,4 +5,5 @@ include mypy.ini
 include pylintrc
 include pytest.ini
 include pyproject.toml
+recursive-include src/blinter py.typed
 graft .well-known

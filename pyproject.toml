@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Blinter"
-version = "1.0.116"
+version = "1.0.117"
 description = "Blinter is a linter for Windows batch files. It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -58,10 +58,15 @@ Repository = "https://github.com/tboy1337/Blinter.git"
 Issues = "https://github.com/tboy1337/Blinter/issues"
 
 [project.scripts]
-blinter = "blinter:main"
+blinter = "blinter.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+blinter = ["py.typed"]
 
 [tool.setuptools]
-py-modules = ["blinter"]
 include-package-data = true
 
 [tool.black]
@@ -94,7 +99,7 @@ include_trailing_comma = true
 force_grid_wrap = 0
 use_parentheses = true
 ensure_newline_before_comments = true
-src_paths = ["."]
+src_paths = ["src"]
 known_first_party = ["blinter"]
 sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 default_section = "THIRDPARTY"

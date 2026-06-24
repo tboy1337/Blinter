@@ -1,6 +1,6 @@
 [run]
 # Source code directories
-source = blinter.py
+source = src/blinter
 
 # Exclude patterns  
 omit =
@@ -181,5 +181,5 @@ output = coverage.lcov
 [paths]
 # Path mapping for different environments
 source =
-    blinter.py
-    */site-packages/blinter.py
+    src/blinter
+    */site-packages/blinter

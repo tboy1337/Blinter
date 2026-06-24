@@ -34,7 +34,7 @@ jobs:
         shell: pwsh
       - name: Generate version info file
         run: |
-          $versionLine = Select-String -Path blinter.py -Pattern '__version__ = "(.+)"'
+          $versionLine = Select-String -Path pyproject.toml -Pattern 'version = "(.+)"'
           $version = $versionLine.Matches.Groups[1].Value
           $versionParts = $version.Split('.')
           $major = $versionParts[0]

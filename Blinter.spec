@@ -28,13 +28,13 @@ version_info = {
 }
 
 a = Analysis(
-    ['blinter.py'],
-    pathex=[],
+    ['src/blinter/__main__.py'],
+    pathex=['src'],
     binaries=[],
     datas=[
-        ('py.typed', '.'),  # Include type marker file
+        ('src/blinter/py.typed', 'blinter'),
     ],
-    hiddenimports=[],
+    hiddenimports=['blinter', 'charset_normalizer'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
