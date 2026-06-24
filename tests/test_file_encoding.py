@@ -134,7 +134,7 @@ class TestFileEncodingDetection:
             read_file_with_encoding("restricted_file.bat")
 
     @_VALIDATE_FILE_PATCH
-    @patch("charset_normalizer.from_bytes")
+    @patch("blinter.io.encoding.from_bytes")
     @patch("builtins.open")
     def test_charset_normalizer_detection_success(
         self,
@@ -157,7 +157,7 @@ class TestFileEncodingDetection:
         assert encoding == "cp1252"
 
     @_VALIDATE_FILE_PATCH
-    @patch("charset_normalizer.from_bytes")
+    @patch("blinter.io.encoding.from_bytes")
     @patch("builtins.open")
     def test_charset_normalizer_detection_low_confidence(
         self,
@@ -179,8 +179,7 @@ class TestFileEncodingDetection:
         assert encoding == "utf-8"
 
     def test_charset_normalizer_import_error(self) -> None:
-        """Test fallback when charset_normalizer is not available."""
-        # Test the actual ImportError scenario by mocking the import inside the function
+        """Test fallback when charset_normalizer detection fails."""
         content = "test content\n"
         with tempfile.NamedTemporaryFile(
             mode="w", encoding="utf-8", delete=False
@@ -189,18 +188,10 @@ class TestFileEncodingDetection:
             temp_file_path = temp_file.name
 
         try:
-            # Mock the charset_normalizer import to fail
-            with patch("builtins.__import__") as mock_import:
-
-                def import_side_effect(
-                    name: str, *args: object, **kwargs: object
-                ) -> object:
-                    if name == "charset_normalizer":
-                        raise ImportError("No module named charset_normalizer")
-                    return __import__(name, *args, **kwargs)
-
-                mock_import.side_effect = import_side_effect
-
+            with patch(
+                "blinter.io.encoding.from_bytes",
+                side_effect=OSError("charset_normalizer unavailable"),
+            ):
                 lines, encoding = read_file_with_encoding(temp_file_path)
                 assert lines == ["test content\n"]
                 assert encoding in ["utf-8", "ascii"]  # ASCII is subset of UTF-8
@@ -284,7 +275,7 @@ class TestFileEncodingDetection:
             os.unlink(temp_file_path)
 
     @_VALIDATE_FILE_PATCH
-    @patch("charset_normalizer.from_bytes")
+    @patch("blinter.io.encoding.from_bytes")
     @patch("builtins.open")
     def test_charset_detect_encoding_not_in_default_list(
         self,
@@ -306,7 +297,7 @@ class TestFileEncodingDetection:
         assert encoding == "koi8-r"  # Should use the detected encoding
 
     @_VALIDATE_FILE_PATCH
-    @patch("charset_normalizer.from_bytes")
+    @patch("blinter.io.encoding.from_bytes")
     @patch("builtins.open")
     def test_charset_detect_encoding_in_default_list(
         self,
@@ -327,7 +318,7 @@ class TestFileEncodingDetection:
         assert lines == ["test content\n"]
         assert encoding == "latin1"  # Should use latin1 (moved to front)
 
-    @patch("charset_normalizer.from_bytes")
+    @patch("blinter.io.encoding.from_bytes")
     def test_charset_normalizer_exception_handling(
         self, mock_from_bytes: MagicMock
     ) -> None:
@@ -407,7 +398,7 @@ class TestEncodingEdgeCases:
     """Test edge cases in file encoding detection and handling."""
 
     def test_charset_normalizer_not_available_fallback(self) -> None:
-        """Test encoding fallback when charset_normalizer is not available."""
+        """Test encoding fallback when charset_normalizer detection fails."""
         # Create a test file with UTF-8 content
         with tempfile.NamedTemporaryFile(
             mode="wb", delete=False, suffix=".bat"
@@ -417,10 +408,9 @@ class TestEncodingEdgeCases:
             temp_file = temp_file_handle.name
 
         try:
-            # Mock charset_normalizer ImportError
             with patch(
-                "builtins.__import__",
-                side_effect=ImportError("No module named charset_normalizer"),
+                "blinter.io.encoding.from_bytes",
+                side_effect=OSError("charset_normalizer unavailable"),
             ):
                 lines, encoding = read_file_with_encoding(temp_file)
                 assert len(lines) == 2
@@ -445,9 +435,9 @@ class TestEncodingEdgeCases:
             temp_file = temp_file_handle.name
 
         try:
-            # Mock charset_normalizer.from_bytes to raise an exception
+            # Mock blinter.io.encoding.from_bytes to raise an exception
             with patch(
-                "charset_normalizer.from_bytes",
+                "blinter.io.encoding.from_bytes",
                 side_effect=ValueError("Detection failed"),
             ):
                 lines, encoding = read_file_with_encoding(temp_file)
@@ -520,13 +510,13 @@ class TestEncodingFallbackScenarios:
             temp_file = temp_file_handle.name
 
         try:
-            # Mock charset_normalizer.from_bytes to return low confidence
+            # Mock blinter.io.encoding.from_bytes to return low confidence
             mock_result = MagicMock()
             mock_result.encoding = "utf-8"
             mock_result.coherence = 0.5  # Below 0.7 threshold
             mock_from_bytes = MagicMock()
             mock_from_bytes.best.return_value = mock_result
-            with patch("charset_normalizer.from_bytes", return_value=mock_from_bytes):
+            with patch("blinter.io.encoding.from_bytes", return_value=mock_from_bytes):
                 lines, encoding = read_file_with_encoding(temp_file)
                 assert len(lines) == 2
                 # Should fall back to standard encoding list
@@ -551,10 +541,10 @@ class TestEncodingFallbackScenarios:
             temp_file = temp_file_handle.name
 
         try:
-            # Mock charset_normalizer.from_bytes().best() to return None
+            # Mock blinter.io.encoding.from_bytes().best() to return None
             mock_result = MagicMock()
             mock_result.best.return_value = None
-            with patch("charset_normalizer.from_bytes", return_value=mock_result):
+            with patch("blinter.io.encoding.from_bytes", return_value=mock_result):
                 lines, encoding = read_file_with_encoding(temp_file)
                 assert len(lines) == 2
                 assert encoding in [
@@ -602,7 +592,7 @@ class TestAdditionalFileEncodingScenarios:
         with (
             patch_valid_encoding_path(),
             patch("builtins.open", mock_open(read_data=b"test content")),
-            patch("charset_normalizer.from_bytes", return_value=mock_from_bytes),
+            patch("blinter.io.encoding.from_bytes", return_value=mock_from_bytes),
         ):
             # Should succeed by adding the detected encoding to the front
             lines, _ = read_file_with_encoding("test.bat")
@@ -620,7 +610,7 @@ class TestAdditionalFileEncodingScenarios:
         with (
             patch_valid_encoding_path(),
             patch("builtins.open", mock_open(read_data=b"test content")),
-            patch("charset_normalizer.from_bytes", return_value=mock_from_bytes),
+            patch("blinter.io.encoding.from_bytes", return_value=mock_from_bytes),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
             assert encoding == "utf-8"  # Should use detected encoding
@@ -632,7 +622,9 @@ class TestAdditionalFileEncodingScenarios:
         with (
             patch_valid_encoding_path(),
             patch("builtins.open", mock_open(read_data=b"test content")),
-            patch("charset_normalizer.from_bytes", side_effect=OSError("Test OSError")),
+            patch(
+                "blinter.io.encoding.from_bytes", side_effect=OSError("Test OSError")
+            ),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
             assert encoding in [
@@ -652,7 +644,7 @@ class TestAdditionalFileEncodingScenarios:
             patch_valid_encoding_path(),
             patch("builtins.open", mock_open(read_data=b"test content")),
             patch(
-                "charset_normalizer.from_bytes",
+                "blinter.io.encoding.from_bytes",
                 side_effect=ValueError("Test ValueError"),
             ),
         ):
@@ -674,7 +666,8 @@ class TestAdditionalFileEncodingScenarios:
             patch_valid_encoding_path(),
             patch("builtins.open", mock_open(read_data=b"test content")),
             patch(
-                "charset_normalizer.from_bytes", side_effect=TypeError("Test TypeError")
+                "blinter.io.encoding.from_bytes",
+                side_effect=TypeError("Test TypeError"),
             ),
         ):
             lines, encoding = read_file_with_encoding("test.bat")

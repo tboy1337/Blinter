@@ -2,7 +2,7 @@
 
 ## Rule Categories Summary
 
-**Blinter** provides comprehensive static analysis with **151 Built-in Rules** across 5 severity levels:
+**Blinter** provides comprehensive static analysis with **148 Built-in Rules** across 5 severity levels:
 
 ### Error Level Rules (E001-E999)
 **Critical issues that will cause script failure**
@@ -58,7 +58,6 @@
 - **W012**: Non-ASCII characters detected
 - **W013**: Duplicate label
 - **W014**: Missing PAUSE for user interaction
-- **W015**: Deprecated command usage
 - **W017**: Errorlevel comparison semantic difference
 - **W018**: Multi-byte characters with potential line ending risks
 - **W019**: GOTO/CALL with potential line ending risks
@@ -83,7 +82,6 @@
 - **W038**: FOR /R with explicit filename needs wildcard
 - **W039**: Nested FOR loops without call optimization
 - **W040**: FOR loop variable scope issue
-- **W041**: Missing error handling for external commands *(deprecated — superseded by W002 and W003; no longer emitted)*
 - **W042**: Timeout command without /NOBREAK option
 - **W043**: Process management without proper verification
 
@@ -113,7 +111,6 @@
 - **S022**: Inconsistent variable naming convention
 - **S023**: Magic timeout values without explanation
 - **S024**: Complex one-liner should be split
-- **S025**: Missing subroutine documentation
 - **S026**: Inconsistent continuation character usage
 - **S027**: Missing blank lines around code blocks
 - **S028**: Redundant parentheses in simple commands

@@ -257,13 +257,6 @@ RULES: Dict[str, Rule] = {
         ),
         recommendation="Add PAUSE before EXIT to allow user to see script output",
     ),
-    "W015": Rule(
-        code="W015",
-        name="Deprecated command usage",
-        severity=RuleSeverity.WARNING,
-        explanation="Command is deprecated and may not be available in newer Windows versions",
-        recommendation="Replace deprecated commands with modern alternatives",
-    ),
     "E016": Rule(
         code="E016",
         name="Invalid errorlevel comparison syntax",
@@ -755,7 +748,7 @@ RULES: Dict[str, Rule] = {
         recommendation="Add error checking: IF ERRORLEVEL 1 to handle failures. "
         "Only use 2>nul if you genuinely want to ignore expected errors",
     ),
-    # Advanced Style and Best Practice Rules (S017-S025)
+    # Advanced Style and Best Practice Rules (S017-S027)
     "S017": Rule(
         code="S017",
         name="Inconsistent variable naming convention",
@@ -1054,20 +1047,6 @@ RULES: Dict[str, Rule] = {
         explanation="FOR loop variables should use appropriate scope (% vs !) in contexts",
         recommendation="Use !var! inside FOR loops with delayed expansion, %var% outside",
     ),
-    "W041": Rule(
-        code="W041",
-        name="Missing error handling for external commands",
-        severity=RuleSeverity.WARNING,
-        explanation=(
-            "Deprecated: superseded by W002 and W003, which are emitted instead. "
-            "Kept for backward compatibility with blinter.ini rule lists only."
-        ),
-        recommendation=(
-            "Add error checking: IF ERRORLEVEL 1 (handle error) "
-            "or IF %ERRORLEVEL% NEQ 0 (handle error). "
-            "Don't just hide errors with 2>nul unless you have a specific reason"
-        ),
-    ),
     "W042": Rule(
         code="W042",
         name="Timeout command without /NOBREAK option",
@@ -1186,14 +1165,6 @@ RULES: Dict[str, Rule] = {
         explanation="Complex commands spanning multiple operations should be split for readability",
         recommendation="Use continuation character ^ or separate commands for complex operations",
     ),
-    "S025": Rule(
-        code="S025",
-        name="Missing subroutine documentation",
-        severity=RuleSeverity.STYLE,
-        explanation="Subroutines should have REM comments describing parameters and return values",
-        recommendation="Document subroutines: REM Usage: CALL :SubName param1 param2",
-        # Deprecated catalog entry; S018 is emitted by checkers.
-    ),
     "S026": Rule(
         code="S026",
         name="Inconsistent continuation character usage",
@@ -1300,11 +1271,4 @@ RULES: Dict[str, Rule] = {
             "2) Protecting literal ! in strings, or 3) Defensive programming at script start"
         ),
     ),
-}
-
-# Catalog rules superseded by active checkers (integrity test uses this map).
-DEPRECATED_RULE_ALIASES: Dict[str, str] = {
-    "S025": "S018",
-    "W015": "W024",
-    "W041": "W003",
 }

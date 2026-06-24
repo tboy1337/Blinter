@@ -15,7 +15,10 @@ def _s011_rule(max_line_length: int) -> Rule:
         code=base_rule.code,
         name=base_rule.name,
         severity=base_rule.severity,
-        explanation=base_rule.explanation.replace("100", str(max_line_length)),
+        explanation=(
+            f"Lines longer than {max_line_length} characters are hard to read "
+            "and maintain"
+        ),
         recommendation=base_rule.recommendation,
     )
 

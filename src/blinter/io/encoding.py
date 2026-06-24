@@ -9,6 +9,8 @@ from typing import (
     cast,
 )
 
+from charset_normalizer import from_bytes
+
 from blinter.constants import LARGE_FILE_WARNING_BYTES, MAX_FILE_SIZE_BYTES
 from blinter.logging_config import logger
 
@@ -211,9 +213,6 @@ def _detect_charset_norm_bytes(raw_data: bytes, encodings_list: List[str]) -> Li
     Thread-safe: Yes - uses only local variables
     """
     try:
-        # pylint: disable=import-outside-toplevel  # isort: skip
-        from charset_normalizer import from_bytes
-
         best_match = from_bytes(raw_data).best()  # type: ignore[misc]
         detected_encoding = _charset_norm_match_encoding(cast(object, best_match))
         if detected_encoding is None:
@@ -221,10 +220,6 @@ def _detect_charset_norm_bytes(raw_data: bytes, encodings_list: List[str]) -> Li
 
         return _prioritize_detected_encoding(encodings_list, detected_encoding)
 
-    except ImportError:
-        logger.debug(
-            "charset_normalizer not available, using fallback encoding detection"
-        )
     except (OSError, ValueError, TypeError) as detection_error:
         logger.debug("Encoding detection failed: %s, using fallback", detection_error)
 

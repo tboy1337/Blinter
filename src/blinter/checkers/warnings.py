@@ -214,9 +214,6 @@ def _check_command_warnings(  # pylint: disable=unused-argument
             )
         )
 
-    # W015: Deprecated command usage - Now handled by W024 in _check_deprecated_commands()
-    # (Removed duplicate check - W024 provides more comprehensive deprecated command detection)
-
     return issues
 
 

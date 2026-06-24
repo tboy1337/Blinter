@@ -901,7 +901,7 @@ echo Done
 
         # Test RULES structure
         assert isinstance(RULES, dict)
-        assert len(RULES) == 151
+        assert len(RULES) == 148
 
         for rule_code, rule in RULES.items():
             assert isinstance(rule_code, str)
@@ -927,8 +927,6 @@ echo Done
         """Every registered rule must be referenced by checker code."""
         from pathlib import Path
 
-        from blinter.rules.registry import DEPRECATED_RULE_ALIASES
-
         src_root = Path(__file__).resolve().parent.parent / "src" / "blinter"
         referenced: set[str] = set()
 
@@ -952,10 +950,7 @@ echo Done
             for compiled_pattern in rule_patterns:
                 referenced.update(compiled_pattern.findall(text))
 
-        deprecated = set(DEPRECATED_RULE_ALIASES.keys())
-        orphan_rules = sorted(
-            code for code in RULES if code not in referenced and code not in deprecated
-        )
+        orphan_rules = sorted(code for code in RULES if code not in referenced)
         assert not orphan_rules, (
             "Rules in registry but never emitted by checkers: "
             f"{', '.join(orphan_rules)}"

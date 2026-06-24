@@ -169,6 +169,27 @@ class TestMaxLineLengthCLI:
         finally:
             os.unlink(temp_file)
 
+    def test_cli_max_line_length_exceeds_maximum(self) -> None:
+        """Test --max-line-length above MAX_LINE_LENGTH shows error."""
+        content = "@echo off\necho test\n"
+        temp_file = self.create_temp_batch_file(content)
+
+        try:
+            with patch(
+                "sys.argv", ["blinter", temp_file, "--max-line-length", "10001"]
+            ):
+                with patch("builtins.print") as mock_print:
+                    with pytest.raises(SystemExit) as exc_info:
+                        _parse_cli_arguments()
+                    assert exc_info.value.code == 1
+                    error_printed = any(
+                        "must not exceed" in str(call)
+                        for call in mock_print.call_args_list
+                    )
+                    assert error_printed
+        finally:
+            os.unlink(temp_file)
+
     def test_cli_max_line_length_small_value(self) -> None:
         """Test --max-line-length with very small value (edge case)."""
         content = "@echo off\n"
@@ -311,26 +332,26 @@ max_line_length = 100
                 assert "--max-line-length" in help_output
 
     def test_cli_max_line_length_boundary_values(self) -> None:
-        """Test --max-line-length at boundary values."""
-        # Create batch file with line of exactly 88 characters (default limit)
+        """Test S011 boundary behavior at explicit limits (not the 100-char default)."""
+        # 88-character line used to verify limit-1/limit/limit+1 behavior
         line_content = "REM " + "x" * 84  # 88 characters total
         content = f"@echo off\n{line_content}\n"
         temp_file = self.create_temp_batch_file(content)
 
         try:
-            # Test at exactly the default (88) - should not trigger
+            # At limit 88 - should not trigger
             config_88 = BlinterConfig(max_line_length=88)
             issues_88 = lint_batch_file(temp_file, config=config_88)
             s011_issues_88 = [i for i in issues_88 if i.rule.code == "S011"]
             assert len(s011_issues_88) == 0
 
-            # Test at 87 (one below) - should trigger
+            # At 87 (one below) - should trigger
             config_87 = BlinterConfig(max_line_length=87)
             issues_87 = lint_batch_file(temp_file, config=config_87)
             s011_issues_87 = [i for i in issues_87 if i.rule.code == "S011"]
             assert len(s011_issues_87) > 0
 
-            # Test at 89 (one above) - should not trigger
+            # At 89 (one above) - should not trigger
             config_89 = BlinterConfig(max_line_length=89)
             issues_89 = lint_batch_file(temp_file, config=config_89)
             s011_issues_89 = [i for i in issues_89 if i.rule.code == "S011"]
@@ -500,10 +521,9 @@ max_line_length = invalid
             config_file_path = config_file.name
 
         try:
-            # Should handle gracefully and use default
+            # Invalid value should fall back to default (100)
             config = load_config(config_file_path)
-            # Will either use default or fail gracefully
-            assert config.max_line_length > 0
+            assert config.max_line_length == 100
         finally:
             try:
                 os.unlink(config_file_path)
@@ -549,9 +569,8 @@ class TestMaxLineLengthEdgeCases:
             config = BlinterConfig(max_line_length=50)
             issues = lint_batch_file(temp_file, config=config)
             s011_issues = [i for i in issues if i.rule.code == "S011"]
-            # Should detect the whitespace line if it's longer than limit
             whitespace_line_issues = [i for i in s011_issues if i.line_number == 2]
-            assert len(whitespace_line_issues) >= 0  # May or may not count whitespace
+            assert len(whitespace_line_issues) == 1
         finally:
             os.unlink(temp_file)
 

@@ -643,52 +643,32 @@ class TestCommandLineIntegration:
                 os.unlink(temp_file)
 
     def test_main_entry_point_execution(self) -> None:
-        """Test the __name__ == '__main__' execution path via subprocess."""
-        # Create a test script that simulates running blinter as main module
-        test_script_content = """
-import sys
-import tempfile
-import os
-
-# Create a test batch file
-with tempfile.NamedTemporaryFile(mode='w', suffix='.bat', delete=False) as temp_file_handle:
-    f.write('@echo off\\necho test')
-    test_file = f.name
-
-try:
-    # Set up sys.argv as if called from command line
-    sys.argv = ['blinter.py', test_file]
-
-    # Import blinter module - this will execute the if __name__ == "__main__": main() line
-    import blinter
-
-finally:
-    # Clean up
-    if os.path.exists(test_file):
-        os.unlink(test_file)
-"""
-
+        """Test python -m blinter entry point via subprocess."""
         with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False
-        ) as script_file:
-            script_file.write(test_script_content)
-            script_file_path = script_file.name
+            mode="w", suffix=".bat", delete=False, encoding="utf-8"
+        ) as batch_file:
+            batch_file.write("@echo off\n")
+            batch_path = batch_file.name
 
         try:
-            # Execute the script to test the main entry point
             result = subprocess.run(
-                [sys.executable, script_file_path],
+                [sys.executable, "-m", "blinter", batch_path],
                 capture_output=True,
                 text=True,
-                timeout=10,
+                timeout=30,
                 check=False,
+                cwd=str(Path(__file__).resolve().parent.parent),
+                env={
+                    **os.environ,
+                    "PYTHONPATH": str(Path(__file__).resolve().parent.parent / "src"),
+                },
             )
 
-            # Should execute successfully (exit code 0 or 1 for issues found)
-            assert result.returncode in [0, 1]
-
+            assert result.returncode == 0
+            assert "Traceback" not in result.stderr
+            assert "Blinter v" in result.stdout
         finally:
-            os.unlink(script_file_path)
+            os.unlink(batch_path)
 
     def test_main_module_runpy_entry(self) -> None:
         """Test python -m blinter module exposes the CLI entry point."""
@@ -1649,6 +1629,42 @@ class TestCliArgumentValidation:  # pylint: disable=too-few-public-methods
             "argv",
             ["blinter.py", "test.bat", "--verbose", "--quiet"],
         ):
+            with patch("blinter.cli.args.print_help"):
+                with pytest.raises(SystemExit) as exc_info:
+                    _parse_cli_arguments()
+                assert exc_info.value.code == 1
+
+    def test_create_config_writes_default_file(self) -> None:
+        """--create-config should write blinter.ini and exit early."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmpdir)
+                with patch.object(sys, "argv", ["blinter", "--create-config"]):
+                    result = _parse_cli_arguments()
+                assert result is None
+                assert Path("blinter.ini").is_file()
+            finally:
+                os.chdir(original_cwd)
+
+    def test_create_config_existing_file_requires_force(self) -> None:
+        """--create-config without --force fails when blinter.ini exists."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmpdir)
+                Path("blinter.ini").write_text("[general]\n", encoding="utf-8")
+                with patch.object(sys, "argv", ["blinter", "--create-config"]):
+                    with patch("blinter.cli.args.print_help"):
+                        with pytest.raises(SystemExit) as exc_info:
+                            _parse_cli_arguments()
+                assert exc_info.value.code == 1
+            finally:
+                os.chdir(original_cwd)
+
+    def test_config_option_requires_path(self) -> None:
+        """--config without a path should exit with code 1."""
+        with patch.object(sys, "argv", ["blinter", "test.bat", "--config"]):
             with patch("blinter.cli.args.print_help"):
                 with pytest.raises(SystemExit) as exc_info:
                     _parse_cli_arguments()

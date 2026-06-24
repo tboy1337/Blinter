@@ -92,6 +92,10 @@ def _process_single_called_script(
     """
     Process a single called script.
 
+    Follow-calls analysis is best-effort: read or lint failures on called scripts
+    are logged and skipped without adding to ``skipped_files`` (unlike primary
+    targets, which affect the CLI exit code when unreadable).
+
     Returns:
         Tuple of (files_processed, files_with_errors)
     """

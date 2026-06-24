@@ -14,6 +14,7 @@ import pytest
 
 from blinter import (
     BlinterConfig,
+    find_batch_files,
     lint_batch_file,
 )
 from blinter.engine.dependencies import (
@@ -612,6 +613,34 @@ class TestSymlinkSandbox:  # pylint: disable=too-few-public-methods
                 main_script, scan_root=str(scan_root.resolve())
             )
             assert not called
+
+    def test_is_path_under_root_returns_false_for_path_outside_root(self) -> None:
+        """Paths outside scan_root must not be treated as inside."""
+        with tempfile.TemporaryDirectory() as outer:
+            scan_root = Path(outer) / "project"
+            outside_dir = Path(outer) / "outside"
+            scan_root.mkdir()
+            outside_dir.mkdir()
+            outside_file = outside_dir / "script.bat"
+            outside_file.write_text("@ECHO OFF\n", encoding="utf-8")
+            assert is_path_under_root(outside_file, scan_root) is False
+
+    def test_find_batch_files_filters_outside_scan_root(self) -> None:
+        """find_batch_files with root skips files outside scan_root."""
+        with tempfile.TemporaryDirectory() as outer:
+            scan_root = Path(outer) / "project"
+            outside_dir = Path(outer) / "outside"
+            scan_root.mkdir()
+            outside_dir.mkdir()
+            inside = scan_root / "inside.bat"
+            inside.write_text("@ECHO OFF\n", encoding="utf-8")
+            outside = outside_dir / "outside.bat"
+            outside.write_text("@ECHO OFF\n", encoding="utf-8")
+
+            found = find_batch_files(scan_root, root=scan_root)
+            names = {path.name for path in found}
+            assert "inside.bat" in names
+            assert "outside.bat" not in names
 
 
 class TestCallDependencyGraph:  # pylint: disable=too-few-public-methods

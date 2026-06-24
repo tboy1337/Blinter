@@ -30,6 +30,7 @@ from blinter.checkers.advanced import (
 from blinter.checkers.globals import (
     _check_cmd_case_consistency,
     _check_code_duplication,
+    _check_global_style_rules,
     _check_inconsistent_indentation,
     _check_missing_header_doc,
     _check_missing_pause,
@@ -1403,14 +1404,65 @@ class TestGlobalChecks:
         assert len(unreachable_issues) == 1
         assert unreachable_issues[0].line_number == 3
 
-    def test_unhandled_xcopy_reports_w002_w003_not_w041(self) -> None:
-        """Unhandled xcopy gets W002/W003 only; W041 is not duplicated."""
+    def test_unhandled_xcopy_reports_w002_w003(self) -> None:
+        """Unhandled xcopy gets W002 and W003 error-handling warnings."""
         lines = ["@echo off", "xcopy C:\\src C:\\dest"]
         issues = _check_new_global_rules(lines, "test.bat")
         codes = {issue.rule.code for issue in issues}
-        assert "W041" not in codes
         assert "W002" in codes
         assert "W003" in codes
+
+    def test_unused_label_triggers_s010(self) -> None:
+        """Unused labels should trigger S010."""
+        lines = ["@echo off", ":unused_label", "echo done"]
+        issues = _check_global_style_rules(lines, "test.cmd")
+        s010_issues = [issue for issue in issues if issue.rule.code == "S010"]
+        assert len(s010_issues) == 1
+        assert "unused_label" in s010_issues[0].context.lower()
+
+    def test_goto_loop_without_guard_triggers_w004(self) -> None:
+        """GOTO back to a label without exit guard should trigger W004."""
+        lines = ["@echo off", ":loop", "echo hello", "goto loop"]
+        issues = _check_new_global_rules(lines, "test.bat")
+        w004_issues = [issue for issue in issues if issue.rule.code == "W004"]
+        assert len(w004_issues) == 1
+
+    def test_locked_path_operation_triggers_w007(self) -> None:
+        """File operations under system paths should trigger W007."""
+        lines = ["@echo off", "copy file.txt C:\\Windows\\System32\\file.txt"]
+        issues = _check_new_global_rules(lines, "test.bat")
+        w007_issues = [issue for issue in issues if issue.rule.code == "W007"]
+        assert len(w007_issues) == 1
+
+    def test_setlocal_exit_without_endlocal_triggers_p006(self) -> None:
+        """EXIT with active SETLOCAL should trigger P006."""
+        lines = ["@echo off", "setlocal", "exit /b 0"]
+        issues = _check_new_global_rules(lines, "test.bat")
+        p006_issues = [issue for issue in issues if issue.rule.code == "P006"]
+        assert len(p006_issues) == 1
+
+    def test_self_modification_triggers_sec019(self) -> None:
+        """Writing to the running script should trigger SEC019."""
+        lines = ["@echo off", "echo payload > test.bat"]
+        issues = _check_new_global_rules(lines, "test.bat")
+        sec019_issues = [issue for issue in issues if issue.rule.code == "SEC019"]
+        assert len(sec019_issues) == 1
+
+    def test_redundant_setlocal_triggers_p024(self) -> None:
+        """Multiple SETLOCAL commands should trigger P024."""
+        lines = [
+            "@echo off",
+            "setlocal",
+            "echo step1",
+            "echo step2",
+            "echo step3",
+            "echo step4",
+            "echo step5",
+            "setlocal",
+        ]
+        issues = _check_new_global_rules(lines, "test.bat")
+        p024_issues = [issue for issue in issues if issue.rule.code == "P024"]
+        assert len(p024_issues) == 1
 
     def test_check_unreachable_code_after_goto(self) -> None:
         """Test unreachable code detection after GOTO."""
