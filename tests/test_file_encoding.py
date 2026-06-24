@@ -13,6 +13,8 @@ from blinter import (
     lint_batch_file,
     read_file_with_encoding,
 )
+from blinter.constants import MAX_FILE_SIZE_BYTES
+from blinter.io.encoding import _validate_and_read_file
 
 
 class TestFileEncodingDetection:
@@ -739,14 +741,11 @@ class TestAdditionalFileEncodingScenarios:
                 assert "All encoding attempts failed" in str(error)
 
 
-class TestFileSizeLimit:
+class TestFileSizeLimit:  # pylint: disable=too-few-public-methods
     """Test maximum file size enforcement."""
 
     def test_rejects_file_exceeding_max_size(self, tmp_path: Path) -> None:
         """Files larger than MAX_FILE_SIZE_BYTES are rejected."""
-        from blinter.constants import MAX_FILE_SIZE_BYTES
-        from blinter.io.encoding import _validate_and_read_file
-
         big_file = tmp_path / "big.bat"
         big_file.write_bytes(b"@echo off\n" + b"x" * (MAX_FILE_SIZE_BYTES + 1))
 

@@ -64,7 +64,7 @@ class LintIssue:
 
 
 @dataclass
-class BlinterConfig:
+class BlinterConfig:  # pylint: disable=too-many-instance-attributes
     """Configuration settings for blinter."""
 
     # General settings

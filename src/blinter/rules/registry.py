@@ -1,5 +1,8 @@
 """Rule definitions and the RULES lookup table."""
 
+# pylint: disable=too-many-lines
+# Rule catalog is intentionally centralized in one module.
+
 from typing import Dict
 
 from blinter.models import Rule, RuleSeverity

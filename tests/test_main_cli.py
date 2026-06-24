@@ -1,6 +1,7 @@
 """Tests for main function and command-line interface."""
 
 import io
+import logging
 import os
 from pathlib import Path
 import shutil
@@ -18,8 +19,9 @@ from blinter import (
     find_batch_files,
     main,
 )
+from blinter.cli.main import _configure_cli_logging
 
-# pylint: disable=too-many-lines,import-outside-toplevel,redefined-outer-name,reimported
+# pylint: disable=too-many-lines,redefined-outer-name,reimported
 
 
 if TYPE_CHECKING:
@@ -278,8 +280,7 @@ echo %var%
                         output = captured.getvalue()
 
                     assert (
-                        "Could not process" in output
-                        and "Permission denied" in output
+                        "Could not process" in output and "Permission denied" in output
                     )
         finally:
             if os.path.exists(temp_file):
@@ -303,10 +304,7 @@ echo %var%
                             assert sys_exit.code in [0, 1]
                         output = captured.getvalue()
 
-                    assert (
-                        "Could not read" in output
-                        and "encoding issues" in output
-                    )
+                    assert "Could not read" in output and "encoding issues" in output
         finally:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
@@ -640,8 +638,7 @@ class TestCommandLineIntegration:
                             assert (
                                 "Could not process" in output
                                 or "Could not read" in output
-                                or "Error: No batch files could be processed"
-                                in output
+                                or "Error: No batch files could be processed" in output
                             )
         finally:
             if temp_file and os.path.exists(temp_file):
@@ -1013,7 +1010,6 @@ class TestCLIMainFunctionScenarios:
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test main function with permission error."""
-        import blinter
 
         with patch("sys.argv", ["blinter.py", "protected.bat"]):
             with patch(
@@ -1031,7 +1027,6 @@ class TestCLIMainFunctionScenarios:
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test main function handling UnicodeDecodeError during file processing."""
-        import blinter
 
         # Create a test file
         with tempfile.NamedTemporaryFile(
@@ -1061,7 +1056,6 @@ class TestCLIMainFunctionScenarios:
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test main function handling generic file errors during processing."""
-        import blinter
 
         # Create a test file
         with tempfile.NamedTemporaryFile(
@@ -1090,7 +1084,6 @@ class TestCLIMainFunctionScenarios:
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test main function when no files can be processed."""
-        import blinter
 
         # Create a test file that will cause processing to fail
         with tempfile.NamedTemporaryFile(
@@ -1121,7 +1114,6 @@ class TestDirectoryProcessingScenarios:
 
     def test_find_batch_files_empty_directory(self) -> None:
         """Test find_batch_files with empty directory."""
-        import tempfile
 
         with tempfile.TemporaryDirectory() as temp_dir:
             batch_files = find_batch_files(temp_dir, recursive=False)
@@ -1129,7 +1121,6 @@ class TestDirectoryProcessingScenarios:
 
     def test_find_batch_files_directory_with_mixed_files(self) -> None:
         """Test find_batch_files with directory containing mixed file types."""
-        import tempfile
 
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create various file types
@@ -1143,7 +1134,6 @@ class TestDirectoryProcessingScenarios:
 
     def test_find_batch_files_recursive_vs_non_recursive(self) -> None:
         """Test find_batch_files recursive vs non-recursive behavior."""
-        import tempfile
 
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create files in root directory
@@ -1169,9 +1159,6 @@ class TestMainFunctionEdgeCases:
 
     def test_main_function_no_path_provided_edge_case(self) -> None:
         """Test main function with no path provided after processing args."""
-        import sys
-
-        from blinter import main
 
         original_argv = sys.argv.copy()
         try:
@@ -1194,9 +1181,6 @@ class TestMainFunctionEdgeCases:
 
     def test_main_function_argument_processing_edge_cases(self) -> None:
         """Test main function argument processing edge cases."""
-        import sys
-
-        from blinter import main
 
         original_argv = sys.argv.copy()
         try:
@@ -1226,9 +1210,6 @@ class TestMainFunctionEdgeCases:
 
     def test_main_function_find_batch_files_error(self) -> None:
         """Test main function when find_batch_files raises an error."""
-        import sys
-
-        from blinter import main
 
         original_argv = sys.argv.copy()
         try:
@@ -1248,9 +1229,6 @@ class TestMainFunctionEdgeCases:
 
     def test_main_function_file_processing_errors(self) -> None:
         """Test main function with file processing errors."""
-        import sys
-
-        from blinter import main
 
         original_argv = sys.argv.copy()
 
@@ -1295,9 +1273,6 @@ class TestMainFunctionEdgeCases:
 
     def test_main_function_no_files_found_scenario(self) -> None:
         """Test main function when no batch files are found."""
-        import sys
-
-        from blinter import main
 
         original_argv = sys.argv.copy()
 
@@ -1324,9 +1299,6 @@ class TestMainFunctionEdgeCases:
 
     def test_main_function_comprehensive_error_handling(self) -> None:
         """Test comprehensive error handling in main function."""
-        import sys
-
-        from blinter import main
 
         original_argv = sys.argv.copy()
 
@@ -1354,9 +1326,6 @@ class TestMainFunctionEdgeCases:
 
     def test_main_function_edge_paths(self) -> None:
         """Test main function paths that might not be covered."""
-        import sys
-
-        from blinter import main
 
         original_argv = sys.argv.copy()
 
@@ -1383,9 +1352,6 @@ class TestMainFunctionEdgeCases:
 
     def test_main_function_no_path_provided(self) -> None:
         """Test main function when no path is provided."""
-        import sys
-
-        from blinter import main
 
         original_argv = sys.argv[:]
         try:
@@ -1398,9 +1364,6 @@ class TestMainFunctionEdgeCases:
 
     def test_main_function_single_file_processing(self) -> None:
         """Test main function processing single file vs directory."""
-        import sys
-
-        from blinter import main
 
         # Create a temporary batch file
         fd, temp_path = tempfile.mkstemp(suffix=".bat")
@@ -1609,7 +1572,7 @@ class TestFollowCallsCLI:
                 # Should exit with error code due to errors
                 assert exc_info.value.code in [0, 1]
 
-    def test_cli_follow_calls_outside_scan_root_does_not_crash(self) -> None:
+    def test_cli_follow_calls_outside_root_no_crash(self) -> None:
         """Directory scan with follow_calls must not crash on outside paths."""
         with tempfile.TemporaryDirectory() as outer:
             outside_dir = os.path.join(outer, "outside")
@@ -1637,22 +1600,18 @@ class TestFollowCallsCLI:
                 assert exc_info.value.code in [0, 1]
 
 
-class TestCliLogging:
+class TestCliLogging:  # pylint: disable=too-few-public-methods
     """Test CLI logging configuration."""
 
     def test_configure_cli_logging_adds_handler(self) -> None:
         """CLI should attach a stderr handler when none is configured."""
-        import logging
-
-        from blinter.cli.main import _configure_cli_logging
-
         blinter_logger = logging.getLogger("blinter")
         blinter_logger.handlers.clear()
         _configure_cli_logging()
         assert blinter_logger.handlers
 
 
-class TestCLIEdgeCases:
+class TestCLIEdgeCases:  # pylint: disable=too-few-public-methods
     """Test CLI edge cases for additional coverage."""
 
     def test_cli_no_issues_multiple_files(self) -> None:

@@ -249,7 +249,7 @@ EXIT /B 0
         finally:
             os.unlink(temp_path)
 
-    def test_concurrent_linting_with_different_max_line_lengths(self) -> None:
+    def test_concurrent_lint_different_line_lengths(self) -> None:
         """Concurrent lint calls must not share mutable S011 rule state."""
         long_line = "echo " + ("x" * 120) + "\n"
         content = f"@ECHO OFF\n{long_line}"

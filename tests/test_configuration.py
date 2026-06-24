@@ -697,7 +697,7 @@ class TestFollowCallsConfiguration:
             assert isinstance(issues, list)
 
 
-class TestVersionSync:
+class TestVersionSync:  # pylint: disable=too-few-public-methods
     """Ensure package version stays synchronized with pyproject.toml."""
 
     def test_version_matches_pyproject(self) -> None:

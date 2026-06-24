@@ -35,6 +35,31 @@ def _handle_special_cli_flags() -> Optional[bool]:
     return None
 
 
+def _parse_max_line_length_arg(arg_index: int) -> Optional[Tuple[int, int]]:
+    """
+    Parse the value following ``--max-line-length``.
+
+    Returns:
+        Tuple of (next argv index, parsed line length), or None when invalid.
+    """
+    if arg_index + 1 >= len(sys.argv):
+        print("Error: --max-line-length requires a value.\n")
+        print_help()
+        return None
+    try:
+        line_length = int(sys.argv[arg_index + 1])
+        if line_length <= 0:
+            print("Error: --max-line-length must be a positive integer.\n")
+            return None
+        return arg_index + 1, line_length
+    except ValueError:
+        print(
+            f"Error: --max-line-length requires a numeric value, "
+            f"got '{sys.argv[arg_index + 1]}'.\n"
+        )
+        return None
+
+
 def _parse_regular_arguments() -> Tuple[
     Optional[str],
     bool,
@@ -84,22 +109,11 @@ def _parse_regular_arguments() -> Tuple[
             if target_path is None:
                 target_path = arg
         elif arg == "--max-line-length":
-            # Parse the next argument as the line length value
-            if i + 1 >= len(sys.argv):
-                print("Error: --max-line-length requires a value.\n")
-                print_help()
+            parsed_length = _parse_max_line_length_arg(i)
+            if parsed_length is None:
                 sys.exit(1)
-            try:
-                cli_max_line_length = int(sys.argv[i + 1])
-                if cli_max_line_length <= 0:
-                    print("Error: --max-line-length must be a positive integer.\n")
-                    sys.exit(1)
-                i += 1  # Skip the next argument since we've consumed it
-            except ValueError:
-                print(
-                    f"Error: --max-line-length requires a numeric value, got '{sys.argv[i + 1]}'.\n"
-                )
-                sys.exit(1)
+            else:
+                i, cli_max_line_length = parsed_length
         elif arg in arg_handlers:
             _, config, summary, recursive, follow = arg_handlers[arg]()
             if config is not None:

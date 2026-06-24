@@ -537,10 +537,10 @@ class TestScanRootSandbox:
 
             main_script = os.path.join(scan_dir, "main.bat")
             with open(main_script, "w", encoding="utf-8") as file_handle:
-                file_handle.write(f'CALL "..\\outside\\outside.bat"\n')
+                file_handle.write('CALL "..\\outside\\outside.bat"\n')
 
             called = _extract_called_scripts(Path(main_script), scan_root=scan_dir)
-            assert called == []
+            assert not called
 
             inside_script = os.path.join(scan_dir, "helper.bat")
             with open(inside_script, "w", encoding="utf-8") as file_handle:

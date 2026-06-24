@@ -37,6 +37,12 @@ from blinter.output.formatters import (
 )
 
 
+def _stream_is_closed(stream: object) -> bool:
+    """Return True when a stream object reports itself as closed."""
+    closed_attr: object = getattr(stream, "closed", False)
+    return isinstance(closed_attr, bool) and closed_attr
+
+
 def _configure_cli_logging() -> None:
     """Attach a stderr handler when no logging is configured by the host app."""
     blinter_logger = logging.getLogger("blinter")
@@ -45,7 +51,7 @@ def _configure_cli_logging() -> None:
         if not isinstance(handler, logging.StreamHandler):
             continue
         stream = handler.stream
-        if stream is None or getattr(stream, "closed", False):
+        if stream is None or _stream_is_closed(stream):
             blinter_logger.removeHandler(handler)
             handler.close()
             continue

@@ -141,9 +141,46 @@ def _has_multibyte_chars(lines: List[str]) -> Tuple[bool, List[int]]:
     return has_multibyte, affected_lines
 
 
-def _detect_encoding_charset_norm_bytes(
-    raw_data: bytes, encodings_list: List[str]
+def _charset_norm_match_encoding(detected_match: object) -> Optional[str]:
+    """Return a validated lowercase encoding name from a charset_normalizer match."""
+    if detected_match is None:
+        return None
+
+    detected_encoding_raw: object = getattr(detected_match, "encoding", None)
+    detected_coherence_raw: object = getattr(detected_match, "coherence", 0.0)
+    if not isinstance(detected_encoding_raw, str):
+        return None
+    if not isinstance(detected_coherence_raw, (int, float)):
+        return None
+    if detected_coherence_raw <= 0.7:
+        return None
+
+    detected_encoding: str = detected_encoding_raw.lower()
+    logger.debug(
+        "charset_normalizer detected encoding: %s (coherence: %.2f)",
+        detected_encoding,
+        float(detected_coherence_raw),
+    )
+    return detected_encoding
+
+
+def _prioritize_detected_encoding(
+    encodings_list: List[str], detected_encoding: str
 ) -> List[str]:
+    """Move detected encoding to the front of the try list."""
+    if detected_encoding not in [enc.lower() for enc in encodings_list]:
+        encodings_list.insert(0, detected_encoding)
+        return encodings_list
+
+    for index, enc in enumerate(encodings_list):
+        if enc.lower() == detected_encoding:
+            encodings_list.insert(0, encodings_list.pop(index))
+            break
+
+    return encodings_list
+
+
+def _detect_charset_norm_bytes(raw_data: bytes, encodings_list: List[str]) -> List[str]:
     """
     Detect file encoding using charset_normalizer on pre-read bytes.
 
@@ -154,45 +191,20 @@ def _detect_encoding_charset_norm_bytes(
         from charset_normalizer import from_bytes
 
         best_match = from_bytes(raw_data).best()  # type: ignore[misc]
-        detected_match = cast(object, best_match)
-        if detected_match is None:
+        detected_encoding = _charset_norm_match_encoding(cast(object, best_match))
+        if detected_encoding is None:
             return encodings_list
 
-        detected_encoding_raw: object = getattr(detected_match, "encoding", None)
-        detected_coherence_raw: object = getattr(detected_match, "coherence", 0.0)
-        if not isinstance(detected_encoding_raw, str):
-            return encodings_list
-        if not isinstance(detected_coherence_raw, (int, float)):
-            return encodings_list
-        if detected_coherence_raw <= 0.7:
-            return encodings_list
-
-        detected_encoding: str = detected_encoding_raw.lower()
-        logger.debug(
-            "charset_normalizer detected encoding: %s (coherence: %.2f)",
-            detected_encoding,
-            float(detected_coherence_raw),
-        )
-
-        if detected_encoding not in [enc.lower() for enc in encodings_list]:
-            encodings_list.insert(0, detected_encoding)
-            return encodings_list
-
-        for i, enc in enumerate(encodings_list):
-            if enc.lower() == detected_encoding:
-                encodings_list.insert(0, encodings_list.pop(i))
-                break
-
-        return encodings_list
+        return _prioritize_detected_encoding(encodings_list, detected_encoding)
 
     except ImportError:
         logger.debug(
             "charset_normalizer not available, using fallback encoding detection"
         )
-        return encodings_list
     except (ValueError, TypeError) as detection_error:
         logger.debug("Encoding detection failed: %s, using fallback", detection_error)
-        return encodings_list
+
+    return encodings_list
 
 
 def _detect_encoding_charset_norm(
@@ -214,7 +226,7 @@ def _detect_encoding_charset_norm(
     try:
         with open(file_path, "rb") as file_handle:
             raw_data = file_handle.read()
-        return _detect_encoding_charset_norm_bytes(raw_data, encodings_list)
+        return _detect_charset_norm_bytes(raw_data, encodings_list)
 
     except (OSError, ValueError) as detection_error:
         logger.debug("Encoding detection failed: %s, using fallback", detection_error)
@@ -277,7 +289,7 @@ def _read_lines_from_bytes(file_path: str, raw_data: bytes) -> Tuple[List[str], 
         "utf-16",
         "utf-32",
     ]
-    encodings_to_try = _detect_encoding_charset_norm_bytes(raw_data, encodings_to_try)
+    encodings_to_try = _detect_charset_norm_bytes(raw_data, encodings_to_try)
 
     for encoding in encodings_to_try:
         lines = _try_decode_bytes(raw_data, encoding)

@@ -1,6 +1,7 @@
 """Tests for edge cases and specialized scenarios."""
 
 import os
+import sys
 import tempfile
 from typing import Dict, Set
 from unittest.mock import MagicMock, mock_open, patch
@@ -8,7 +9,10 @@ from unittest.mock import MagicMock, mock_open, patch
 import pytest
 
 from blinter import (
+    BlinterConfig,
+    find_batch_files,
     lint_batch_file,
+    main,
     read_file_with_encoding,
 )
 from blinter.checkers.advanced import (
@@ -22,7 +26,11 @@ from blinter.checkers.advanced import (
     _check_magic_numbers,
 )
 from blinter.checkers.globals import (
+    _check_cmd_case_consistency,
     _check_code_duplication,
+    _check_inconsistent_indentation,
+    _check_missing_header_doc,
+    _check_missing_pause,
     _check_redundant_operations,
     _check_unreachable_code,
 )
@@ -35,13 +43,16 @@ from blinter.checkers.warnings import _check_warning_issues
 from blinter.io.encoding import (
     _detect_line_endings,
     _has_multibyte_chars,
+    _validate_and_read_file,
 )
+from blinter.parsing.context import _is_command_in_safe_context
 from blinter.parsing.structure import (
+    _analyze_script_structure,
     _collect_labels,
     _collect_set_variables,
 )
 
-# pylint: disable=too-many-lines,import-outside-toplevel,redefined-outer-name,reimported
+# pylint: disable=too-many-lines,redefined-outer-name,reimported
 # pylint: disable=unused-argument,invalid-name,missing-class-docstring,too-few-public-methods
 # pylint: disable=unused-variable,unused-import
 
@@ -342,7 +353,6 @@ class TestStyleIssueChecking:
             all_issues.extend(issues)
 
         # Now check using the global function that detects inconsistencies
-        from blinter.checkers.globals import _check_cmd_case_consistency
 
         consistency_issues = _check_cmd_case_consistency(test_lines)
 
@@ -485,7 +495,6 @@ class TestGlobalFunctionChecking:
             "set /p answer=Do you want to continue? ",
             "echo Processing...",
         ]
-        from blinter.checkers.globals import _check_missing_pause
 
         issues = _check_missing_pause(lines)
         assert len(issues) == 1
@@ -497,7 +506,6 @@ class TestGlobalFunctionChecking:
             "choice /c yn /m Continue?",
             "echo Processing...",
         ]
-        from blinter.checkers.globals import _check_missing_pause
 
         issues = _check_missing_pause(lines)
         assert len(issues) == 1
@@ -510,7 +518,6 @@ class TestGlobalFunctionChecking:
             "pause",
             "echo Done",
         ]
-        from blinter.checkers.globals import _check_missing_pause
 
         issues = _check_missing_pause(lines)
         assert len(issues) == 0
@@ -522,7 +529,6 @@ class TestGlobalFunctionChecking:
             "\t echo mixed indentation",  # Tab followed by space - mixed within line
             "  echo other indentation",  # Just spaces
         ]
-        from blinter.checkers.globals import _check_inconsistent_indentation
 
         issues = _check_inconsistent_indentation(lines)
         assert len(issues) >= 1  # Should detect mixed indentation
@@ -537,7 +543,6 @@ class TestGlobalFunctionChecking:
             "  echo with spaces",
             "echo end",
         ]
-        from blinter.checkers.globals import _check_inconsistent_indentation
 
         issues = _check_inconsistent_indentation(lines)
         assert len(issues) == 1
@@ -578,7 +583,6 @@ class TestGlobalFunctionChecking:
             "echo line 30",
             "echo line 31",  # Now 31 lines, should trigger S013 with new threshold of 30
         ]
-        from blinter.checkers.globals import _check_missing_header_doc
 
         issues = _check_missing_header_doc(lines)
         assert len(issues) == 1
@@ -593,7 +597,6 @@ class TestGlobalFunctionChecking:
             "echo world",
             "echo content",
         ]
-        from blinter.checkers.globals import _check_missing_header_doc
 
         issues = _check_missing_header_doc(lines)
         assert len(issues) == 0
@@ -604,10 +607,6 @@ class TestMainFunctionEdgeCases:
 
     def test_find_batch_files_file_not_batch(self) -> None:
         """Test find_batch_files with non-batch file."""
-        import os
-        import tempfile
-
-        from blinter import find_batch_files
 
         # Create a temporary file
         fd, temp_path = tempfile.mkstemp(suffix=".txt")
@@ -623,14 +622,12 @@ class TestMainFunctionEdgeCases:
 
     def test_find_batch_files_nonexistent_path(self) -> None:
         """Test find_batch_files with nonexistent path."""
-        from blinter import find_batch_files
 
         with pytest.raises(FileNotFoundError):
             find_batch_files("/nonexistent/path")
 
     def test_validate_and_read_file_edge_cases(self) -> None:
         """Test _validate_and_read_file edge cases."""
-        from blinter.io.encoding import _validate_and_read_file
 
         # Test empty file path
         with pytest.raises(ValueError, match="file_path must be a non-empty string"):
@@ -642,7 +639,6 @@ class TestMainFunctionEdgeCases:
 
     def test_analyze_script_structure_edge_cases(self) -> None:
         """Test _analyze_script_structure edge cases."""
-        from blinter.parsing.structure import _analyze_script_structure
 
         lines = [
             "setlocal",
@@ -676,7 +672,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_encoding_failure_edge_case(self) -> None:
         """Test encoding failure when no exceptions are stored."""
-        from blinter import read_file_with_encoding
 
         def mock_open_special(*args: object, **kwargs: object) -> object:
             # Return nothing but don't store exception
@@ -694,10 +689,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_validate_and_read_file_large_file_warning(self) -> None:
         """Test large file warning in _validate_and_read_file."""
-        import os
-        import tempfile
-
-        from blinter.io.encoding import _validate_and_read_file
 
         # Mock a large file
         def mock_stat(*args: object, **kwargs: object) -> object:
@@ -730,7 +721,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_script_structure_analysis_edge_cases(self) -> None:
         """Test _analyze_script_structure with edge cases."""
-        from blinter.parsing.structure import _analyze_script_structure
 
         # Empty lines
         lines: list[str] = []
@@ -761,7 +751,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_missing_pause_edge_case(self) -> None:
         """Test _check_missing_pause with edge cases."""
-        from blinter.checkers.globals import _check_missing_pause
 
         # Script with user input but already has pause - should not warn
         lines = [
@@ -775,9 +764,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_find_batch_files_not_file_or_directory(self) -> None:
         """Test find_batch_files with invalid path type."""
-        import os
-
-        from blinter import find_batch_files
 
         # This should be very rare, but test the "neither file nor directory" path
         # We'll mock a path that exists but is neither
@@ -797,7 +783,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_security_is_command_in_safe_context(self) -> None:
         """Test _is_command_in_safe_context function behavior."""
-        from blinter.parsing.context import _is_command_in_safe_context
 
         # Test REM comment context
         assert _is_command_in_safe_context("rem del *.* is dangerous") is True
@@ -812,7 +797,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_charset_normalizer_detected_encoding_not_in_list(self) -> None:
         """Test charset_normalizer detecting encoding not in our default list."""
-        from blinter import read_file_with_encoding
 
         mock_result = MagicMock()
         mock_result.encoding = "iso-2022-jp"
@@ -830,7 +814,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_style_issues_edge_cases(self) -> None:
         """Test style issue detection edge cases."""
-        from blinter.checkers.style import _check_style_issues
 
         # Small number, should not trigger magic number rule
         issues = _check_style_issues("timeout /t 5", 1)
@@ -840,9 +823,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_main_function_directory_processing_edge_case(self) -> None:
         """Test main function with directory processing edge cases."""
-        import sys
-
-        from blinter import main
 
         # Test with --no-recursive flag
         original_argv = sys.argv[:]
@@ -857,7 +837,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_performance_issue_edge_cases(self) -> None:
         """Test performance issue detection edge cases."""
-        from blinter.checkers.performance import _check_performance_issues
 
         # Test temp file with random - should not trigger P007
         issues = _check_performance_issues(
@@ -877,7 +856,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_missing_pause_reverse_line_order(self) -> None:
         """Test _check_missing_pause finding appropriate line number."""
-        from blinter.checkers.globals import _check_missing_pause
 
         # Test finding the last executable line for warning
         lines = [
@@ -894,7 +872,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_inconsistent_indentation_few_indented_lines(self) -> None:
         """Test inconsistent indentation with less than 2 indented lines."""
-        from blinter.checkers.globals import _check_inconsistent_indentation
 
         lines = [
             "echo start",
@@ -906,9 +883,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_main_function_no_path_provided(self) -> None:
         """Test main function when no path is provided."""
-        import sys
-
-        from blinter import main
 
         original_argv = sys.argv[:]
         try:
@@ -921,11 +895,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_main_function_single_file_processing(self) -> None:
         """Test main function processing single file vs directory."""
-        import os
-        import sys
-        import tempfile
-
-        from blinter import main
 
         # Create a temporary batch file
         fd, temp_path = tempfile.mkstemp(suffix=".bat")
@@ -949,7 +918,6 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_security_admin_commands_edge_cases(self) -> None:
         """Test admin command detection edge cases."""
-        from blinter.checkers.security import _check_security_issues
 
         # Test specific admin commands
         test_cases = [
@@ -1148,8 +1116,6 @@ class TestStyleChecking:
                 f"{keyword} test",  # lowercase
                 f"{keyword.upper()} test2",  # uppercase - should trigger S003
             ]
-
-            from blinter.checkers.globals import _check_cmd_case_consistency
 
             consistency_issues = _check_cmd_case_consistency(test_lines)
             casing_issues = [i for i in consistency_issues if i.rule.code == "S003"]
@@ -1666,7 +1632,6 @@ class TestRuleEdgeCases:
 
     def create_temp_batch_file(self, content: str) -> str:
         """Create a temporary batch file with the given content."""
-        import tempfile
 
         with tempfile.NamedTemporaryFile(
             mode="w", delete=False, suffix=".bat", encoding="utf-8"
@@ -1676,9 +1641,6 @@ class TestRuleEdgeCases:
 
     def test_comment_style_labels_not_flagged_as_duplicates(self) -> None:
         """Test that comment-style labels (:::::::) are not flagged as duplicates."""
-        import os
-
-        from blinter import lint_batch_file
 
         content = """@echo off
 ::::::::::::::::::::::::
@@ -1700,9 +1662,6 @@ ECHO Hello
 
     def test_e003_if_incomplete_comparison(self) -> None:
         """Test E003 rule for incomplete IF statement comparisons."""
-        import os
-
-        from blinter import lint_batch_file
 
         content = """@echo off
 IF myvar
@@ -1718,9 +1677,6 @@ IF "somevalue"
 
     def test_e011_mismatched_percent_delimiters(self) -> None:
         """Test E011 rule for mismatched percent delimiters."""
-        import os
-
-        from blinter import lint_batch_file
 
         content = """@echo off
 ECHO This has mismatched %VAR delimiters
@@ -1736,9 +1692,6 @@ SET result=%ERRORLEVEL
 
     def test_e011_mismatched_exclamation_delimiters(self) -> None:
         """Test E011 rule for mismatched exclamation delimiters."""
-        import os
-
-        from blinter import lint_batch_file
 
         content = """@echo off
 SETLOCAL ENABLEDELAYEDEXPANSION
@@ -1755,9 +1708,6 @@ SET result=!ERRORLEVEL
 
     def test_s014_long_parameter_list(self) -> None:
         """Test S014 rule for long parameter lists in CALL statements."""
-        import os
-
-        from blinter import lint_batch_file
 
         content = """@echo off
 CALL :myfunction param1 param2 param3 param4 param5 param6 param7
@@ -1776,9 +1726,6 @@ GOTO :EOF
 
     def test_s014_call_with_chained_command(self) -> None:
         """Test that chained commands after CALL are not counted as parameters."""
-        import os
-
-        from blinter import lint_batch_file
 
         content = """@echo off
 CALL :GetParams "D" @THISDAY & IF NOT DEFINED @THISDAY (SET @THISDAY=%@TODAY_EXP%)
@@ -1804,7 +1751,6 @@ class TestSpecificRuleEdgeCases:
 
     def create_temp_batch_file(self, content: str) -> str:
         """Create a temporary batch file with the given content."""
-        import tempfile
 
         with tempfile.NamedTemporaryFile(
             mode="w", delete=False, suffix=".bat", encoding="utf-8"
@@ -1814,9 +1760,6 @@ class TestSpecificRuleEdgeCases:
 
     def test_if_exist_with_comparison_operator_e004(self) -> None:
         """Test E004 rule for IF EXIST syntax mixing."""
-        import os
-
-        from blinter import lint_batch_file
 
         content = """@echo off
 IF EXIST myfile.txt == "yes" ECHO Found
@@ -1831,9 +1774,6 @@ IF EXIST myfile.txt == "yes" ECHO Found
 
     def test_path_invalid_characters_e005(self) -> None:
         """Test E005 rule for invalid path characters."""
-        import os
-
-        from blinter import lint_batch_file
 
         # Test truly invalid characters (< > |) are still caught
         content = """@echo off
@@ -1862,9 +1802,6 @@ DEL "file?.bat",
 
     def test_for_loop_missing_do_e010(self) -> None:
         """Test E010 rule for FOR loop missing DO keyword."""
-        import os
-
-        from blinter import lint_batch_file
 
         content = """@echo off
 FOR %%i IN (1 2 3) ECHO %%i
@@ -1879,9 +1816,6 @@ FOR %%i IN (1 2 3) ECHO %%i
 
     def test_subroutine_call_without_call_e012(self) -> None:
         """Test E012 rule for subroutine invocation without CALL."""
-        import os
-
-        from blinter import lint_batch_file
 
         # Test case: attempting to invoke a label without CALL or GOTO
         content = """@echo off
@@ -1909,9 +1843,6 @@ GOTO :EOF
 
     def test_e012_label_definition_with_comment(self) -> None:
         """Test E012 does NOT trigger for label definitions with inline comments."""
-        import os
-
-        from blinter import lint_batch_file
 
         content = """@echo off
 :GetDate7 -- Deprecated because the DOFF utility is no longer available
@@ -1933,9 +1864,6 @@ EXIT /B
 
     def test_e012_builtin_commands(self) -> None:
         """Test E012 does NOT trigger for builtin commands that match label names."""
-        import os
-
-        from blinter import lint_batch_file
 
         content = """@echo off
 :echo
@@ -1961,9 +1889,6 @@ set MY_VAR=test
 
     def test_e012_case_insensitive(self) -> None:
         """Test E012 detects case-insensitive label invocations."""
-        import os
-
-        from blinter import lint_batch_file
 
         content = """@echo off
 :MyFunction
@@ -1986,9 +1911,6 @@ MyFunction arg3
 
     def test_e012_correct_invocations(self) -> None:
         """Test E012 does NOT trigger for correct CALL and GOTO usage."""
-        import os
-
-        from blinter import lint_batch_file
 
         content = """@echo off
 :MyFunction
@@ -2017,9 +1939,6 @@ goto :MyFunction
 
     def test_magic_number_in_timeout_s009(self) -> None:
         """Test S009 rule for magic numbers in timeout commands."""
-        import os
-
-        from blinter import lint_batch_file
 
         content = """@echo off
 TIMEOUT /T 300
@@ -2269,8 +2188,6 @@ class TestSpecializedEdgeCases:
         """Test line ending detection with empty content."""
         # This test handles empty file scenarios
         # Just test basic functionality here
-        import os
-        import tempfile
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as f:
             temp_path = f.name
@@ -2299,10 +2216,6 @@ class TestSpecializedEdgeCases:
 
     def test_empty_file_scenarios(self) -> None:
         """Test scenarios with empty files and edge cases."""
-        import os
-        import tempfile
-
-        from blinter import BlinterConfig, lint_batch_file
 
         # Create a truly empty file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as f:
@@ -2319,10 +2232,6 @@ class TestSpecializedEdgeCases:
 
     def test_file_with_only_whitespace(self) -> None:
         """Test file with only whitespace to trigger edge cases."""
-        import os
-        import tempfile
-
-        from blinter import BlinterConfig, lint_batch_file
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as f:
             f.write("   \n\t\n   \n")  # Only whitespace
@@ -2338,10 +2247,6 @@ class TestSpecializedEdgeCases:
 
     def test_single_line_file_no_newline(self) -> None:
         """Test file with single line and no newline."""
-        import os
-        import tempfile
-
-        from blinter import BlinterConfig, lint_batch_file
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".bat", delete=False) as f:
             f.write("@echo off")  # No newline at end
@@ -2357,10 +2262,6 @@ class TestSpecializedEdgeCases:
 
     def test_file_with_unicode_bom(self) -> None:
         """Test file with Unicode BOM."""
-        import os
-        import tempfile
-
-        from blinter import BlinterConfig, lint_batch_file
 
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".bat", delete=False, encoding="utf-8-sig"
