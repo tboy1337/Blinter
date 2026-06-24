@@ -259,12 +259,10 @@ class TestMainFunctionEdgeCases:
             temp_path = temp_file.name
 
         try:
-            # Main function actually processes files regardless of extension
-            # if they exist, but shows help for non-.bat/.cmd files in argv parsing
             with patch("sys.argv", ["blinter.py", temp_path]):
-                with patch("sys.exit"):
+                with pytest.raises(SystemExit) as exit_info:
                     main()
-                    # The function will show help and return normally
+                assert exit_info.value.code == 1
         finally:
             os.unlink(temp_path)
 

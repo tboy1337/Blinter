@@ -1,5 +1,7 @@
 """pytest configuration and shared fixtures for blinter tests."""
 
+from pathlib import Path
+import tomllib
 from typing import Generator
 import warnings
 
@@ -40,6 +42,22 @@ settings.register_profile(
 
 # Load default profile
 settings.load_profile("default")
+
+
+def get_project_version() -> str:
+    """Return the package version from pyproject.toml."""
+    project_root = Path(__file__).resolve().parent.parent
+    with (project_root / "pyproject.toml").open("rb") as pyproject_file:
+        pyproject_data_object: object = tomllib.load(pyproject_file)
+    if not isinstance(pyproject_data_object, dict):
+        raise ValueError("pyproject.toml must contain a top-level table")
+    project_object: object = pyproject_data_object.get("project")
+    if not isinstance(project_object, dict):
+        raise ValueError("pyproject.toml must contain a [project] table")
+    version_object: object = project_object.get("version")
+    if not isinstance(version_object, str) or not version_object:
+        raise ValueError("pyproject.toml [project].version must be a non-empty string")
+    return version_object
 
 
 @pytest.fixture(autouse=True)

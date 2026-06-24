@@ -16,6 +16,7 @@ from unittest.mock import patch
 import pytest
 
 from blinter import find_batch_files, main
+from tests.conftest import get_project_version
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -103,9 +104,11 @@ class TestMainFunction:
         """Test main function with non-existent file."""
         with patch("sys.argv", ["blinter.py", "nonexistent.bat"]):
             with self.capture_stdout() as captured:
-                main()
+                with pytest.raises(SystemExit) as exit_info:
+                    main()
                 output = captured.getvalue()
 
+            assert exit_info.value.code == 1
             assert "Error: Path 'nonexistent.bat' not found" in output
 
     def test_main_non_bat_file(self) -> None:
@@ -119,13 +122,11 @@ class TestMainFunction:
         try:
             with patch("sys.argv", ["blinter.py", temp_file_path]):
                 with self.capture_stdout() as captured:
-                    try:
+                    with pytest.raises(SystemExit) as exit_info:
                         main()
-                    except SystemExit as sys_exit:
-                        # Exit code 0 or 1 is expected
-                        assert sys_exit.code in [0, 1]
                     output = captured.getvalue()
 
+                assert exit_info.value.code == 1
                 assert "not a batch file (.bat or .cmd)" in output
         finally:
             os.unlink(temp_file_path)
@@ -237,9 +238,11 @@ echo %var%
 
         with patch("sys.argv", ["blinter.py", temp_file]):
             with self.capture_stdout() as captured:
-                main()
+                with pytest.raises(SystemExit) as exit_info:
+                    main()
                 output = captured.getvalue()
 
+            assert exit_info.value.code == 1
             # The main function validates file existence before processing
             assert "Error: Path" in output and "not found" in output
 
@@ -619,8 +622,10 @@ class TestCommandLineIntegration:
                         with patch(
                             "sys.stdout", new_callable=io.StringIO
                         ) as mock_stdout:
-                            main()  # Should not raise an exception
+                            with pytest.raises(SystemExit) as exit_info:
+                                main()
                             output = mock_stdout.getvalue()
+                            assert exit_info.value.code == 1
                             assert "Warning:" in output or "Error:" in output
         finally:
             if temp_file and os.path.exists(temp_file):
@@ -915,9 +920,11 @@ class TestDirectoryFunctionality:
             sys.argv = ["blinter.py", temp_dir]
 
             with self.capture_stdout() as captured:
-                main()  # Should exit without error
+                with pytest.raises(SystemExit) as exit_info:
+                    main()
                 output = captured.getvalue()
 
+                assert exit_info.value.code == 1
                 # Should indicate no batch files found
                 assert "No batch files" in output
 
@@ -979,8 +986,10 @@ class TestCLIMainFunctionScenarios:
     ) -> None:
         """Test main function with nonexistent file."""
         with patch("sys.argv", ["blinter.py", "nonexistent.bat"]):
-            main()
+            with pytest.raises(SystemExit) as exit_info:
+                main()
 
+        assert exit_info.value.code == 1
         captured = capsys.readouterr()
         assert "Error: Path 'nonexistent.bat' not found." in captured.out
 
@@ -996,8 +1005,10 @@ class TestCLIMainFunctionScenarios:
                 "find_batch_files",
                 side_effect=PermissionError("Access denied"),
             ):
-                main()
+                with pytest.raises(SystemExit) as exit_info:
+                    main()
 
+        assert exit_info.value.code == 1
         captured = capsys.readouterr()
         assert "Error: Cannot access 'protected.bat'" in captured.out
 
@@ -1021,8 +1032,10 @@ class TestCLIMainFunctionScenarios:
                     "lint_batch_file",
                     side_effect=UnicodeDecodeError("test", b"", 0, 1, "test"),
                 ):
-                    main()
+                    with pytest.raises(SystemExit) as exit_info:
+                        main()
 
+            assert exit_info.value.code == 1
             captured = capsys.readouterr()
             assert "Warning: Could not read" in captured.out
             assert "due to encoding issues" in captured.out
@@ -1049,8 +1062,10 @@ class TestCLIMainFunctionScenarios:
                     "lint_batch_file",
                     side_effect=OSError("Generic file error"),
                 ):
-                    main()
+                    with pytest.raises(SystemExit) as exit_info:
+                        main()
 
+            assert exit_info.value.code == 1
             captured = capsys.readouterr()
             assert "Warning: Could not process" in captured.out
         finally:
@@ -1076,8 +1091,10 @@ class TestCLIMainFunctionScenarios:
                     "lint_batch_file",
                     side_effect=ValueError("Processing error"),
                 ):
-                    main()
+                    with pytest.raises(SystemExit) as exit_info:
+                        main()
 
+            assert exit_info.value.code == 1
             captured = capsys.readouterr()
             assert "Error: No batch files could be processed." in captured.out
         finally:
@@ -1149,8 +1166,10 @@ class TestMainFunctionEdgeCases:
 
             with patch("builtins.print") as mock_print:
                 with patch("blinter.print_help") as mock_help:
-                    main()
+                    with pytest.raises(SystemExit) as exit_info:
+                        main()
 
+                    assert exit_info.value.code == 1
                     # Verify error message and help are shown
                     mock_print.assert_any_call(
                         "Error: No batch file or directory provided.\n"
@@ -1202,8 +1221,10 @@ class TestMainFunctionEdgeCases:
             sys.argv = ["blinter", "nonexistent_directory_path_12345"]
 
             with patch("builtins.print") as mock_print:
-                main()
+                with pytest.raises(SystemExit) as exit_info:
+                    main()
 
+                assert exit_info.value.code == 1
                 # Should print file not found error
                 mock_print.assert_any_call(
                     "Error: Path 'nonexistent_directory_path_12345' not found."
@@ -1233,27 +1254,28 @@ class TestMainFunctionEdgeCases:
                     with patch("builtins.print") as mock_print:
                         # Test FileNotFoundError
                         mock_lint.side_effect = FileNotFoundError("File not found")
-                        main()
+                        with pytest.raises(SystemExit):
+                            main()
 
                         # Should handle the error gracefully
                         assert mock_print.called
 
                         # Test PermissionError
                         mock_lint.side_effect = PermissionError("Access denied")
-                        main()
+                        with pytest.raises(SystemExit):
+                            main()
 
                         # Test UnicodeDecodeError
                         mock_lint.side_effect = UnicodeDecodeError(
                             "utf-8", b"", 0, 1, "invalid start byte"
                         )
-                        main()
+                        with pytest.raises(SystemExit):
+                            main()
 
                         # Test generic Exception
                         mock_lint.side_effect = Exception("Generic error")
-                        try:
+                        with pytest.raises(Exception):
                             main()
-                        except Exception:
-                            pass  # Expected to fail
             finally:
                 sys.argv = original_argv
 
@@ -1276,8 +1298,10 @@ class TestMainFunctionEdgeCases:
                 sys.argv = ["blinter", temp_dir]
 
                 with patch("builtins.print") as mock_print:
-                    main()
+                    with pytest.raises(SystemExit) as exit_info:
+                        main()
 
+                    assert exit_info.value.code == 1
                     # Should report no files found (check for either possible message)
                     print_calls = [str(call) for call in mock_print.call_args_list]
                     assert any("No batch files" in call for call in print_calls)
@@ -1448,19 +1472,21 @@ class TestVersionFunctionality:
 
     def test_version_flag(self) -> None:
         """Test that --version flag displays version information."""
+        project_version = get_project_version()
         with patch("sys.argv", ["blinter", "--version"]):
             with StdoutCapture() as captured:
                 main()
                 output = captured.getvalue()
 
         # Check for version information in output (just the version number)
-        assert "v1.0.113" in output
+        assert f"v{project_version}" in output
         # Ensure author and license are NOT shown
         assert "Author:" not in output
         assert "License:" not in output
 
     def test_version_in_help(self) -> None:
         """Test that version is displayed in help menu."""
+        project_version = get_project_version()
         with patch("sys.argv", ["blinter", "--help"]):
             with StdoutCapture() as captured:
                 main()
@@ -1468,10 +1494,11 @@ class TestVersionFunctionality:
 
             # Check for version in help text
             assert "Blinter - Help Menu" in output
-            assert "Version: 1.0.113" in output
+            assert f"Version: {project_version}" in output
 
     def test_version_in_normal_run(self) -> None:
         """Test that version is displayed when script runs normally."""
+        project_version = get_project_version()
         # Create a temporary batch file
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".bat", delete=False
@@ -1488,7 +1515,27 @@ class TestVersionFunctionality:
                         output = captured.getvalue()
 
                     # Check that version is displayed at the start
-                    assert "Blinter v1.0.113 - Batch File Linter" in output
+                    assert f"Blinter v{project_version} - Batch File Linter" in output
+        finally:
+            os.unlink(temp_path)
+
+    def test_unknown_flag_exits_with_error(self) -> None:
+        """Test that unknown CLI flags exit with an error."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
+            temp_file.write("@echo off\n")
+            temp_path = temp_file.name
+
+        try:
+            with patch("sys.argv", ["blinter", temp_path, "--not-a-real-flag"]):
+                with StdoutCapture() as captured:
+                    with pytest.raises(SystemExit) as exit_info:
+                        main()
+                    output = captured.getvalue()
+
+                assert exit_info.value.code == 1
+                assert "Unknown option '--not-a-real-flag'" in output
         finally:
             os.unlink(temp_path)
 

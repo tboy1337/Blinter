@@ -7,7 +7,7 @@ import tempfile
 import time
 from typing import List
 
-from blinter import LintIssue, lint_batch_file, read_file_with_encoding
+from blinter import BlinterConfig, LintIssue, lint_batch_file, read_file_with_encoding
 
 
 class TestThreadSafety:
@@ -240,6 +240,47 @@ EXIT /B 0
                 assert (
                     result == first_result
                 ), f"Race condition detected: {result} != {first_result}"
+
+        finally:
+            os.unlink(temp_path)
+
+    def test_concurrent_linting_with_different_max_line_lengths(self) -> None:
+        """Concurrent lint calls must not share mutable S011 rule state."""
+        long_line = "echo " + ("x" * 120) + "\n"
+        content = f"@ECHO OFF\n{long_line}"
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
+            temp_file.write(content)
+            temp_path = temp_file.name
+
+        try:
+
+            def lint_with_limit(max_line_length: int) -> List[LintIssue]:
+                config = BlinterConfig(max_line_length=max_line_length)
+                return lint_batch_file(temp_path, config=config)
+
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                short_futures = [
+                    executor.submit(lint_with_limit, 80) for _ in range(20)
+                ]
+                long_futures = [
+                    executor.submit(lint_with_limit, 200) for _ in range(20)
+                ]
+                short_results = [future.result() for future in short_futures]
+                long_results = [future.result() for future in long_futures]
+
+            for issues in short_results:
+                s011_issues = [issue for issue in issues if issue.rule.code == "S011"]
+                assert s011_issues, "Expected S011 for 80-character limit"
+                assert all(
+                    "max 80" in issue.context for issue in s011_issues
+                ), f"Unexpected S011 context: {s011_issues[0].context}"
+
+            for issues in long_results:
+                s011_issues = [issue for issue in issues if issue.rule.code == "S011"]
+                assert not s011_issues, "Did not expect S011 for 200-character limit"
 
         finally:
             os.unlink(temp_path)

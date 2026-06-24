@@ -4,7 +4,7 @@ This module provides comprehensive functionality to lint Windows batch files (.b
 for common syntax errors, style issues, security vulnerabilities and performance problems.
 
 Features:
-- 150+ built-in rules across 5 severity levels
+- 100 built-in rules across 5 severity levels
 - Thread-safe operations for concurrent processing
 - Robust encoding detection and handling
 - Comprehensive error handling for production use
@@ -47,7 +47,18 @@ import logging
 from pathlib import Path
 import re
 import sys
-from typing import Callable, DefaultDict, Dict, List, Optional, Set, Tuple, Union, cast
+from typing import (
+    Callable,
+    DefaultDict,
+    Dict,
+    List,
+    NoReturn,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+    cast,
+)
 import warnings
 
 __version__ = "1.0.113"
@@ -91,6 +102,26 @@ class Rule:
             raise ValueError("Rule explanation must be a non-empty string")
         if not self.recommendation or not isinstance(self.recommendation, str):
             raise ValueError("Rule recommendation must be a non-empty string")
+
+
+def _s011_rule(max_line_length: int) -> Rule:
+    """Return the S011 rule, with explanation adjusted for custom line length."""
+    base_rule = RULES["S011"]
+    if max_line_length == 100:
+        return base_rule
+    return Rule(
+        code=base_rule.code,
+        name=base_rule.name,
+        severity=base_rule.severity,
+        explanation=base_rule.explanation.replace("100", str(max_line_length)),
+        recommendation=base_rule.recommendation,
+    )
+
+
+def _cli_error(message: str) -> NoReturn:
+    """Print an error message and exit with status code 1."""
+    print(message)
+    raise SystemExit(1)
 
 
 @dataclass
@@ -1846,15 +1877,25 @@ def _detect_encoding_charset_norm(
         with open(file_path, "rb") as file_handle:
             raw_data = file_handle.read()
 
-        detected = from_bytes(raw_data).best()
-        if not detected or not detected.encoding or detected.coherence <= 0.7:
+        best_match = from_bytes(raw_data).best()  # type: ignore[misc]
+        detected_match = cast(object, best_match)
+        if detected_match is None:
             return encodings_list
 
-        detected_encoding: str = detected.encoding.lower()
+        detected_encoding_raw: object = getattr(detected_match, "encoding", None)
+        detected_coherence_raw: object = getattr(detected_match, "coherence", 0.0)
+        if not isinstance(detected_encoding_raw, str):
+            return encodings_list
+        if not isinstance(detected_coherence_raw, (int, float)):
+            return encodings_list
+        if detected_coherence_raw <= 0.7:
+            return encodings_list
+
+        detected_encoding: str = detected_encoding_raw.lower()
         logger.debug(
             "charset_normalizer detected encoding: %s (coherence: %.2f)",
             detected_encoding,
-            detected.coherence,
+            float(detected_coherence_raw),
         )
 
         # Add detected encoding to the front if not already there
@@ -2528,7 +2569,7 @@ Arguments:
 
 Options:
   --summary           Show a summary section with total errors and most common error.
-  --severity          Show error severity levels and their meaning.
+  --severity          Accepted for compatibility; severity breakdown is always shown.
   --max-line-length <n>  Set maximum line length for S011 rule (default: 100).
   --no-recursive      When processing directories, don't search subdirectories (default: recursive).
   --follow-calls      Automatically scan scripts called by CALL statements (one level deep).
@@ -4050,7 +4091,7 @@ def _check_style_issues(
         issues.append(
             LintIssue(
                 line_number=line_num,
-                rule=RULES["S011"],
+                rule=_s011_rule(max_line_length),
                 context=f"Line is {line_length} characters (max {max_line_length})",
             )
         )
@@ -6004,19 +6045,6 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     # Detect embedded PowerShell/VBScript blocks to avoid false positives
     skip_lines = _detect_embedded_script_blocks(lines)
 
-    # Store original max_line_length for S011 rule
-    original_s011_rule = RULES["S011"]
-    if config.max_line_length != 100:
-        RULES["S011"] = Rule(
-            code="S011",
-            name=original_s011_rule.name,
-            severity=original_s011_rule.severity,
-            explanation=original_s011_rule.explanation.replace(
-                "100", str(config.max_line_length)
-            ),
-            recommendation=original_s011_rule.recommendation,
-        )
-
     issues: List[LintIssue] = []
 
     # Analyze script structure for context-aware checking
@@ -6075,10 +6103,6 @@ def lint_batch_file(  # pylint: disable=too-many-locals
 
     # Global checks for new rules
     issues.extend(_check_new_global_rules(lines, file_path))
-
-    # Restore original S011 rule if modified
-    if config.max_line_length != 100:
-        RULES["S011"] = original_s011_rule
 
     # Set file_path on all issues that don't have it
     for issue in issues:
@@ -7513,7 +7537,7 @@ def _parse_regular_arguments() -> Tuple[
             None,
             None,
         ),  # (path, config, summary, recursive, follow)
-        "--severity": lambda: (None, None, None, None, None),  # Always shown, no-op
+        "--severity": lambda: (None, None, None, None, None),
         "--no-recursive": lambda: (None, None, None, False, None),
         "--no-config": lambda: (None, False, None, None, None),
         "--follow-calls": lambda: (None, None, None, None, True),
@@ -7552,6 +7576,10 @@ def _parse_regular_arguments() -> Tuple[
                 cli_recursive = recursive
             if follow is not None:
                 cli_follow_calls = follow
+        elif arg.startswith("--"):
+            print(f"Error: Unknown option '{arg}'.\n")
+            print_help()
+            sys.exit(1)
         i += 1
 
     return (
@@ -7584,7 +7612,7 @@ def _parse_cli_arguments() -> Optional[CliArguments]:
     if not target_path:
         print("Error: No batch file or directory provided.\n")
         print_help()
-        return None
+        sys.exit(1)
 
     return CliArguments(
         target_path,
@@ -7730,8 +7758,8 @@ def _try_add_dependency(
         resolved_script = script_path.resolve()
         if resolved_script != batch_file_resolved:
             deps.add(resolved_script)
-    except (ValueError, OSError):
-        pass
+    except (ValueError, OSError) as dependency_error:
+        logger.debug("Skipping dependency %s: %s", script_path, dependency_error)
 
 
 def _extract_direct_dependencies(
@@ -8325,23 +8353,19 @@ def main() -> None:
     try:
         batch_files = find_batch_files(cli_args.target_path, recursive=config.recursive)
     except FileNotFoundError:
-        print(f"Error: Path '{cli_args.target_path}' not found.")
-        return
+        _cli_error(f"Error: Path '{cli_args.target_path}' not found.")
     except ValueError as value_error:
-        print(f"Error: {value_error}")
-        return
+        _cli_error(f"Error: {value_error}")
     except (OSError, PermissionError) as path_error:
-        print(f"Error: Cannot access '{cli_args.target_path}': {path_error}")
-        return
+        _cli_error(f"Error: Cannot access '{cli_args.target_path}': {path_error}")
 
     if not batch_files:
-        print(f"No batch files (.bat or .cmd) found in: {cli_args.target_path}")
-        return
+        _cli_error(f"No batch files (.bat or .cmd) found in: {cli_args.target_path}")
 
     # Process batch files
     results = _process_batch_files(batch_files, config)
     if results is None:
-        return
+        sys.exit(1)
 
     # Display results
     _display_results(results, cli_args.target_path, config)

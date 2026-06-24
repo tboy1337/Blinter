@@ -3,18 +3,11 @@
 
 # Core Testing Packages
 pytest
-pytest-asyncio
 pytest-timeout
 pytest-xdist
 pytest-mock
 pytest-cov
 hypothesis
-
-# Additional Testing Packages
-pytest-html
-pytest-json-report
-pytest-benchmark
-pytest-rerunfailures
 
 # Linting
 pylint

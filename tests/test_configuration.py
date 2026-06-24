@@ -9,10 +9,12 @@ from unittest.mock import patch
 from blinter import (
     BlinterConfig,
     RuleSeverity,
+    __version__,
     create_default_config_file,
     lint_batch_file,
     load_config,
 )
+from tests.conftest import get_project_version
 
 
 class TestBlinterConfig:
@@ -692,3 +694,16 @@ class TestFollowCallsConfiguration:
             issues = lint_batch_file(main_script, config=config)
             # Should process helper only once
             assert isinstance(issues, list)
+
+
+class TestVersionSync:
+    """Ensure package version stays synchronized with pyproject.toml."""
+
+    def test_version_matches_pyproject(self) -> None:
+        """Fail if blinter.__version__ drifts from pyproject.toml."""
+        expected_version = get_project_version()
+        assert __version__ == expected_version, (
+            f"blinter.__version__ ({__version__}) does not match "
+            f"pyproject.toml ({expected_version}). "
+            "Run: py scripts/sync_version.py"
+        )

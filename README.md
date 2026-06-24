@@ -4,12 +4,12 @@
 
 - ✅ **Configurable Options** - Configurable rules, logging, robust error handling
 - ✅ **Unicode Support** - Support for international characters and filenames
-- ✅ **Performance Optimized** - Handles large files (10MB+) efficiently
+- ✅ **Performance Optimized** - Handles large batch files efficiently
 
 ## Features ✨
 
 ### 🔍 **Rule Categories**
-- **159 Built-in Rules** across 5 severity levels
+- **100 Built-in Rules** across 5 severity levels
 - **Error Level (E001-E999)**: Critical syntax errors that prevent execution
 - **Warning Level (W001-W999)**: Potential runtime issues and bad practices
 - **Style Level (S001-S999)**: Code formatting and readability improvements
@@ -33,7 +33,7 @@
 - **Security Scanning**: Path traversal attacks, command injection risks, unsafe temp file creation
 - **Performance Optimization**: DIR flag optimization, unnecessary output detection, string operation efficiency
 - **Cross-Platform Compatibility**: Warns about Windows version issues and deprecated commands
-- **Large File Handling**: Efficiently processes files up to 10MB+ with performance warnings
+- **Large File Handling**: Efficiently processes large batch files with performance monitoring
 - **Robust Encoding Detection**: Handles UTF-8, UTF-16, Latin-1 and 6 more encoding formats
 - **Advanced Escaping Techniques**: Validates caret escape sequences, multilevel escaping, and continuation characters
 - **Professional FOR Command Analysis**: Checks for usebackq, proper tokenizing, delimiters, and skip options
@@ -73,7 +73,7 @@ pip install -r requirements.txt
 ```
 
 ### Prerequisites
-- **Python 3.10+** (required for pip installation and development)
+- **Python 3.12+** (required for pip installation and development)
 - **Windows OS** (required for standalone executable)
 
 ## Usage 📟
@@ -313,7 +313,7 @@ with ThreadPoolExecutor(max_workers=4) as executor:
 - `.bat` files (traditional batch files)
 - `.cmd` files (recommended for modern Windows)
 - **Unicode filenames** and international characters supported
-- **Large files** (10MB+) handled efficiently with performance monitoring
+- **Large files** handled efficiently with performance monitoring
 
 ### 📁 **Directory Processing**
 
