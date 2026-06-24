@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Performance issue line checks (P-prefix rules)."""
 import re
 from typing import (
     List,

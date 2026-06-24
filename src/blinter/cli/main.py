@@ -1,4 +1,4 @@
-"""Blinter package module."""
+"""CLI entry point and multi-file batch processing orchestration."""
 
 from pathlib import Path
 import sys
@@ -17,6 +17,8 @@ from blinter.engine.dependencies import (
     _build_call_dependency_graph,
     _extract_called_scripts,
 )
+from blinter.engine.linter import lint_batch_file
+from blinter.io.discovery import find_batch_files
 from blinter.models import (
     BlinterConfig,
     LintIssue,
@@ -54,9 +56,7 @@ def _process_single_called_script(
         return (0, 0, None)
 
     try:
-        import blinter
-
-        called_issues = blinter.lint_batch_file(str(called_script), config=config)
+        called_issues = lint_batch_file(str(called_script), config=config)
         file_results[str(called_script)] = called_issues
         all_issues.extend(called_issues)
         processed_files.add(called_script.resolve())
@@ -131,15 +131,13 @@ def _process_batch_files(
     if config.follow_calls:
         dependency_graph = _build_call_dependency_graph(batch_files)
 
-    import blinter
-
     for batch_file in batch_files:
         # Skip if already processed (could happen with follow_calls)
         if batch_file.resolve() in state.processed_files:
             continue
 
         try:
-            issues = blinter.lint_batch_file(
+            issues = lint_batch_file(
                 str(batch_file), config=config, dependency_graph=dependency_graph
             )
             state.file_results[str(batch_file)] = issues
@@ -363,10 +361,8 @@ def main() -> None:
         config.max_line_length = cli_args.cli_max_line_length
 
     # Find all batch files to process
-    import blinter
-
     try:
-        batch_files = blinter.find_batch_files(
+        batch_files = find_batch_files(
             cli_args.target_path, recursive=config.recursive
         )
     except FileNotFoundError:

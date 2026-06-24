@@ -5,18 +5,19 @@ This module tests that when --follow-calls is enabled and multiple files are
 processed, issues are properly displayed with file annotations to distinguish
 which file each line number belongs to.
 """
-
-import os
-import tempfile
-
 from blinter import (
     BlinterConfig,
     LintIssue,
     Rule,
     RuleSeverity,
-    _format_line_numbers_with_files,
     lint_batch_file,
 )
+from blinter.output.formatters import _format_line_numbers_with_files
+
+
+import os
+import tempfile
+
 
 
 class TestFormatLineNumbersWithFiles:

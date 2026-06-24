@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Syntax error checks (E-prefix rules)."""
 import re
 from typing import (
     Dict,

@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""CLI output formatting: summaries, grouping, and help text."""
 from collections import defaultdict
 from pathlib import Path
 from typing import (

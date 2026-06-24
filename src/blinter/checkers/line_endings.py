@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Line ending and multibyte character checks."""
 import re
 from typing import (
     List,

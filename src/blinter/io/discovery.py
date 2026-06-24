@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Batch file discovery in directories and paths."""
 from pathlib import Path
 from typing import List, Union
 

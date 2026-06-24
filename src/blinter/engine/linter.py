@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Main lint orchestration entry point for single batch files."""
 from pathlib import Path
 from typing import (
     Dict,

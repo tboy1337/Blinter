@@ -1,4 +1,11 @@
 """Tests for the main batch file linting functionality."""
+from blinter import (
+    RuleSeverity,
+    lint_batch_file,
+)
+from blinter.patterns import DANGEROUS_COMMAND_PATTERNS
+from blinter.rules.registry import RULES
+
 
 # pylint: disable=too-many-lines
 
@@ -6,7 +13,6 @@ import os
 import re
 import tempfile
 
-from blinter import DANGEROUS_COMMAND_PATTERNS, RULES, RuleSeverity, lint_batch_file
 
 
 class TestLintBatchFile:

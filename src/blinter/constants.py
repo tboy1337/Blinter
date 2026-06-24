@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Shared numeric and string constants for checker modules."""
 from typing import Set
 
 BUILTIN_VARS: Set[str] = {

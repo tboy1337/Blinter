@@ -1,4 +1,9 @@
 """Tests for main function and command-line interface."""
+from blinter import (
+    find_batch_files,
+    main,
+)
+
 
 # pylint: disable=too-many-lines,import-outside-toplevel,redefined-outer-name,reimported
 
@@ -15,7 +20,6 @@ from unittest.mock import patch
 
 import pytest
 
-from blinter import find_batch_files, main
 from tests.conftest import get_project_version
 
 if TYPE_CHECKING:
@@ -252,7 +256,7 @@ echo %var%
 
         try:
             with patch(
-                "blinter.lint_batch_file",
+                "blinter.cli.main.lint_batch_file",
                 side_effect=PermissionError("Permission denied"),
             ):
                 with patch("sys.argv", ["blinter.py", temp_file]):
@@ -278,7 +282,7 @@ echo %var%
 
         try:
             with patch(
-                "blinter.lint_batch_file",
+                "blinter.cli.main.lint_batch_file",
                 side_effect=UnicodeDecodeError("utf-8", b"", 0, 1, "invalid"),
             ):
                 with patch("sys.argv", ["blinter.py", temp_file]):
@@ -304,7 +308,7 @@ echo %var%
 
         try:
             with patch(
-                "blinter.lint_batch_file",
+                "blinter.cli.main.lint_batch_file",
                 side_effect=ValueError("Something went wrong"),
             ):
                 with patch("sys.argv", ["blinter.py", temp_file]):
@@ -617,7 +621,7 @@ class TestCommandLineIntegration:
                 temp_file = tf.name
 
             for _error_name, error_obj in test_scenarios:
-                with patch("blinter.lint_batch_file", side_effect=error_obj):
+                with patch("blinter.cli.main.lint_batch_file", side_effect=error_obj):
                     with patch("sys.argv", ["blinter.py", temp_file]):
                         with patch(
                             "sys.stdout", new_callable=io.StringIO
@@ -1000,9 +1004,7 @@ class TestCLIMainFunctionScenarios:
         import blinter
 
         with patch("sys.argv", ["blinter.py", "protected.bat"]):
-            with patch.object(
-                blinter,
-                "find_batch_files",
+            with patch("blinter.cli.main.find_batch_files",
                 side_effect=PermissionError("Access denied"),
             ):
                 with pytest.raises(SystemExit) as exit_info:
@@ -1027,9 +1029,7 @@ class TestCLIMainFunctionScenarios:
 
         try:
             with patch("sys.argv", ["blinter.py", temp_file]):
-                with patch.object(
-                    blinter,
-                    "lint_batch_file",
+                with patch("blinter.cli.main.lint_batch_file",
                     side_effect=UnicodeDecodeError("test", b"", 0, 1, "test"),
                 ):
                     with pytest.raises(SystemExit) as exit_info:
@@ -1057,9 +1057,7 @@ class TestCLIMainFunctionScenarios:
 
         try:
             with patch("sys.argv", ["blinter.py", temp_file]):
-                with patch.object(
-                    blinter,
-                    "lint_batch_file",
+                with patch("blinter.cli.main.lint_batch_file",
                     side_effect=OSError("Generic file error"),
                 ):
                     with pytest.raises(SystemExit) as exit_info:
@@ -1086,9 +1084,7 @@ class TestCLIMainFunctionScenarios:
 
         try:
             with patch("sys.argv", ["blinter.py", temp_file]):
-                with patch.object(
-                    blinter,
-                    "lint_batch_file",
+                with patch("blinter.cli.main.lint_batch_file",
                     side_effect=ValueError("Processing error"),
                 ):
                     with pytest.raises(SystemExit) as exit_info:
@@ -1165,7 +1161,7 @@ class TestMainFunctionEdgeCases:
             sys.argv = ["blinter", "--summary", "--severity"]
 
             with patch("builtins.print") as mock_print:
-                with patch("blinter.print_help") as mock_help:
+                with patch("blinter.cli.args.print_help") as mock_help:
                     with pytest.raises(SystemExit) as exit_info:
                         main()
 
@@ -1250,7 +1246,7 @@ class TestMainFunctionEdgeCases:
                 sys.argv = ["blinter", temp_dir]
 
                 # Mock lint_batch_file to raise different types of errors
-                with patch("blinter.lint_batch_file") as mock_lint:
+                with patch("blinter.cli.main.lint_batch_file") as mock_lint:
                     with patch("builtins.print") as mock_print:
                         # Test FileNotFoundError
                         mock_lint.side_effect = FileNotFoundError("File not found")
@@ -1329,7 +1325,7 @@ class TestMainFunctionEdgeCases:
                 sys.argv = test_argv.copy()
                 try:
                     with patch("builtins.print"):
-                        with patch("blinter.print_help"):
+                        with patch("blinter.cli.args.print_help"):
                             main()
                 except SystemExit:
                     pass  # Expected for some cases like --help

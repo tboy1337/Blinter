@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Warning-level line checks (W-prefix rules)."""
 import re
 from typing import (
     List,

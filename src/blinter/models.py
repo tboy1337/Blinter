@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Core data models: rules, lint issues, and configuration."""
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path

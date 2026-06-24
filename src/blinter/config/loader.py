@@ -1,18 +1,12 @@
-"""Blinter package module."""
+"""INI configuration loading and default config file generation."""
 
 import configparser
-import logging
 from pathlib import Path
 from typing import (
     Optional,
 )
+from blinter.logging_config import logger
 from blinter.models import BlinterConfig, RuleSeverity
-
-
-def _logger() -> logging.Logger:
-    from blinter import logger as package_logger
-
-    return package_logger
 
 def _load_general_settings(
     config: BlinterConfig, parser: configparser.ConfigParser
@@ -45,7 +39,7 @@ def _set_min_severity(config: BlinterConfig, severity_str: str) -> None:
     if severity_upper in severity_map:
         config.min_severity = severity_map[severity_upper]
     else:
-        _logger().warning("Invalid min_severity value: %s", severity_str)
+        logger.warning("Invalid min_severity value: %s", severity_str)
 
 def _load_rule_settings(
     config: BlinterConfig, parser: configparser.ConfigParser
@@ -94,7 +88,7 @@ def load_config(
     config_file = Path(config_path)
 
     if not config_file.exists():
-        _logger().info("No configuration file found at %s, using defaults", config_file)
+        logger.info("No configuration file found at %s, using defaults", config_file)
         return config
 
     try:
@@ -104,10 +98,10 @@ def load_config(
         _load_general_settings(config, parser)
         _load_rule_settings(config, parser)
 
-        _logger().info("Configuration loaded from %s", config_file)
+        logger.info("Configuration loaded from %s", config_file)
 
     except (configparser.Error, OSError, ValueError) as error:
-        _logger().warning(
+        logger.warning(
             "Error loading configuration from %s: %s. Using defaults.",
             config_file,
             error,

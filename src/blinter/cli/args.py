@@ -1,4 +1,4 @@
-"""Blinter package module."""
+"""Command-line argument parsing for the Blinter CLI."""
 
 import sys
 from typing import (
@@ -9,18 +9,7 @@ from typing import (
 )
 from blinter.config.loader import create_default_config_file
 from blinter.models import CliArguments
-
-
-def _show_version() -> None:
-    from blinter import print_version
-
-    print_version()
-
-
-def _show_help() -> None:
-    from blinter import print_help
-
-    print_help()
+from blinter.output.formatters import print_help, print_version
 
 def _handle_special_cli_flags() -> Optional[bool]:
     """
@@ -30,11 +19,11 @@ def _handle_special_cli_flags() -> Optional[bool]:
         None if should continue parsing, False if should exit with None
     """
     if "--version" in sys.argv:
-        _show_version()
+        print_version()
         return False
 
     if len(sys.argv) < 2 or "--help" in sys.argv:
-        _show_help()
+        print_help()
         return False
 
     if "--create-config" in sys.argv:
@@ -95,7 +84,7 @@ def _parse_regular_arguments() -> Tuple[
             # Parse the next argument as the line length value
             if i + 1 >= len(sys.argv):
                 print("Error: --max-line-length requires a value.\n")
-                _show_help()
+                print_help()
                 sys.exit(1)
             try:
                 cli_max_line_length = int(sys.argv[i + 1])
@@ -120,7 +109,7 @@ def _parse_regular_arguments() -> Tuple[
                 cli_follow_calls = follow
         elif arg.startswith("--"):
             print(f"Error: Unknown option '{arg}'.\n")
-            _show_help()
+            print_help()
             sys.exit(1)
         i += 1
 
@@ -152,7 +141,7 @@ def _parse_cli_arguments() -> Optional[CliArguments]:
 
     if not target_path:
         print("Error: No batch file or directory provided.\n")
-        _show_help()
+        print_help()
         sys.exit(1)
 
     return CliArguments(

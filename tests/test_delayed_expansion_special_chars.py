@@ -4,10 +4,11 @@ This test module verifies that the linter correctly detects delayed expansion
 variables that contain special characters like @, -, #, $, etc. which are commonly
 used in batch script variable naming conventions.
 """
+from blinter import lint_batch_file
+
 
 import pathlib
 
-from blinter import lint_batch_file
 
 
 def test_delayed_expand_at_symbol(tmp_path: pathlib.Path) -> None:

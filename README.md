@@ -83,6 +83,8 @@ pip install -r requirements.txt
 **If installed via pip:**
 ```cmd
 # Analyze a single batch file
+blinter script.bat
+# or
 python -m blinter script.bat
 
 # Analyze all batch files in a directory (recursive)
@@ -140,37 +142,39 @@ Blinter-v1.0.x.exe --help
 Blinter-v1.0.x.exe --version
 ```
 
-**If using manual installation:**
+**If using a local development install:**
 ```cmd
+pip install -e .
+
 # Analyze a single batch file
-python blinter.py script.bat
+blinter script.bat
 
 # Analyze all batch files in a directory (recursive)
-python blinter.py /path/to/batch/files
+blinter /path/to/batch/files
 
 # Analyze batch files in directory only (non-recursive)
-python blinter.py /path/to/batch/files --no-recursive
+blinter /path/to/batch/files --no-recursive
 
 # Analyze with summary
-python blinter.py script.bat --summary
+blinter script.bat --summary
 
 # Analyze script and scripts it calls with shared variable context
-python blinter.py script.bat --follow-calls
+blinter script.bat --follow-calls
 
 # Analyze with custom maximum line length
-python blinter.py script.bat --max-line-length 120
+blinter script.bat --max-line-length 120
 
 # Create configuration file
-python blinter.py --create-config
+blinter --create-config
 
 # Ignore configuration file
-python blinter.py script.bat --no-config
+blinter script.bat --no-config
 
 # Get help
-python blinter.py --help
+blinter --help
 
 # Get version
-python blinter.py --version
+blinter --version
 ```
 
 ### Command Line Options
@@ -263,24 +267,28 @@ REM This line and the next will be ignored for all rules
 
 ### 🐍 **Programmatic API Usage**
 
-Blinter provides a powerful Python API for integration into your applications:
+Blinter exposes a small public API from the top-level `blinter` package:
 
 ```python
-import blinter
+from blinter import (
+    BlinterConfig,
+    RuleSeverity,
+    lint_batch_file,
+    load_config,
+)
 
 # Basic usage
-issues = blinter.lint_batch_file("script.bat")
+issues = lint_batch_file("script.bat")
 for issue in issues:
     print(f"Line {issue.line_number}: {issue.rule.name} ({issue.rule.code})")
 
 # With custom configuration
-from blinter import BlinterConfig, RuleSeverity
 config = BlinterConfig(
     max_line_length=80,
     disabled_rules={"S007", "S011"},
-    min_severity=RuleSeverity.WARNING
+    min_severity=RuleSeverity.WARNING,
 )
-issues = blinter.lint_batch_file("script.bat", config=config)
+issues = lint_batch_file("script.bat", config=config)
 
 # Process results
 for issue in issues:
@@ -288,14 +296,52 @@ for issue in issues:
     print(f"  {issue.rule.explanation}")
     print(f"  Fix: {issue.rule.recommendation}")
 
-
 # Thread-safe design allows safe concurrent usage
-# You can implement your own concurrent processing if needed
 from concurrent.futures import ThreadPoolExecutor
 
 files = ["script1.bat", "script2.cmd", "script3.bat"]
 with ThreadPoolExecutor(max_workers=4) as executor:
-    results = list(executor.map(blinter.lint_batch_file, files))
+    results = list(executor.map(lint_batch_file, files))
+```
+
+Advanced integrators can import from submodules directly:
+
+```python
+from blinter.rules.registry import RULES
+from blinter.patterns import DANGEROUS_COMMAND_PATTERNS
+from blinter.checkers.syntax import _check_syntax_errors
+```
+
+See [docs/Architecture.md](docs/Architecture.md) for the full module map and extension points.
+
+### Package layout
+
+```
+src/blinter/
+  __init__.py          # Public API
+  models.py            # BlinterConfig, LintIssue, Rule
+  rules/               # RULES registry
+  patterns.py          # Dangerous-command patterns
+  parsing/             # Structure and context analysis
+  checkers/            # Rule implementations by category
+  engine/              # lint_batch_file orchestration
+  io/                  # Encoding and file discovery
+  config/              # blinter.ini loading
+  output/              # CLI formatters
+  cli/                 # Command-line entry point
+```
+
+```mermaid
+flowchart BT
+  models --> constants
+  constants --> patterns
+  patterns --> rules
+  rules --> parsing
+  parsing --> checkers
+  checkers --> engine
+  engine --> cli
+  config --> cli
+  io --> engine
 ```
 
 ### 🔧 **Configuration Options**
@@ -328,19 +374,19 @@ Blinter can analyze entire directories of batch files with powerful options:
 **Examples:**
 ```cmd
 # Pip installation:
-python -m blinter ./my-batch-scripts                 # Analyze all files recursively
-python -m blinter . --no-recursive                   # Current directory only
-python -m blinter ./scripts --summary               # With summary statistics
+blinter ./my-batch-scripts                 # Analyze all files recursively
+blinter . --no-recursive                   # Current directory only
+blinter ./scripts --summary               # With summary statistics
 
 # Standalone executable:
 Blinter-v1.0.x.exe ./my-batch-scripts            # Analyze all files recursively
 Blinter-v1.0.x.exe . --no-recursive             # Current directory only
 Blinter-v1.0.x.exe ./scripts --summary          # With summary statistics
 
-# Manual installation:
-python blinter.py ./my-batch-scripts      # Analyze all files recursively
-python blinter.py . --no-recursive       # Current directory only  
-python blinter.py ./scripts --summary     # With summary statistics
+# Local development install:
+blinter ./my-batch-scripts      # Analyze all files recursively
+blinter . --no-recursive       # Current directory only
+blinter ./scripts --summary     # With summary statistics
 ```
 
 ## 🔥 **Integration Example**
@@ -351,14 +397,14 @@ python blinter.py ./scripts --summary     # With summary statistics
 - name: Lint Batch Files
   run: |
     python -c "
-    import blinter
+    from blinter import lint_batch_file
     import sys
-    issues = blinter.lint_batch_file('deploy.bat')
+    issues = lint_batch_file('deploy.bat')
     errors = [i for i in issues if i.rule.severity.value == 'Error']
     if errors:
         print(f'Found {len(errors)} critical errors!')
         sys.exit(1)
-    print(f'✅ Batch file passed with {len(issues)} total issues')
+    print(f'Batch file passed with {len(issues)} total issues')
     "
 ```
 

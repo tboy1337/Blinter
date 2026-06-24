@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Security vulnerability line checks (SEC-prefix rules)."""
 import re
 from typing import (
     List,

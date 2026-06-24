@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Shared helpers for constructing LintIssue instances."""
 from typing import List, Optional
 from blinter.models import LintIssue, Rule, RuleSeverity
 from blinter.rules.registry import RULES

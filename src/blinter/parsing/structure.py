@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Label collection, script structure, and subroutine detection."""
 import re
 from typing import (
     Dict,

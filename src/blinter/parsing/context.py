@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Comment detection and safe-context helpers for checkers."""
 import re
 from typing import cast
 

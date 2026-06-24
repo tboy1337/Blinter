@@ -1,4 +1,9 @@
 """Tests for file encoding detection functionality."""
+from blinter import (
+    lint_batch_file,
+    read_file_with_encoding,
+)
+
 
 import os
 import tempfile
@@ -8,7 +13,6 @@ import warnings
 
 import pytest
 
-from blinter import lint_batch_file, read_file_with_encoding
 
 
 class TestFileEncodingDetection:

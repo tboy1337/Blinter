@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Undefined and unsafe variable usage checks."""
 import re
 from typing import (
     Dict,

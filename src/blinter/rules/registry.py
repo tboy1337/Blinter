@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Rule definitions and the RULES lookup table."""
 from typing import Dict
 from blinter.models import Rule, RuleSeverity
 

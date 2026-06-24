@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""File encoding detection and line-ending analysis."""
 from pathlib import Path
 from typing import (
     List,

@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Style and formatting line checks (S-prefix rules)."""
 import re
 from typing import (
     List,

@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Embedded script block detection within batch files."""
 from dataclasses import dataclass
 import re
 from typing import (

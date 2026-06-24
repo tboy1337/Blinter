@@ -1,6 +1,5 @@
-"""Blinter package module."""
-
-__version__ = "1.0.117"
+"""Package version, author, and license metadata."""
+__version__ = "1.0.118"
 
 __author__ = "tboy1337"
 

@@ -1,4 +1,19 @@
 """Tests for output and utility functions."""
+from blinter import (
+    LintIssue,
+    RuleSeverity,
+)
+from blinter.cli.main import _display_analyzed_scripts
+from blinter.output.formatters import (
+    _format_line_numbers_with_files,
+    group_issues,
+    print_detailed,
+    print_help,
+    print_severity_info,
+    print_summary,
+)
+from blinter.rules.registry import RULES
+
 
 from collections import defaultdict
 import io
@@ -7,18 +22,6 @@ import sys
 import threading
 from typing import Callable, List, Optional, Tuple, Union
 
-from blinter import (
-    RULES,
-    LintIssue,
-    RuleSeverity,
-    _display_analyzed_scripts,
-    _format_line_numbers_with_files,
-    group_issues,
-    print_detailed,
-    print_help,
-    print_severity_info,
-    print_summary,
-)
 
 
 class TestGroupIssues:

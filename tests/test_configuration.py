@@ -1,11 +1,4 @@
 """Tests for blinter configuration functionality."""
-
-import configparser
-import os
-import tempfile
-from typing import Set
-from unittest.mock import patch
-
 from blinter import (
     BlinterConfig,
     RuleSeverity,
@@ -14,6 +7,14 @@ from blinter import (
     lint_batch_file,
     load_config,
 )
+
+
+import configparser
+import os
+import tempfile
+from typing import Set
+from unittest.mock import patch
+
 from tests.conftest import get_project_version
 
 
@@ -266,7 +267,7 @@ min_severity = INVALID
             config_file.close()  # Close file before reading on Windows
 
             try:
-                with patch("blinter.logger") as mock_logger:
+                with patch("blinter.config.loader.logger") as mock_logger:
                     config = load_config(config_file.name)
 
                     # Should use default (None) and log warning
@@ -290,7 +291,7 @@ min_severity = INVALID
             config_file.close()  # Close file before reading on Windows
 
         try:
-            with patch("blinter.logger") as mock_logger:
+            with patch("blinter.config.loader.logger") as mock_logger:
                 config = load_config(config_file.name)
 
                 # Should return defaults and log warning

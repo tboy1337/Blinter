@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""CALL dependency graph and cross-script variable collection."""
 from pathlib import Path
 import re
 from typing import (

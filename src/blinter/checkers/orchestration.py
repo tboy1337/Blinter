@@ -1,5 +1,4 @@
-"""Blinter package module."""
-
+"""Coordinates all checker categories for a parsed script."""
 from typing import (
     Dict,
     List,

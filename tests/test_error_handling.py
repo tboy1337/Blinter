@@ -1,4 +1,16 @@
 """Tests for error handling and edge cases in real-world usage scenarios."""
+from blinter import (
+    LintIssue,
+    find_batch_files,
+    lint_batch_file,
+    main,
+    read_file_with_encoding,
+)
+from blinter.checkers.security import _check_security_issues
+from blinter.checkers.syntax import _check_syntax_errors
+from blinter.checkers.warnings import _check_warning_issues
+from blinter.io.encoding import _detect_line_endings
+
 
 import os
 import tempfile
@@ -8,17 +20,6 @@ import warnings
 
 import pytest
 
-from blinter import (
-    LintIssue,
-    _check_security_issues,
-    _check_syntax_errors,
-    _check_warning_issues,
-    _detect_line_endings,
-    find_batch_files,
-    lint_batch_file,
-    main,
-    read_file_with_encoding,
-)
 
 
 class TestRealWorldErrorHandling:
