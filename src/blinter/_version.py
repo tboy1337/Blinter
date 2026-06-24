@@ -1,5 +1,5 @@
 """Package version, author, and license metadata."""
-__version__ = "1.0.119"
+__version__ = "1.0.120"
 
 __author__ = "tboy1337"
 

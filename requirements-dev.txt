@@ -7,7 +7,6 @@ pytest-timeout
 pytest-xdist
 pytest-mock
 pytest-cov
-hypothesis
 
 # Linting
 pylint

@@ -5,7 +5,6 @@ import tomllib
 from typing import Generator
 import warnings
 
-from hypothesis import HealthCheck, Verbosity, settings
 import pytest
 
 try:
@@ -14,34 +13,6 @@ try:
     COVERAGE_AVAILABLE = True
 except ImportError:
     COVERAGE_AVAILABLE = False
-
-# Configure hypothesis settings globally
-settings.register_profile(
-    "default",
-    max_examples=100,
-    deadline=None,
-    suppress_health_check=[HealthCheck.too_slow],
-    verbosity=Verbosity.normal,
-)
-
-settings.register_profile(
-    "ci",
-    max_examples=200,
-    deadline=None,
-    suppress_health_check=[HealthCheck.too_slow],
-    verbosity=Verbosity.verbose,
-)
-
-settings.register_profile(
-    "dev",
-    max_examples=20,
-    deadline=None,
-    suppress_health_check=[HealthCheck.too_slow],
-    verbosity=Verbosity.normal,
-)
-
-# Load default profile
-settings.load_profile("default")
 
 
 def get_project_version() -> str:
