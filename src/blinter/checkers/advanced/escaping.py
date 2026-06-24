@@ -8,12 +8,8 @@ from typing import (
     Tuple,
     cast,
 )
-from blinter.constants import MAGIC_NUMBER_EXCEPTIONS
 from blinter.models import LintIssue
-from blinter.patterns import DEPRECATED_COMMANDS, REMOVED_COMMANDS
 from blinter.rules.registry import RULES
-from blinter.parsing.context import _is_comment_line
-from blinter.parsing.structure import _is_in_subroutine_context
 
 def _should_flag_caret_escape(stripped: str, caret_pos: int, line: str = "") -> bool:
     """Check if a caret escape sequence should be flagged as improper."""

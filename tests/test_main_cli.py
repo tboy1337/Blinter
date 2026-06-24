@@ -1591,6 +1591,48 @@ class TestFollowCallsCLI:
                 # Should exit with error code due to errors
                 assert exc_info.value.code in [0, 1]
 
+    def test_cli_follow_calls_outside_scan_root_does_not_crash(self) -> None:
+        """Directory scan with follow_calls must not crash on outside paths."""
+        with tempfile.TemporaryDirectory() as outer:
+            outside_dir = os.path.join(outer, "outside")
+            scan_dir = os.path.join(outer, "scan")
+            os.makedirs(outside_dir)
+            os.makedirs(scan_dir)
+
+            outside_script = os.path.join(outside_dir, "outside.bat")
+            with open(outside_script, "w", encoding="utf-8") as bat_file:
+                bat_file.write("@ECHO OFF\nSET X=1\nEXIT /b 0\n")
+
+            main_script = os.path.join(scan_dir, "main.bat")
+            with open(main_script, "w", encoding="utf-8") as bat_file:
+                bat_file.write("@ECHO OFF\n")
+                bat_file.write('CALL "..\\outside\\outside.bat"\n')
+                bat_file.write("EXIT /b 0\n")
+
+            second_script = os.path.join(scan_dir, "second.bat")
+            with open(second_script, "w", encoding="utf-8") as bat_file:
+                bat_file.write("@ECHO OFF\nEXIT /b 0\n")
+
+            with patch.object(sys, "argv", ["blinter.py", scan_dir, "--follow-calls"]):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                assert exc_info.value.code in [0, 1]
+
+
+class TestCliLogging:
+    """Test CLI logging configuration."""
+
+    def test_configure_cli_logging_adds_handler(self) -> None:
+        """CLI should attach a stderr handler when none is configured."""
+        import logging
+
+        from blinter.cli.main import _configure_cli_logging
+
+        blinter_logger = logging.getLogger("blinter")
+        blinter_logger.handlers.clear()
+        _configure_cli_logging()
+        assert blinter_logger.handlers
+
 
 class TestCLIEdgeCases:
     """Test CLI edge cases for additional coverage."""

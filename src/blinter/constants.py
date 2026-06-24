@@ -1,6 +1,8 @@
 """Shared numeric and string constants for checker modules."""
 from typing import Set
 
+MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
+
 BUILTIN_VARS: Set[str] = {
     "DATE",
     "TIME",

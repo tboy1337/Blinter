@@ -115,9 +115,17 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     if config.follow_calls:
         try:
             batch_path = Path(file_path)
-            called_scripts_vars = _collect_called_vars(batch_path, dependency_graph)
-        except (OSError, ValueError):
-            # If we can't collect called script variables, continue without them
+            called_scripts_vars = _collect_called_vars(
+                batch_path,
+                dependency_graph,
+                scan_root=config.scan_root,
+            )
+        except (OSError, ValueError) as collect_error:
+            logger.warning(
+                "Could not collect variables from called scripts for %s: %s",
+                file_path,
+                collect_error,
+            )
             called_scripts_vars = None
 
     # Process all line-by-line and global checks

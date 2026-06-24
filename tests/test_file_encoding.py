@@ -7,6 +7,7 @@ from blinter import (
 
 import os
 import tempfile
+from pathlib import Path
 from typing import IO, Union
 from unittest.mock import MagicMock, mock_open, patch
 import warnings
@@ -737,3 +738,18 @@ class TestAdditionalFileEncodingScenarios:
             except OSError as error:
                 # Should hit the fallback path with last_exception
                 assert "All encoding attempts failed" in str(error)
+
+
+class TestFileSizeLimit:
+    """Test maximum file size enforcement."""
+
+    def test_rejects_file_exceeding_max_size(self, tmp_path: Path) -> None:
+        """Files larger than MAX_FILE_SIZE_BYTES are rejected."""
+        from blinter.constants import MAX_FILE_SIZE_BYTES
+        from blinter.io.encoding import _validate_and_read_file
+
+        big_file = tmp_path / "big.bat"
+        big_file.write_bytes(b"@echo off\n" + b"x" * (MAX_FILE_SIZE_BYTES + 1))
+
+        with pytest.raises(ValueError, match="exceeds maximum size"):
+            _validate_and_read_file(str(big_file))

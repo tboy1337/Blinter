@@ -2,6 +2,16 @@
 from pathlib import Path
 from typing import List, Union
 
+
+def is_path_under_root(path: Path, root: Path) -> bool:
+    """Return True when path resolves inside root."""
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
 def find_batch_files(path: Union[str, Path], recursive: bool = True) -> List[Path]:
     """
     Find all batch files (.bat and .cmd) in a directory or return single file.

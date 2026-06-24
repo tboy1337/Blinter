@@ -1,21 +1,15 @@
 """Exit statements and unreachable-code detection."""
 
-from collections import defaultdict
-from pathlib import Path
 import re
 from typing import (
-    DefaultDict,
     Dict,
     List,
     Optional,
     Tuple,
 )
 from blinter.models import LintIssue
-from blinter.patterns import COMMAND_CASING_KEYWORDS
-from blinter.parsing.context import _is_comment_line
 from blinter.rules.helpers import _add_issue
 from blinter.rules.registry import RULES
-from blinter.parsing.context import _is_safe_ctx_for_privilege
 
 def _check_missing_exit_statement(  # pylint: disable=too-many-branches
     lines: List[str],

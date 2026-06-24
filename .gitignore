@@ -10,6 +10,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+blinter-*/
 build/
 develop-eggs/
 dist/

@@ -9,10 +9,12 @@ from blinter import (
     BlinterConfig,
     lint_batch_file,
 )
+from blinter.engine.dependencies import _extract_called_scripts
 
 
 import os
 import tempfile
+from pathlib import Path
 
 
 
@@ -458,3 +460,98 @@ class TestFollowCallsEdgeCases:
             config = BlinterConfig(follow_calls=True)
             issues = lint_batch_file(main_script, config=config)
             assert isinstance(issues, list)
+
+
+class TestScanRootSandbox:
+    """Test scan_root limits for follow_calls file access."""
+
+    def test_scan_root_blocks_outside_called_script_vars(self) -> None:
+        """Variables from scripts outside scan_root must not be collected."""
+        with tempfile.TemporaryDirectory() as outer:
+            outside_dir = os.path.join(outer, "outside")
+            scan_dir = os.path.join(outer, "project")
+            os.makedirs(outside_dir)
+            os.makedirs(scan_dir)
+
+            outside_script = os.path.join(outside_dir, "outside.bat")
+            with open(outside_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("SET OUTSIDE_VAR=outside_value\n")
+
+            main_script = os.path.join(scan_dir, "main.bat")
+            with open(main_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write('CALL "..\\outside\\outside.bat"\n')
+                file_handle.write("ECHO %OUTSIDE_VAR%\n")
+                file_handle.write("EXIT /b 0\n")
+
+            config = BlinterConfig(
+                follow_calls=True,
+                scan_root=scan_dir,
+            )
+            issues = lint_batch_file(main_script, config=config)
+
+            outside_var_issues = [
+                issue
+                for issue in issues
+                if issue.rule.code == "E006" and "OUTSIDE_VAR" in issue.context
+            ]
+            assert len(outside_var_issues) > 0
+
+    def test_scan_root_allows_inside_called_script_vars(self) -> None:
+        """Variables from scripts inside scan_root are still collected."""
+        with tempfile.TemporaryDirectory() as scan_dir:
+            helper_script = os.path.join(scan_dir, "helper.bat")
+            with open(helper_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("SET HELPER_VAR=helper_value\n")
+
+            main_script = os.path.join(scan_dir, "main.bat")
+            with open(main_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write(f'CALL "{helper_script}"\n')
+                file_handle.write("ECHO %HELPER_VAR%\n")
+                file_handle.write("EXIT /b 0\n")
+
+            config = BlinterConfig(
+                follow_calls=True,
+                scan_root=scan_dir,
+            )
+            issues = lint_batch_file(main_script, config=config)
+
+            helper_var_issues = [
+                issue
+                for issue in issues
+                if issue.rule.code == "E006" and "HELPER_VAR" in issue.context
+            ]
+            assert len(helper_var_issues) == 0
+
+    def test_extract_called_scripts_respects_scan_root(self) -> None:
+        """_extract_called_scripts skips targets outside scan_root."""
+        with tempfile.TemporaryDirectory() as outer:
+            outside_dir = os.path.join(outer, "outside")
+            scan_dir = os.path.join(outer, "project")
+            os.makedirs(outside_dir)
+            os.makedirs(scan_dir)
+
+            outside_script = os.path.join(outside_dir, "outside.bat")
+            with open(outside_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+
+            main_script = os.path.join(scan_dir, "main.bat")
+            with open(main_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write(f'CALL "..\\outside\\outside.bat"\n')
+
+            called = _extract_called_scripts(Path(main_script), scan_root=scan_dir)
+            assert called == []
+
+            inside_script = os.path.join(scan_dir, "helper.bat")
+            with open(inside_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+
+            with open(main_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write('CALL "helper.bat"\n')
+
+            called_inside = _extract_called_scripts(
+                Path(main_script), scan_root=scan_dir
+            )
+            assert len(called_inside) == 1
+            assert called_inside[0].name == "helper.bat"

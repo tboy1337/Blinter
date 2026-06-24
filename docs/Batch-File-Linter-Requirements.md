@@ -2,7 +2,7 @@
 
 ## Rule Categories Summary
 
-**Blinter** provides comprehensive static analysis with **159 Built-in Rules** across 5 severity levels:
+**Blinter** provides comprehensive static analysis with **100 Built-in Rules** across 5 severity levels:
 
 ### Error Level Rules (E001-E999)
 **Critical issues that will cause script failure**

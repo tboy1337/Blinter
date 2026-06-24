@@ -408,6 +408,21 @@ blinter ./scripts --summary     # With summary statistics
     "
 ```
 
+## Development
+
+Install development dependencies and run the quality gate locally before releasing:
+
+```bash
+pip install -r requirements-dev.txt
+py -m pytest
+py -m mypy
+py -m pylint src/blinter --output-format=text > pylint-report.txt
+```
+
+The test suite enforces 90% branch coverage (`pytest.ini`, `.coveragerc`). CI builds and publishes packages but does not run tests; treat a green local `pytest` run as the release gate.
+
+See [docs/Architecture.md](docs/Architecture.md) for module layout and extension points.
+
 ## Contributing 🤝
 
 **Contributions are welcome!** 

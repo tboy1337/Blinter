@@ -67,6 +67,7 @@ class BlinterConfig:
     show_summary: bool = False
     max_line_length: int = 100
     follow_calls: bool = False
+    scan_root: Optional[str] = None
 
     # Rule enablement - all rules enabled by default
     enabled_rules: Optional[Set[str]] = None
@@ -81,6 +82,10 @@ class BlinterConfig:
             self.enabled_rules = set()
         if self.disabled_rules is None:
             self.disabled_rules = set()
+
+        if self.scan_root is not None:
+            if not isinstance(self.scan_root, str) or not self.scan_root.strip():
+                raise ValueError("scan_root must be a non-empty string path when set")
 
     def is_rule_enabled(self, rule_code: str) -> bool:
         """Check if a rule is enabled based on configuration."""

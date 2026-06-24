@@ -7,6 +7,7 @@ from typing import (
     cast,
 )
 import warnings
+from blinter.constants import MAX_FILE_SIZE_BYTES
 from blinter.logging_config import logger
 
 def _detect_line_endings(file_path: str) -> Tuple[str, bool, int, int, int]:
@@ -301,6 +302,12 @@ def _validate_and_read_file(file_path: str) -> Tuple[List[str], str]:
         logger.warning(
             "Large file detected (%dMB). Processing may take longer.",
             file_size // 1024 // 1024,
+        )
+
+    if file_size > MAX_FILE_SIZE_BYTES:
+        max_mb = MAX_FILE_SIZE_BYTES // 1024 // 1024
+        raise ValueError(
+            f"File exceeds maximum size of {max_mb}MB: {file_path}"
         )
 
     lines, encoding_used = read_file_with_encoding(file_path)

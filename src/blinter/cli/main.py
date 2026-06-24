@@ -1,5 +1,6 @@
 """CLI entry point and multi-file batch processing orchestration."""
 
+import logging
 from pathlib import Path
 import sys
 from typing import (
@@ -18,9 +19,11 @@ from blinter.engine.dependencies import (
     _extract_called_scripts,
 )
 from blinter.engine.linter import lint_batch_file
-from blinter.io.discovery import find_batch_files
+from blinter.io.discovery import find_batch_files, is_path_under_root
+from blinter.logging_config import logger
 from blinter.models import (
     BlinterConfig,
+    CliArguments,
     LintIssue,
     ProcessingResults,
     ProcessingState,
@@ -31,6 +34,17 @@ from blinter.output.formatters import (
     print_severity_info,
     print_summary,
 )
+
+def _configure_cli_logging() -> None:
+    """Attach a stderr handler when no logging is configured by the host app."""
+    blinter_logger = logging.getLogger("blinter")
+    if not blinter_logger.handlers:
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setLevel(logging.WARNING)
+        handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+        blinter_logger.addHandler(handler)
+        blinter_logger.setLevel(logging.WARNING)
+
 
 def _cli_error(message: str) -> NoReturn:
     """Print an error message and exit with status code 1."""
@@ -53,6 +67,14 @@ def _process_single_called_script(
     """
     # Skip if already processed
     if called_script.resolve() in processed_files:
+        return (0, 0, None)
+
+    if config.scan_root is not None and not is_path_under_root(
+        called_script, Path(config.scan_root)
+    ):
+        logger.debug(
+            "Skipping called script outside scan root: %s", called_script
+        )
         return (0, 0, None)
 
     try:
@@ -99,7 +121,9 @@ def _process_called_scripts(
     """
     files_processed = 0
     files_with_errors = 0
-    called_scripts = _extract_called_scripts(batch_file)
+    called_scripts = _extract_called_scripts(
+        batch_file, scan_root=config.scan_root
+    )
 
     for called_script in called_scripts:
         result = _process_single_called_script(
@@ -129,7 +153,9 @@ def _process_batch_files(
     # Build dependency graph if follow_calls is enabled
     dependency_graph: Optional[Dict[Path, Set[Path]]] = None
     if config.follow_calls:
-        dependency_graph = _build_call_dependency_graph(batch_files)
+        dependency_graph = _build_call_dependency_graph(
+            batch_files, scan_root=config.scan_root
+        )
 
     for batch_file in batch_files:
         # Skip if already processed (could happen with follow_calls)
@@ -245,7 +271,10 @@ def _display_results(
         # Show results for each file if there are multiple files
         if len(results.file_results) > 1:
             for file_path, issues in results.file_results.items():
-                relative_path = Path(file_path).relative_to(Path(target_path))
+                try:
+                    relative_path = Path(file_path).relative_to(Path(target_path))
+                except ValueError:
+                    relative_path = Path(file_path)
                 print(f"\n File: {relative_path}")
                 print("-" * (8 + len(str(relative_path))))
 
@@ -329,6 +358,27 @@ def _exit_with_results(results: ProcessingResults, target_path: str) -> None:
             print("\nNo issues found! Your batch file looks great!")
             sys.exit(0)
 
+def _apply_cli_config_overrides(
+    cli_args: CliArguments,
+    config: BlinterConfig,
+) -> None:
+    """Apply CLI flag overrides and derive scan_root from the target path."""
+    if cli_args.cli_show_summary is not None:
+        config.show_summary = cli_args.cli_show_summary
+    if cli_args.cli_recursive is not None:
+        config.recursive = cli_args.cli_recursive
+    if cli_args.cli_follow_calls is not None:
+        config.follow_calls = cli_args.cli_follow_calls
+    if cli_args.cli_max_line_length is not None:
+        config.max_line_length = cli_args.cli_max_line_length
+
+    target_path_obj = Path(cli_args.target_path)
+    if target_path_obj.is_dir():
+        config.scan_root = str(target_path_obj.resolve())
+    else:
+        config.scan_root = str(target_path_obj.parent.resolve())
+
+
 def main() -> None:
     """Main entry point for the blinter application."""
     # Configure stdout for UTF-8 encoding to handle Unicode characters on Windows
@@ -338,6 +388,8 @@ def main() -> None:
     except (AttributeError, OSError):
         # Fallback for older Python versions or when reconfigure is not available
         pass
+
+    _configure_cli_logging()
 
     # Parse CLI arguments
     cli_args = _parse_cli_arguments()
@@ -349,16 +401,7 @@ def main() -> None:
 
     # Load configuration
     config = load_config(use_config=cli_args.use_config)
-
-    # Override config with CLI arguments
-    if cli_args.cli_show_summary is not None:
-        config.show_summary = cli_args.cli_show_summary
-    if cli_args.cli_recursive is not None:
-        config.recursive = cli_args.cli_recursive
-    if cli_args.cli_follow_calls is not None:
-        config.follow_calls = cli_args.cli_follow_calls
-    if cli_args.cli_max_line_length is not None:
-        config.max_line_length = cli_args.cli_max_line_length
+    _apply_cli_config_overrides(cli_args, config)
 
     # Find all batch files to process
     try:
