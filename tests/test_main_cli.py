@@ -20,7 +20,12 @@ from blinter import (
     main,
 )
 from blinter.cli.args import _parse_cli_arguments
-from blinter.cli.main import _configure_cli_logging, main as cli_main
+from blinter.cli.main import (
+    _apply_cli_config_overrides,
+    _configure_cli_logging,
+    main as cli_main,
+)
+from blinter.models import BlinterConfig, CliArguments
 
 # pylint: disable=too-many-lines,redefined-outer-name,reimported
 
@@ -1417,7 +1422,7 @@ class TestMainFunctionEdgeCases:
                         exit_code = (
                             mock_exit.call_args[0][0] if mock_exit.call_args else 0
                         )
-                        assert exit_code in [0, 1]  # Either success or error is valid
+                        assert exit_code == 1
                         # Verify that some output was generated
                         assert (
                             mock_print.called
@@ -1580,6 +1585,50 @@ class TestFollowCallsCLI:
                 with pytest.raises(SystemExit) as exc_info:
                     main()
                 assert exc_info.value.code in [0, 1]
+
+
+class TestScanRootDerivation:  # pylint: disable=too-few-public-methods
+    """Test scan_root derivation from CLI target paths."""
+
+    def test_scan_root_from_directory_target(self) -> None:
+        """Directory target sets scan_root to the resolved directory."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cli_args = CliArguments(
+                target_path=temp_dir,
+                use_config=False,
+                cli_show_summary=None,
+                cli_recursive=None,
+                cli_follow_calls=None,
+                cli_max_line_length=None,
+                cli_log_level=None,
+            )
+            config = BlinterConfig()
+            _apply_cli_config_overrides(cli_args, config)
+            assert config.scan_root == str(Path(temp_dir).resolve())
+
+    def test_scan_root_from_file_target(self) -> None:
+        """File target sets scan_root to the resolved parent directory."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False
+        ) as temp_file:
+            temp_file.write("@ECHO OFF\n")
+            temp_path = temp_file.name
+
+        try:
+            cli_args = CliArguments(
+                target_path=temp_path,
+                use_config=False,
+                cli_show_summary=None,
+                cli_recursive=None,
+                cli_follow_calls=None,
+                cli_max_line_length=None,
+                cli_log_level=None,
+            )
+            config = BlinterConfig()
+            _apply_cli_config_overrides(cli_args, config)
+            assert config.scan_root == str(Path(temp_path).parent.resolve())
+        finally:
+            os.unlink(temp_path)
 
 
 class TestCliLogging:  # pylint: disable=too-few-public-methods

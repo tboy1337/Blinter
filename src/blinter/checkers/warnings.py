@@ -106,14 +106,12 @@ def _check_echo_unicode_risk(stripped: str) -> bool:
 
 def _check_search_unicode_risk(stripped: str) -> bool:
     """Check for Unicode risks in findstr/find commands."""
-    return (
-        not all(ord(c) < 128 for c in stripped)  # Contains non-ASCII
-        or bool(
-            re.search(r"/[a-z]", stripped, re.IGNORECASE)
-        )  # Uses flags affecting Unicode
-        or ">" in stripped
-        or "<" in stripped  # File redirection
-    )
+    if not all(ord(c) < 128 for c in stripped):
+        return True
+    if ">" in stripped or "<" in stripped:
+        return True
+    # Only flag switches known to affect Unicode handling (/u, /g, /p)
+    return bool(re.search(r"(?:^|\s)/(?:u|g|p)(?:\s|$)", stripped, re.IGNORECASE))
 
 
 def _check_general_unicode_risk(stripped: str) -> bool:
@@ -309,20 +307,32 @@ def _check_inefficient_modifiers(stripped: str, line_num: int) -> List[LintIssue
     return issues
 
 
+def _char_outside_cp437(char: str) -> bool:
+    """Return True when a character cannot be represented in Code Page 437."""
+    if ord(char) < 128:
+        return False
+    try:
+        char.encode("cp437")
+        return False
+    except UnicodeEncodeError:
+        return True
+
+
 def _check_extended_non_ascii(stripped: str, line_num: int) -> List[LintIssue]:
-    """Check for extended non-ASCII characters (W030)."""
+    """Check for characters outside Code Page 437 (W030)."""
     issues: List[LintIssue] = []
-    if any(ord(char) > 127 for char in stripped):
-        # Check if it's not just typical CP437 characters
-        non_ascii_chars = [char for char in stripped if ord(char) > 127]
-        if non_ascii_chars:
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["W030"],
-                    context=f"Non-ASCII characters detected: {''.join(set(non_ascii_chars))}",
-                )
+    outside_cp437 = {char for char in stripped if _char_outside_cp437(char)}
+    if outside_cp437:
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W030"],
+                context=(
+                    "Characters outside Code Page 437 detected: "
+                    f"{''.join(sorted(outside_cp437))}"
+                ),
             )
+        )
     return issues
 
 
@@ -364,8 +374,11 @@ def _check_call_ambiguity(stripped: str, line_num: int) -> List[LintIssue]:
     return issues
 
 
-def _check_warning_issues(  # pylint: disable=unused-argument
-    line: str, line_num: int, set_vars: Set[str], delayed_expansion_enabled: bool
+def _check_warning_issues(
+    line: str,
+    line_num: int,
+    _set_vars: Set[str],
+    _delayed_expansion_enabled: bool,
 ) -> List[LintIssue]:
     """Check for warning level issues."""
     issues: List[LintIssue] = []

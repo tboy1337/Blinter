@@ -1654,9 +1654,9 @@ call oldutil.com
             os.unlink(temp_file)
 
     def test_w030_non_ascii_characters(self) -> None:
-        """Test W030: Non-ASCII characters may cause encoding issues."""
+        """Test W030: characters outside Code Page 437 trigger W030."""
         content = """@ECHO OFF
-echo Héllo Wörld
+echo \u4f60\u597d
 echo Normal text
 """
         temp_file = self.create_temp_batch_file(content)
@@ -1664,6 +1664,20 @@ echo Normal text
             issues = lint_batch_file(temp_file)
             rule_codes = [issue.rule.code for issue in issues]
             assert "W030" in rule_codes
+        finally:
+            os.unlink(temp_file)
+
+    def test_w030_cp437_accented_chars_no_w030(self) -> None:
+        """Test W030: CP437-representable accented chars trigger W012 only."""
+        content = """@ECHO OFF
+echo H\u00e9llo W\u00f6rld
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            assert "W012" in rule_codes
+            assert "W030" not in rule_codes
         finally:
             os.unlink(temp_file)
 
@@ -1821,8 +1835,8 @@ set /a result=(5+3
 echo %~d1% %~p1%
 append c:\\mydir
 call oldutil.com
-echo Héllo Wörld
-copy "filé.txt" backup\\
+echo \u4f60\u597d
+copy "fil\u00e9.txt" backup\\
 call myscript
 copy file.txt \\\\server\\share\\
 start "" %0

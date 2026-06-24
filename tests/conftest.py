@@ -16,11 +16,18 @@ except ImportError:
     COVERAGE_AVAILABLE = False
 
 
-def patch_valid_encoding_path() -> Any:
+def make_mock_encoding_path(read_data: bytes = b"test content\n") -> MagicMock:
+    """Return a Path-like mock whose read_bytes() returns the given payload."""
+    mock_path = MagicMock(spec=Path)
+    mock_path.read_bytes.return_value = read_data
+    return mock_path
+
+
+def patch_valid_encoding_path(read_data: bytes = b"test content\n") -> Any:
     """Bypass filesystem checks for mocked encoding read tests."""
     return patch(
         "blinter.io.encoding._validate_file_for_read",
-        return_value=Path("test.bat"),
+        return_value=make_mock_encoding_path(read_data),
     )
 
 

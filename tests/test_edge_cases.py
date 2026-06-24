@@ -1056,6 +1056,15 @@ class TestWarningChecking:
         warning_issues = [i for i in issues if i.rule.code == "W011"]
         assert len(warning_issues) == 0
 
+    def test_findstr_safe_switches_no_w011(self) -> None:
+        """ASCII findstr with standard switches must not trigger W011."""
+        set_vars: set[str] = set()
+        issues = _check_warning_issues(
+            "findstr /i pattern file.txt", 1, set_vars, False
+        )
+        w011_issues = [i for i in issues if i.rule.code == "W011"]
+        assert len(w011_issues) == 0
+
     def test_non_ascii_character_detection(self) -> None:
         """Test detection of non-ASCII characters."""
         set_vars: set[str] = set()

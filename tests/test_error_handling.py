@@ -29,7 +29,7 @@ class TestRealWorldErrorHandling:
     def test_file_encoding_all_fail_scenario(self) -> None:
         """Test scenario where all encoding attempts fail with different errors."""
         with (
-            patch_valid_encoding_path(),
+            patch_valid_encoding_path(read_data=b"test data"),
             patch("builtins.open", mock_open(read_data=b"test data")),
             patch("blinter.io.encoding._try_decode_bytes", return_value=None),
         ):

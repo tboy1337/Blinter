@@ -299,36 +299,8 @@ def read_file_with_encoding(file_path: str) -> Tuple[List[str], str]:
         >>> print(f"Read {len(lines)} lines using {encoding} encoding")
     """
     file_obj = _validate_file_for_read(file_path)
-
-    # List of encodings to try in order of preference
-    encodings_to_try = [
-        "utf-8",  # Standard UTF-8
-        "utf-8-sig",  # UTF-8 with BOM
-        "latin1",  # ISO 8859-1 (can decode any byte sequence)
-        "cp1252",  # Windows-1252 (common Windows encoding)
-        "iso-8859-1",  # ISO Latin-1
-        "ascii",  # Basic ASCII
-        "cp437",  # Original IBM PC encoding
-        "utf-16",  # UTF-16 with BOM detection
-        "utf-32",  # UTF-32 with BOM detection
-    ]
-
-    # Read once, then detect encoding and decode from cached bytes
-    with open(file_obj, "rb") as file_handle:
-        raw_data = file_handle.read()
-    encodings_to_try = _detect_charset_norm_bytes(raw_data, encodings_to_try)
-
-    # Try each encoding until one works
-    for encoding in encodings_to_try:
-        lines = _try_decode_bytes(raw_data, encoding)
-        if lines is not None:
-            return lines, encoding
-
-    # If we get here, all encodings failed - this should be extremely rare
-    raise OSError(
-        f"All encoding attempts failed for file '{file_path}'. "
-        f"Could not read file with any supported encoding"
-    )
+    raw_data = file_obj.read_bytes()
+    return _read_lines_from_bytes(file_path, raw_data)
 
 
 def _validate_and_read_file(
@@ -353,14 +325,5 @@ def _validate_and_read_file(
             file_path,
             encoding_used,
         )
-    elif encoding_used.lower() == "ascii":
-        # Only warn if the file actually needs UTF-8 features
-        file_content = "".join(lines)
-        if any(ord(char) > 127 for char in file_content):
-            logger.warning(
-                "File '%s' contains non-ASCII characters but was read as ASCII. "
-                "Consider converting the file to UTF-8 for proper character support.",
-                file_path,
-            )
 
     return lines, encoding_used, line_ending_info

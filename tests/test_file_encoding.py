@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, mock_open, patch
 import warnings
 
 import pytest
-from tests.conftest import patch_valid_encoding_path
+from tests.conftest import make_mock_encoding_path, patch_valid_encoding_path
 
 from blinter import (
     lint_batch_file,
@@ -19,7 +19,7 @@ from blinter.io.encoding import _validate_and_read_file
 
 _VALIDATE_FILE_PATCH = patch(
     "blinter.io.encoding._validate_file_for_read",
-    return_value=Path("test.bat"),
+    return_value=make_mock_encoding_path(b"test content\n"),
 )
 
 
@@ -124,9 +124,9 @@ class TestFileEncodingDetection:
     @patch.object(Path, "exists", return_value=True)
     @patch.object(Path, "is_file", return_value=True)
     @patch.object(Path, "stat")
-    @patch("builtins.open", side_effect=PermissionError("Permission denied"))
+    @patch.object(Path, "read_bytes", side_effect=PermissionError("Permission denied"))
     def test_permission_error(
-        self, _mock_file: MagicMock, mock_stat: MagicMock, *_unused: MagicMock
+        self, _mock_read_bytes: MagicMock, mock_stat: MagicMock, *_unused: MagicMock
     ) -> None:
         """Test handling of permission error."""
         mock_stat.return_value.st_size = 10
@@ -340,58 +340,43 @@ class TestFileEncodingDetection:
         finally:
             os.unlink(temp_file_path)
 
-    def test_encoding_exhaustion_fallback_error(self) -> None:
-        """Test the fallback error when all encoding attempts fail and no last_exception."""
+    def test_encoding_exhaustion_raises_oserror(self) -> None:
+        """Test OSError when all encoding decode attempts fail."""
+        content = b"test content"
 
-        # Test the extremely rare case where last_exception is None
-        def simulate_fallback_error() -> None:
-            # Simulate the exact condition for the fallback error
-            last_exception = None
-            file_path = "test.bat"
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as temp_file:
+            temp_file.write(content)
+            temp_file_path = temp_file.name
 
-            # This simulates the fallback when last_exception is None
-            if last_exception:
-                raise OSError(
-                    f"All encoding attempts failed for file '{file_path}'. "
-                    f"Last error: {last_exception}"
-                ) from last_exception
+        try:
+            with patch(
+                "blinter.io.encoding._try_decode_bytes",
+                return_value=None,
+            ):
+                with pytest.raises(OSError, match="All encoding attempts failed"):
+                    read_file_with_encoding(temp_file_path)
+        finally:
+            os.unlink(temp_file_path)
 
-            # This is the fallback error path
-            raise OSError(
-                f"Could not read file '{file_path}' with any supported encoding"
+    def test_read_paths_return_same_encoding(self) -> None:
+        """read_file_with_encoding and _validate_and_read_file use the same decoder."""
+        content = "@ECHO OFF\r\necho test\r\n"
+
+        with tempfile.NamedTemporaryFile(
+            mode="wb", delete=False, suffix=".bat"
+        ) as temp_file:
+            temp_file.write(content.encode("utf-8"))
+            temp_file_path = temp_file.name
+
+        try:
+            read_lines, read_encoding = read_file_with_encoding(temp_file_path)
+            validate_lines, validate_encoding, _ = _validate_and_read_file(
+                temp_file_path
             )
-
-        with pytest.raises(OSError) as exc_info:
-            simulate_fallback_error()
-
-        assert "Could not read file 'test.bat' with any supported encoding" in str(
-            exc_info.value
-        )
-
-    def test_unicode_decode_error_with_last_exception(self) -> None:
-        """Test encoding failure handling with a last_exception."""
-
-        def simulate_with_last_exception() -> None:
-            # Simulate having a last exception
-            last_exception = UnicodeDecodeError("utf-8", b"", 0, 1, "invalid byte")
-            file_path = "test.bat"
-
-            # This should trigger the path with last_exception
-            if last_exception:
-                raise OSError(
-                    f"All encoding attempts failed for file '{file_path}'. "
-                    f"Last error: {last_exception}"
-                ) from last_exception
-
-            raise OSError(
-                f"Could not read file '{file_path}' with any supported encoding"
-            )
-
-        with pytest.raises(OSError) as exc_info:
-            simulate_with_last_exception()
-
-        # Verify we got the "All encoding attempts failed" message
-        assert "All encoding attempts failed" in str(exc_info.value)
+            assert read_encoding == validate_encoding
+            assert read_lines == validate_lines
+        finally:
+            os.unlink(temp_file_path)
 
 
 class TestEncodingEdgeCases:
