@@ -8,7 +8,6 @@ from typing import (
     Tuple,
     cast,
 )
-import warnings
 
 from blinter.constants import LARGE_FILE_WARNING_BYTES, MAX_FILE_SIZE_BYTES
 from blinter.logging_config import logger
@@ -232,32 +231,6 @@ def _detect_charset_norm_bytes(raw_data: bytes, encodings_list: List[str]) -> Li
     return encodings_list
 
 
-def _detect_encoding_charset_norm(
-    file_path: str, encodings_list: List[str]
-) -> List[str]:
-    """
-    Detect file encoding using charset_normalizer library if available.
-
-    Thread-safe: Yes - uses only local variables
-    Performance: Single file read operation
-
-    Args:
-        file_path: Path to the file to analyze
-        encodings_list: List of encodings to prioritize
-
-    Returns:
-        Updated list of encodings with detected encoding moved to front
-    """
-    try:
-        with open(file_path, "rb") as file_handle:
-            raw_data = file_handle.read()
-        return _detect_charset_norm_bytes(raw_data, encodings_list)
-
-    except (OSError, ValueError) as detection_error:
-        logger.debug("Encoding detection failed: %s, using fallback", detection_error)
-        return encodings_list
-
-
 def _try_decode_bytes(raw_data: bytes, encoding: str) -> Optional[List[str]]:
     """Attempt to decode bytes with a specific encoding."""
     try:
@@ -271,33 +244,6 @@ def _try_decode_bytes(raw_data: bytes, encoding: str) -> Optional[List[str]]:
         return lines
     except (UnicodeDecodeError, LookupError, ValueError) as error:
         logger.debug("Failed to decode with %s: %s", encoding, error)
-        return None
-
-
-def _try_read_with_encoding(file_path: str, encoding: str) -> Optional[List[str]]:
-    """
-    Attempt to read a file with a specific encoding.
-
-    Thread-safe: Yes - uses only local file operations
-    Performance: Single file read operation
-
-    Args:
-        file_path: Path to the file to read
-        encoding: Encoding to try
-
-    Returns:
-        List of lines if successful, None if encoding fails
-    """
-    try:
-        logger.debug("Attempting to read file with encoding: %s", encoding)
-        with open(file_path, "r", encoding=encoding, errors="strict") as file_handle:
-            lines = file_handle.readlines()
-        logger.debug(
-            "Successfully read %d lines using %s encoding", len(lines), encoding
-        )
-        return lines
-    except (UnicodeDecodeError, LookupError, ValueError) as error:
-        logger.debug("Failed to read with %s: %s", encoding, error)
         return None
 
 
@@ -404,24 +350,22 @@ def _validate_and_read_file(
     line_ending_info = _line_ending_stats_from_bytes(raw_data)
     lines, encoding_used = _read_lines_from_bytes(file_path, raw_data)
 
-    # Issue a warning if we had to fall back from UTF-8, but not for pure ASCII files
+    # Log when we had to fall back from UTF-8, but not for pure ASCII files
     if encoding_used.lower() not in ["utf-8", "utf-8-sig", "ascii"]:
-        warnings.warn(
-            f"File '{file_path}' was read using '{encoding_used}' encoding instead of UTF-8. "
-            f"Consider converting the file to UTF-8 for better compatibility.",
-            UserWarning,
-            stacklevel=3,
+        logger.warning(
+            "File '%s' was read using '%s' encoding instead of UTF-8. "
+            "Consider converting the file to UTF-8 for better compatibility.",
+            file_path,
+            encoding_used,
         )
     elif encoding_used.lower() == "ascii":
-        # Check if file contains non-ASCII characters (shouldn't happen with ASCII encoding)
         # Only warn if the file actually needs UTF-8 features
         file_content = "".join(lines)
         if any(ord(char) > 127 for char in file_content):
-            warnings.warn(
-                f"File '{file_path}' contains non-ASCII characters but was read as ASCII. "
-                f"Consider converting the file to UTF-8 for proper character support.",
-                UserWarning,
-                stacklevel=3,
+            logger.warning(
+                "File '%s' contains non-ASCII characters but was read as ASCII. "
+                "Consider converting the file to UTF-8 for proper character support.",
+                file_path,
             )
 
     return lines, encoding_used, line_ending_info

@@ -116,16 +116,13 @@ def _apply_handler_flags(
     cli_follow_calls: Optional[bool],
 ) -> Tuple[bool, Optional[bool], Optional[bool], Optional[bool]]:
     """Apply flag handler side effects to parse state."""
-    _, config, summary, recursive, follow = handler_result
-    if config is not None:
-        use_config = config
-    if summary is not None:
-        cli_show_summary = summary
-    if recursive is not None:
-        cli_recursive = recursive
-    if follow is not None:
-        cli_follow_calls = follow
-    return use_config, cli_show_summary, cli_recursive, cli_follow_calls
+    _, config_flag, summary_flag, recursive_flag, follow_flag = handler_result
+    return (
+        use_config if config_flag is None else config_flag,
+        cli_show_summary if summary_flag is None else summary_flag,
+        cli_recursive if recursive_flag is None else recursive_flag,
+        cli_follow_calls if follow_flag is None else follow_flag,
+    )
 
 
 @dataclass

@@ -33,6 +33,7 @@ from blinter.checkers.globals import (
     _check_inconsistent_indentation,
     _check_missing_header_doc,
     _check_missing_pause,
+    _check_new_global_rules,
     _check_redundant_operations,
     _check_unreachable_code,
 )
@@ -1401,6 +1402,15 @@ class TestGlobalChecks:
         unreachable_issues = [i for i in issues if i.rule.code == "E008"]
         assert len(unreachable_issues) == 1
         assert unreachable_issues[0].line_number == 3
+
+    def test_unhandled_xcopy_reports_w002_w003_not_w041(self) -> None:
+        """Unhandled xcopy gets W002/W003 only; W041 is not duplicated."""
+        lines = ["@echo off", "xcopy C:\\src C:\\dest"]
+        issues = _check_new_global_rules(lines, "test.bat")
+        codes = {issue.rule.code for issue in issues}
+        assert "W041" not in codes
+        assert "W002" in codes
+        assert "W003" in codes
 
     def test_check_unreachable_code_after_goto(self) -> None:
         """Test unreachable code detection after GOTO."""

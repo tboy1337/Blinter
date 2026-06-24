@@ -226,9 +226,6 @@ def _check_advanced_global_patterns(
     # W039: Nested FOR loops without call optimization
     issues.extend(_check_nested_for_loops(lines))
 
-    # W041: Missing error handling for external commands
-    issues.extend(_check_external_error_handling(lines))
-
     # SEC016: Automatic restart without failure limits
     issues.extend(_check_restart_limits(lines))
 
