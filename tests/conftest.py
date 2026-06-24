@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import tomllib
-from typing import Any, Generator
+from typing import Any, Callable, Generator
 from unittest.mock import MagicMock, patch
 import warnings
 
@@ -40,6 +40,18 @@ def get_project_version() -> str:
     return version_object
 
 
+@pytest.fixture
+def write_batch_file(tmp_path: Path) -> Callable[[str, str], Path]:
+    """Write batch script content to a file under the pytest tmp directory."""
+
+    def _write(content: str, name: str = "test.bat") -> Path:
+        script_path = tmp_path / name
+        script_path.write_text(content, encoding="utf-8")
+        return script_path
+
+    return _write
+
+
 @pytest.fixture(autouse=True)
 def suppress_test_warnings() -> Generator[None, None, None]:
     """Suppress expected warnings during tests.
@@ -61,11 +73,3 @@ def suppress_test_warnings() -> Generator[None, None, None]:
     yield
     # Reset warnings after test
     warnings.resetwarnings()
-
-
-@pytest.fixture(autouse=True)
-def clean_environment() -> Generator[None, None, None]:
-    """Ensure clean test environment for each test."""
-    # This fixture runs before and after each test to ensure isolation
-    yield
-    # Any cleanup code would go here if needed

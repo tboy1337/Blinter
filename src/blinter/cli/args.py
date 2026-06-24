@@ -92,6 +92,27 @@ def _parse_config_arg(arg_index: int) -> Optional[Tuple[int, str]]:
     return arg_index + 1, sys.argv[arg_index + 1]
 
 
+def _apply_handler_flags(
+    handler_result: _ArgHandlerResult,
+    *,
+    use_config: bool,
+    cli_show_summary: Optional[bool],
+    cli_recursive: Optional[bool],
+    cli_follow_calls: Optional[bool],
+) -> Tuple[bool, Optional[bool], Optional[bool], Optional[bool]]:
+    """Apply flag handler side effects to parse state."""
+    _, config, summary, recursive, follow = handler_result
+    if config is not None:
+        use_config = config
+    if summary is not None:
+        cli_show_summary = summary
+    if recursive is not None:
+        cli_recursive = recursive
+    if follow is not None:
+        cli_follow_calls = follow
+    return use_config, cli_show_summary, cli_recursive, cli_follow_calls
+
+
 def _parse_regular_arguments() -> Tuple[
     Optional[str],
     bool,
@@ -147,15 +168,15 @@ def _parse_regular_arguments() -> Tuple[
         elif arg == "--quiet":
             cli_quiet = True
         elif arg in arg_handlers:
-            _, config, summary, recursive, follow = arg_handlers[arg]()
-            if config is not None:
-                use_config = config
-            if summary is not None:
-                cli_show_summary = summary
-            if recursive is not None:
-                cli_recursive = recursive
-            if follow is not None:
-                cli_follow_calls = follow
+            use_config, cli_show_summary, cli_recursive, cli_follow_calls = (
+                _apply_handler_flags(
+                    arg_handlers[arg](),
+                    use_config=use_config,
+                    cli_show_summary=cli_show_summary,
+                    cli_recursive=cli_recursive,
+                    cli_follow_calls=cli_follow_calls,
+                )
+            )
         elif arg.startswith("--"):
             _print_cli_error(f"Error: Unknown option '{arg}'.\n")
             print_help()

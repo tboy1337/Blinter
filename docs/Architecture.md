@@ -71,7 +71,7 @@ flowchart BT
 - `lint_batch_file`, `read_file_with_encoding`, `find_batch_files`
 - `load_config`, `create_default_config_file`, `main`
 - `BlinterConfig`, `LintIssue`, `Rule`, `RuleSeverity`
-- `__version__`, `__author__`, `__license__`
+- `__version__`, `__author__`, `__license__` — `__version__` is read from `[project].version` in `pyproject.toml` when developing from a source checkout; otherwise it uses installed package metadata (`importlib.metadata`), with a final fallback to parsing `pyproject.toml` (see `_version.py`).
 
 **Internal / extension imports** (import from subpackages):
 

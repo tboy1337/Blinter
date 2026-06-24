@@ -132,7 +132,7 @@ class BlinterConfig:  # pylint: disable=too-many-instance-attributes
         )
 
 
-@dataclass
+@dataclass  # pylint: disable=too-many-instance-attributes  # CLI argument bag
 class CliArguments:
     """Parsed CLI arguments."""
 

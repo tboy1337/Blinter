@@ -2343,8 +2343,8 @@ ECHO Script completed
             sec005_issues = [i for i in issues if i.rule.code == "SEC005"]
             # Actual NET commands should still trigger SEC005
             assert (
-                len(sec005_issues) >= 2
-            ), f"Expected at least 2 SEC005 issues, got {len(sec005_issues)}"
+                len(sec005_issues) == 2
+            ), f"Expected exactly 2 SEC005 issues, got {len(sec005_issues)}"
             # Check that both NET commands are flagged
             net_view_flagged = any(
                 "NET command" in i.context for i in sec005_issues if i.line_number == 2
@@ -2354,6 +2354,24 @@ ECHO Script completed
             )
             assert net_view_flagged, "NET VIEW on line 2 should be flagged"
             assert net_user_flagged, "NET USER on line 3 should be flagged"
+        finally:
+            os.unlink(temp_file)
+
+    def test_sec005_no_duplicate_reports(self) -> None:
+        """Privileged commands must emit exactly one SEC005 per line."""
+        content = """@ECHO OFF
+net user admin password /add
+sc create TestService binpath=test.exe
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            sec005_issues = [i for i in issues if i.rule.code == "SEC005"]
+            assert len(sec005_issues) == 2, (
+                f"Expected exactly 2 SEC005 issues, got {len(sec005_issues)}: "
+                f"{[(i.line_number, i.context) for i in sec005_issues]}"
+            )
+            assert {issue.line_number for issue in sec005_issues} == {2, 3}
         finally:
             os.unlink(temp_file)
 

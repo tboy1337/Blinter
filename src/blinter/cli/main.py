@@ -15,6 +15,7 @@ from typing import (
 from blinter._version import __version__
 from blinter.cli.args import _parse_cli_arguments
 from blinter.config.loader import load_config
+from blinter.constants import MAX_FOLLOW_CALL_DEPTH, MAX_FOLLOW_CALL_FILES
 from blinter.engine.dependencies import (
     _build_call_dependency_graph,
     _extract_called_scripts,
@@ -85,10 +86,7 @@ def _is_fatal_severity(severity: RuleSeverity) -> bool:
 def _process_single_called_script(
     called_script: Path,
     config: BlinterConfig,
-    processed_files: Set[Path],
-    all_issues: List[LintIssue],
-    file_results: Dict[str, List[LintIssue]],
-    processed_file_paths: List[Tuple[str, Optional[str]]],
+    state: ProcessingState,
     parent_path: str,
 ) -> Tuple[int, int]:
     """
@@ -97,7 +95,15 @@ def _process_single_called_script(
     Returns:
         Tuple of (files_processed, files_with_errors)
     """
-    if called_script.resolve() in processed_files:
+    if called_script.resolve() in state.processed_files:
+        return (0, 0)
+
+    if len(state.processed_files) >= MAX_FOLLOW_CALL_FILES:
+        logger.warning(
+            "Follow-calls file limit (%d) reached; skipping %s",
+            MAX_FOLLOW_CALL_FILES,
+            called_script,
+        )
         return (0, 0)
 
     if config.scan_root is not None and not is_path_under_root(
@@ -108,14 +114,14 @@ def _process_single_called_script(
 
     try:
         called_issues = lint_batch_file(str(called_script), config=config)
-        file_results[str(called_script)] = called_issues
-        all_issues.extend(called_issues)
-        processed_files.add(called_script.resolve())
+        state.file_results[str(called_script)] = called_issues
+        state.all_issues.extend(called_issues)
+        state.processed_files.add(called_script.resolve())
 
-        existing_paths = {path for path, _parent in processed_file_paths}
+        existing_paths = {path for path, _parent in state.processed_file_paths}
         called_path_str = str(called_script)
         if called_path_str not in existing_paths:
-            processed_file_paths.append((called_path_str, parent_path))
+            state.processed_file_paths.append((called_path_str, parent_path))
 
         has_fatal = any(
             _is_fatal_severity(issue.rule.severity) for issue in called_issues
@@ -141,6 +147,7 @@ def _process_called_scripts(
     batch_file: Path,
     config: BlinterConfig,
     state: ProcessingState,
+    depth: int = 0,
 ) -> Tuple[int, int]:
     """
     Process all called scripts for a batch file.
@@ -153,6 +160,14 @@ def _process_called_scripts(
     Returns:
         Tuple of (files_processed, files_with_errors)
     """
+    if depth > MAX_FOLLOW_CALL_DEPTH:
+        logger.warning(
+            "Follow-calls depth limit (%d) reached at %s",
+            MAX_FOLLOW_CALL_DEPTH,
+            batch_file,
+        )
+        return 0, 0
+
     files_processed = 0
     files_with_errors = 0
     called_scripts = _extract_called_scripts(
@@ -162,17 +177,24 @@ def _process_called_scripts(
     )
 
     for called_script in called_scripts:
+        if len(state.processed_files) >= MAX_FOLLOW_CALL_FILES:
+            logger.warning(
+                "Follow-calls file limit (%d) reached; stopping at %s",
+                MAX_FOLLOW_CALL_FILES,
+                batch_file,
+            )
+            break
         result = _process_single_called_script(
             called_script,
             config,
-            state.processed_files,
-            state.all_issues,
-            state.file_results,
-            state.processed_file_paths,
+            state,
             str(batch_file),
         )
         files_processed += result[0]
         files_with_errors += result[1]
+        nested = _process_called_scripts(called_script, config, state, depth + 1)
+        files_processed += nested[0]
+        files_with_errors += nested[1]
 
     return files_processed, files_with_errors
 

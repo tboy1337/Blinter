@@ -20,6 +20,7 @@ from blinter.engine.dependencies import (
     _build_call_dependency_graph,
     _extract_called_scripts,
 )
+from blinter.io.discovery import is_path_under_root
 
 
 class TestFollowCallsVariableContext:
@@ -566,8 +567,6 @@ class TestSymlinkSandbox:  # pylint: disable=too-few-public-methods
 
     def test_is_path_under_root_rejects_symlink_outside_scan_root(self) -> None:
         """Symlinks pointing outside scan_root must not be treated as inside."""
-        from blinter.io.discovery import is_path_under_root
-
         with tempfile.TemporaryDirectory() as outer:
             scan_root = Path(outer) / "project"
             outside_dir = Path(outer) / "outside"
@@ -684,3 +683,51 @@ class TestCallDependencyGraph:  # pylint: disable=too-few-public-methods
             called = _extract_called_scripts(main_script, scan_root=tmpdir)
             assert len(called) == 1
             assert called[0].name == "helper.bat"
+
+
+class TestFollowCallsLimits:
+    """Test follow_calls traversal depth and file-count limits."""
+
+    def test_dependency_graph_respects_depth_limit(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Transitive CALL resolution stops at MAX_FOLLOW_CALL_DEPTH."""
+        monkeypatch.setattr(
+            "blinter.engine.dependencies.MAX_FOLLOW_CALL_DEPTH",
+            0,
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_c = Path(tmpdir) / "c.bat"
+            script_c.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+            script_b = Path(tmpdir) / "b.bat"
+            script_b.write_text(f'CALL "{script_c}"\n', encoding="utf-8")
+            script_a = Path(tmpdir) / "a.bat"
+            script_a.write_text(f'CALL "{script_b}"\n', encoding="utf-8")
+
+            graph = _build_call_dependency_graph([script_a], scan_root=tmpdir)
+            deps = graph[script_a.resolve()]
+            assert script_b.resolve() in deps
+            assert script_c.resolve() not in deps
+
+    def test_dependency_graph_respects_file_limit(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CALL graph traversal stops at MAX_FOLLOW_CALL_FILES."""
+        monkeypatch.setattr(
+            "blinter.engine.dependencies.MAX_FOLLOW_CALL_FILES",
+            1,
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_b = Path(tmpdir) / "b.bat"
+            script_b.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+            script_c = Path(tmpdir) / "c.bat"
+            script_c.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+            script_a = Path(tmpdir) / "a.bat"
+            script_a.write_text(
+                f'CALL "{script_b}"\nCALL "{script_c}"\n',
+                encoding="utf-8",
+            )
+
+            graph = _build_call_dependency_graph([script_a], scan_root=tmpdir)
+            deps = graph[script_a.resolve()]
+            assert len(deps) <= 1

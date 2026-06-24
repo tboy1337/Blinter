@@ -20,6 +20,12 @@ from blinter.patterns import (
 )
 from blinter.rules.registry import RULES
 
+_ADMIN_COMMANDS: tuple[str, ...] = ("reg add hklm", "reg delete hklm", "sc ")
+_NET_PRIVILEGE_CHECK_PATTERNS: tuple[str, ...] = (
+    r"net\s+session\s*>",  # net session redirected (used for checking)
+    r"net\s+session\s*$",  # net session at end of line (used for checking)
+)
+
 
 def _check_input_validation_sec(
     line: str, line_num: int, stripped: str
@@ -120,14 +126,7 @@ def _check_privilege_security(
     if line and _is_safe_ctx_for_privilege(line):
         return issues
 
-    # SEC005: Missing privilege check for admin operations
-    admin_commands = ["reg add hklm", "reg delete hklm", "sc "]
-    net_privilege_check_patterns = [
-        r"net\s+session\s*>",  # net session redirected (used for checking)
-        r"net\s+session\s*$",  # net session at end of line (used for checking)
-    ]
-
-    for cmd in admin_commands:
+    for cmd in _ADMIN_COMMANDS:
         if cmd in stripped.lower():
             # Check if there's already a privilege check earlier in the script
             if lines and _has_priv_check_before(lines, line_num):
@@ -148,7 +147,7 @@ def _check_privilege_security(
     if re.search(r"\bnet\s+", stripped.lower()):
         is_privilege_check = any(
             re.search(pattern, stripped.lower())
-            for pattern in net_privilege_check_patterns
+            for pattern in _NET_PRIVILEGE_CHECK_PATTERNS
         )
         if not is_privilege_check:
             # Check if there's already a privilege check earlier in the script
@@ -316,15 +315,16 @@ def _check_malware_security(stripped: str, line_num: int) -> List[LintIssue]:
     return issues
 
 
-def _check_security_issues(line: str, line_num: int) -> List[LintIssue]:
+def _check_security_issues(
+    line: str, line_num: int, lines: Optional[List[str]] = None
+) -> List[LintIssue]:
     """Check for security level issues."""
     issues: List[LintIssue] = []
     stripped = line.strip()
 
     # Check different categories of security issues
     issues.extend(_check_input_validation_sec(line, line_num, stripped))
-    # Include line-by-line privilege checks for backward compatibility with tests
-    issues.extend(_check_privilege_security(stripped, line_num, line=line))
+    issues.extend(_check_privilege_security(stripped, line_num, lines=lines, line=line))
     issues.extend(_check_path_security(line, stripped, line_num))
     issues.extend(_check_info_disclosure_sec(stripped, line_num))
     issues.extend(_check_malware_security(stripped, line_num))

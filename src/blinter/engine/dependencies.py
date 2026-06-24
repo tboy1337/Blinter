@@ -7,8 +7,10 @@ from typing import (
     List,
     Optional,
     Set,
+    Tuple,
 )
 
+from blinter.constants import MAX_FOLLOW_CALL_DEPTH, MAX_FOLLOW_CALL_FILES
 from blinter.io.discovery import is_path_under_root
 from blinter.io.encoding import _validate_and_read_file
 from blinter.logging_config import logger
@@ -256,18 +258,43 @@ def _build_call_dependency_graph(
     transitive_deps: Dict[Path, Set[Path]] = {}
     memo: Dict[Path, Set[Path]] = {}
 
-    def get_all_deps(file_path: Path, visiting: Set[Path]) -> Set[Path]:
+    def get_all_deps(file_path: Path, visiting: Set[Path], depth: int = 0) -> Set[Path]:
         """Recursively get all dependencies (direct and transitive)."""
         if file_path in memo:
             return set(memo[file_path])
         if file_path in visiting:
             return set()
+        if depth > MAX_FOLLOW_CALL_DEPTH:
+            logger.warning(
+                "CALL dependency depth exceeded %d at %s; stopping traversal",
+                MAX_FOLLOW_CALL_DEPTH,
+                file_path,
+            )
+            return set()
 
         visiting.add(file_path)
         all_deps = set(direct_deps.get(file_path, set()))
+        if len(all_deps) > MAX_FOLLOW_CALL_FILES:
+            logger.warning(
+                "CALL dependency file limit (%d) reached; stopping traversal",
+                MAX_FOLLOW_CALL_FILES,
+            )
+            all_deps = set(sorted(all_deps, key=str)[:MAX_FOLLOW_CALL_FILES])
 
         for dep in list(all_deps):
-            all_deps.update(get_all_deps(dep, visiting))
+            if len(all_deps) >= MAX_FOLLOW_CALL_FILES:
+                logger.warning(
+                    "CALL dependency file limit (%d) reached; stopping traversal",
+                    MAX_FOLLOW_CALL_FILES,
+                )
+                break
+            all_deps.update(get_all_deps(dep, visiting, depth + 1))
+            if len(all_deps) >= MAX_FOLLOW_CALL_FILES:
+                logger.warning(
+                    "CALL dependency file limit (%d) reached; stopping traversal",
+                    MAX_FOLLOW_CALL_FILES,
+                )
+                break
 
         visiting.remove(file_path)
         memo[file_path] = all_deps
@@ -300,8 +327,15 @@ def _collect_vars_from_dependencies(
     """
     all_vars: Set[str] = set()
     dependencies = dependency_graph.get(batch_file_resolved, set())
+    files_collected = 0
 
     for dep_file in dependencies:
+        if files_collected >= MAX_FOLLOW_CALL_FILES:
+            logger.warning(
+                "CALL dependency file limit (%d) reached while collecting variables",
+                MAX_FOLLOW_CALL_FILES,
+            )
+            break
         if not _is_within_scan_root(dep_file, scan_root):
             logger.debug("Skipping dependency outside scan root: %s", dep_file)
             continue
@@ -316,6 +350,7 @@ def _collect_vars_from_dependencies(
         dep_vars = _collect_set_variables(called_lines)
         dep_vars.discard("__DYNAMIC_VARS__")
         all_vars.update(dep_vars)
+        files_collected += 1
 
     return {0: all_vars} if all_vars else {}
 
@@ -357,6 +392,43 @@ def _collect_vars_from_script(
     called_vars = _collect_set_variables(called_lines)
     called_vars.discard("__DYNAMIC_VARS__")
     return called_vars
+
+
+def _vars_from_call_line(
+    line: str,
+    line_num: int,
+    batch_dir: Path,
+    batch_file_resolved: Path,
+    scan_root: Optional[str],
+    lines_cache: Optional[Dict[Path, List[str]]],
+) -> Optional[Tuple[int, Set[str]]]:
+    """Return line number and variables when a line contains a resolvable CALL."""
+    stripped = line.strip().lower()
+    if stripped.startswith("rem ") or stripped.startswith("::"):
+        return None
+
+    call_match = re.search(
+        r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|(\S+\.(?:bat|cmd)))',
+        line,
+        re.IGNORECASE,
+    )
+    if not call_match:
+        return None
+
+    script_path_str = call_match.group(1) or call_match.group(2)
+    script_path = _resolve_script_path(script_path_str, batch_dir, scan_root=scan_root)
+    if script_path is None:
+        return None
+
+    called_vars = _collect_vars_from_script(
+        script_path,
+        batch_file_resolved,
+        scan_root=scan_root,
+        lines_cache=lines_cache,
+    )
+    if not called_vars:
+        return None
+    return line_num, called_vars
 
 
 def _collect_called_vars(
@@ -407,33 +479,15 @@ def _collect_called_vars(
         return called_vars_by_line
 
     for line_num, line in enumerate(file_lines, start=1):
-        stripped = line.strip().lower()
-        if stripped.startswith("rem ") or stripped.startswith("::"):
-            continue
-
-        call_match = re.search(
-            r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|(\S+\.(?:bat|cmd)))',
+        call_vars = _vars_from_call_line(
             line,
-            re.IGNORECASE,
-        )
-
-        if not call_match:
-            continue
-
-        script_path_str = call_match.group(1) or call_match.group(2)
-        script_path = _resolve_script_path(
-            script_path_str, batch_dir, scan_root=scan_root
-        )
-        if script_path is None:
-            continue
-
-        called_vars = _collect_vars_from_script(
-            script_path,
+            line_num,
+            batch_dir,
             batch_file_resolved,
-            scan_root=scan_root,
-            lines_cache=lines_cache,
+            scan_root,
+            lines_cache,
         )
-        if called_vars:
-            called_vars_by_line[line_num] = called_vars
+        if call_vars is not None:
+            called_vars_by_line[call_vars[0]] = call_vars[1]
 
     return called_vars_by_line

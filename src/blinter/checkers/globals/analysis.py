@@ -12,7 +12,7 @@ from typing import (
 )
 
 from blinter.models import LintIssue
-from blinter.parsing.context import _is_comment_line, _is_safe_ctx_for_privilege
+from blinter.parsing.context import _is_comment_line
 from blinter.rules.helpers import _add_issue
 from blinter.rules.registry import RULES
 
@@ -152,64 +152,6 @@ def _check_goto_colon_consistency(  # pylint: disable=too-many-locals
     return issues
 
 
-def _check_global_priv_security(lines: List[str]) -> List[LintIssue]:
-    """Check for SEC005 privilege issues globally across the entire script."""
-    issues: List[LintIssue] = []
-
-    # Check if there's a privilege check (net session) in the script
-    has_privilege_check = False
-    for line in lines:
-        stripped = line.strip().lower()
-        if re.search(r"net\s+session\s*(>|$)", stripped):
-            has_privilege_check = True
-            break
-
-    # If no privilege check found, flag all commands that need privileges
-    if not has_privilege_check:
-        for i, line in enumerate(lines, start=1):
-            # Skip commands in safe contexts (comments, ECHO, SET statements)
-            # Note: Uses privilege-specific safe context check that excludes IF DEFINED
-            if _is_safe_ctx_for_privilege(line):
-                continue
-
-            stripped = line.strip().lower()
-
-            # Check for admin commands
-            admin_commands = ["reg add hklm", "reg delete hklm", "sc "]
-            for cmd in admin_commands:
-                if cmd in stripped:
-                    issues.append(
-                        LintIssue(
-                            line_number=i,
-                            rule=RULES["SEC005"],
-                            context=f"Command '{cmd.strip()}' may require administrator privileges",
-                        )
-                    )
-                    break
-
-            # Check for net commands that aren't privilege checks
-            # Use word boundary to match "net" as a command, not as part of words like "internet"
-            if re.search(r"\bnet\s+", stripped):
-                net_privilege_check_patterns = [
-                    r"net\s+session\s*>",  # net session redirected (used for checking)
-                    r"net\s+session\s*$",  # net session at end of line (used for checking)
-                ]
-                is_privilege_check = any(
-                    re.search(pattern, stripped)
-                    for pattern in net_privilege_check_patterns
-                )
-                if not is_privilege_check:
-                    issues.append(
-                        LintIssue(
-                            line_number=i,
-                            rule=RULES["SEC005"],
-                            context="NET command may require administrator privileges",
-                        )
-                    )
-
-    return issues
-
-
 def _check_new_global_rules(lines: List[str], file_path: str) -> List[LintIssue]:
     """Check for new global rules that require full file context."""
     issues: List[LintIssue] = []
@@ -222,10 +164,7 @@ def _check_new_global_rules(lines: List[str], file_path: str) -> List[LintIssue]
     issues.extend(_check_error_handling_warnings(lines))
     issues.extend(_check_infinite_loop_warnings(lines))
     issues.extend(_check_locked_file_operations(lines))
-    issues.extend(_check_missing_endlocal_before_exit(lines))
-
-    # Global security checks
-    issues.extend(_check_global_priv_security(lines))
+    issues.extend(_check_endlocal_before_exit(lines))
 
     return issues
 
@@ -377,12 +316,6 @@ def _find_nested_for_issues(lines: List[str], start_line: int) -> List[LintIssue
             break
 
     return []
-
-
-def _find_nested_for_issue(lines: List[str], start_line: int) -> Optional[LintIssue]:
-    """Backward-compatible wrapper returning the first nested FOR issue."""
-    issues = _find_nested_for_issues(lines, start_line)
-    return issues[0] if issues else None
 
 
 def _check_external_error_handling(lines: List[str]) -> List[LintIssue]:
@@ -764,7 +697,7 @@ def _check_locked_file_operations(lines: List[str]) -> List[LintIssue]:
     return issues
 
 
-def _check_missing_endlocal_before_exit(lines: List[str]) -> List[LintIssue]:
+def _check_endlocal_before_exit(lines: List[str]) -> List[LintIssue]:
     """Check for SETLOCAL without ENDLOCAL before EXIT (P006)."""
     issues: List[LintIssue] = []
     setlocal_depth = 0

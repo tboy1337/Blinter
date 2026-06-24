@@ -636,11 +636,11 @@ class TestMainFunctionEdgeCases:
             except (OSError, PermissionError):
                 pass  # Ignore cleanup errors
 
-    def test_find_batch_files_nonexistent_path(self) -> None:
+    def test_find_batch_files_nonexistent_path(self, tmp_path: Path) -> None:
         """Test find_batch_files with nonexistent path."""
 
         with pytest.raises(FileNotFoundError):
-            find_batch_files("/nonexistent/path")
+            find_batch_files(str(tmp_path / "does-not-exist"))
 
     def test_validate_and_read_file_edge_cases(self) -> None:
         """Test _validate_and_read_file edge cases."""

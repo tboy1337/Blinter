@@ -20,7 +20,7 @@ from blinter import (
     main,
 )
 from blinter.cli.args import _parse_cli_arguments
-from blinter.cli.main import _configure_cli_logging
+from blinter.cli.main import _configure_cli_logging, main as cli_main
 
 # pylint: disable=too-many-lines,redefined-outer-name,reimported
 
@@ -692,8 +692,6 @@ finally:
 
     def test_main_module_runpy_entry(self) -> None:
         """Test python -m blinter module exposes the CLI entry point."""
-        from blinter.cli.main import main as cli_main
-
         with patch.object(sys, "argv", ["blinter", "--help"]):
             cli_main()
 
@@ -872,13 +870,10 @@ class TestDirectoryFunctionality:
         finally:
             self.cleanup_temp_directory(temp_dir)
 
-    def test_find_batch_files_nonexistent_path(self) -> None:
+    def test_find_batch_files_nonexistent_path(self, tmp_path: Path) -> None:
         """Test find_batch_files with nonexistent path raises error."""
-        try:
-            find_batch_files("/nonexistent/path/that/does/not/exist")
-            assert False, "Should have raised FileNotFoundError"
-        except FileNotFoundError:
-            pass  # Expected
+        with pytest.raises(FileNotFoundError):
+            find_batch_files(str(tmp_path / "does-not-exist" / "nested"))
 
     def test_main_with_directory_argument(self) -> None:
         """Test main function with directory argument."""

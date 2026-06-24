@@ -71,6 +71,49 @@ def _check_advanced_security(
     return issues
 
 
+def _check_for_block_performance(
+    lines: List[str], line_number: int, line: str, stripped: str
+) -> List[LintIssue]:
+    """Check performance issues that apply inside FOR loop blocks."""
+    issues: List[LintIssue] = []
+    if not _line_is_inside_for_block(lines, line_number):
+        return issues
+
+    if re.search(r"set\s+\w+=.*%", stripped) and "set /a" not in stripped:
+        issues.append(
+            LintIssue(
+                line_number,
+                RULES["P016"],
+                context="String concatenation inside FOR loop is inefficient",
+            )
+        )
+    if re.search(r"![^!]+!", line) and stripped.count("!") >= 4:
+        issues.append(
+            LintIssue(
+                line_number,
+                RULES["P019"],
+                context="Excessive delayed expansion inside FOR loop",
+            )
+        )
+    if re.search(r">\s*nul", stripped) or re.search(r"2>\s*nul", stripped):
+        issues.append(
+            LintIssue(
+                line_number,
+                RULES["P022"],
+                context="Output redirection inside loop adds I/O overhead",
+            )
+        )
+    if stripped.startswith("set /a"):
+        issues.append(
+            LintIssue(
+                line_number,
+                RULES["P023"],
+                context="Complex SET /A inside loop; use intermediate variables",
+            )
+        )
+    return issues
+
+
 def _check_advanced_performance(
     lines: List[str], line_number: int, line: str
 ) -> List[LintIssue]:
@@ -119,39 +162,11 @@ def _check_advanced_performance(
         )
 
     in_for_block = _line_is_inside_for_block(lines, line_number)
-    if in_for_block:
-        if re.search(r"set\s+\w+=.*%", stripped) and "set /a" not in stripped:
-            issues.append(
-                LintIssue(
-                    line_number,
-                    RULES["P016"],
-                    context="String concatenation inside FOR loop is inefficient",
-                )
-            )
-        if re.search(r"![^!]+!", line) and stripped.count("!") >= 4:
-            issues.append(
-                LintIssue(
-                    line_number,
-                    RULES["P019"],
-                    context="Excessive delayed expansion inside FOR loop",
-                )
-            )
-        if re.search(r">\s*nul", stripped) or re.search(r"2>\s*nul", stripped):
-            issues.append(
-                LintIssue(
-                    line_number,
-                    RULES["P022"],
-                    context="Output redirection inside loop adds I/O overhead",
-                )
-            )
-        if stripped.startswith("set /a"):
-            issues.append(
-                LintIssue(
-                    line_number,
-                    RULES["P023"],
-                    context="Complex SET /A inside loop; use intermediate variables",
-                )
-            )
+    issues.extend(
+        _check_for_block_performance(lines, line_number, line, stripped)
+        if in_for_block
+        else []
+    )
 
     if stripped.startswith("for /r") and "*.*" in stripped:
         issues.append(
@@ -193,6 +208,18 @@ def _line_is_inside_for_block(lines: List[str], line_number: int) -> bool:
     return False
 
 
+def _timeout_lacks_explanation(
+    lines: List[str], line_number: int, timeout_value: int
+) -> bool:
+    """Return True when a large TIMEOUT value has no nearby comment."""
+    if timeout_value <= 10:
+        return False
+    for check_line in (line_number - 2, line_number - 1, line_number):
+        if 0 <= check_line - 1 < len(lines) and _is_comment_line(lines[check_line - 1]):
+            return False
+    return True
+
+
 def _check_advanced_style_patterns(
     line: str, line_number: int, lines: List[str]
 ) -> List[LintIssue]:
@@ -200,27 +227,18 @@ def _check_advanced_style_patterns(
     issues: List[LintIssue] = []
     stripped = line.strip()
 
-    # S023: Magic timeout values without explanation
     timeout_match = re.search(r"timeout\s+/t\s+(\d+)", stripped.lower())
-    if timeout_match:
+    if timeout_match and _timeout_lacks_explanation(
+        lines, line_number, int(timeout_match.group(1))
+    ):
         timeout_value = int(timeout_match.group(1))
-        if timeout_value > 10:  # Arbitrary values > 10 seconds
-            # Check if there's a comment explaining the value
-            has_explanation = False
-            check_lines = [line_number - 2, line_number - 1, line_number]
-            for check_line in check_lines:
-                if 0 <= check_line - 1 < len(lines):
-                    if _is_comment_line(lines[check_line - 1]):
-                        has_explanation = True
-                        break
-            if not has_explanation:
-                issues.append(
-                    LintIssue(
-                        line_number,
-                        RULES["S023"],
-                        context=f"Timeout value {timeout_value} needs explanation",
-                    )
-                )
+        issues.append(
+            LintIssue(
+                line_number,
+                RULES["S023"],
+                context=f"Timeout value {timeout_value} needs explanation",
+            )
+        )
 
     # S024: Complex one-liner should be split
     if len(stripped) > 80 and ("&&" in stripped or "||" in stripped):
