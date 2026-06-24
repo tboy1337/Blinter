@@ -314,34 +314,6 @@ def _find_nested_for_issues(lines: List[str], start_line: int) -> List[LintIssue
     return []
 
 
-def _check_external_error_handling(lines: List[str]) -> List[LintIssue]:
-    """Check for missing error handling on external commands."""
-    issues: List[LintIssue] = []
-    external_commands = ["xcopy", "robocopy", "reg", "sc", "net", "wmic", "powershell"]
-
-    for i, line in enumerate(lines, start=1):
-        stripped = line.strip().lower()
-        for cmd in external_commands:
-            if stripped.startswith(cmd):
-                # Check if next few lines have error handling
-                has_error_check = False
-                for j in range(i, min(i + 3, len(lines))):
-                    if "errorlevel" in lines[j].lower() or "if not" in lines[j].lower():
-                        has_error_check = True
-                        break
-                if not has_error_check:
-                    issues.append(
-                        LintIssue(
-                            line_number=i,
-                            rule=RULES["W041"],
-                            context=f"External command '{cmd}' needs error handling",
-                        )
-                    )
-                break
-
-    return issues
-
-
 def _check_restart_limits(lines: List[str]) -> List[LintIssue]:
     """Check for restart patterns without proper limits."""
     issues: List[LintIssue] = []

@@ -83,7 +83,7 @@
 - **W038**: FOR /R with explicit filename needs wildcard
 - **W039**: Nested FOR loops without call optimization
 - **W040**: FOR loop variable scope issue
-- **W041**: Missing error handling for external commands
+- **W041**: Missing error handling for external commands *(deprecated — superseded by W002 and W003; no longer emitted)*
 - **W042**: Timeout command without /NOBREAK option
 - **W043**: Process management without proper verification
 

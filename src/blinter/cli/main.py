@@ -389,6 +389,14 @@ def _count_fatal_issues(issues: List[LintIssue]) -> int:
 
 def _exit_with_results(results: ProcessingResults, target_path: str) -> None:
     """Exit with appropriate code based on results."""
+    if results.skipped_files:
+        skipped_text = "s" if len(results.skipped_files) != 1 else ""
+        print(
+            f"\nWARNING  {len(results.skipped_files)} batch file{skipped_text} "
+            f"could not be processed."
+        )
+        sys.exit(1)
+
     is_directory = Path(target_path).is_dir()
     fatal_count = _count_fatal_issues(results.all_issues)
 
@@ -470,6 +478,16 @@ def _configure_stdio_utf8() -> None:
 
 def main() -> None:
     """Main entry point for the blinter application."""
+    try:
+        _run_cli()
+    except Exception:
+        logger.exception("Unexpected error during CLI execution")
+        print("Error: An unexpected internal error occurred.", file=sys.stderr)
+        raise SystemExit(2) from None
+
+
+def _run_cli() -> None:
+    """Run the blinter CLI after argument parsing and setup."""
     _configure_stdio_utf8()
 
     cli_args = _parse_cli_arguments()

@@ -144,7 +144,6 @@ class CliArguments:  # pylint: disable=too-many-instance-attributes  # CLI argum
     cli_max_line_length: Optional[int]
     cli_log_level: Optional[int]
     config_path: Optional[str] = None
-    create_config_force: bool = False
 
 
 @dataclass

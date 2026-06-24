@@ -1059,7 +1059,8 @@ RULES: Dict[str, Rule] = {
         name="Missing error handling for external commands",
         severity=RuleSeverity.WARNING,
         explanation=(
-            "External commands should have errorlevel checking to handle failures properly"
+            "Deprecated: superseded by W002 and W003, which are emitted instead. "
+            "Kept for backward compatibility with blinter.ini rule lists only."
         ),
         recommendation=(
             "Add error checking: IF ERRORLEVEL 1 (handle error) "
@@ -1305,4 +1306,5 @@ RULES: Dict[str, Rule] = {
 DEPRECATED_RULE_ALIASES: Dict[str, str] = {
     "S025": "S018",
     "W015": "W024",
+    "W041": "W003",
 }

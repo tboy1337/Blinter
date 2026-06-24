@@ -14,6 +14,24 @@ from blinter import (
 )
 from blinter.cli.args import _parse_cli_arguments
 from blinter.output.formatters import print_help
+from blinter.rules.helpers import _s011_rule
+
+
+class TestS011RuleHelper:
+    """Test _s011_rule helper for custom max line length."""
+
+    def test_s011_rule_returns_base_rule_at_default_length(self) -> None:
+        """Default max_line_length should return the registry rule unchanged."""
+        base_rule = _s011_rule(100)
+        custom_same = _s011_rule(100)
+        assert base_rule is custom_same
+        assert "100" in base_rule.explanation
+
+    def test_s011_rule_adjusts_explanation_for_custom_length(self) -> None:
+        """Custom max_line_length should update the S011 explanation text."""
+        rule = _s011_rule(150)
+        assert "150" in rule.explanation
+        assert "100" not in rule.explanation
 
 
 class TestMaxLineLengthCLI:

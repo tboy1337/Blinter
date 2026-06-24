@@ -413,7 +413,15 @@ blinter ./scripts --summary     # With summary statistics
     "
 ```
 
-The `blinter` CLI also exits with code `1` when any **Error** or **Security** findings are present (warnings and style issues alone do not fail the run).
+The `blinter` CLI exit codes:
+
+| Code | Meaning |
+|------|---------|
+| **0** | Success: no Error or Security findings, and every discovered file was processed |
+| **1** | Lint failure: any **Error** or **Security** finding, CLI/path errors, no processable files, or one or more files could not be read |
+| **2** | Unexpected internal error |
+
+Warnings and style issues alone do not fail the run when exit code would otherwise be 0.
 
 ## Development
 

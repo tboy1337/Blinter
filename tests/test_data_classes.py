@@ -3,6 +3,7 @@
 import pytest
 
 from blinter import (
+    BlinterConfig,
     LintIssue,
     Rule,
     RuleSeverity,
@@ -249,3 +250,24 @@ class TestLintIssueValidation:
         """Test LintIssue validation with None rule."""
         with pytest.raises(ValueError, match="Rule must be a Rule instance"):
             LintIssue(line_number=5, rule=None)
+
+
+class TestBlinterConfigValidation:
+    """Test BlinterConfig dataclass validation."""
+
+    def test_scan_root_empty_string_rejected(self) -> None:
+        """Empty scan_root must be rejected."""
+        with pytest.raises(ValueError, match="scan_root must be a non-empty string"):
+            BlinterConfig(scan_root="   ")
+
+    def test_max_line_length_zero_rejected(self) -> None:
+        """max_line_length of zero must be rejected."""
+        with pytest.raises(ValueError, match="max_line_length must be between"):
+            BlinterConfig(max_line_length=0)
+
+    def test_max_line_length_over_limit_rejected(self) -> None:
+        """max_line_length above MAX_LINE_LENGTH must be rejected."""
+        from blinter.constants import MAX_LINE_LENGTH
+
+        with pytest.raises(ValueError, match="max_line_length must be between"):
+            BlinterConfig(max_line_length=MAX_LINE_LENGTH + 1)

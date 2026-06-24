@@ -1265,10 +1265,11 @@ class TestMainFunctionEdgeCases:
                         with pytest.raises(SystemExit):
                             main()
 
-                        # Test generic Exception
+                        # Test generic Exception (unexpected internal error)
                         mock_lint.side_effect = Exception("Generic error")
-                        with pytest.raises(Exception):
+                        with pytest.raises(SystemExit) as exc_info:
                             main()
+                        assert exc_info.value.code == 2
             finally:
                 sys.argv = original_argv
 
@@ -1760,3 +1761,64 @@ class TestCliFatalExitCodes:  # pylint: disable=too-few-public-methods
                 with pytest.raises(SystemExit) as exc_info:
                     main()
                 assert exc_info.value.code == 0
+
+
+class TestCliSkippedFilesExitCodes:  # pylint: disable=too-few-public-methods
+    """Test CLI exit codes when some files cannot be processed."""
+
+    def test_cli_exits_1_when_some_files_skipped(self) -> None:
+        """Skipped files must cause non-zero exit even without lint findings."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            good_bat = os.path.join(tmpdir, "good.bat")
+            bad_bat = os.path.join(tmpdir, "bad.bat")
+            with open(good_bat, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\nEXIT /b 0\n")
+            with open(bad_bat, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+
+            def lint_side_effect(
+                file_path: str, *args: object, **kwargs: object
+            ) -> list[object]:
+                if file_path.endswith("bad.bat"):
+                    raise PermissionError("Access denied")
+                return []
+
+            with patch(
+                "blinter.cli.main.lint_batch_file", side_effect=lint_side_effect
+            ):
+                with patch.object(sys, "argv", ["blinter", tmpdir]):
+                    with pytest.raises(SystemExit) as exc_info:
+                        main()
+                    assert exc_info.value.code == 1
+
+    def test_cli_exits_0_when_all_files_processed(self) -> None:
+        """All files processed successfully with no fatal findings exits 0."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            good_bat = os.path.join(tmpdir, "good.bat")
+            with open(good_bat, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\nEXIT /b 0\n")
+
+            with patch.object(sys, "argv", ["blinter", tmpdir]):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                assert exc_info.value.code == 0
+
+
+class TestCliUnexpectedErrorExit:  # pylint: disable=too-few-public-methods
+    """Test CLI exit code for unexpected internal failures."""
+
+    def test_cli_exits_2_on_unexpected_internal_error(self) -> None:
+        """Unexpected exceptions during CLI execution must exit with code 2."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bat_file = os.path.join(tmpdir, "test.bat")
+            with open(bat_file, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\nEXIT /b 0\n")
+
+            with patch.object(sys, "argv", ["blinter", bat_file]):
+                with patch(
+                    "blinter.cli.main.find_batch_files",
+                    side_effect=RuntimeError("unexpected failure"),
+                ):
+                    with pytest.raises(SystemExit) as exc_info:
+                        main()
+                    assert exc_info.value.code == 2
