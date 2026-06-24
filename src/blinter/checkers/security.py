@@ -21,6 +21,12 @@ from blinter.patterns import (
 from blinter.rules.registry import RULES
 
 _ADMIN_COMMANDS: tuple[str, ...] = ("reg add hklm", "reg delete hklm", "sc ")
+# SEC007 scan patterns (detection literals, not runtime temp paths)
+_HARDCODED_TEMP_PATH_PATTERNS: tuple[str, ...] = (
+    r"C:\temp",
+    r"C:\tmp",
+    r"/tmp",
+)
 _NET_PRIVILEGE_CHECK_PATTERNS: tuple[str, ...] = (
     r"net\s+session\s*>",  # net session redirected (used for checking)
     r"net\s+session\s*$",  # net session at end of line (used for checking)
@@ -189,8 +195,7 @@ def _check_path_security(line: str, stripped: str, line_num: int) -> List[LintIs
             break
 
     # SEC007: Hardcoded temporary directory (patterns scanned by this rule, not runtime paths)
-    temp_paths = [r"C:\temp", r"C:\tmp", r"/tmp"]  # nosec B108
-    for temp_path in temp_paths:
+    for temp_path in _HARDCODED_TEMP_PATH_PATTERNS:
         if temp_path in stripped:
             issues.append(
                 LintIssue(

@@ -80,7 +80,7 @@ def _detect_line_endings(file_path: str) -> LineEndingInfo:
     can cause GOTO/CALL label parsing failures in Windows batch files.
 
     Thread-safe: Yes - uses only local variables and read-only file operations
-    Performance: Optimized to read file in chunks for memory efficiency
+    Performance: Single-pass full read bounded by MAX_FILE_SIZE_BYTES (50 MB)
 
     Args:
         file_path: Path to the file to analyze for line endings

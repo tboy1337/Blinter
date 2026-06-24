@@ -2908,6 +2908,178 @@ class TestEmbeddedScriptDetection:  # pylint: disable=too-few-public-methods
         assert 3 in skip_lines or 4 in skip_lines
 
 
+class TestSuppressionCommentParsing:
+    """Direct tests for inline suppression comment parsing."""
+
+    def test_parse_suppression_ignore_next_line_specific_code(self) -> None:
+        """REM LINT:IGNORE with code suppresses that rule on the next line."""
+        from blinter.parsing.structure import _parse_suppression_comments
+
+        lines = [
+            "REM LINT:IGNORE E009\n",
+            "SET VAR=value\n",
+        ]
+        suppressions = _parse_suppression_comments(lines)
+        assert 2 in suppressions
+        assert "E009" in suppressions[2]
+
+    def test_parse_suppression_ignore_next_line_all_rules(self) -> None:
+        """REM LINT:IGNORE without code suppresses all rules on the next line."""
+        from blinter.parsing.structure import _parse_suppression_comments
+
+        lines = [
+            "REM LINT:IGNORE\n",
+            "SET VAR=value\n",
+        ]
+        suppressions = _parse_suppression_comments(lines)
+        assert 2 in suppressions
+        assert suppressions[2] == set()
+
+    def test_parse_suppression_ignore_line_same_line(self) -> None:
+        """REM LINT:IGNORE-LINE on a REM line suppresses that line."""
+        from blinter.parsing.structure import _parse_suppression_comments
+
+        lines = [
+            "REM LINT:IGNORE-LINE S007\n",
+        ]
+        suppressions = _parse_suppression_comments(lines)
+        assert 1 in suppressions
+        assert "S007" in suppressions[1]
+
+
+class TestFindBatchFilesDiscovery:
+    """Additional discovery tests for find_batch_files."""
+
+    def test_find_batch_files_empty_directory(self, tmp_path: Path) -> None:
+        """Empty directories return no batch files."""
+        found = find_batch_files(tmp_path)
+        assert found == []
+
+    def test_find_batch_files_nested_recursive(self, tmp_path: Path) -> None:
+        """Recursive search finds batch files in subdirectories."""
+        nested = tmp_path / "sub"
+        nested.mkdir()
+        (tmp_path / "root.bat").write_text("@ECHO OFF\n", encoding="utf-8")
+        (nested / "nested.cmd").write_text("@ECHO OFF\n", encoding="utf-8")
+        found = find_batch_files(tmp_path)
+        names = {path.name for path in found}
+        assert names == {"root.bat", "nested.cmd"}
+
+    def test_find_batch_files_non_recursive(self, tmp_path: Path) -> None:
+        """Non-recursive search only returns files in the top directory."""
+        nested = tmp_path / "sub"
+        nested.mkdir()
+        (tmp_path / "root.bat").write_text("@ECHO OFF\n", encoding="utf-8")
+        (nested / "nested.bat").write_text("@ECHO OFF\n", encoding="utf-8")
+        found = find_batch_files(tmp_path, recursive=False)
+        assert [path.name for path in found] == ["root.bat"]
+
+    def test_find_batch_files_ignores_non_batch_extensions(
+        self, tmp_path: Path
+    ) -> None:
+        """Only .bat and .cmd files are discovered."""
+        (tmp_path / "readme.txt").write_text("not a batch file\n", encoding="utf-8")
+        (tmp_path / "script.bat").write_text("@ECHO OFF\n", encoding="utf-8")
+        found = find_batch_files(tmp_path)
+        assert [path.name for path in found] == ["script.bat"]
+
+
+class TestAdvancedSecurityPerformanceRules:
+    """Direct tests for advanced security and performance checkers."""
+
+    def test_sec014_flags_unescaped_user_input(self) -> None:
+        """SEC014 triggers for unescaped %1 with special characters."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_advanced_security,
+        )
+
+        lines = ["@echo off\n", "echo %1 & dir\n"]
+        issues = _check_advanced_security(lines[1], 2, lines, {})
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC014" in codes
+
+    def test_sec017_flags_predictable_temp_file(self) -> None:
+        """SEC017 triggers for temp files without randomness."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_advanced_security,
+        )
+
+        issues = _check_advanced_security(
+            "set outfile=c:\\temp\\data.tmp\n", 1, ["@echo off\n"], {}
+        )
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC017" in codes
+
+    def test_sec018_flags_insecure_redirection(self) -> None:
+        """SEC018 triggers for redirection to insecure temp paths."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_advanced_security,
+        )
+
+        issues = _check_advanced_security(
+            "dir > c:\\temp\\output.txt\n", 1, ["@echo off\n"], {}
+        )
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC018" in codes
+
+    def test_for_loop_performance_rules(self) -> None:
+        """P019 and P022 trigger inside FOR blocks."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_for_block_performance,
+        )
+
+        lines = [
+            "@echo off\n",
+            "for %%i in (1) do (\n",
+            "set result=!a!!b!!c!!d!\n",
+            "dir > nul\n",
+            ")\n",
+        ]
+        delayed_issues = _check_for_block_performance(
+            lines, 3, lines[2], lines[2].strip()
+        )
+        redirect_issues = _check_for_block_performance(
+            lines, 4, lines[3], lines[3].strip()
+        )
+        assert "P019" in {issue.rule.code for issue in delayed_issues}
+        assert "P022" in {issue.rule.code for issue in redirect_issues}
+
+
+class TestEmbeddedScriptEdgeCases:
+    """Edge cases for embedded script block detection."""
+
+    def test_powershell_heredoc_block_skipped(self) -> None:
+        """PowerShell <# ... #> heredoc lines are skipped."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            "<#",
+            "$x = 1",
+            "#>",
+            "exit /b 0",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 2 in skip_lines
+        assert 3 in skip_lines
+        assert 4 in skip_lines
+
+    def test_vbscript_block_ends_on_batch_line(self) -> None:
+        """VBScript blocks end when batch syntax resumes."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            ":vbblock",
+            "Dim x",
+            'Set x = CreateObject("Scripting.FileSystemObject")',
+            "exit /b 0",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 3 in skip_lines
+        assert 4 in skip_lines
+
+
 class TestLineEndingCheckerRules:  # pylint: disable=too-few-public-methods
     """Direct tests for line ending checker rules."""
 

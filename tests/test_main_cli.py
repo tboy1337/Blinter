@@ -1887,3 +1887,79 @@ class TestCliUnexpectedErrorExit:  # pylint: disable=too-few-public-methods
                     with pytest.raises(SystemExit) as exc_info:
                         main()
                     assert exc_info.value.code == 2
+
+
+class TestCliStdioAndModuleEntry:
+    """Test console encoding setup and python -m blinter entry point."""
+
+    def test_configure_stdio_utf8_handles_missing_reconfigure(self) -> None:
+        """Streams without reconfigure() are skipped without error."""
+        from blinter.cli.main import _configure_stdio_utf8
+
+        class _LegacyStream:
+            """Stream stub lacking reconfigure()."""
+
+            encoding = "cp1252"
+
+        with patch("blinter.cli.main.sys.stdout", _LegacyStream()):
+            with patch("blinter.cli.main.sys.stderr", _LegacyStream()):
+                _configure_stdio_utf8()
+
+    def test_configure_stdio_utf8_handles_oserror(self) -> None:
+        """OSError during reconfigure is swallowed."""
+        from blinter.cli.main import _configure_stdio_utf8
+
+        class _FailingStream:
+            """Stream stub whose reconfigure() raises OSError."""
+
+            def reconfigure(self, **_kwargs: object) -> None:
+                raise OSError("not supported")
+
+        with patch("blinter.cli.main.sys.stdout", _FailingStream()):
+            with patch("blinter.cli.main.sys.stderr", _FailingStream()):
+                _configure_stdio_utf8()
+
+    def test_skipped_files_message_printed(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Skipped files are reported in CLI output."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            good_bat = os.path.join(tmpdir, "good.bat")
+            bad_bat = os.path.join(tmpdir, "bad.bat")
+            with open(good_bat, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\nEXIT /b 0\n")
+            with open(bad_bat, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+
+            def lint_side_effect(
+                file_path: str, *args: object, **kwargs: object
+            ) -> list[object]:
+                if file_path.endswith("bad.bat"):
+                    raise PermissionError("Access denied")
+                return []
+
+            with patch(
+                "blinter.cli.main.lint_batch_file", side_effect=lint_side_effect
+            ):
+                with patch.object(sys, "argv", ["blinter", tmpdir]):
+                    with pytest.raises(SystemExit):
+                        main()
+
+            captured = capsys.readouterr()
+            assert "Skipped files" in captured.out
+            assert "bad.bat" in captured.out
+
+    def test_python_m_blinter_module_entry(self) -> None:
+        """python -m blinter runs the CLI entry point."""
+        import subprocess
+        import sys as sys_module
+
+        result = subprocess.run(
+            [sys_module.executable, "-m", "blinter", "--help"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+        assert result.returncode == 0
+        assert "Blinter" in result.stdout or "usage" in result.stdout.lower()

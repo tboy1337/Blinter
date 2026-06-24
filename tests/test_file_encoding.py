@@ -754,3 +754,33 @@ class TestFileSizeLimit:  # pylint: disable=too-few-public-methods
 
         with pytest.raises(ValueError, match="exceeds maximum size"):
             read_file_with_encoding(str(big_file))
+
+
+class TestLineEndingStandaloneDetection:
+    """Tests for standalone line-ending detection paths."""
+
+    def test_detect_line_endings_crlf_file(self, tmp_path: Path) -> None:
+        """CRLF files report CRLF as the dominant line ending."""
+        from blinter.io.encoding import _detect_line_endings
+
+        bat_file = tmp_path / "crlf.bat"
+        bat_file.write_bytes(b"@echo off\r\nexit /b 0\r\n")
+        ending_type, has_mixed, crlf_count, lf_only, cr_only = _detect_line_endings(
+            str(bat_file)
+        )
+        assert ending_type == "CRLF"
+        assert crlf_count >= 1
+        assert lf_only == 0
+        assert has_mixed is False
+
+    def test_validate_and_read_file_includes_ending_info(self, tmp_path: Path) -> None:
+        """Single-pass read returns line-ending statistics."""
+        bat_file = tmp_path / "mixed.bat"
+        bat_file.write_bytes(b"line1\r\nline2\n")
+        lines, encoding, ending_info = _validate_and_read_file(str(bat_file))
+        assert len(lines) == 2
+        assert encoding in {"utf-8", "ascii", "cp1252", "latin1"}
+        dominant_type, has_mixed, crlf_count, lf_only, _cr_only = ending_info
+        assert dominant_type in {"CRLF", "LF", "MIXED"}
+        assert crlf_count + lf_only >= 1
+        assert isinstance(has_mixed, bool)

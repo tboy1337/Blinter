@@ -158,7 +158,8 @@ def _check_compatibility_warnings(  # pylint: disable=unused-argument
 
     # W027: Command behavior differs between interpreters
     interpreter_diff_commands = ["append", "dpath", "ftype", "assoc", "path"]
-    first_word = stripped.split()[0].lower() if stripped.split() else ""
+    parts = stripped.split()
+    first_word = parts[0].lower() if parts else ""
     if first_word in interpreter_diff_commands:
         issues.append(
             LintIssue(
@@ -340,7 +341,8 @@ def _check_unicode_filenames(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for Unicode filename in batch operation (W031)."""
     issues: List[LintIssue] = []
     unicode_file_ops = ["copy", "move", "del", "type", "ren", "rename"]
-    first_word = stripped.split()[0].lower() if stripped.split() else ""
+    parts = stripped.split()
+    first_word = parts[0].lower() if parts else ""
     if first_word in unicode_file_ops:
         # Look for non-ASCII characters in file paths
         if re.search(r"[^\x00-\x7F]", stripped):

@@ -9,6 +9,7 @@ false positive E006 (undefined variable) errors.
 import os
 from pathlib import Path
 import tempfile
+from unittest.mock import patch
 
 import pytest
 
@@ -19,7 +20,11 @@ from blinter import (
 )
 from blinter.engine.dependencies import (
     _build_call_dependency_graph,
+    _collect_called_vars,
     _extract_called_scripts,
+    _is_within_scan_root,
+    _read_batch_lines,
+    _resolve_script_path,
 )
 from blinter.io.discovery import is_path_under_root
 
@@ -760,3 +765,118 @@ class TestFollowCallsLimits:
             graph = _build_call_dependency_graph([script_a], scan_root=tmpdir)
             deps = graph[script_a.resolve()]
             assert len(deps) <= 1
+
+
+class TestDependenciesInternals:
+    """Direct unit tests for dependency helper functions."""
+
+    def test_is_within_scan_root_none_returns_true(self, tmp_path: Path) -> None:
+        """Unset scan_root allows any path."""
+        assert _is_within_scan_root(tmp_path / "script.bat", None) is True
+
+    def test_is_within_scan_root_rejects_outside_path(self) -> None:
+        """Paths outside scan_root are rejected."""
+        with tempfile.TemporaryDirectory() as outer:
+            scan_root = Path(outer) / "project"
+            outside = Path(outer) / "outside.bat"
+            scan_root.mkdir()
+            outside.write_text("@ECHO OFF\n", encoding="utf-8")
+            assert _is_within_scan_root(outside, str(scan_root)) is False
+
+    def test_read_batch_lines_returns_supplied_lines(self, tmp_path: Path) -> None:
+        """Pre-supplied lines are returned without disk read."""
+        script = tmp_path / "script.bat"
+        supplied = ["@ECHO OFF\n", "EXIT /b 0\n"]
+        assert _read_batch_lines(script, lines=supplied) == supplied
+
+    def test_read_batch_lines_reads_from_disk(self, tmp_path: Path) -> None:
+        """Lines are read from disk when not pre-supplied."""
+        script = tmp_path / "script.bat"
+        script.write_text("@ECHO OFF\nSET VAR=1\n", encoding="utf-8")
+        lines = _read_batch_lines(script)
+        assert lines is not None
+        assert "SET VAR=1" in lines[1]
+
+    def test_read_batch_lines_returns_none_on_missing_file(
+        self, tmp_path: Path
+    ) -> None:
+        """Unreadable paths return None instead of raising."""
+        missing = tmp_path / "missing.bat"
+        assert _read_batch_lines(missing) is None
+
+    def test_resolve_script_path_relative_in_batch_dir(self, tmp_path: Path) -> None:
+        """Relative CALL targets resolve against the caller directory."""
+        resolved = _resolve_script_path("helper.bat", tmp_path)
+        assert resolved == tmp_path / "helper.bat"
+
+    def test_resolve_script_path_dp0_expansion(self, tmp_path: Path) -> None:
+        """%~dp0 expands to the batch file directory."""
+        resolved = _resolve_script_path("%~dp0helper.bat", tmp_path)
+        assert resolved == tmp_path / "helper.bat"
+
+    def test_resolve_script_path_outside_scan_root_returns_none(self) -> None:
+        """Absolute paths outside scan_root are rejected."""
+        with tempfile.TemporaryDirectory() as outer:
+            scan_root = Path(outer) / "project"
+            outside = Path(outer) / "outside.bat"
+            scan_root.mkdir()
+            outside.write_text("@ECHO OFF\n", encoding="utf-8")
+            resolved = _resolve_script_path(
+                str(outside), scan_root, scan_root=str(scan_root)
+            )
+            assert resolved is None
+
+    def test_collect_called_vars_maps_call_line_to_script_vars(
+        self, tmp_path: Path
+    ) -> None:
+        """Variables from called scripts are keyed by CALL line number."""
+        helper = tmp_path / "helper.bat"
+        helper.write_text("@ECHO OFF\nSET HELPER_VAR=value\n", encoding="utf-8")
+        main_script = tmp_path / "main.bat"
+        main_script.write_text(
+            f'@ECHO OFF\nCALL "{helper}"\nECHO %HELPER_VAR%\n',
+            encoding="utf-8",
+        )
+
+        called_vars = _collect_called_vars(main_script, scan_root=str(tmp_path))
+        assert 2 in called_vars
+        assert "HELPER_VAR" in called_vars[2]
+
+    def test_collect_called_vars_uses_dependency_graph(self, tmp_path: Path) -> None:
+        """Dependency graph mode collects vars from all dependencies at line 0."""
+        helper = tmp_path / "helper.bat"
+        helper.write_text("@ECHO OFF\nSET GRAPH_VAR=value\n", encoding="utf-8")
+        main_script = tmp_path / "main.bat"
+        main_script.write_text(
+            f'@ECHO OFF\nCALL "{helper}"\n',
+            encoding="utf-8",
+        )
+        graph = _build_call_dependency_graph(
+            [main_script, helper], scan_root=str(tmp_path)
+        )
+
+        called_vars = _collect_called_vars(
+            main_script,
+            dependency_graph=graph,
+            scan_root=str(tmp_path),
+        )
+        assert 0 in called_vars
+        assert "GRAPH_VAR" in called_vars[0]
+
+    def test_extract_called_scripts_skips_self_call(self, tmp_path: Path) -> None:
+        """CALL to the same script is not listed as a dependency."""
+        script = tmp_path / "loop.bat"
+        script.write_text(f'@ECHO OFF\nCALL "{script}"\n', encoding="utf-8")
+        called = _extract_called_scripts(script, scan_root=str(tmp_path))
+        assert called == []
+
+    def test_read_batch_lines_returns_none_on_validate_error(
+        self, tmp_path: Path
+    ) -> None:
+        """Validation failures during read return None."""
+        script = tmp_path / "broken.bat"
+        with patch(
+            "blinter.engine.dependencies._validate_and_read_file",
+            side_effect=ValueError("too large"),
+        ):
+            assert _read_batch_lines(script) is None
