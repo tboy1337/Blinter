@@ -414,11 +414,9 @@ echo test
             with patch(
                 "sys.argv", ["blinter", temp_file, "--max-line-length", "120.5"]
             ):
-                with patch("sys.exit") as mock_exit:
-                    with patch("builtins.print"):
-                        result = _parse_cli_arguments()
-                        # Should fail since we expect integer
-                        assert result is None or mock_exit.called
+                with pytest.raises(SystemExit) as exit_info:
+                    _parse_cli_arguments()
+                assert exit_info.value.code == 1
         finally:
             os.unlink(temp_file)
 

@@ -2,7 +2,8 @@
 
 from pathlib import Path
 import tomllib
-from typing import Generator
+from typing import Any, Generator
+from unittest.mock import MagicMock, patch
 import warnings
 
 import pytest
@@ -15,10 +16,8 @@ except ImportError:
     COVERAGE_AVAILABLE = False
 
 
-def patch_valid_encoding_path() -> "patch":
+def patch_valid_encoding_path() -> Any:
     """Bypass filesystem checks for mocked encoding read tests."""
-    from unittest.mock import patch
-
     return patch(
         "blinter.io.encoding._validate_file_for_read",
         return_value=Path("test.bat"),

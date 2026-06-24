@@ -7,7 +7,6 @@ from typing import Set
 from unittest.mock import patch
 
 import pytest
-
 from tests.conftest import get_project_version
 
 from blinter import (

@@ -24,6 +24,11 @@ _ArgHandlerResult = Tuple[
 ]
 
 
+def _print_cli_error(message: str) -> None:
+    """Print a CLI error message to stderr."""
+    print(message, file=sys.stderr)
+
+
 def _handle_special_cli_flags() -> Optional[bool]:
     """
     Handle special CLI flags that should exit early.
@@ -40,7 +45,8 @@ def _handle_special_cli_flags() -> Optional[bool]:
         return False
 
     if "--create-config" in sys.argv:
-        if not create_default_config_file():
+        force = "--force" in sys.argv
+        if not create_default_config_file(force=force):
             sys.exit(1)
         return False
 
@@ -55,26 +61,35 @@ def _parse_max_line_length_arg(arg_index: int) -> Optional[Tuple[int, int]]:
         Tuple of (next argv index, parsed line length), or None when invalid.
     """
     if arg_index + 1 >= len(sys.argv):
-        print("Error: --max-line-length requires a value.\n")
+        _print_cli_error("Error: --max-line-length requires a value.\n")
         print_help()
         return None
     try:
         line_length = int(sys.argv[arg_index + 1])
         if line_length <= 0:
-            print("Error: --max-line-length must be a positive integer.\n")
+            _print_cli_error("Error: --max-line-length must be a positive integer.\n")
             return None
         if line_length > MAX_LINE_LENGTH:
-            print(
+            _print_cli_error(
                 f"Error: --max-line-length must not exceed {MAX_LINE_LENGTH}.\n"
             )
             return None
         return arg_index + 1, line_length
     except ValueError:
-        print(
+        _print_cli_error(
             f"Error: --max-line-length requires a numeric value, "
             f"got '{sys.argv[arg_index + 1]}'.\n"
         )
         return None
+
+
+def _parse_config_arg(arg_index: int) -> Optional[Tuple[int, str]]:
+    """Parse the value following ``--config``."""
+    if arg_index + 1 >= len(sys.argv):
+        _print_cli_error("Error: --config requires a path.\n")
+        print_help()
+        return None
+    return arg_index + 1, sys.argv[arg_index + 1]
 
 
 def _parse_regular_arguments() -> Tuple[
@@ -85,13 +100,14 @@ def _parse_regular_arguments() -> Tuple[
     Optional[bool],
     Optional[int],
     Optional[int],
+    Optional[str],
 ]:
     """
     Parse regular command-line arguments using a lookup table.
 
     Returns:
         Tuple of (target_path, use_config, cli_show_summary, cli_recursive,
-        cli_follow_calls, cli_max_line_length, cli_log_level)
+        cli_follow_calls, cli_max_line_length, cli_log_level, config_path)
     """
     positional_paths: List[str] = []
     use_config = True
@@ -101,6 +117,7 @@ def _parse_regular_arguments() -> Tuple[
     cli_max_line_length: Optional[int] = None
     cli_verbose = False
     cli_quiet = False
+    config_path: Optional[str] = None
 
     arg_handlers: Dict[str, Callable[[], _ArgHandlerResult]] = {
         "--summary": lambda: (None, None, True, None, None),
@@ -119,8 +136,12 @@ def _parse_regular_arguments() -> Tuple[
             parsed_length = _parse_max_line_length_arg(i)
             if parsed_length is None:
                 sys.exit(1)
-            else:
-                i, cli_max_line_length = parsed_length
+            i, cli_max_line_length = parsed_length
+        elif arg == "--config":
+            parsed_config = _parse_config_arg(i)
+            if parsed_config is None:
+                sys.exit(1)
+            i, config_path = parsed_config
         elif arg == "--verbose":
             cli_verbose = True
         elif arg == "--quiet":
@@ -136,18 +157,18 @@ def _parse_regular_arguments() -> Tuple[
             if follow is not None:
                 cli_follow_calls = follow
         elif arg.startswith("--"):
-            print(f"Error: Unknown option '{arg}'.\n")
+            _print_cli_error(f"Error: Unknown option '{arg}'.\n")
             print_help()
             sys.exit(1)
         i += 1
 
     if cli_verbose and cli_quiet:
-        print("Error: --verbose and --quiet cannot be used together.\n")
+        _print_cli_error("Error: --verbose and --quiet cannot be used together.\n")
         print_help()
         sys.exit(1)
 
     if len(positional_paths) > 1:
-        print("Error: Only one target path is allowed.\n")
+        _print_cli_error("Error: Only one target path is allowed.\n")
         print_help()
         sys.exit(1)
 
@@ -167,6 +188,7 @@ def _parse_regular_arguments() -> Tuple[
         cli_follow_calls,
         cli_max_line_length,
         cli_log_level,
+        config_path,
     )
 
 
@@ -184,10 +206,11 @@ def _parse_cli_arguments() -> Optional[CliArguments]:
         cli_follow_calls,
         cli_max_line_length,
         cli_log_level,
+        config_path,
     ) = _parse_regular_arguments()
 
     if not target_path:
-        print("Error: No batch file or directory provided.\n")
+        _print_cli_error("Error: No batch file or directory provided.\n")
         print_help()
         sys.exit(1)
 
@@ -199,4 +222,5 @@ def _parse_cli_arguments() -> Optional[CliArguments]:
         cli_follow_calls,
         cli_max_line_length,
         cli_log_level,
+        config_path=config_path,
     )

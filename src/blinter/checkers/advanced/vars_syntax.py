@@ -235,5 +235,41 @@ def _check_advanced_vars(lines: List[str]) -> List[LintIssue]:
         issues.extend(_check_for_loop_var_syntax(stripped, i))
         issues.extend(_check_string_operation_syntax(stripped, i))
         issues.extend(_check_set_a_quoting(stripped, i))
+        issues.extend(_check_set_a_arithmetic(stripped, i))
+
+    return issues
+
+
+def _check_set_a_arithmetic(stripped: str, line_number: int) -> List[LintIssue]:
+    """Check SET /A arithmetic syntax (E022)."""
+    issues: List[LintIssue] = []
+    seta_match = re.match(r"set\s+/a\s+(.+)", stripped, re.IGNORECASE)
+    if not seta_match:
+        return issues
+
+    expression = seta_match.group(1)
+    expr_match = re.match(r"^([^&|]*?)(?:\s*(?:[^\\^]|^)[&|]|$)", expression)
+    if expr_match:
+        expression = expr_match.group(1).strip()
+
+    if re.search(r"[=+\-*/%<>!][=+\-*/%<>!]", expression):
+        issues.append(
+            LintIssue(
+                line_number=line_number,
+                rule=RULES["E022"],
+                context="Invalid operator sequence in SET /A expression",
+            )
+        )
+
+    if re.search(r"[a-zA-Z_]", expression) and not re.search(
+        r"0x[0-9a-fA-F]+", expression
+    ):
+        issues.append(
+            LintIssue(
+                line_number=line_number,
+                rule=RULES["E022"],
+                context="SET /A expression contains invalid alphabetic tokens",
+            )
+        )
 
     return issues

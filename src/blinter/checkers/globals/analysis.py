@@ -5,13 +5,14 @@ from pathlib import Path
 import re
 from typing import (
     DefaultDict,
+    Dict,
     List,
     Optional,
     Tuple,
 )
 
 from blinter.models import LintIssue
-from blinter.parsing.context import _is_safe_ctx_for_privilege
+from blinter.parsing.context import _is_comment_line, _is_safe_ctx_for_privilege
 from blinter.rules.helpers import _add_issue
 from blinter.rules.registry import RULES
 
@@ -56,6 +57,45 @@ def _check_global_style_rules(lines: List[str], file_path: str) -> List[LintIssu
 
     # S015: Inconsistent colon usage in GOTO statements
     issues.extend(_check_goto_colon_consistency(lines))
+
+    # S010: Unused labels
+    issues.extend(_check_unused_labels(lines))
+
+    return issues
+
+
+def _check_unused_labels(lines: List[str]) -> List[LintIssue]:
+    """Check for labels that are never referenced by GOTO or CALL (S010)."""
+    issues: List[LintIssue] = []
+    labels: Dict[str, int] = {}
+    referenced: set[str] = set()
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        label_match = re.match(r"^:([a-zA-Z_][\w]*)", stripped, re.IGNORECASE)
+        if label_match:
+            labels[str(label_match.group(1)).lower()] = i
+            continue
+
+        lowered = stripped.lower()
+        goto_match = re.match(r"goto\s+(:?)([a-zA-Z_][\w]*)", lowered)
+        if goto_match:
+            referenced.add(str(goto_match.group(2)).lower())
+            continue
+
+        call_match = re.match(r"call\s+(:)([a-zA-Z_][\w]*)", lowered)
+        if call_match:
+            referenced.add(str(call_match.group(2)).lower())
+
+    for label_name, line_num in labels.items():
+        if label_name not in referenced:
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["S010"],
+                    context=f"Label ':{label_name}' is never referenced",
+                )
+            )
 
     return issues
 
@@ -179,6 +219,10 @@ def _check_new_global_rules(lines: List[str], file_path: str) -> List[LintIssue]
     issues.extend(_check_advanced_global_patterns(lines, file_path))
     issues.extend(_check_code_documentation(lines))
     issues.extend(_check_setlocal_redundancy(lines))
+    issues.extend(_check_error_handling_warnings(lines))
+    issues.extend(_check_infinite_loop_warnings(lines))
+    issues.extend(_check_locked_file_operations(lines))
+    issues.extend(_check_missing_endlocal_before_exit(lines))
 
     # Global security checks
     issues.extend(_check_global_priv_security(lines))
@@ -266,14 +310,14 @@ def _check_nested_for_loops(lines: List[str]) -> List[LintIssue]:
             continue
 
         # Found a FOR loop, check for nested FORs
-        nested_for_issue = _find_nested_for_issue(lines, i)
-        if nested_for_issue:
-            issues.append(nested_for_issue)
+        nested_for_issues = _find_nested_for_issues(lines, i)
+        if nested_for_issues:
+            issues.extend(nested_for_issues)
 
     return issues
 
 
-def _find_nested_for_issue(lines: List[str], start_line: int) -> Optional[LintIssue]:
+def _find_nested_for_issues(lines: List[str], start_line: int) -> List[LintIssue]:
     """Find nested FOR loop issues starting from given line."""
     brace_count = 0
     in_for_block = False
@@ -288,18 +332,57 @@ def _find_nested_for_issue(lines: List[str], start_line: int) -> Optional[LintIs
         # Check for nested FOR loop
         if in_for_block and check_line.lower().strip().startswith("for "):
             if j != start_line - 1:  # Not the same line
-                if "call :" not in check_line.lower():
-                    return LintIssue(
+                outer_line = lines[start_line - 1]
+                outer_var = re.search(
+                    r"for\s+/[lfdr]\s+.*?%%(\w)",
+                    outer_line,
+                    re.IGNORECASE,
+                )
+                inner_var = re.search(
+                    r"for\s+/[lfdr]\s+.*?%%(\w)",
+                    check_line,
+                    re.IGNORECASE,
+                )
+                nested_issues: List[LintIssue] = [
+                    LintIssue(
                         line_number=j + 1,
-                        rule=RULES["W039"],
-                        context="Nested FOR loop should use CALL :subroutine",
+                        rule=RULES["W023"],
+                        context="Nested FOR loops can be inefficient with large data sets",
                     )
-                break
+                ]
+                outer_var_name = str(outer_var.group(1)).lower() if outer_var else ""
+                inner_var_name = str(inner_var.group(1)).lower() if inner_var else ""
+                if outer_var_name and outer_var_name == inner_var_name:
+                    nested_issues.append(
+                        LintIssue(
+                            line_number=j + 1,
+                            rule=RULES["W040"],
+                            context=(
+                                "Nested FOR loops reuse the same loop variable name"
+                            ),
+                        )
+                    )
+                if "call :" not in check_line.lower():
+                    nested_issues.append(
+                        LintIssue(
+                            line_number=j + 1,
+                            rule=RULES["W039"],
+                            context="Nested FOR loop should use CALL :subroutine",
+                        )
+                    )
+                return nested_issues
+            break
 
         if brace_count <= 0 and in_for_block:
             break
 
-    return None
+    return []
+
+
+def _find_nested_for_issue(lines: List[str], start_line: int) -> Optional[LintIssue]:
+    """Backward-compatible wrapper returning the first nested FOR issue."""
+    issues = _find_nested_for_issues(lines, start_line)
+    return issues[0] if issues else None
 
 
 def _check_external_error_handling(lines: List[str]) -> List[LintIssue]:
@@ -394,6 +477,42 @@ def _check_code_documentation(lines: List[str]) -> List[LintIssue]:
     # S022: Inconsistent variable naming convention
     issues.extend(_check_var_naming(lines))
 
+    # S008: Missing comments for complex parenthesis blocks
+    issues.extend(_check_missing_complex_comments(lines))
+
+    return issues
+
+
+def _check_missing_complex_comments(lines: List[str]) -> List[LintIssue]:
+    """Flag long IF/FOR blocks that lack explanatory comments (S008)."""
+    issues: List[LintIssue] = []
+    block_start = 0
+    depth = 0
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if not stripped or _should_skip_line_for_var_check(stripped.lower()):
+            continue
+
+        previous_depth = depth
+        depth += stripped.count("(") - stripped.count(")")
+
+        if depth > 0 and previous_depth == 0:
+            block_start = i
+
+        if previous_depth > 0 and depth == 0 and (i - block_start) >= 6:
+            has_comment = any(
+                _is_comment_line(lines[j - 1]) for j in range(block_start, i + 1)
+            )
+            if not has_comment:
+                issues.append(
+                    LintIssue(
+                        line_number=block_start,
+                        rule=RULES["S008"],
+                        context="Complex block lacks REM comments explaining its purpose",
+                    )
+                )
+
     return issues
 
 
@@ -472,6 +591,12 @@ def _check_var_naming(lines: List[str]) -> List[LintIssue]:
             _add_issue(
                 issues,
                 line_number=1,
+                rule_code="S006",
+                context="Variable names should follow one consistent naming convention",
+            )
+            _add_issue(
+                issues,
+                line_number=1,
                 rule_code="S022",
                 context=f"Mixed variable naming styles detected. "
                 f"Consider using {dominant_style} consistently",
@@ -497,5 +622,166 @@ def _check_setlocal_redundancy(lines: List[str]) -> List[LintIssue]:
                     )
                 )
                 break
+
+    return issues
+
+
+_RISKY_COMMANDS = (
+    "xcopy",
+    "robocopy",
+    "copy",
+    "move",
+    "del",
+    "erase",
+    "reg",
+    "sc",
+    "net",
+    "wmic",
+    "powershell",
+)
+
+
+def _has_nearby_errorlevel_check(lines: List[str], line_index: int) -> bool:
+    """Return True when error handling appears within a few lines."""
+    for j in range(line_index, min(line_index + 4, len(lines))):
+        lowered = lines[j].lower()
+        if (
+            "errorlevel" in lowered
+            or "if not" in lowered
+            or "if %errorlevel%" in lowered
+        ):
+            return True
+    return False
+
+
+def _check_error_handling_warnings(lines: List[str]) -> List[LintIssue]:
+    """Check for missing ERRORLEVEL and general error handling (W002, W003)."""
+    issues: List[LintIssue] = []
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip().lower()
+        for cmd in _RISKY_COMMANDS:
+            if stripped.startswith(cmd + " ") or stripped == cmd:
+                if not _has_nearby_errorlevel_check(lines, i - 1):
+                    issues.append(
+                        LintIssue(
+                            line_number=i,
+                            rule=RULES["W002"],
+                            context=(
+                                f"Command '{cmd}' should be followed by ERRORLEVEL check"
+                            ),
+                        )
+                    )
+                if cmd in {
+                    "xcopy",
+                    "robocopy",
+                    "reg",
+                    "sc",
+                    "net",
+                    "wmic",
+                    "powershell",
+                }:
+                    if not _has_nearby_errorlevel_check(lines, i - 1):
+                        issues.append(
+                            LintIssue(
+                                line_number=i,
+                                rule=RULES["W003"],
+                                context=(
+                                    f"External operation '{cmd}' lacks error handling"
+                                ),
+                            )
+                        )
+                break
+
+    return issues
+
+
+def _check_infinite_loop_warnings(lines: List[str]) -> List[LintIssue]:
+    """Check for potential infinite loops (W004)."""
+    issues: List[LintIssue] = []
+    loop_labels: set[str] = set()
+
+    for line in lines:
+        label_match = re.match(r"^\s*:([a-zA-Z_][a-zA-Z0-9_]*)\s*$", line.strip())
+        if label_match:
+            loop_labels.add(str(label_match.group(1)).lower())
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip().lower()
+        goto_match = re.match(r"goto\s+:?([a-zA-Z_][a-zA-Z0-9_]*)\b", stripped)
+        if not goto_match:
+            continue
+        target = str(goto_match.group(1)).lower()
+        if target not in loop_labels:
+            continue
+        context_lines = lines[max(0, i - 5) : min(len(lines), i + 5)]
+        has_exit_guard = any(
+            "set /a" in ctx.lower() or "counter" in ctx.lower() for ctx in context_lines
+        )
+        if not has_exit_guard:
+            issues.append(
+                LintIssue(
+                    line_number=i,
+                    rule=RULES["W004"],
+                    context=(
+                        f"GOTO :{target} may create an infinite loop "
+                        "without exit condition"
+                    ),
+                )
+            )
+
+    return issues
+
+
+def _check_locked_file_operations(lines: List[str]) -> List[LintIssue]:
+    """Check file operations on potentially locked targets (W007)."""
+    issues: List[LintIssue] = []
+    locked_patterns = (
+        r"\\windows\\",
+        r"\\system32\\",
+        r"\\program files",
+        r"\.exe\b",
+        r"\.dll\b",
+    )
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip().lower()
+        if not stripped.startswith(
+            ("copy ", "move ", "del ", "erase ", "ren ", "rename ")
+        ):
+            continue
+        if any(re.search(pattern, stripped) for pattern in locked_patterns):
+            issues.append(
+                LintIssue(
+                    line_number=i,
+                    rule=RULES["W007"],
+                    context=(
+                        "File operation targets a path that may be locked or in use"
+                    ),
+                )
+            )
+
+    return issues
+
+
+def _check_missing_endlocal_before_exit(lines: List[str]) -> List[LintIssue]:
+    """Check for SETLOCAL without ENDLOCAL before EXIT (P006)."""
+    issues: List[LintIssue] = []
+    setlocal_depth = 0
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip().lower()
+        if "setlocal" in stripped:
+            setlocal_depth += 1
+        if "endlocal" in stripped and setlocal_depth > 0:
+            setlocal_depth -= 1
+        if re.match(r"exit\b", stripped) and setlocal_depth > 0:
+            issues.append(
+                LintIssue(
+                    line_number=i,
+                    rule=RULES["P006"],
+                    context="EXIT with active SETLOCAL should be preceded by ENDLOCAL",
+                )
+            )
 
     return issues

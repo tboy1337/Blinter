@@ -9,6 +9,7 @@ from typing import (
 from blinter.constants import MAX_LINE_LENGTH
 from blinter.logging_config import logger
 from blinter.models import BlinterConfig, RuleSeverity
+from blinter.rules.registry import RULES
 
 
 def _load_general_settings(
@@ -57,6 +58,21 @@ def _set_min_severity(config: BlinterConfig, severity_str: str) -> None:
         logger.warning("Invalid min_severity value: %s", severity_str)
 
 
+def _validate_rule_codes(rule_codes: set[str], setting_name: str) -> set[str]:
+    """Return validated rule codes, logging warnings for unknown entries."""
+    validated: set[str] = set()
+    for rule_code in rule_codes:
+        if rule_code in RULES:
+            validated.add(rule_code)
+        else:
+            logger.warning(
+                "Unknown rule code '%s' in %s; ignoring this entry",
+                rule_code,
+                setting_name,
+            )
+    return validated
+
+
 def _load_rule_settings(
     config: BlinterConfig, parser: configparser.ConfigParser
 ) -> None:
@@ -69,15 +85,17 @@ def _load_rule_settings(
     # Handle enabled_rules
     enabled_str = rules.get("enabled_rules", "").strip()
     if enabled_str:
-        config.enabled_rules = set(
-            rule.strip() for rule in enabled_str.split(",") if rule.strip()
+        config.enabled_rules = _validate_rule_codes(
+            {rule.strip() for rule in enabled_str.split(",") if rule.strip()},
+            "enabled_rules",
         )
 
     # Handle disabled_rules
     disabled_str = rules.get("disabled_rules", "").strip()
     if disabled_str:
-        config.disabled_rules = set(
-            rule.strip() for rule in disabled_str.split(",") if rule.strip()
+        config.disabled_rules = _validate_rule_codes(
+            {rule.strip() for rule in disabled_str.split(",") if rule.strip()},
+            "disabled_rules",
         )
 
 
@@ -127,16 +145,27 @@ def load_config(
     return config
 
 
-def create_default_config_file(config_path: str = "blinter.ini") -> bool:
+def create_default_config_file(
+    config_path: str = "blinter.ini", force: bool = False
+) -> bool:
     """
     Create a default configuration file with all available options documented.
 
     Args:
         config_path: Path where to create the config file
+        force: When True, overwrite an existing configuration file
 
     Returns:
         True when the file was written successfully, False on failure.
     """
+    config_file = Path(config_path)
+    if config_file.exists() and not force:
+        print(
+            f"Configuration file already exists: {config_path}\n"
+            "Use --create-config --force to overwrite, or edit the existing file."
+        )
+        return False
+
     config_content = """# Blinter Configuration File
 # This file configures the behavior of the blinter batch file linter.
 # All settings are optional - if not specified, defaults will be used.
@@ -180,8 +209,8 @@ follow_calls = false
 """
 
     try:
-        with open(config_path, "w", encoding="utf-8") as config_file:
-            config_file.write(config_content)
+        with open(config_path, "w", encoding="utf-8") as config_handle:
+            config_handle.write(config_content)
         print(f"Default configuration file created: {config_path}")
         return True
     except OSError as error:

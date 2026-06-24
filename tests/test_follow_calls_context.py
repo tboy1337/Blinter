@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 import tempfile
 
+import pytest
+
 from blinter import (
     BlinterConfig,
     lint_batch_file,
@@ -559,6 +561,60 @@ class TestScanRootSandbox:
             assert called_inside[0].name == "helper.bat"
 
 
+class TestSymlinkSandbox:  # pylint: disable=too-few-public-methods
+    """Test scan_root containment against symlink escape."""
+
+    def test_is_path_under_root_rejects_symlink_outside_scan_root(self) -> None:
+        """Symlinks pointing outside scan_root must not be treated as inside."""
+        from blinter.io.discovery import is_path_under_root
+
+        with tempfile.TemporaryDirectory() as outer:
+            scan_root = Path(outer) / "project"
+            outside_dir = Path(outer) / "outside"
+            scan_root.mkdir()
+            outside_dir.mkdir()
+
+            outside_file = outside_dir / "secret.bat"
+            outside_file.write_text("@ECHO OFF\n", encoding="utf-8")
+
+            real_file = scan_root / "real.bat"
+            real_file.write_text("@ECHO OFF\n", encoding="utf-8")
+
+            escape_link = scan_root / "escape.bat"
+            try:
+                os.symlink(outside_file, escape_link)
+            except OSError:
+                pytest.skip("symlink creation not supported on this platform")
+
+            assert is_path_under_root(real_file, scan_root) is True
+            assert is_path_under_root(escape_link, scan_root) is False
+
+    def test_extract_called_scripts_skips_symlink_outside_scan_root(self) -> None:
+        """CALL targets reached via symlinks outside scan_root are ignored."""
+        with tempfile.TemporaryDirectory() as outer:
+            scan_root = Path(outer) / "project"
+            outside_dir = Path(outer) / "outside"
+            scan_root.mkdir()
+            outside_dir.mkdir()
+
+            outside_script = outside_dir / "outside.bat"
+            outside_script.write_text("@ECHO OFF\n", encoding="utf-8")
+
+            escape_link = scan_root / "outside.bat"
+            try:
+                os.symlink(outside_script, escape_link)
+            except OSError:
+                pytest.skip("symlink creation not supported on this platform")
+
+            main_script = scan_root / "main.bat"
+            main_script.write_text('CALL "outside.bat"\n', encoding="utf-8")
+
+            called = _extract_called_scripts(
+                main_script, scan_root=str(scan_root.resolve())
+            )
+            assert not called
+
+
 class TestCallDependencyGraph:  # pylint: disable=too-few-public-methods
     """Test CALL dependency graph construction."""
 
@@ -598,3 +654,33 @@ class TestCallDependencyGraph:  # pylint: disable=too-few-public-methods
         temp_path.unlink()
         graph = _build_call_dependency_graph([temp_path])
         assert graph.get(temp_path.resolve(), set()) == set()
+
+    def test_build_call_dependency_graph_handles_cyclic_calls(self) -> None:
+        """Cyclic CALL graphs include both directions of the cycle."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_a = Path(tmpdir) / "a.bat"
+            script_b = Path(tmpdir) / "b.bat"
+            script_a.write_text(
+                f'@ECHO OFF\nCALL "{script_b.name}"\n', encoding="utf-8"
+            )
+            script_b.write_text(
+                f'@ECHO OFF\nCALL "{script_a.name}"\n', encoding="utf-8"
+            )
+
+            graph = _build_call_dependency_graph([script_a, script_b], scan_root=tmpdir)
+            a_deps = graph[script_a.resolve()]
+            b_deps = graph[script_b.resolve()]
+            assert script_b.resolve() in a_deps
+            assert script_a.resolve() in b_deps
+
+    def test_extract_called_scripts_spaced_path(self) -> None:
+        """CALL with extra spacing before script path is detected."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            helper = Path(tmpdir) / "helper.bat"
+            helper.write_text("@ECHO OFF\n", encoding="utf-8")
+            main_script = Path(tmpdir) / "main.bat"
+            main_script.write_text("CALL  helper.bat\n", encoding="utf-8")
+
+            called = _extract_called_scripts(main_script, scan_root=tmpdir)
+            assert len(called) == 1
+            assert called[0].name == "helper.bat"

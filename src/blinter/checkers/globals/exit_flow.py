@@ -146,6 +146,44 @@ def _can_main_execution_reach_eof(lines: List[str]) -> bool:
     return reachable
 
 
+def _check_nested_paren_mismatch(lines: List[str]) -> List[LintIssue]:
+    """Check for mismatched IF/FOR parenthesis blocks (E001)."""
+    issues: List[LintIssue] = []
+    depth = 0
+    last_open_line = 0
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip().lower()
+        if not stripped or stripped.startswith("rem") or stripped.startswith("::"):
+            continue
+
+        previous_depth = depth
+        depth = _update_paren_depth(stripped, depth)
+        if depth > previous_depth:
+            last_open_line = i
+
+        if depth < 0:
+            issues.append(
+                LintIssue(
+                    line_number=i,
+                    rule=RULES["E001"],
+                    context="Unmatched closing parenthesis in IF/FOR block",
+                )
+            )
+            depth = 0
+
+    if depth > 0:
+        issues.append(
+            LintIssue(
+                line_number=last_open_line or len(lines),
+                rule=RULES["E001"],
+                context=f"{depth} unclosed parenthesis block(s) in IF/FOR structure",
+            )
+        )
+
+    return issues
+
+
 def _check_unreachable_code(lines: List[str]) -> List[LintIssue]:
     """Check for unreachable code after EXIT or GOTO statements."""
     issues: List[LintIssue] = []

@@ -4,12 +4,38 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 
-def is_path_under_root(path: Path, root: Path) -> bool:
-    """Return True when path resolves inside root."""
+def _resolved_is_under_root(resolved: Path, root_resolved: Path) -> bool:
+    """Return True when resolved is inside root_resolved."""
     try:
-        path.resolve().relative_to(root.resolve())
+        resolved.relative_to(root_resolved)
         return True
     except ValueError:
+        return False
+
+
+def is_path_under_root(path: Path, root: Path) -> bool:
+    """Return True when path resolves inside root without symlink escape."""
+    try:
+        root_resolved = root.resolve()
+        candidate = path if path.is_absolute() else Path.cwd() / path
+
+        for part in [candidate, *candidate.parents]:
+            if part.is_symlink():
+                link_target = part.readlink()
+                resolved_link = (
+                    link_target
+                    if link_target.is_absolute()
+                    else (part.parent / link_target)
+                )
+                try:
+                    resolved_link = resolved_link.resolve()
+                except OSError:
+                    return False
+                if not _resolved_is_under_root(resolved_link, root_resolved):
+                    return False
+
+        return _resolved_is_under_root(candidate.resolve(), root_resolved)
+    except (OSError, ValueError):
         return False
 
 

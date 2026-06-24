@@ -3,11 +3,12 @@
 import os
 from pathlib import Path
 import tempfile
-from typing import IO, Union
+from typing import IO, List, Optional, Union
 from unittest.mock import MagicMock, mock_open, patch
 import warnings
 
 import pytest
+from tests.conftest import patch_valid_encoding_path
 
 from blinter import (
     lint_batch_file,
@@ -15,7 +16,6 @@ from blinter import (
 )
 from blinter.constants import MAX_FILE_SIZE_BYTES
 from blinter.io.encoding import _validate_and_read_file
-from tests.conftest import patch_valid_encoding_path
 
 _VALIDATE_FILE_PATCH = patch(
     "blinter.io.encoding._validate_file_for_read",
@@ -137,7 +137,10 @@ class TestFileEncodingDetection:
     @patch("charset_normalizer.from_bytes")
     @patch("builtins.open")
     def test_charset_normalizer_detection_success(
-        self, mock_file: MagicMock, mock_from_bytes: MagicMock, _mock_validate: MagicMock
+        self,
+        mock_file: MagicMock,
+        mock_from_bytes: MagicMock,
+        _mock_validate: MagicMock,
     ) -> None:
         """Test successful charset_normalizer encoding detection."""
         # Mock charset_normalizer detection
@@ -146,15 +149,8 @@ class TestFileEncodingDetection:
         mock_result.coherence = 0.8
         mock_from_bytes.return_value.best.return_value = mock_result
 
-        # Mock file operations
-        mock_file.side_effect = [
-            mock_open(
-                read_data=b"test content"
-            ).return_value,  # Binary read for charset_normalizer
-            mock_open(
-                read_data="test content\n"
-            ).return_value,  # Text read with detected encoding
-        ]
+        # Mock file operations (single binary read)
+        mock_file.return_value = mock_open(read_data=b"test content\n").return_value
 
         lines, encoding = read_file_with_encoding("test.bat")
         assert lines == ["test content\n"]
@@ -164,7 +160,10 @@ class TestFileEncodingDetection:
     @patch("charset_normalizer.from_bytes")
     @patch("builtins.open")
     def test_charset_normalizer_detection_low_confidence(
-        self, mock_file: MagicMock, mock_from_bytes: MagicMock, _mock_validate: MagicMock
+        self,
+        mock_file: MagicMock,
+        mock_from_bytes: MagicMock,
+        _mock_validate: MagicMock,
     ) -> None:
         """Test charset_normalizer detection with low confidence."""
         # Mock charset_normalizer with low confidence
@@ -173,11 +172,7 @@ class TestFileEncodingDetection:
         mock_result.coherence = 0.3
         mock_from_bytes.return_value.best.return_value = mock_result
 
-        # Mock file operations - first binary read, then text read with utf-8
-        mock_file.side_effect = [
-            mock_open(read_data=b"test content").return_value,
-            mock_open(read_data="test content\n").return_value,
-        ]
+        mock_file.return_value = mock_open(read_data=b"test content\n").return_value
 
         lines, encoding = read_file_with_encoding("test.bat")
         assert lines == ["test content\n"]
@@ -214,27 +209,40 @@ class TestFileEncodingDetection:
 
     @_VALIDATE_FILE_PATCH
     @patch("builtins.open")
-    def test_all_encodings_fail(self, mock_file: MagicMock, _mock_validate: MagicMock) -> None:
+    def test_all_encodings_fail(
+        self, mock_file: MagicMock, _mock_validate: MagicMock
+    ) -> None:
         """Test when all encoding attempts fail."""
-        # Mock all encoding attempts to fail
-        mock_file.side_effect = UnicodeDecodeError("utf-8", b"", 0, 1, "invalid")
+        mock_file.return_value = mock_open(read_data=b"test content").return_value
 
-        with pytest.raises(OSError) as exc_info:
+        with (
+            patch("blinter.io.encoding._try_decode_bytes", return_value=None),
+            pytest.raises(OSError) as exc_info,
+        ):
             read_file_with_encoding("test.bat")
 
         assert "All encoding attempts failed" in str(exc_info.value)
 
     @_VALIDATE_FILE_PATCH
     @patch("builtins.open")
-    def test_encoding_lookup_error(self, mock_file: MagicMock, _mock_validate: MagicMock) -> None:
+    def test_encoding_lookup_error(
+        self, mock_file: MagicMock, _mock_validate: MagicMock
+    ) -> None:
         """Test handling of encoding lookup errors."""
-        # Mock LookupError for invalid encoding
-        mock_file.side_effect = [
-            ValueError("unknown encoding"),
-            mock_open(read_data="test content\n").return_value,
-        ]
+        mock_file.return_value = mock_open(read_data=b"test content\n").return_value
 
-        lines, _encoding = read_file_with_encoding("test.bat")
+        def mock_decode_bytes(raw_data: bytes, encoding: str) -> Optional[List[str]]:
+            if encoding == "utf-8":
+                return None
+            if encoding == "latin1":
+                return ["test content\n"]
+            return None
+
+        with patch(
+            "blinter.io.encoding._try_decode_bytes",
+            side_effect=mock_decode_bytes,
+        ):
+            lines, _encoding = read_file_with_encoding("test.bat")
         assert lines == ["test content\n"]
 
     def test_empty_file(self) -> None:
@@ -279,7 +287,10 @@ class TestFileEncodingDetection:
     @patch("charset_normalizer.from_bytes")
     @patch("builtins.open")
     def test_charset_detect_encoding_not_in_default_list(
-        self, mock_file: MagicMock, mock_from_bytes: MagicMock, _mock_validate: MagicMock
+        self,
+        mock_file: MagicMock,
+        mock_from_bytes: MagicMock,
+        _mock_validate: MagicMock,
     ) -> None:
         """Test when charset_normalizer detects encoding NOT in our default list - inserted at front."""
         # Mock charset_normalizer to return an encoding NOT in the default list
@@ -288,15 +299,7 @@ class TestFileEncodingDetection:
         mock_result.coherence = 0.9
         mock_from_bytes.return_value.best.return_value = mock_result
 
-        # Mock file operations
-        mock_file.side_effect = [
-            mock_open(
-                read_data=b"test content"
-            ).return_value,  # Binary read for charset_normalizer
-            mock_open(
-                read_data="test content\n"
-            ).return_value,  # Text read with detected encoding
-        ]
+        mock_file.return_value = mock_open(read_data=b"test content\n").return_value
 
         lines, encoding = read_file_with_encoding("test.bat")
         assert lines == ["test content\n"]
@@ -306,7 +309,10 @@ class TestFileEncodingDetection:
     @patch("charset_normalizer.from_bytes")
     @patch("builtins.open")
     def test_charset_detect_encoding_in_default_list(
-        self, mock_file: MagicMock, mock_from_bytes: MagicMock, _mock_validate: MagicMock
+        self,
+        mock_file: MagicMock,
+        mock_from_bytes: MagicMock,
+        _mock_validate: MagicMock,
     ) -> None:
         """Test when charset_normalizer detects encoding that exists in our list - should be moved to front."""
         # Mock charset_normalizer to return an encoding that IS in the default list
@@ -315,15 +321,7 @@ class TestFileEncodingDetection:
         mock_result.coherence = 0.85
         mock_from_bytes.return_value.best.return_value = mock_result
 
-        # Mock file operations
-        mock_file.side_effect = [
-            mock_open(
-                read_data=b"test content"
-            ).return_value,  # Binary read for charset_normalizer
-            mock_open(
-                read_data="test content\n"
-            ).return_value,  # Text read with detected encoding
-        ]
+        mock_file.return_value = mock_open(read_data=b"test content\n").return_value
 
         lines, encoding = read_file_with_encoding("test.bat")
         assert lines == ["test content\n"]
@@ -467,14 +465,10 @@ class TestEncodingEdgeCases:
 
     def test_all_encoding_attempts_fail(self) -> None:
         """Test the rare case where all encoding attempts fail."""
-        # This is very hard to trigger in practice since latin1 can decode any byte sequence
-        # We'll mock the open function to always fail
         with (
             patch_valid_encoding_path(),
-            patch(
-                "builtins.open",
-                side_effect=UnicodeDecodeError("test", b"", 0, 1, "test error"),
-            ),
+            patch("builtins.open", mock_open(read_data=b"test content")),
+            patch("blinter.io.encoding._try_decode_bytes", return_value=None),
         ):
             with pytest.raises(OSError, match="All encoding attempts failed"):
                 read_file_with_encoding("test.bat")
@@ -607,7 +601,7 @@ class TestAdditionalFileEncodingScenarios:
 
         with (
             patch_valid_encoding_path(),
-            patch("builtins.open", mock_open(read_data="test content")),
+            patch("builtins.open", mock_open(read_data=b"test content")),
             patch("charset_normalizer.from_bytes", return_value=mock_from_bytes),
         ):
             # Should succeed by adding the detected encoding to the front
@@ -697,89 +691,76 @@ class TestAdditionalFileEncodingScenarios:
     def test_encoding_lookup_error_fallback(self) -> None:
         """Test handling when encoding lookup fails."""
 
-        def mock_open_with_lookup_error(*args: object, **kwargs: object) -> object:
-            if "encoding" in kwargs:
-                # Simulate LookupError for unsupported encoding
-                if kwargs["encoding"] == "utf-8":
-                    raise LookupError("Unknown encoding")
-            return mock_open(read_data="test content")(*args, **kwargs)
+        def mock_decode_bytes(raw_data: bytes, encoding: str) -> Optional[List[str]]:
+            if encoding == "utf-8":
+                return None
+            if encoding == "latin1":
+                return ["test content\n"]
+            return None
 
         with (
             patch_valid_encoding_path(),
-            patch("builtins.open", side_effect=mock_open_with_lookup_error),
+            patch("builtins.open", mock_open(read_data=b"test content")),
+            patch(
+                "blinter.io.encoding._try_decode_bytes",
+                side_effect=mock_decode_bytes,
+            ),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
-            assert encoding != "utf-8"  # Should fall back to other encoding
+            assert encoding != "utf-8"
             assert len(lines) > 0
 
     def test_encoding_value_error_fallback(self) -> None:
         """Test handling when encoding value is invalid."""
 
-        def mock_open_with_value_error(*args: object, **kwargs: object) -> object:
-            if "encoding" in kwargs:
-                # Simulate ValueError for invalid encoding
-                if kwargs["encoding"] == "utf-8":
-                    raise ValueError("Invalid encoding")
-            return mock_open(read_data="test content")(*args, **kwargs)
+        def mock_decode_bytes(raw_data: bytes, encoding: str) -> Optional[List[str]]:
+            if encoding == "utf-8":
+                return None
+            if encoding == "latin1":
+                return ["test content\n"]
+            return None
 
         with (
             patch_valid_encoding_path(),
-            patch("builtins.open", side_effect=mock_open_with_value_error),
+            patch("builtins.open", mock_open(read_data=b"test content")),
+            patch(
+                "blinter.io.encoding._try_decode_bytes",
+                side_effect=mock_decode_bytes,
+            ),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
-            assert encoding != "utf-8"  # Should fall back to other encoding
+            assert encoding != "utf-8"
             assert len(lines) > 0
 
     def test_all_encodings_fail_with_exception(self) -> None:
         """Test when all encodings fail and we have a last exception."""
-
-        def mock_open_always_fail(*args: object, **kwargs: object) -> object:
-            if "encoding" in kwargs:
-                raise UnicodeDecodeError("test", b"", 0, 1, "test error")
-            return mock_open(read_data="test content")(*args, **kwargs)
-
         with (
             patch_valid_encoding_path(),
-            patch("builtins.open", side_effect=mock_open_always_fail),
+            patch("builtins.open", mock_open(read_data=b"test content")),
+            patch("blinter.io.encoding._try_decode_bytes", return_value=None),
         ):
             with pytest.raises(OSError, match="All encoding attempts failed"):
                 read_file_with_encoding("test.bat")
 
     def test_all_encodings_fail_no_exception(self) -> None:
         """Test when all encodings fail but no exception is stored."""
-
-        def mock_open_no_exception(*args: object, **kwargs: object) -> object:
-            # Don't store any exception by not raising UnicodeDecodeError
-            if "encoding" in kwargs:
-                raise LookupError("Encoding not supported")
-            return mock_open(read_data="test content")(*args, **kwargs)
-
         with (
             patch_valid_encoding_path(),
-            patch("builtins.open", side_effect=mock_open_no_exception),
+            patch("builtins.open", mock_open(read_data=b"test content")),
+            patch("blinter.io.encoding._try_decode_bytes", return_value=None),
         ):
             with pytest.raises(OSError, match="All encoding attempts failed"):
                 read_file_with_encoding("test.bat")
 
     def test_encoding_failure_edge_case(self) -> None:
         """Test encoding failure when no exceptions are stored."""
-
-        def mock_open_special(*_args: object, **kwargs: object) -> object:
-            # Return nothing but don't store exception
-            if "encoding" in kwargs and kwargs["encoding"] == "utf-32":
-                raise LookupError("Encoding not supported")
-            raise UnicodeDecodeError("test", b"", 0, 1, "test error")
-
         with (
             patch_valid_encoding_path(),
-            patch("builtins.open", side_effect=mock_open_special),
+            patch("builtins.open", mock_open(read_data=b"test content")),
+            patch("blinter.io.encoding._try_decode_bytes", return_value=None),
         ):
-            try:
+            with pytest.raises(OSError, match="All encoding attempts failed"):
                 read_file_with_encoding("test.bat")
-                assert False, "Should have raised OSError"
-            except OSError as error:
-                # Should hit the fallback path with last_exception
-                assert "All encoding attempts failed" in str(error)
 
 
 class TestFileSizeLimit:  # pylint: disable=too-few-public-methods

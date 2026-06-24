@@ -4,10 +4,11 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-from typing import Dict, Set
+from typing import Dict, List, Optional, Set
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
+from tests.conftest import patch_valid_encoding_path
 
 from blinter import (
     BlinterConfig,
@@ -56,8 +57,6 @@ from blinter.parsing.structure import (
 # pylint: disable=too-many-lines,redefined-outer-name,reimported
 # pylint: disable=unused-argument,invalid-name,missing-class-docstring,too-few-public-methods
 # pylint: disable=unused-variable,unused-import
-
-from tests.conftest import patch_valid_encoding_path
 
 
 class TestFileEncodingEdgeCases:
@@ -125,66 +124,64 @@ class TestFileEncodingEdgeCases:
     def test_encoding_lookup_error_fallback(self) -> None:
         """Test handling when encoding lookup fails."""
 
-        def mock_open_with_lookup_error(*args: object, **kwargs: object) -> object:
-            if "encoding" in kwargs:
-                # Simulate LookupError for unsupported encoding
-                if kwargs["encoding"] == "utf-8":
-                    raise LookupError("Unknown encoding")
-            return mock_open(read_data="test content")(*args, **kwargs)
+        def mock_decode_bytes(raw_data: bytes, encoding: str) -> Optional[List[str]]:
+            if encoding == "utf-8":
+                return None
+            if encoding == "latin1":
+                return ["test content\n"]
+            return None
 
         with (
             patch_valid_encoding_path(),
-            patch("builtins.open", side_effect=mock_open_with_lookup_error),
+            patch("builtins.open", mock_open(read_data=b"test content")),
+            patch(
+                "blinter.io.encoding._try_decode_bytes",
+                side_effect=mock_decode_bytes,
+            ),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
-            assert encoding != "utf-8"  # Should fall back to other encoding
+            assert encoding != "utf-8"
             assert len(lines) > 0
 
     def test_encoding_value_error_fallback(self) -> None:
         """Test handling when encoding value is invalid."""
 
-        def mock_open_with_value_error(*args: object, **kwargs: object) -> object:
-            if "encoding" in kwargs:
-                # Simulate ValueError for invalid encoding
-                if kwargs["encoding"] == "utf-8":
-                    raise ValueError("Invalid encoding")
-            return mock_open(read_data="test content")(*args, **kwargs)
+        def mock_decode_bytes(raw_data: bytes, encoding: str) -> Optional[List[str]]:
+            if encoding == "utf-8":
+                return None
+            if encoding == "latin1":
+                return ["test content\n"]
+            return None
 
         with (
             patch_valid_encoding_path(),
-            patch("builtins.open", side_effect=mock_open_with_value_error),
+            patch("builtins.open", mock_open(read_data=b"test content")),
+            patch(
+                "blinter.io.encoding._try_decode_bytes",
+                side_effect=mock_decode_bytes,
+            ),
         ):
             lines, encoding = read_file_with_encoding("test.bat")
-            assert encoding != "utf-8"  # Should fall back to other encoding
+            assert encoding != "utf-8"
             assert len(lines) > 0
 
     def test_all_encodings_fail_with_exception(self) -> None:
         """Test when all encodings fail and we have a last exception."""
 
-        def mock_open_always_fail(*args: object, **kwargs: object) -> object:
-            if "encoding" in kwargs:
-                raise UnicodeDecodeError("test", b"", 0, 1, "test error")
-            return mock_open(read_data="test content")(*args, **kwargs)
-
         with (
             patch_valid_encoding_path(),
-            patch("builtins.open", side_effect=mock_open_always_fail),
+            patch("builtins.open", mock_open(read_data=b"test content")),
+            patch("blinter.io.encoding._try_decode_bytes", return_value=None),
         ):
             with pytest.raises(OSError, match="All encoding attempts failed"):
                 read_file_with_encoding("test.bat")
 
     def test_all_encodings_fail_no_exception(self) -> None:
         """Test when all encodings fail but no exception is stored."""
-
-        def mock_open_no_exception(*args: object, **kwargs: object) -> object:
-            # Don't store any exception by not raising UnicodeDecodeError
-            if "encoding" in kwargs:
-                raise LookupError("Encoding not supported")
-            return mock_open(read_data="test content")(*args, **kwargs)
-
         with (
             patch_valid_encoding_path(),
-            patch("builtins.open", side_effect=mock_open_no_exception),
+            patch("builtins.open", mock_open(read_data=b"test content")),
+            patch("blinter.io.encoding._try_decode_bytes", return_value=None),
         ):
             with pytest.raises(OSError, match="All encoding attempts failed"):
                 read_file_with_encoding("test.bat")
@@ -691,23 +688,13 @@ class TestAdditionalEdgeCaseScenarios:
 
     def test_encoding_failure_edge_case(self) -> None:
         """Test encoding failure when no exceptions are stored."""
-
-        def mock_open_special(*args: object, **kwargs: object) -> object:
-            # Return nothing but don't store exception
-            if "encoding" in kwargs and kwargs["encoding"] == "utf-32":
-                raise LookupError("Encoding not supported")
-            raise UnicodeDecodeError("test", b"", 0, 1, "test error")
-
         with (
             patch_valid_encoding_path(),
-            patch("builtins.open", side_effect=mock_open_special),
+            patch("builtins.open", mock_open(read_data=b"test content")),
+            patch("blinter.io.encoding._try_decode_bytes", return_value=None),
         ):
-            try:
+            with pytest.raises(OSError, match="All encoding attempts failed"):
                 read_file_with_encoding("test.bat")
-                assert False, "Should have raised OSError"
-            except OSError as e:
-                # Should hit the fallback path with last_exception
-                assert "All encoding attempts failed" in str(e)
 
     def test_validate_and_read_file_large_file_warning(self) -> None:
         """Test large file warning in _validate_and_read_file."""
@@ -828,7 +815,7 @@ class TestAdditionalEdgeCaseScenarios:
 
         with (
             patch_valid_encoding_path(),
-            patch("builtins.open", mock_open(read_data="test content")),
+            patch("builtins.open", mock_open(read_data=b"test content")),
             patch("charset_normalizer.from_bytes", return_value=mock_from_bytes),
         ):
             # Should succeed by adding the detected encoding to the front
@@ -2800,3 +2787,67 @@ ECHO Missing delimiter %WRONGVAR
             ), f"Wrong lines flagged: {[i.line_number for i in e011_issues]}"
         finally:
             os.unlink(temp_file)
+
+
+class TestEmbeddedScriptDetection:  # pylint: disable=too-few-public-methods
+    """Test embedded PowerShell/VBScript/C# block detection."""
+
+    def test_detect_embedded_powershell_block(self) -> None:
+        """PowerShell syntax after a label is skipped during linting."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            ":psblock",
+            "$name = 'test'",
+            "Write-Host $name",
+            "exit /b 0",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 3 in skip_lines
+        assert 4 in skip_lines
+
+    def test_detect_embedded_vbscript_block(self) -> None:
+        """VBScript syntax after a label is skipped during linting."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            ":vbsblock",
+            "Dim obj",
+            'Set obj = CreateObject("Scripting.FileSystemObject")',
+            "exit /b 0",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 3 in skip_lines
+        assert 4 in skip_lines
+
+    def test_detect_embedded_csharp_block(self) -> None:
+        """C# syntax after a label is skipped during linting."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            ":csharpblock",
+            "foreach (string item in items)",
+            "using System;",
+            "exit /b 0",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 3 in skip_lines or 4 in skip_lines
+
+
+class TestLineEndingCheckerRules:  # pylint: disable=too-few-public-methods
+    """Direct tests for line ending checker rules."""
+
+    def test_check_line_ending_rules_e018_w018_w019(self) -> None:
+        """LF files with multibyte chars and GOTO labels trigger line-ending rules."""
+        from blinter.checkers.line_endings import _check_line_ending_rules
+
+        lines = ["@echo off\n", "goto :target\n", "echo café\n"]
+        ending_info = ("LF", False, 0, 3, 0)
+        issues = _check_line_ending_rules(lines, "test.bat", ending_info=ending_info)
+        codes = {issue.rule.code for issue in issues}
+        assert "E018" in codes
+        assert "W018" in codes
+        assert "W019" in codes

@@ -288,24 +288,21 @@ echo %var%
                 os.unlink(temp_file)
 
     def test_main_unicode_decode_error(self) -> None:
-        """Test main function with unicode decode error."""
+        """Test main function when a file cannot be processed."""
         temp_file = self.create_temp_batch_file("@echo off\necho test\n")
 
         try:
             with patch(
                 "blinter.cli.main.lint_batch_file",
-                side_effect=UnicodeDecodeError("utf-8", b"", 0, 1, "invalid"),
+                side_effect=OSError("Could not read file"),
             ):
                 with patch("sys.argv", ["blinter.py", temp_file]):
                     with self.capture_stdout() as captured:
-                        try:
+                        with pytest.raises(SystemExit) as exit_info:
                             main()
-                        except SystemExit as sys_exit:
-                            # Exit code 0 or 1 is expected
-                            assert sys_exit.code in [0, 1]
                         output = captured.getvalue()
 
-                    assert "Could not read" in output and "encoding issues" in output
+                    assert exit_info.value.code == 1
         finally:
             if os.path.exists(temp_file):
                 os.unlink(temp_file)
@@ -693,6 +690,13 @@ finally:
         finally:
             os.unlink(script_file_path)
 
+    def test_main_module_runpy_entry(self) -> None:
+        """Test python -m blinter module exposes the CLI entry point."""
+        from blinter.cli.main import main as cli_main
+
+        with patch.object(sys, "argv", ["blinter", "--help"]):
+            cli_main()
+
     def test_comprehensive_main_execution_scenarios(self) -> None:
         """Test main function execution with comprehensive scenarios."""
         original_argv = sys.argv
@@ -1005,7 +1009,7 @@ class TestCLIMainFunctionScenarios:
 
         assert exit_info.value.code == 1
         captured = capsys.readouterr()
-        assert "Error: Path 'nonexistent.bat' not found." in captured.out
+        assert "Error: Path 'nonexistent.bat' not found." in captured.err
 
     def test_main_with_permission_error(
         self, capsys: pytest.CaptureFixture[str]
@@ -1022,7 +1026,7 @@ class TestCLIMainFunctionScenarios:
 
         assert exit_info.value.code == 1
         captured = capsys.readouterr()
-        assert "Error: Cannot access 'protected.bat'" in captured.out
+        assert "Error: Cannot access 'protected.bat'" in captured.err
 
     def test_main_with_unicode_decode_error_in_processing(
         self, capsys: pytest.CaptureFixture[str]
@@ -1040,7 +1044,7 @@ class TestCLIMainFunctionScenarios:
             with patch("sys.argv", ["blinter.py", temp_file]):
                 with patch(
                     "blinter.cli.main.lint_batch_file",
-                    side_effect=UnicodeDecodeError("test", b"", 0, 1, "test"),
+                    side_effect=OSError("Could not read file"),
                 ):
                     with pytest.raises(SystemExit) as exit_info:
                         main()
@@ -1048,8 +1052,7 @@ class TestCLIMainFunctionScenarios:
             assert exit_info.value.code == 1
             captured = capsys.readouterr()
             combined_output = captured.out + captured.err
-            assert "Could not read" in combined_output
-            assert "due to encoding issues" in combined_output
+            assert "Skipped files" in combined_output
         finally:
             os.unlink(temp_file)
 
@@ -1104,7 +1107,7 @@ class TestCLIMainFunctionScenarios:
 
             assert exit_info.value.code == 1
             captured = capsys.readouterr()
-            assert "Error: No batch files could be processed." in captured.out
+            assert "Error: No batch files could be processed." in captured.err
         finally:
             os.unlink(temp_file)
 
@@ -1174,7 +1177,8 @@ class TestMainFunctionEdgeCases:
                     assert exit_info.value.code == 1
                     # Verify error message and help are shown
                     mock_print.assert_any_call(
-                        "Error: No batch file or directory provided.\n"
+                        "Error: No batch file or directory provided.\n",
+                        file=sys.stderr,
                     )
                     mock_help.assert_called_once()
         finally:
@@ -1223,7 +1227,8 @@ class TestMainFunctionEdgeCases:
                 assert exit_info.value.code == 1
                 # Should print file not found error
                 mock_print.assert_any_call(
-                    "Error: Path 'nonexistent_directory_path_12345' not found."
+                    "Error: Path 'nonexistent_directory_path_12345' not found.",
+                    file=sys.stderr,
                 )
         finally:
             sys.argv = original_argv
@@ -1525,17 +1530,17 @@ class TestFollowCallsCLI:
         """Test follow_calls via CLI with actual file."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create called script
-            helper_script = os.path.join(tmpdir, "helper.bat")
+            helper_script = os.path.join(tmpdir, "helper.cmd")
             with open(helper_script, "w", encoding="utf-8") as bat_file:
                 bat_file.write("@ECHO OFF\n")
                 bat_file.write("SET VAR=value\n")
                 bat_file.write("EXIT /b 0\n")
 
             # Create main script
-            main_script = os.path.join(tmpdir, "main.bat")
+            main_script = os.path.join(tmpdir, "main.cmd")
             with open(main_script, "w", encoding="utf-8") as bat_file:
                 bat_file.write("@ECHO OFF\n")
-                bat_file.write(f'CALL "{helper_script}"\n')
+                bat_file.write("CALL helper.cmd\n")
                 bat_file.write("EXIT /b 0\n")
 
             # Test via CLI
@@ -1713,4 +1718,50 @@ class TestCLIEdgeCases:  # pylint: disable=too-few-public-methods
                 with pytest.raises(SystemExit) as exc_info:
                     main()
                 # Style issues only exit with 0
+                assert exc_info.value.code == 0
+
+
+class TestCliFatalExitCodes:  # pylint: disable=too-few-public-methods
+    """Test CLI exit codes for ERROR and SECURITY severities."""
+
+    def test_cli_exits_1_on_security_findings_only(self) -> None:
+        """SECURITY findings must cause non-zero exit without ERROR findings."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bat_file = os.path.join(tmpdir, "risky.bat")
+            with open(bat_file, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write("RMDIR /S /Q C:\\temp\\folder\n")
+                file_handle.write("EXIT /b 0\n")
+
+            with patch.object(sys, "argv", ["blinter", bat_file]):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                assert exc_info.value.code == 1
+
+    def test_cli_exits_1_on_error_findings(self) -> None:
+        """ERROR findings must cause non-zero exit."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bat_file = os.path.join(tmpdir, "broken.bat")
+            with open(bat_file, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write("IF EXIST file (\n")
+                file_handle.write("EXIT /b 0\n")
+
+            with patch.object(sys, "argv", ["blinter", bat_file]):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                assert exc_info.value.code == 1
+
+    def test_cli_exits_0_on_warnings_without_fatal_issues(self) -> None:
+        """WARNING-only findings must not cause non-zero exit."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bat_file = os.path.join(tmpdir, "warn.bat")
+            with open(bat_file, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write("DEL important.txt\n")
+                file_handle.write("EXIT /b 0\n")
+
+            with patch.object(sys, "argv", ["blinter", bat_file]):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
                 assert exc_info.value.code == 0

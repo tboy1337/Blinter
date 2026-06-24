@@ -66,7 +66,7 @@ def _extract_called_scripts(
             continue
 
         call_match = re.search(
-            r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|([^\s]+\.(?:bat|cmd)))',
+            r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|(\S+\.(?:bat|cmd)))',
             line,
             re.IGNORECASE,
         )
@@ -200,7 +200,7 @@ def _extract_direct_dependencies(
             continue
 
         call_match = re.search(
-            r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|([^\s]+\.(?:bat|cmd)))',
+            r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|(\S+\.(?:bat|cmd)))',
             line,
             re.IGNORECASE,
         )
@@ -254,18 +254,23 @@ def _build_call_dependency_graph(
         )
 
     transitive_deps: Dict[Path, Set[Path]] = {}
+    memo: Dict[Path, Set[Path]] = {}
 
-    def get_all_deps(file_path: Path, visited: Set[Path]) -> Set[Path]:
+    def get_all_deps(file_path: Path, visiting: Set[Path]) -> Set[Path]:
         """Recursively get all dependencies (direct and transitive)."""
-        if file_path in visited:
+        if file_path in memo:
+            return set(memo[file_path])
+        if file_path in visiting:
             return set()
 
-        visited.add(file_path)
+        visiting.add(file_path)
         all_deps = set(direct_deps.get(file_path, set()))
 
         for dep in list(all_deps):
-            all_deps.update(get_all_deps(dep, visited))
+            all_deps.update(get_all_deps(dep, visiting))
 
+        visiting.remove(file_path)
+        memo[file_path] = all_deps
         return all_deps
 
     for batch_file in batch_files:
@@ -407,7 +412,7 @@ def _collect_called_vars(
             continue
 
         call_match = re.search(
-            r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|([^\s]+\.(?:bat|cmd)))',
+            r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|(\S+\.(?:bat|cmd)))',
             line,
             re.IGNORECASE,
         )

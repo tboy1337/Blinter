@@ -1,6 +1,7 @@
 """Main lint orchestration entry point for single batch files."""
 
 from pathlib import Path
+import threading
 from typing import (
     Dict,
     List,
@@ -29,6 +30,8 @@ from blinter.parsing.structure import (
     _parse_suppression_comments,
 )
 
+_LINES_CACHE_LOCK = threading.Lock()
+
 
 def lint_batch_file(  # pylint: disable=too-many-locals
     file_path: str,
@@ -43,7 +46,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     static analysis including syntax validation, security checks, style analysis,
     and performance optimization suggestions.
 
-    Thread-safe: Yes - uses only local variables and immutable global rules
+    Thread-safe: Yes - per-call state is local; optional shared ``lines_cache`` is locked
     Performance: Optimized for files up to 10MB; files above 50MB are rejected
 
     Args:
@@ -85,7 +88,9 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     # Read and validate file
     lines, _encoding_used, line_ending_info = _validate_and_read_file(file_path)
     if lines_cache is not None:
-        lines_cache[Path(file_path).resolve()] = lines
+        resolved_path = Path(file_path).resolve()
+        with _LINES_CACHE_LOCK:
+            lines_cache[resolved_path] = lines
 
     if not lines:
         return []  # Empty file, no issues

@@ -698,6 +698,29 @@ def _check_set_a_expression(stripped: str, line_num: int) -> List[LintIssue]:
     return issues
 
 
+def _check_empty_variable_syntax(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check IF comparisons with unquoted variables that may be empty (E007)."""
+    issues: List[LintIssue] = []
+    if not stripped.lower().startswith("if "):
+        return issues
+
+    if re.search(
+        r'if\s+(?![\'"])(%[^%]+%)\s*==\s*""',
+        stripped,
+        re.IGNORECASE,
+    ):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E007"],
+                context=(
+                    "Unquoted empty-variable comparison breaks when the variable is unset"
+                ),
+            )
+        )
+    return issues
+
+
 def _check_syntax_errors(
     line: str, line_num: int, labels: Dict[str, int]
 ) -> List[LintIssue]:
@@ -721,5 +744,6 @@ def _check_syntax_errors(
     issues.extend(_check_unc_path(stripped, line_num))
     issues.extend(_check_quote_escaping(stripped, line_num))
     issues.extend(_check_set_a_expression(stripped, line_num))
+    issues.extend(_check_empty_variable_syntax(stripped, line_num))
 
     return issues

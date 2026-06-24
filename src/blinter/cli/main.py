@@ -36,6 +36,8 @@ from blinter.output.formatters import (
     print_summary,
 )
 
+_CLI_HANDLER_ATTR = "blinter_cli_handler"
+
 
 def _stream_is_closed(stream: object) -> bool:
     """Return True when a stream object reports itself as closed."""
@@ -50,10 +52,11 @@ def _configure_cli_logging(log_level: int = logging.WARNING) -> None:
     for handler in list(blinter_logger.handlers):
         if not isinstance(handler, logging.StreamHandler):
             continue
+        if not hasattr(handler, _CLI_HANDLER_ATTR):
+            continue
         stream = handler.stream
         if stream is None or _stream_is_closed(stream):
             blinter_logger.removeHandler(handler)
-            handler.close()
             continue
         handler.setStream(sys.stderr)
         handler.setLevel(log_level)
@@ -63,14 +66,20 @@ def _configure_cli_logging(log_level: int = logging.WARNING) -> None:
     handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(log_level)
     handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    setattr(handler, _CLI_HANDLER_ATTR, True)
     blinter_logger.addHandler(handler)
     blinter_logger.setLevel(log_level)
 
 
 def _cli_error(message: str) -> NoReturn:
-    """Print an error message and exit with status code 1."""
-    print(message)
+    """Print an error message to stderr and exit with status code 1."""
+    print(message, file=sys.stderr)
     raise SystemExit(1)
+
+
+def _is_fatal_severity(severity: RuleSeverity) -> bool:
+    """Return True when an issue severity should cause a non-zero CLI exit."""
+    return severity in (RuleSeverity.ERROR, RuleSeverity.SECURITY)
 
 
 def _process_single_called_script(
@@ -79,23 +88,23 @@ def _process_single_called_script(
     processed_files: Set[Path],
     all_issues: List[LintIssue],
     file_results: Dict[str, List[LintIssue]],
-) -> Tuple[int, int, Optional[str]]:
+    processed_file_paths: List[Tuple[str, Optional[str]]],
+    parent_path: str,
+) -> Tuple[int, int]:
     """
     Process a single called script.
 
     Returns:
-        Tuple of (files_processed, files_with_errors, processed_path)
-        processed_path is None if the file was not processed
+        Tuple of (files_processed, files_with_errors)
     """
-    # Skip if already processed
     if called_script.resolve() in processed_files:
-        return (0, 0, None)
+        return (0, 0)
 
     if config.scan_root is not None and not is_path_under_root(
         called_script, Path(config.scan_root)
     ):
         logger.debug("Skipping called script outside scan root: %s", called_script)
-        return (0, 0, None)
+        return (0, 0)
 
     try:
         called_issues = lint_batch_file(str(called_script), config=config)
@@ -103,13 +112,17 @@ def _process_single_called_script(
         all_issues.extend(called_issues)
         processed_files.add(called_script.resolve())
 
-        has_errors = any(
-            issue.rule.severity == RuleSeverity.ERROR for issue in called_issues
+        existing_paths = {path for path, _parent in processed_file_paths}
+        called_path_str = str(called_script)
+        if called_path_str not in existing_paths:
+            processed_file_paths.append((called_path_str, parent_path))
+
+        has_fatal = any(
+            _is_fatal_severity(issue.rule.severity) for issue in called_issues
         )
-        return (1, 1 if has_errors else 0, str(called_script))
+        return (1, 1 if has_fatal else 0)
 
     except (
-        UnicodeDecodeError,
         FileNotFoundError,
         PermissionError,
         OSError,
@@ -121,7 +134,7 @@ def _process_single_called_script(
             f"'{called_script}': {called_error}"
         )
         logger.warning(error_msg)
-        return (0, 0, None)
+        return (0, 0)
 
 
 def _process_called_scripts(
@@ -155,13 +168,33 @@ def _process_called_scripts(
             state.processed_files,
             state.all_issues,
             state.file_results,
+            state.processed_file_paths,
+            str(batch_file),
         )
         files_processed += result[0]
         files_with_errors += result[1]
-        if result[2]:  # called_path
-            state.processed_file_paths.append((result[2], str(batch_file)))
 
     return files_processed, files_with_errors
+
+
+def _record_skipped_file(
+    skipped_files: List[Tuple[str, str]],
+    batch_file: Path,
+    reason: str,
+) -> None:
+    """Record a file that could not be processed."""
+    skipped_files.append((str(batch_file), reason))
+    logger.warning("Could not process '%s': %s", batch_file, reason)
+
+
+def _print_skipped_files_summary(skipped_files: List[Tuple[str, str]]) -> None:
+    """Print a user-visible summary of files that could not be processed."""
+    if not skipped_files:
+        return
+
+    print("\nSkipped files (could not be processed):")
+    for file_path, reason in skipped_files:
+        print(f"  - {file_path}: {reason}")
 
 
 def _process_batch_files(
@@ -173,8 +206,8 @@ def _process_batch_files(
     )
     total_files_processed = 0
     files_with_errors = 0
+    skipped_files: List[Tuple[str, str]] = []
 
-    # Build dependency graph if follow_calls is enabled
     dependency_graph: Optional[Dict[Path, Set[Path]]] = None
     if config.follow_calls:
         dependency_graph = _build_call_dependency_graph(
@@ -184,7 +217,6 @@ def _process_batch_files(
         )
 
     for batch_file in batch_files:
-        # Skip if already processed (could happen with follow_calls)
         if batch_file.resolve() in state.processed_files:
             continue
 
@@ -199,26 +231,16 @@ def _process_batch_files(
             state.all_issues.extend(issues)
             total_files_processed += 1
             state.processed_files.add(batch_file.resolve())
-            state.processed_file_paths.append(
-                (str(batch_file), None)
-            )  # Main file, no parent
+            state.processed_file_paths.append((str(batch_file), None))
 
-            if any(issue.rule.severity == RuleSeverity.ERROR for issue in issues):
+            if any(_is_fatal_severity(issue.rule.severity) for issue in issues):
                 files_with_errors += 1
 
-            # If follow_calls is enabled, process called scripts
             if config.follow_calls:
                 called_results = _process_called_scripts(batch_file, config, state)
                 total_files_processed += called_results[0]
                 files_with_errors += called_results[1]
 
-        except UnicodeDecodeError as decode_error:
-            logger.warning(
-                "Could not read '%s' due to encoding issues: %s",
-                batch_file,
-                decode_error,
-            )
-            continue
         except (
             FileNotFoundError,
             PermissionError,
@@ -226,12 +248,16 @@ def _process_batch_files(
             ValueError,
             TypeError,
         ) as file_error:
-            logger.warning("Could not process '%s': %s", batch_file, file_error)
+            _record_skipped_file(skipped_files, batch_file, str(file_error))
             continue
 
     if total_files_processed == 0:
-        print("Error: No batch files could be processed.")
+        _print_skipped_files_summary(skipped_files)
+        print("Error: No batch files could be processed.", file=sys.stderr)
         return None
+
+    if skipped_files:
+        _print_skipped_files_summary(skipped_files)
 
     return ProcessingResults(
         state.all_issues,
@@ -239,6 +265,7 @@ def _process_batch_files(
         total_files_processed,
         files_with_errors,
         state.processed_file_paths,
+        skipped_files,
     )
 
 
@@ -260,18 +287,15 @@ def _display_analyzed_scripts(
 
     print("Scripts Analyzed:")
     for idx, (file_path, parent) in enumerate(processed_file_paths, 1):
-        # Format the file path
         display_path: str
         if is_directory:
             try:
                 display_path = str(Path(file_path).relative_to(Path(target_path)))
             except ValueError:
-                # If relative_to fails (file outside target), use absolute path
                 display_path = str(Path(file_path))
         else:
             display_path = Path(file_path).name
 
-        # Display with parent information if it's a called script
         if parent:
             parent_name = Path(parent).name
             print(f"  {idx}.   ↳ {display_path} (called by {parent_name})")
@@ -296,12 +320,10 @@ def _display_results(
         print(f"Processed {results.total_files_processed} batch file{file_count_text}")
         print()
 
-        # Show list of analyzed scripts
         _display_analyzed_scripts(
             results.processed_file_paths, target_path, is_directory
         )
 
-        # Show results for each file if there are multiple files
         if len(results.file_results) > 1:
             for file_path, issues in results.file_results.items():
                 try:
@@ -317,21 +339,17 @@ def _display_results(
                     print("No issues found! OK")
                 print()
         else:
-            # Single file in directory
             print_detailed(results.all_issues)
     else:
-        # Single file processing
         print(f"\n Batch File Analysis: {target_path}")
         print("=" * (25 + len(target_path)))
 
-        # Show list of analyzed scripts
         _display_analyzed_scripts(
             results.processed_file_paths, target_path, is_directory
         )
 
         print_detailed(results.all_issues)
 
-    # Show combined summary if processing multiple files
     if is_directory and len(results.file_results) > 1:
         print("\n COMBINED RESULTS:")
         print("===================")
@@ -342,20 +360,24 @@ def _display_results(
     print_severity_info(results.all_issues)
 
 
+def _count_fatal_issues(issues: List[LintIssue]) -> int:
+    """Count issues that should cause a non-zero exit code."""
+    return sum(1 for issue in issues if _is_fatal_severity(issue.rule.severity))
+
+
 def _exit_with_results(results: ProcessingResults, target_path: str) -> None:
     """Exit with appropriate code based on results."""
     is_directory = Path(target_path).is_dir()
-    error_count = sum(
-        1 for issue in results.all_issues if issue.rule.severity == RuleSeverity.ERROR
-    )
+    fatal_count = _count_fatal_issues(results.all_issues)
 
     if is_directory:
-        if error_count > 0:
-            error_text = "s" if error_count != 1 else ""
+        if fatal_count > 0:
+            error_text = "s" if fatal_count != 1 else ""
             file_text = "s" if results.files_with_errors != 1 else ""
             print(
-                f"\nWARNING  Found {error_count} critical error{error_text} "
-                f"across {results.files_with_errors} file{file_text} that must be fixed."
+                f"\nWARNING  Found {fatal_count} critical issue{error_text} "
+                f"(errors or security) across {results.files_with_errors} "
+                f"file{file_text} that must be fixed."
             )
             sys.exit(1)
         elif results.all_issues:
@@ -376,10 +398,11 @@ def _exit_with_results(results: ProcessingResults, target_path: str) -> None:
             )
             sys.exit(0)
     else:
-        if error_count > 0:
+        if fatal_count > 0:
             print(
-                f"\nWARNING  Found {error_count} critical "
-                f"error{'s' if error_count != 1 else ''} that must be fixed."
+                f"\nWARNING  Found {fatal_count} critical "
+                f"issue{'s' if fatal_count != 1 else ''} "
+                f"(errors or security) that must be fixed."
             )
             sys.exit(1)
         elif results.all_issues:
@@ -414,32 +437,37 @@ def _apply_cli_config_overrides(
         config.scan_root = str(target_path_obj.parent.resolve())
 
 
+def _configure_stdio_utf8() -> None:
+    """Reconfigure stdout/stderr for UTF-8 on Windows consoles."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+        except (AttributeError, OSError):
+            pass
+
+
 def main() -> None:
     """Main entry point for the blinter application."""
-    # Configure stdout for UTF-8 encoding to handle Unicode characters on Windows
-    # This prevents UnicodeEncodeError when outputting to cp1252 console
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
-    except (AttributeError, OSError):
-        # Fallback for older Python versions or when reconfigure is not available
-        pass
+    _configure_stdio_utf8()
 
     cli_args = _parse_cli_arguments()
     if cli_args is None:
         return
 
     _configure_cli_logging(
-        cli_args.cli_log_level if cli_args.cli_log_level is not None else logging.WARNING
+        cli_args.cli_log_level
+        if cli_args.cli_log_level is not None
+        else logging.WARNING
     )
 
-    # Display version information
     print(f"Blinter v{__version__} - Batch File Linter\n")
 
-    # Load configuration
-    config = load_config(use_config=cli_args.use_config)
+    config = load_config(
+        config_path=cli_args.config_path,
+        use_config=cli_args.use_config,
+    )
     _apply_cli_config_overrides(cli_args, config)
 
-    # Find all batch files to process
     target_path_obj = Path(cli_args.target_path)
     discovery_root = (
         target_path_obj.resolve()
@@ -462,13 +490,9 @@ def main() -> None:
     if not batch_files:
         _cli_error(f"No batch files (.bat or .cmd) found in: {cli_args.target_path}")
 
-    # Process batch files
     results = _process_batch_files(batch_files, config)
     if results is None:
         sys.exit(1)
 
-    # Display results
     _display_results(results, cli_args.target_path, config)
-
-    # Exit with appropriate code
     _exit_with_results(results, cli_args.target_path)

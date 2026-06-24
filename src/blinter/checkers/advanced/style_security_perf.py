@@ -118,7 +118,79 @@ def _check_advanced_performance(
             )
         )
 
+    in_for_block = _line_is_inside_for_block(lines, line_number)
+    if in_for_block:
+        if re.search(r"set\s+\w+=.*%", stripped) and "set /a" not in stripped:
+            issues.append(
+                LintIssue(
+                    line_number,
+                    RULES["P016"],
+                    context="String concatenation inside FOR loop is inefficient",
+                )
+            )
+        if re.search(r"![^!]+!", line) and stripped.count("!") >= 4:
+            issues.append(
+                LintIssue(
+                    line_number,
+                    RULES["P019"],
+                    context="Excessive delayed expansion inside FOR loop",
+                )
+            )
+        if re.search(r">\s*nul", stripped) or re.search(r"2>\s*nul", stripped):
+            issues.append(
+                LintIssue(
+                    line_number,
+                    RULES["P022"],
+                    context="Output redirection inside loop adds I/O overhead",
+                )
+            )
+        if stripped.startswith("set /a"):
+            issues.append(
+                LintIssue(
+                    line_number,
+                    RULES["P023"],
+                    context="Complex SET /A inside loop; use intermediate variables",
+                )
+            )
+
+    if stripped.startswith("for /r") and "*.*" in stripped:
+        issues.append(
+            LintIssue(
+                line_number,
+                RULES["P018"],
+                context="FOR /R with *.* traverses unnecessary files",
+            )
+        )
+
+    if "*.*" in stripped and any(
+        stripped.startswith(prefix) for prefix in ("del ", "copy ", "for ")
+    ):
+        issues.append(
+            LintIssue(
+                line_number,
+                RULES["P025"],
+                context="Use specific extensions instead of *.* wildcard",
+            )
+        )
+
     return issues
+
+
+def _line_is_inside_for_block(lines: List[str], line_number: int) -> bool:
+    """Return True when line_number appears inside a FOR loop block."""
+    depth = 0
+    in_for = False
+    for index, loop_line in enumerate(lines, start=1):
+        lowered = loop_line.strip().lower()
+        if lowered.startswith("for "):
+            in_for = True
+        if in_for:
+            depth += lowered.count("(") - lowered.count(")")
+            if index == line_number:
+                return depth >= 0
+            if depth <= 0 and index > line_number:
+                return False
+    return False
 
 
 def _check_advanced_style_patterns(
@@ -177,6 +249,32 @@ def _check_advanced_style_patterns(
                         context="Continuation character should be at line end",
                     )
                 )
+
+    # S027: Missing blank lines around code blocks
+    if re.match(r"^\s*:[a-zA-Z_]", stripped):
+        prev_idx = line_number - 2
+        if 0 <= prev_idx < len(lines):
+            prev_line = lines[prev_idx].strip()
+            if prev_line and not _is_comment_line(lines[prev_idx]):
+                issues.append(
+                    LintIssue(
+                        line_number,
+                        RULES["S027"],
+                        context="Add a blank line before subroutine or block label",
+                    )
+                )
+
+    # S028: Redundant parentheses in simple commands
+    if re.match(r"^\s*if\s+.+\)\s*$", stripped) and "(" in stripped:
+        inner = re.sub(r"^\s*if\s+", "", stripped, flags=re.IGNORECASE)
+        if inner.count("(") == 1 and "&&" not in inner and "||" not in inner:
+            issues.append(
+                LintIssue(
+                    line_number,
+                    RULES["S028"],
+                    context="Simple IF command does not need parentheses",
+                )
+            )
 
     return issues
 
@@ -610,5 +708,19 @@ def _check_enhanced_performance(lines: List[str]) -> List[LintIssue]:
         p014_issue = _check_unnecessary_output_p014(lines, i, stripped)
         if p014_issue:
             issues.append(p014_issue)
+
+        # P012: Inefficient string operations (multiple substring ops on one line)
+        subst_ops = cast(
+            List[str],
+            re.findall(r"%[^%]+%:[^=]+%", stripped, re.IGNORECASE),
+        )
+        if len(subst_ops) >= 2:
+            issues.append(
+                LintIssue(
+                    line_number=i,
+                    rule=RULES["P012"],
+                    context="Multiple string substitution operations on one line",
+                )
+            )
 
     return issues

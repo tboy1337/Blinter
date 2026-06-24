@@ -28,7 +28,8 @@ Blinter - Help Menu
 Version: {__version__}
 
 Usage:
-  python blinter.py <path> [options]
+  blinter <path> [options]
+  python -m blinter <path> [options]
 
 Arguments:
   <path>              Path to a batch file (.bat or .cmd) OR directory containing batch files.
@@ -37,6 +38,7 @@ Arguments:
 Options:
   --summary           Show a summary section with total errors and most common error.
   --severity          Accepted for compatibility; severity breakdown is always shown.
+  --config <path>     Path to blinter.ini configuration file (default: blinter.ini).
   --max-line-length <n>  Set maximum line length for S011 rule (default: 100).
   --no-recursive      When processing directories, don't search subdirectories (default: recursive).
   --follow-calls      Scan scripts called by CALL statements from each seed file.
@@ -46,6 +48,7 @@ Options:
   --quiet             Show only error-level logging on stderr.
   --no-config         Don't use configuration file (blinter.ini) even if it exists.
   --create-config     Create a default blinter.ini configuration file and exit.
+  --force             With --create-config, overwrite an existing blinter.ini file.
   --help              Display this help menu and exit.
   --version           Display version information and exit.
 
@@ -62,25 +65,25 @@ Rule Categories:
   P001-P999   Performance    - Performance and efficiency improvements
 
 Examples:
-  python blinter.py myscript.bat
+  blinter myscript.bat
       Analyze a single batch file with detailed error list and recommendations.
 
-  python blinter.py /path/to/batch/files
+  blinter /path/to/batch/files
       Analyze all .bat and .cmd files in directory and subdirectories.
 
-  python blinter.py /path/to/batch/files --no-recursive
+  blinter /path/to/batch/files --no-recursive
       Analyze only .bat and .cmd files in the directory (no subdirectories).
 
-  python blinter.py myscript.cmd --summary
+  blinter myscript.cmd --summary
       Shows summary and detailed errors for a single file.
 
-  python blinter.py myscript.bat --follow-calls
+  blinter myscript.bat --follow-calls
       Analyze script and any scripts it calls (e.g., configuration scripts).
 
-  python blinter.py myscript.bat --max-line-length 120
+  blinter myscript.bat --max-line-length 120
       Analyze with custom maximum line length of 120 characters.
 
-  python blinter.py /project/scripts --summary --severity
+  blinter /project/scripts --summary --severity
       Shows summary, detailed errors and severity info for all batch files in directory.
 
 If no <path> is specified or '--help' is passed, this help menu will be displayed.
@@ -134,9 +137,14 @@ def print_summary(issues: List[LintIssue]) -> None:
     print("\nSUMMARY:")
     print(f"Total issues: {total_issues}")
     if most_common_rule[0]:
-        most_common_rule_obj = RULES[most_common_rule[0]]
+        most_common_rule_obj = RULES.get(most_common_rule[0])
+        rule_name = (
+            most_common_rule_obj.name
+            if most_common_rule_obj is not None
+            else most_common_rule[0]
+        )
         print(
-            f"Most common issue: '{most_common_rule_obj.name}' "
+            f"Most common issue: '{rule_name}' "
             f"({most_common_rule[0]}) - {most_common_rule[1]} occurrences"
         )
     else:

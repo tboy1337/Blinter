@@ -402,15 +402,18 @@ blinter ./scripts --summary     # With summary statistics
   run: |
     python -c "
     from blinter import lint_batch_file
+    from blinter import RuleSeverity
     import sys
     issues = lint_batch_file('deploy.bat')
-    errors = [i for i in issues if i.rule.severity.value == 'Error']
-    if errors:
-        print(f'Found {len(errors)} critical errors!')
+    fatal = [i for i in issues if i.rule.severity in (RuleSeverity.ERROR, RuleSeverity.SECURITY)]
+    if fatal:
+        print(f'Found {len(fatal)} critical issues (errors or security)!')
         sys.exit(1)
     print(f'Batch file passed with {len(issues)} total issues')
     "
 ```
+
+The `blinter` CLI also exits with code `1` when any **Error** or **Security** findings are present (warnings and style issues alone do not fail the run).
 
 ## Development
 
@@ -423,6 +426,9 @@ py -m pytest
 py -m mypy
 py -m mypy tests
 py -m pylint src/blinter --output-format=text > pylint-report.txt
+py -m bandit -r src/blinter
+py -m black --check src tests
+py -m isort --check-only src tests
 ```
 
 The test suite enforces 90% branch coverage (`pytest.ini`, `.coveragerc`). CI builds and publishes packages but does not run tests; treat a green local `pytest` run as the release gate.

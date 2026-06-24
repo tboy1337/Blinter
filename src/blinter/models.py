@@ -143,6 +143,8 @@ class CliArguments:
     cli_follow_calls: Optional[bool]
     cli_max_line_length: Optional[int]
     cli_log_level: Optional[int]
+    config_path: Optional[str] = None
+    create_config_force: bool = False
 
 
 @dataclass
@@ -156,6 +158,9 @@ class ProcessingResults:
     processed_file_paths: List[
         Tuple[str, Optional[str]]
     ]  # (file_path, called_by_parent)
+    skipped_files: List[Tuple[str, str]] = field(
+        default_factory=list
+    )  # (file_path, reason)
 
 
 @dataclass

@@ -923,6 +923,44 @@ echo Done
         for rule in RULES.values():
             assert rule.severity in valid_severities
 
+    def test_all_rules_are_emittable(self) -> None:
+        """Every registered rule must be referenced by checker code."""
+        from pathlib import Path
+
+        from blinter.rules.registry import DEPRECATED_RULE_ALIASES
+
+        src_root = Path(__file__).resolve().parent.parent / "src" / "blinter"
+        referenced: set[str] = set()
+
+        for pattern, rule_code in DANGEROUS_COMMAND_PATTERNS:
+            referenced.add(rule_code)
+
+        patterns_file = src_root / "patterns.py"
+        patterns_text = patterns_file.read_text(encoding="utf-8")
+        referenced.update(re.findall(r'"((?:E|W|S|P)\d{3}|SEC\d{3})"', patterns_text))
+
+        rule_patterns = [
+            re.compile(r'RULES\["([A-Z0-9]+)"\]'),
+            re.compile(r"RULES\['([A-Z0-9]+)'\]"),
+            re.compile(r'rule_code=["\']([A-Z0-9]+)["\']'),
+        ]
+
+        for py_file in src_root.rglob("*.py"):
+            if py_file.name == "registry.py":
+                continue
+            text = py_file.read_text(encoding="utf-8")
+            for compiled_pattern in rule_patterns:
+                referenced.update(compiled_pattern.findall(text))
+
+        deprecated = set(DEPRECATED_RULE_ALIASES.keys())
+        orphan_rules = sorted(
+            code for code in RULES if code not in referenced and code not in deprecated
+        )
+        assert not orphan_rules, (
+            "Rules in registry but never emitted by checkers: "
+            f"{', '.join(orphan_rules)}"
+        )
+
     def test_complex_edge_cases(self) -> None:
         """Test various complex edge cases in batch file linting."""
         # Test file with only whitespace

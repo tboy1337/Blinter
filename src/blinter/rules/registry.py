@@ -838,7 +838,7 @@ RULES: Dict[str, Rule] = {
         ),
         recommendation="Redirect unwanted output: command >nul 2>&1",
     ),
-    # Enhanced Parameter Validation Rules (E024-E026)
+    # Enhanced Parameter Validation Rules (E024-E025, E027)
     "E024": Rule(
         code="E024",
         name="Invalid parameter modifier combination",
@@ -1191,6 +1191,7 @@ RULES: Dict[str, Rule] = {
         severity=RuleSeverity.STYLE,
         explanation="Subroutines should have REM comments describing parameters and return values",
         recommendation="Document subroutines: REM Usage: CALL :SubName param1 param2",
+        # Deprecated catalog entry; S018 is emitted by checkers.
     ),
     "S026": Rule(
         code="S026",
@@ -1298,4 +1299,10 @@ RULES: Dict[str, Rule] = {
             "2) Protecting literal ! in strings, or 3) Defensive programming at script start"
         ),
     ),
+}
+
+# Catalog rules superseded by active checkers (integrity test uses this map).
+DEPRECATED_RULE_ALIASES: Dict[str, str] = {
+    "S025": "S018",
+    "W015": "W024",
 }

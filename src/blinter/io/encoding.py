@@ -226,7 +226,7 @@ def _detect_charset_norm_bytes(raw_data: bytes, encodings_list: List[str]) -> Li
         logger.debug(
             "charset_normalizer not available, using fallback encoding detection"
         )
-    except (ValueError, TypeError) as detection_error:
+    except (OSError, ValueError, TypeError) as detection_error:
         logger.debug("Encoding detection failed: %s, using fallback", detection_error)
 
     return encodings_list
@@ -372,12 +372,14 @@ def read_file_with_encoding(file_path: str) -> Tuple[List[str], str]:
         "utf-32",  # UTF-32 with BOM detection
     ]
 
-    # Try to detect encoding using charset_normalizer if available
-    encodings_to_try = _detect_encoding_charset_norm(str(file_obj), encodings_to_try)
+    # Read once, then detect encoding and decode from cached bytes
+    with open(file_obj, "rb") as file_handle:
+        raw_data = file_handle.read()
+    encodings_to_try = _detect_charset_norm_bytes(raw_data, encodings_to_try)
 
     # Try each encoding until one works
     for encoding in encodings_to_try:
-        lines = _try_read_with_encoding(str(file_obj), encoding)
+        lines = _try_decode_bytes(raw_data, encoding)
         if lines is not None:
             return lines, encoding
 

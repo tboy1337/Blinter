@@ -111,7 +111,7 @@ class TestPrintFunctions:
 
         assert "Blinter - Help Menu" in output
         assert "Usage:" in output
-        assert "python blinter.py <path>" in output
+        assert "blinter <path>" in output
         assert "--summary" in output
         assert "--severity" in output
         assert "--help" in output

@@ -27,6 +27,7 @@ from blinter.checkers.globals import (
     _check_missing_exit_statement,
     _check_missing_header_doc,
     _check_missing_pause,
+    _check_nested_paren_mismatch,
     _check_redundant_operations,
     _check_unreachable_code,
 )
@@ -118,6 +119,7 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
     # Global checks (across all lines)
     issues.extend(_check_undefined_variables(lines, set_vars, called_scripts_vars))
     issues.extend(_check_missing_exit_statement(lines))
+    issues.extend(_check_nested_paren_mismatch(lines))
     issues.extend(_check_unreachable_code(lines))
     issues.extend(_check_redundant_operations(lines))
     issues.extend(_check_code_duplication(lines))
