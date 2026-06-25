@@ -2,6 +2,7 @@
 
 import configparser
 import os
+from pathlib import Path
 import tempfile
 from typing import Set
 from unittest.mock import patch
@@ -421,15 +422,19 @@ class TestCreateDefaultConfigFile:
             assert "max_line_length" in parser["general"]
             assert "max_scan_files" in parser["general"]
 
-    def test_create_default_config_file_permission_error(self) -> None:
+    def test_create_default_config_file_permission_error(self, tmp_path: Path) -> None:
         """Test creating config file with permission error."""
-        with patch("builtins.open", side_effect=PermissionError("Permission denied")):
+        config_path = tmp_path / "readonly.ini"
+        with patch(
+            "blinter.config.loader.Path.write_text",
+            side_effect=PermissionError("Permission denied"),
+        ):
             with patch("blinter.config.loader.logger.error") as mock_logger_error:
-                assert create_default_config_file("readonly.ini") is False
+                assert create_default_config_file(str(config_path)) is False
 
                 mock_logger_error.assert_called_once()
                 logged_args = mock_logger_error.call_args[0]
-                assert logged_args[1] == "readonly.ini"
+                assert logged_args[1] == str(config_path)
                 assert "Permission denied" in str(logged_args[2])
 
 

@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Dict, Optional, Protocol, Set, TextIO
 from unittest.mock import patch
 
 import pytest
-from tests.conftest import get_project_version
 
 from blinter import (
     find_batch_files,
@@ -29,6 +28,7 @@ from blinter.cli.main import (
 )
 from blinter.engine.linter import lint_batch_file as engine_lint_batch_file
 from blinter.models import BlinterConfig, CliArguments, LintIssue, ProcessingState
+from tests.conftest import get_project_version
 
 # pylint: disable=too-many-lines,redefined-outer-name,reimported
 
@@ -702,7 +702,7 @@ class TestCommandLineIntegration:
                     main()
 
         captured = capsys.readouterr()
-        assert exit_info.value.code == 1
+        assert exit_info.value.code == 0
         assert "internal lint error" in captured.err
         assert "Processed 1 batch file" in captured.out
 
@@ -2063,8 +2063,8 @@ class TestCliFatalExitCodes:  # pylint: disable=too-few-public-methods
 class TestCliSkippedFilesExitCodes:  # pylint: disable=too-few-public-methods
     """Test CLI exit codes when some files cannot be processed."""
 
-    def test_cli_exits_1_when_some_files_skipped(self) -> None:
-        """Skipped files must cause non-zero exit even without lint findings."""
+    def test_cli_exits_0_when_some_files_skipped_but_others_ok(self) -> None:
+        """Partial skips warn but exit 0 when remaining files lint cleanly."""
         with tempfile.TemporaryDirectory() as tmpdir:
             good_bat = os.path.join(tmpdir, "good.bat")
             bad_bat = os.path.join(tmpdir, "bad.bat")
@@ -2086,7 +2086,7 @@ class TestCliSkippedFilesExitCodes:  # pylint: disable=too-few-public-methods
                 with patch.object(sys, "argv", ["blinter", tmpdir]):
                     with pytest.raises(SystemExit) as exc_info:
                         main()
-                    assert exc_info.value.code == 1
+                    assert exc_info.value.code == 0
 
     def test_cli_exits_0_when_all_files_processed(self) -> None:
         """All files processed successfully with no fatal findings exits 0."""
@@ -2174,12 +2174,38 @@ class TestCliStdioAndModuleEntry:
                 "blinter.cli.main.lint_batch_file", side_effect=lint_side_effect
             ):
                 with patch.object(sys, "argv", ["blinter", tmpdir]):
-                    with pytest.raises(SystemExit):
+                    with pytest.raises(SystemExit) as exit_info:
                         main()
 
+            assert exit_info.value.code == 0
             captured = capsys.readouterr()
             assert "Skipped files" in captured.out
             assert "bad.bat" in captured.out
+
+    def test_skipped_files_exit_one_when_all_fail(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """CLI exits 1 when every file is skipped."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bad_bat = os.path.join(tmpdir, "bad.bat")
+            with open(bad_bat, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+
+            def lint_side_effect(
+                file_path: str, *args: object, **kwargs: object
+            ) -> list[object]:
+                raise PermissionError("Access denied")
+
+            with patch(
+                "blinter.cli.main.lint_batch_file", side_effect=lint_side_effect
+            ):
+                with patch.object(sys, "argv", ["blinter", tmpdir]):
+                    with pytest.raises(SystemExit) as exit_info:
+                        main()
+
+            assert exit_info.value.code == 1
+            captured = capsys.readouterr()
+            assert "Skipped files" in captured.out
 
     def test_python_m_blinter_module_entry(self) -> None:
         """python -m blinter runs the CLI entry point."""

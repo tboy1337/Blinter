@@ -14,7 +14,9 @@ mypy
 autopep8
 bandit
 
+# Security Analysis
+pip-audit
+
 # Code Formatting
 black
 isort
-pip-audit

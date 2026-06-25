@@ -107,6 +107,45 @@ class TestFollowCallsVariableContext:
                 e006_issues[0].line_number == 2
             ), "E006 should be on line 2 (before CALL)"
 
+    def test_cli_variable_used_before_call_triggers_error(self) -> None:
+        """CLI --follow-calls keeps position-aware undefined-variable checking."""
+        import sys
+
+        from blinter.cli.main import main
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            helper_script = os.path.join(tmpdir, "helper.bat")
+            with open(helper_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write("SET HELPER_VAR=helper_value\n")
+                file_handle.write("EXIT /b 0\n")
+
+            main_script = os.path.join(tmpdir, "main.bat")
+            with open(main_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write(
+                    "ECHO Using helper variable BEFORE call: %HELPER_VAR%\n"
+                )
+                file_handle.write("CALL helper.bat\n")
+                file_handle.write(
+                    "ECHO Using helper variable AFTER call: %HELPER_VAR%\n"
+                )
+                file_handle.write("EXIT /b 0\n")
+
+            with patch.object(sys, "argv", ["blinter", main_script, "--follow-calls"]):
+                with pytest.raises(SystemExit) as exit_info:
+                    main()
+
+            assert exit_info.value.code == 0
+
+            config = BlinterConfig(follow_calls=True)
+            issues = lint_batch_file(main_script, config=config)
+            e006_issues = [
+                i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context
+            ]
+            assert len(e006_issues) == 1
+            assert e006_issues[0].line_number == 2
+
     def test_multiple_call_statements_accumulate_variables(self) -> None:
         """Multiple CALL statements should accumulate variables."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -706,8 +745,12 @@ class TestCallDependencyGraph:  # pylint: disable=too-few-public-methods
         graph = _build_call_dependency_graph([temp_path])
         assert graph.get(temp_path.resolve(), set()) == set()
 
-    def test_build_call_dependency_graph_handles_cyclic_calls(self) -> None:
+    def test_build_call_dependency_graph_handles_cyclic_calls(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Cyclic CALL graphs include both directions of the cycle."""
+        import logging
+
         with tempfile.TemporaryDirectory() as tmpdir:
             script_a = Path(tmpdir) / "a.bat"
             script_b = Path(tmpdir) / "b.bat"
@@ -718,11 +761,18 @@ class TestCallDependencyGraph:  # pylint: disable=too-few-public-methods
                 f'@ECHO OFF\nCALL "{script_a.name}"\n', encoding="utf-8"
             )
 
-            graph = _build_call_dependency_graph([script_a, script_b], scan_root=tmpdir)
+            with caplog.at_level(logging.WARNING, logger="blinter"):
+                graph = _build_call_dependency_graph(
+                    [script_a, script_b], scan_root=tmpdir
+                )
             a_deps = graph[script_a.resolve()]
             b_deps = graph[script_b.resolve()]
             assert script_b.resolve() in a_deps
             assert script_a.resolve() in b_deps
+            assert any(
+                "Circular CALL dependency" in record.message
+                for record in caplog.records
+            )
 
     def test_extract_called_scripts_spaced_path(self) -> None:
         """CALL with extra spacing before script path is detected."""
@@ -860,8 +910,28 @@ class TestDependenciesInternals:
         assert 2 in called_vars
         assert "HELPER_VAR" in called_vars[2]
 
-    def test_collect_called_vars_uses_dependency_graph(self, tmp_path: Path) -> None:
-        """Dependency graph mode collects vars from all dependencies at line 0."""
+    def test_read_batch_lines_logs_warning_for_called_script(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Unreadable CALL targets log warnings when follow-calls reads them."""
+        import logging
+
+        helper = tmp_path / "helper.bat"
+        helper.write_text("@ECHO OFF\nSET HELPER_VAR=1\n", encoding="utf-8")
+        main_script = tmp_path / "main.bat"
+        main_script.write_text(f'CALL "{helper}"\n', encoding="utf-8")
+        helper.unlink()
+
+        with caplog.at_level(logging.WARNING, logger="blinter"):
+            called_vars = _collect_called_vars(main_script, scan_root=str(tmp_path))
+
+        assert called_vars == {}
+        assert any("Could not read" in record.message for record in caplog.records)
+
+    def test_collect_called_vars_is_position_aware_with_call_line(
+        self, tmp_path: Path
+    ) -> None:
+        """Variables from CALL targets are keyed by CALL line, not line 0."""
         helper = tmp_path / "helper.bat"
         helper.write_text("@ECHO OFF\nSET GRAPH_VAR=value\n", encoding="utf-8")
         main_script = tmp_path / "main.bat"
@@ -869,17 +939,11 @@ class TestDependenciesInternals:
             f'@ECHO OFF\nCALL "{helper}"\n',
             encoding="utf-8",
         )
-        graph = _build_call_dependency_graph(
-            [main_script, helper], scan_root=str(tmp_path)
-        )
 
-        called_vars = _collect_called_vars(
-            main_script,
-            dependency_graph=graph,
-            scan_root=str(tmp_path),
-        )
-        assert 0 in called_vars
-        assert "GRAPH_VAR" in called_vars[0]
+        called_vars = _collect_called_vars(main_script, scan_root=str(tmp_path))
+        assert 0 not in called_vars
+        assert 2 in called_vars
+        assert "GRAPH_VAR" in called_vars[2]
 
     def test_extract_called_scripts_skips_self_call(self, tmp_path: Path) -> None:
         """CALL to the same script is not listed as a dependency."""

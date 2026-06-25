@@ -186,7 +186,7 @@ def create_default_config_file(
 # Whether to recursively search directories for batch files (default: true)
 recursive = true
 
-# Whether to show summary statistics at the end (default: false)  
+# Whether to show summary statistics at the end (default: false)
 show_summary = false
 
 # Maximum line length before triggering S011 and S020 rules (default: 100)
@@ -225,8 +225,7 @@ follow_calls = false
 """
 
     try:
-        with open(config_path, "w", encoding="utf-8") as config_handle:
-            config_handle.write(config_content)
+        config_file.write_text(config_content, encoding="utf-8")
         logger.info("Default configuration file created: %s", config_path)
         return True
     except OSError as error:

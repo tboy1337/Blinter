@@ -212,6 +212,10 @@ def _check_path_security(line: str, stripped: str, line_num: int) -> List[LintIs
     if _is_command_in_safe_context(line):
         return issues
 
+    # CALL targets are script paths, not direct file operations on hardcoded paths
+    if re.match(r"^\s*call\s+", stripped, re.IGNORECASE):
+        return issues
+
     # SEC006: Hardcoded absolute path
     hardcoded_paths = [r"C:\\", r"D:\\", r"E:\\", r"/Users/", r"/home/"]
     for path_pattern in hardcoded_paths:

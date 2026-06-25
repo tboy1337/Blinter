@@ -13,6 +13,7 @@ from blinter.constants import MAGIC_NUMBER_EXCEPTIONS
 from blinter.models import LintIssue
 from blinter.parsing.context import _is_comment_line
 from blinter.parsing.structure import _is_in_subroutine_context
+from blinter.patterns import SAFE_COMMAND_INJECTION_PATTERNS
 from blinter.rules.registry import RULES
 
 _REDIRECT_MACRO_VARS: frozenset[str] = frozenset(
@@ -43,6 +44,45 @@ _REDIRECT_MACRO_VARS: frozenset[str] = frozenset(
 )
 
 
+_SEC011_PATH_OP_PATTERN = re.compile(r"\b(cd|copy|move|del)\b", re.IGNORECASE)
+_SEC012_TEMP_FILE_PATTERN = re.compile(
+    r"(%temp%|%tmp%|\\temp\\|\bc:\\temp\\).*\.(tmp|bat|cmd|exe)\b"
+    r"|\.(tmp|bat|cmd|exe)\b.*(%temp%|%tmp%|\\temp\\|\bc:\\temp\\)",
+    re.IGNORECASE,
+)
+_USER_ARG_PERCENT_PATTERN = re.compile(r"%([1-9]|\*)")
+_USER_ARG_DELAYED_PATTERN = re.compile(r"!([1-9]|\*)!")
+
+
+def _has_path_traversal_risk(stripped: str) -> bool:
+    """Return True when a line uses .. with a path-operation command."""
+    if ".." not in stripped or _is_comment_line(stripped):
+        return False
+    return _SEC011_PATH_OP_PATTERN.search(stripped) is not None
+
+
+def _has_unsafe_temp_creation(stripped: str) -> bool:
+    """Return True when temp file creation lacks a randomness component."""
+    lower = stripped.lower()
+    if "%random%" in lower:
+        return False
+    return _SEC012_TEMP_FILE_PATTERN.search(stripped) is not None
+
+
+def _has_unescaped_user_args(stripped: str) -> bool:
+    """Return True when batch args (%1-%9, %*, !1!-!9!, !*!) use shell operators."""
+    has_user_arg = (
+        _USER_ARG_PERCENT_PATTERN.search(stripped) is not None
+        or _USER_ARG_DELAYED_PATTERN.search(stripped) is not None
+    )
+    if not has_user_arg:
+        return False
+    special_chars = ["&", "|", ">", "<", "^"]
+    if not any(char in stripped for char in special_chars):
+        return False
+    return re.search(r"\^[&|><^]", stripped) is None
+
+
 def _check_advanced_security(
     line: str, line_number: int, lines: List[str], labels: Dict[str, int]
 ) -> List[LintIssue]:
@@ -53,20 +93,15 @@ def _check_advanced_security(
     # SEC014: Unescaped user input in command execution
     # Only check if we're NOT in a subroutine context
     # In subroutines, %1-%9 and %* refer to subroutine parameters, not user input
-    if re.search(r"%([1-9]|\*)", stripped):
-        # Skip this check if we're inside a subroutine
-        if not _is_in_subroutine_context(lines, line_number, labels):
-            # Check for user parameters used without proper escaping
-            special_chars = ["&", "|", ">", "<", "^"]
-            if any(char in stripped for char in special_chars):
-                if not re.search(r"\^[&|><^]", stripped):
-                    issues.append(
-                        LintIssue(
-                            line_number,
-                            RULES["SEC014"],
-                            context="User input parameters should be escaped",
-                        )
-                    )
+    if not _is_in_subroutine_context(lines, line_number, labels):
+        if _has_unescaped_user_args(stripped):
+            issues.append(
+                LintIssue(
+                    line_number,
+                    RULES["SEC014"],
+                    context="User input parameters should be escaped",
+                )
+            )
 
     # SEC017: Temporary file creation in predictable location
     if "temp" in stripped.lower() and (".tmp" in stripped or ".temp" in stripped):
@@ -590,66 +625,13 @@ def _get_safe_system_variables() -> List[str]:
     ]
 
 
-def _get_safe_command_patterns() -> List[str]:
-    """Return list of safe command patterns for SEC013 rule."""
-    return [
-        r'cd\s+/d\s+"%[a-zA-Z_][a-zA-Z0-9_]*%"',  # Standard drive change
-        r"echo\s+.*>\s*nul",  # Output redirection to nul
-        r'echo\s+.*>>\s*"[^"]*"',  # Safe file append
-        r'echo\s+.*>\s*"[^"]*"',  # Safe file write
-        r'%[a-zA-Z_][a-zA-Z0-9_]*%"\s*>[^&|]*$',  # Variable in quotes followed by redirection
-        # Safe file operations with variables (no command chaining)
-        r"^[^&|]*\b(del|copy|move|type|xcopy)\s+[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*>[^&|]*$",
-        r"^[^&|]*\b(rd|md|mkdir|rmdir)\s+[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*>[^&|]*$",
-        # Safe operations with multiple variables but no chaining
-        r"^[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*>[^&|]*$",
-        # Redirect macros used before conditional blocks (e.g. %nul% && ()
-        r"%[a-zA-Z_][a-zA-Z0-9_]*%\s*(?:&&|\|\|)\s*\(\s*$",
-        # Menu dispatch: if %_erl%==5 setlocal & call :subroutine
-        r"^if\s+%[^%]+%==\S+\s+setlocal\s*&\s*call\s+:\w+",
-        # Menu lines: if %_erl%==N start %url% & goto :label
-        r"^if\s+%[^%]+%==\S+\s+start\s+.*&\s*goto\s*:",
-        # Compound SET assignments inside IF blocks
-        r"^if\s+defined\s+\S+\s+\(set\s+",
-        # findstr with redirect macro and conditional assignment
-        r"findstr\b.*%nul\d*%.*&&\s*set\b",
-        # MAS menu: if %_erl%==N (set ... & goto:label)
-        r"^if\s+%[^%]+%==\S+\s+\(set\s+",
-        r"^if\s+%[^%]+%==\S+\s+\(start\s+.*&\s*(?:goto|exit)\b",
-        r"^if\s+!errorlevel!==\d+\s+\(start\s+.*&\s*exit\b",
-        # echo piped to find inside IF
-        r"^if\s+defined\s+\S+\s+echo\s+\".*\"\s*\|\s*find\b",
-        # PowerShell helper invocations
-        r"^%psc%\s+\"",
-        r"^for\s+.*\bdo\s+\(%psc%\s+\"",
-        # reg/find with redirect macro before conditional block
-        r"reg\s+query\b.*%nul\d+%\s*\|\s*find\b.*%nul\d+%\s*&&\s*\(",
-        r"^if\s+%[^%]+%\s+(?:EQU|NEQ|LSS|LEQ|GEQ|GTR)\s+\S+\s+\(set\s+",
-        r"^if\s+%[^%]+%\s+(?:LSS|LEQ|GEQ|GTR)\s+\d+\s+if\s+exist\s+",
-        r"^if\s+%[^%]+%\s+(?:LSS|LEQ)\s+\d+\s+\(set\s+.*&exit\b",
-        r"^if\s+/i\s+\"%[^%]+%\"==\"\S+\"\s+\(set\s+",
-        r"^if\s+defined\s+\S+\s+\(call\s+:",
-        r"^if\s+defined\s+\S+\s+\(if\s+exist\s+",
-        r"^%nul%\s+reg\s+query\b",
-        r"^find\b.*/i\b.*%nul\d+%\s*&&\s*set\b",
-        r"^if\s+%[^%]+%==\d+\s+timeout\b.*&\s*exit\b",
-        r"^if\s+![^!]+!==\d+\s+start\b.*&\s*goto\b",
-        r"^if\s+%[^%]+%\s+(?:EQU|NEQ)\s+\d+\s+set\s+\"\w+=for\s+/f",
-        r"^(?:if\s+%[^%]+%\s+(?:EQU|NEQ)\s+\d+\s+)?wmic\b.*%nul\d+%\s*\|\s*find\b",
-        r"^set\s+\"\w+=[^\"]*&(?:call|echo)\b",
-        r"^set\s+@\w+=.*&\s*set\s+@",
-    ]
-
-
-def _is_safe_command_injection(stripped: str) -> bool:
-    """Check if a command with variables is safe from injection attacks."""
+def _uses_only_system_variables(stripped: str) -> bool:
+    """Return True when expanded variables are system or redirect macros."""
     system_variables = _get_safe_system_variables()
-
-    # Check if only system variables are used
     variables_in_line: List[str] = cast(
         List[str], re.findall(r"%([a-zA-Z_][a-zA-Z0-9_()]*)%", stripped)
     )
-    uses_only_system_vars = all(
+    return all(
         var in system_variables
         or var.lower() in _REDIRECT_MACRO_VARS
         or var.startswith("~")
@@ -657,33 +639,43 @@ def _is_safe_command_injection(stripped: str) -> bool:
         for var in variables_in_line
     )
 
-    # If only system variables are used, be more lenient
-    if uses_only_system_vars:
-        return True
 
-    # Check against safe patterns
-    safe_patterns = _get_safe_command_patterns()
-    if any(re.search(pattern, stripped, re.IGNORECASE) for pattern in safe_patterns):
-        return True
-
-    # Additional safety check for file operations with only redirection
+def _has_unsafe_command_chaining(stripped: str) -> bool:
+    """Return True when & or | chain commands beyond I/O redirection."""
     potential_chaining: List[str] = cast(List[str], re.findall(r"[&|]", stripped))
-    has_command_chaining = False
     for match in potential_chaining:
         match_pos = stripped.find(match)
         context = stripped[max(0, match_pos - 3) : match_pos + 3]
         if "2>&1" not in context and ">&1" not in context:
-            has_command_chaining = True
-            break
+            return True
+    return False
 
+
+def _is_safe_file_redirection_only(stripped: str) -> bool:
+    """Return True for file operations that only redirect output."""
     is_file_operation = bool(
         re.search(
             r"\b(del|copy|move|type|xcopy|rd|md|mkdir|rmdir)\b", stripped, re.IGNORECASE
         )
     )
     has_only_redirection = bool(re.search(r">.*$", stripped))
+    return (
+        is_file_operation
+        and has_only_redirection
+        and not _has_unsafe_command_chaining(stripped)
+    )
 
-    return is_file_operation and has_only_redirection and not has_command_chaining
+
+def _is_safe_command_injection(stripped: str) -> bool:
+    """Check if a command with variables is safe from injection attacks."""
+    if _uses_only_system_variables(stripped):
+        return True
+    if any(
+        re.search(pattern, stripped, re.IGNORECASE)
+        for pattern in SAFE_COMMAND_INJECTION_PATTERNS
+    ):
+        return True
+    return _is_safe_file_redirection_only(stripped)
 
 
 def _check_enhanced_security_rules(lines: List[str]) -> List[LintIssue]:
@@ -694,9 +686,7 @@ def _check_enhanced_security_rules(lines: List[str]) -> List[LintIssue]:
         stripped = line.strip()
 
         # Check for path traversal (SEC011)
-        if ".." in stripped and any(
-            op in stripped for op in ["cd", "copy", "move", "del"]
-        ):
+        if _has_path_traversal_risk(stripped):
             issues.append(
                 LintIssue(
                     line_number=i,
@@ -706,16 +696,14 @@ def _check_enhanced_security_rules(lines: List[str]) -> List[LintIssue]:
             )
 
         # Check for unsafe temp file creation (SEC012)
-        temp_pattern = r"[^%]temp[^%].*\.(tmp|bat|cmd|exe)"
-        if re.search(temp_pattern, stripped, re.IGNORECASE):
-            if "%random%" not in stripped.lower():
-                issues.append(
-                    LintIssue(
-                        line_number=i,
-                        rule=RULES["SEC012"],
-                        context="Temp file creation without random component",
-                    )
+        if _has_unsafe_temp_creation(stripped):
+            issues.append(
+                LintIssue(
+                    line_number=i,
+                    rule=RULES["SEC012"],
+                    context="Temp file creation without random component",
                 )
+            )
 
         # Check for command injection via variables (SEC013)
         # Exclude echo statements as they are generally safe for output

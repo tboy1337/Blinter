@@ -424,16 +424,18 @@ def _count_fatal_issues(issues: List[LintIssue]) -> int:
 
 def _exit_with_results(results: ProcessingResults, target_path: str) -> None:
     """Exit with appropriate code based on results."""
+    fatal_count = _count_fatal_issues(results.all_issues)
+
     if results.skipped_files:
         skipped_text = "s" if len(results.skipped_files) != 1 else ""
         print(
             f"\nWARNING  {len(results.skipped_files)} batch file{skipped_text} "
             f"could not be processed."
         )
-        sys.exit(1)
+        if results.total_files_processed == 0 or fatal_count > 0:
+            sys.exit(1)
 
     is_directory = Path(target_path).is_dir()
-    fatal_count = _count_fatal_issues(results.all_issues)
 
     if is_directory:
         if fatal_count > 0:

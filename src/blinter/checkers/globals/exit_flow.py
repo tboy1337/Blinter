@@ -1,5 +1,6 @@
 """Exit statements and unreachable-code detection."""
 
+from dataclasses import dataclass
 import re
 from typing import (
     Dict,
@@ -12,9 +13,61 @@ from blinter.models import LintIssue
 from blinter.rules.registry import RULES
 
 
-def _check_missing_exit_statement(  # pylint: disable=too-many-branches
-    lines: List[str],
-) -> List[LintIssue]:
+@dataclass(frozen=True)
+class _ScriptLayout:
+    """First meaningful executable and label positions in a script."""
+
+    has_meaningful_code: bool
+    first_executable_line: int
+    first_label_line: int
+
+
+def _analyze_script_layout(lines: List[str]) -> _ScriptLayout:
+    """Scan lines for the first executable command and label."""
+    has_meaningful_code = False
+    first_executable_line = -1
+    first_label_line = -1
+
+    for index, line in enumerate(lines):
+        stripped = line.strip().lower()
+        if not stripped or stripped.startswith("rem") or stripped.startswith("::"):
+            continue
+        if stripped.startswith(":") and not stripped.startswith("::"):
+            if first_label_line == -1:
+                first_label_line = index
+            continue
+        if _is_truly_executable_command(stripped):
+            if first_executable_line == -1:
+                first_executable_line = index
+            if not re.match(r"^@?echo\s+(off|on)$", stripped):
+                has_meaningful_code = True
+
+    return _ScriptLayout(
+        has_meaningful_code=has_meaningful_code,
+        first_executable_line=first_executable_line,
+        first_label_line=first_label_line,
+    )
+
+
+def _find_last_executable_line(lines: List[str]) -> int:
+    """Return the 1-based line number of the last executable command."""
+    for index in range(len(lines) - 1, -1, -1):
+        stripped = lines[index].strip().lower()
+        if _is_truly_executable_command(stripped):
+            return index + 1
+    return -1
+
+
+def _is_subroutine_library(layout: _ScriptLayout) -> bool:
+    """Return True when labels precede all executable code."""
+    return (
+        layout.first_label_line != -1
+        and layout.first_executable_line != -1
+        and layout.first_label_line < layout.first_executable_line
+    )
+
+
+def _check_missing_exit_statement(lines: List[str]) -> List[LintIssue]:
     """Check if script can reach EOF without an explicit EXIT statement (W001).
 
     This function performs control flow analysis to determine if the main execution
@@ -28,61 +81,13 @@ def _check_missing_exit_statement(  # pylint: disable=too-many-branches
     - Understands GOTO, labels, and conditional branches
     """
     issues: List[LintIssue] = []
+    layout = _analyze_script_layout(lines)
 
-    # Empty script or comments-only script doesn't need exit
-    has_meaningful_code = False
-    first_executable_line = -1
-    first_label_line = -1
-
-    # Find first executable code and first label
-    for i, line in enumerate(lines):
-        stripped = line.strip().lower()
-
-        # Skip empty lines and comments
-        if not stripped or stripped.startswith("rem") or stripped.startswith("::"):
-            continue
-
-        # Check for labels (but not comment-style labels)
-        if stripped.startswith(":") and not stripped.startswith("::"):
-            if first_label_line == -1:
-                first_label_line = i
-            continue
-
-        # Check for executable code
-        if _is_truly_executable_command(stripped):
-            if first_executable_line == -1:
-                first_executable_line = i
-            # @echo off is a setup command, not meaningful executable code
-            # Only count as meaningful if it's not just @echo off/on
-            if not re.match(r"^@?echo\s+(off|on)$", stripped):
-                has_meaningful_code = True
-
-    # If no meaningful executable code, no issue
-    if not has_meaningful_code:
+    if not layout.has_meaningful_code or _is_subroutine_library(layout):
         return issues
 
-    # If first label comes before first executable code, this is a subroutine library
-    # These scripts are meant to be CALLed, not executed directly
-    if (
-        first_label_line != -1
-        and first_executable_line != -1
-        and first_label_line < first_executable_line
-    ):
-        return issues
-
-    # Now check if the main execution path reaches EOF without EXIT
-    # Scan backwards from end of file to find if we can reach EOF
-    can_reach_eof = _can_execution_reach_eof(lines)
-
-    if can_reach_eof:
-        # Find the last line of executable code to report the issue there
-        last_executable_line = -1
-        for i in range(len(lines) - 1, -1, -1):
-            stripped = lines[i].strip().lower()
-            if _is_truly_executable_command(stripped):
-                last_executable_line = i + 1  # Convert to 1-indexed
-                break
-
+    if _can_execution_reach_eof(lines):
+        last_executable_line = _find_last_executable_line(lines)
         if last_executable_line > 0:
             issues.append(
                 LintIssue(
@@ -164,7 +169,46 @@ def _is_goto_eof_target(target: str) -> bool:
     return target.lstrip(":") == "eof"
 
 
-def _can_execution_reach_eof(  # pylint: disable=too-many-branches,too-many-return-statements
+def _apply_exit_to_branch_state(
+    paren_depth: int,
+    in_else_branch: bool,
+    if_branch_exited: bool,
+    else_branch_exited: bool,
+) -> tuple[bool, bool, Optional[bool]]:
+    """Update branch exit flags; return (if_exited, else_exited, stop_result)."""
+    if paren_depth != 0:
+        if in_else_branch:
+            return if_branch_exited, True, None
+        return True, else_branch_exited, None
+    return if_branch_exited, else_branch_exited, False
+
+
+def _follow_goto_target(
+    stripped: str,
+    labels: Dict[str, int],
+    visiting_labels: Set[str],
+    lines: List[str],
+) -> Optional[bool]:
+    """Follow a GOTO target when resolvable; None when the line is not GOTO."""
+    if not re.match(r"goto\s+", stripped):
+        return None
+    target = _parse_goto_target(stripped)
+    if target is None or _is_goto_eof_target(target):
+        return False
+    if target in visiting_labels:
+        return False
+    label_index = labels.get(target)
+    if label_index is None:
+        return False
+    visiting_labels.add(target)
+    return _can_execution_reach_eof(
+        lines,
+        start_index=label_index,
+        visiting_labels=visiting_labels,
+    )
+
+
+def _can_execution_reach_eof(
     lines: List[str],
     start_index: int = 0,
     visiting_labels: Optional[Set[str]] = None,
@@ -212,12 +256,13 @@ def _can_execution_reach_eof(  # pylint: disable=too-many-branches,too-many-retu
             in_else_branch = True
 
         if re.match(r"exit\b", stripped):
-            if paren_depth == 0:
-                return False
-            if in_else_branch:
-                else_branch_exited = True
-            else:
-                if_branch_exited = True
+            if_branch_exited, else_branch_exited, stop_result = (
+                _apply_exit_to_branch_state(
+                    paren_depth, in_else_branch, if_branch_exited, else_branch_exited
+                )
+            )
+            if stop_result is not None:
+                return stop_result
         elif _if_else_block_exits_reach_eof(
             previous_depth,
             paren_depth,
@@ -226,21 +271,10 @@ def _can_execution_reach_eof(  # pylint: disable=too-many-branches,too-many-retu
             index,
         ):
             return False
-        elif paren_depth == 0 and re.match(r"goto\s+", stripped):
-            target = _parse_goto_target(stripped)
-            if target is None or _is_goto_eof_target(target):
-                return False
-            if target in visiting_labels:
-                return False
-            label_index = labels.get(target)
-            if label_index is None:
-                return False
-            visiting_labels.add(target)
-            return _can_execution_reach_eof(
-                lines,
-                start_index=label_index,
-                visiting_labels=visiting_labels,
-            )
+        elif paren_depth == 0:
+            goto_result = _follow_goto_target(stripped, labels, visiting_labels, lines)
+            if goto_result is not None:
+                return goto_result
 
     return reachable
 

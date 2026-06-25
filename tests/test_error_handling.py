@@ -8,7 +8,6 @@ from unittest.mock import mock_open, patch
 import warnings
 
 import pytest
-from tests.conftest import patch_valid_encoding_path
 
 from blinter import (
     LintIssue,
@@ -22,6 +21,7 @@ from blinter.checkers.syntax import _check_syntax_errors
 from blinter.checkers.warnings import _check_warning_issues
 from blinter.io.discovery import is_path_under_root
 from blinter.io.encoding import _detect_line_endings
+from tests.conftest import patch_valid_encoding_path
 
 
 class TestRealWorldErrorHandling:
@@ -578,3 +578,17 @@ class TestDiscoverySandbox:  # pylint: disable=too-few-public-methods
             pytest.skip("symlink creation not supported on this platform")
 
         assert is_path_under_root(escape_link, scan_root) is False
+
+    def test_find_batch_files_raises_when_scan_limit_exceeded(
+        self, tmp_path: Path
+    ) -> None:
+        """Directory scans above max_scan_files raise ValueError."""
+        scan_dir = tmp_path / "many"
+        scan_dir.mkdir()
+        for index in range(3):
+            (scan_dir / f"script{index}.bat").write_text(
+                "@echo off\n", encoding="utf-8"
+            )
+
+        with pytest.raises(ValueError, match="exceeding the limit"):
+            find_batch_files(scan_dir, max_scan_files=2)

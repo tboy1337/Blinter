@@ -204,6 +204,10 @@ blinter --version
 | `[rules]` | `enabled_rules` | Comma-separated list of rules to enable exclusively | None (all enabled) |
 | `[rules]` | `disabled_rules` | Comma-separated list of rules to disable | None |
 
+**Configuration notes:**
+- When both `enabled_rules` and `disabled_rules` are set, a rule must appear in `enabled_rules` to run; `disabled_rules` then removes matches from that allowlist.
+- `max_line_length` in `blinter.ini` controls style rules S011/S020 (default `100`). The hard read limit for individual lines is `10,000` characters (`MAX_LINE_LENGTH` in the engine); lines longer than that are rejected before linting.
+
 **Rule migration:** Style rule `S006` was merged into `S022`. If your `blinter.ini` references `S006` in `enabled_rules` or `disabled_rules`, use `S022` instead.
 
 ### Command Line Override
@@ -419,8 +423,8 @@ The `blinter` CLI exit codes:
 
 | Code | Meaning |
 |------|---------|
-| **0** | Success: no Error or Security findings, and every discovered file was processed |
-| **1** | Lint failure: any **Error** or **Security** finding, CLI/path errors, no processable files, or one or more files could not be read |
+| **0** | Success: no Error or Security findings, and at least one file was processed (skipped files may still be reported with a warning) |
+| **1** | Lint failure: any **Error** or **Security** finding, CLI/path errors, no processable files, skipped files together with fatal findings, or all discovered files failed to read |
 | **2** | Unexpected internal error |
 
 Warnings and style issues alone do not fail the run when exit code would otherwise be 0.
@@ -446,6 +450,12 @@ py -m bandit -r src/blinter
 py -m pip-audit -r requirements.txt -r requirements-dev.txt
 py -m black --check src tests
 py -m isort --check-only src tests
+```
+
+Optional corpus regression (requires a local `batch-script-examples/` directory):
+
+```bash
+py scripts/corpus_lint.py
 ```
 
 The test suite enforces 90% branch coverage (`pytest.ini`, `.coveragerc`). CI builds and publishes packages but does not run tests; treat a green local `pytest` run as the release gate.

@@ -8,7 +8,6 @@ from typing import Dict, List, Optional, Set
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
-from tests.conftest import patch_valid_encoding_path
 
 from blinter import (
     BlinterConfig,
@@ -57,6 +56,7 @@ from blinter.parsing.structure import (
     _collect_labels,
     _collect_set_variables,
 )
+from tests.conftest import patch_valid_encoding_path
 
 # pylint: disable=too-many-lines,redefined-outer-name,reimported
 # pylint: disable=unused-argument,invalid-name,missing-class-docstring,too-few-public-methods
@@ -1369,6 +1369,17 @@ class TestSecurityChecking:
             assert (
                 len(path_issues) == 0
             ), f":: line should not trigger SEC006: {colon_line}"
+
+        call_cases = [
+            'CALL "C:\\Scripts\\helper.bat"',
+            "call D:\\Tools\\build.cmd",
+        ]
+        for call_line in call_cases:
+            issues = _check_security_issues(call_line, 1)
+            path_issues = [i for i in issues if i.rule.code == "SEC006"]
+            assert (
+                len(path_issues) == 0
+            ), f"CALL line should not trigger SEC006: {call_line}"
 
         # But actual commands with hardcoded paths SHOULD still be flagged
         actual_commands = [
@@ -3358,6 +3369,41 @@ class TestAdvancedSecurityPerformanceRules:
         )
         codes = {issue.rule.code for issue in issues}
         assert "SEC011" not in codes
+
+    def test_sec011_ignores_substring_command_matches(self) -> None:
+        """SEC011 does not flag 'cd' inside unrelated words like abcd."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_enhanced_security_rules,
+        )
+
+        issues = _check_enhanced_security_rules(
+            ["@echo off\n", "set abcd=..\\windows\n"]
+        )
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC011" not in codes
+
+    def test_sec014_flags_delayed_expansion_user_input(self) -> None:
+        """SEC014 triggers for unescaped !1! with special characters."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_advanced_security,
+        )
+
+        lines = ["@echo off\n", "echo !1! & dir\n"]
+        issues = _check_advanced_security(lines[1], 2, lines, {})
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC014" in codes
+
+    def test_sec012_ignores_non_temp_paths(self) -> None:
+        """SEC012 does not flag arbitrary words containing 'temp'."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_enhanced_security_rules,
+        )
+
+        issues = _check_enhanced_security_rules(
+            ["@echo off\n", "set attempt=value.tmp\n"]
+        )
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC012" not in codes
 
     def test_sec012_flags_unsafe_temp_file(self) -> None:
         """SEC012 triggers for predictable temp file paths."""

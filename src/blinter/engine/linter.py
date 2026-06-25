@@ -1,5 +1,6 @@
 """Main lint orchestration entry point for single batch files."""
 
+from collections import Counter
 from pathlib import Path
 from typing import (
     Dict,
@@ -44,15 +45,16 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     static analysis including syntax validation, security checks, style analysis,
     and performance optimization suggestions.
 
-    Thread-safe: Yes - per-call state is local; optional shared ``lines_cache`` is locked
+    Thread-safe for concurrent ``lint_batch_file`` calls with an optional shared
+    ``lines_cache`` (CLI orchestration is single-threaded).
     Performance: Optimized for files up to 10MB; files above 50MB are rejected
 
     Args:
         file_path: Path to the batch file (.bat or .cmd) to lint.
                   Can be absolute or relative path.
         config: BlinterConfig object with configuration settings. If None, uses defaults.
-        dependency_graph: Optional pre-built dependency graph from folder scanning.
-                         When provided, enables cross-file variable tracking.
+        dependency_graph: Reserved for CLI file traversal with ``--follow-calls``.
+                         Not used for variable availability during per-file linting.
         lines_cache: Optional shared dict mapping resolved file paths to line lists.
                      Reads and writes are synchronized for concurrent linting.
 
@@ -83,6 +85,8 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     # Use provided config or create default
     if config is None:
         config = BlinterConfig()
+
+    _ = dependency_graph  # Reserved for CLI file traversal; unused during linting.
 
     scan_root = config.scan_root
     if scan_root is None:
@@ -135,7 +139,6 @@ def lint_batch_file(  # pylint: disable=too-many-locals
             batch_path = Path(file_path)
             called_scripts_vars = _collect_called_vars(
                 batch_path,
-                dependency_graph,
                 scan_root=scan_root,
                 lines=lines,
                 lines_cache=lines_cache,
@@ -181,19 +184,18 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     # Filter issues based on configuration and inline suppressions
     filtered_issues = _filter_issues_by_config(issues, config, suppressions)
 
+    severity_counts = Counter(issue.rule.severity for issue in filtered_issues)
     logger.info(
         "Lint analysis completed. Found %d issues (filtered to %d) across %d error(s), "
         "%d warning(s), %d style issue(s), %d security issue(s), "
         "%d performance issue(s)",
         len(issues),
         len(filtered_issues),
-        len([i for i in filtered_issues if i.rule.severity == RuleSeverity.ERROR]),
-        len([i for i in filtered_issues if i.rule.severity == RuleSeverity.WARNING]),
-        len([i for i in filtered_issues if i.rule.severity == RuleSeverity.STYLE]),
-        len([i for i in filtered_issues if i.rule.severity == RuleSeverity.SECURITY]),
-        len(
-            [i for i in filtered_issues if i.rule.severity == RuleSeverity.PERFORMANCE]
-        ),
+        severity_counts[RuleSeverity.ERROR],
+        severity_counts[RuleSeverity.WARNING],
+        severity_counts[RuleSeverity.STYLE],
+        severity_counts[RuleSeverity.SECURITY],
+        severity_counts[RuleSeverity.PERFORMANCE],
     )
 
     return filtered_issues

@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, mock_open, patch
 import warnings
 
 import pytest
-from tests.conftest import make_mock_encoding_path, patch_valid_encoding_path
 
 from blinter import (
     lint_batch_file,
@@ -16,6 +15,7 @@ from blinter import (
 )
 from blinter.constants import MAX_FILE_SIZE_BYTES, MAX_LINE_LENGTH
 from blinter.io.encoding import _validate_and_read_file
+from tests.conftest import make_mock_encoding_path, patch_valid_encoding_path
 
 _VALIDATE_FILE_PATCH = patch(
     "blinter.io.encoding._validate_file_for_read",
@@ -818,4 +818,24 @@ class TestLineEndingStandaloneDetection:
         """Empty line lists produce no line-ending issues."""
         from blinter.checkers.line_endings import _check_line_ending_rules
 
-        assert _check_line_ending_rules([], "empty.bat") == []
+        issues = _check_line_ending_rules([], "empty.bat", ending_info=None)
+        assert issues == []
+
+    @pytest.mark.parametrize(
+        ("encoding", "coherence", "expected"),
+        [
+            ("utf-8", 0.95, "utf-8"),
+            ("utf-8", 0.5, None),
+            (123, 0.95, None),
+        ],
+    )
+    def test_charset_norm_match_encoding(
+        self, encoding: object, coherence: float, expected: str | None
+    ) -> None:
+        """Encoding detection rejects low-coherence or invalid matches."""
+        from blinter.io.encoding import _charset_norm_match_encoding
+
+        match = MagicMock()
+        match.encoding = encoding
+        match.coherence = coherence
+        assert _charset_norm_match_encoding(match) == expected

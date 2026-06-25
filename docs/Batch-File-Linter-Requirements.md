@@ -6,6 +6,8 @@
 
 Across 5 severity levels:
 
+> **Security rules:** SEC-prefixed findings are static heuristics over source text. They help spot risky patterns but do not prove exploitability or guarantee runtime safety.
+
 ### Error Level Rules (E001-E999)
 **Critical issues that will cause script failure**
 

@@ -44,6 +44,8 @@ def _is_within_scan_root(path: Path, scan_root: Optional[str]) -> bool:
 def _read_batch_lines(
     path: Path,
     lines: Optional[List[str]] = None,
+    *,
+    warn_on_read_failure: bool = False,
 ) -> Optional[List[str]]:
     """Read batch file lines using encoding detection."""
     if lines is not None:
@@ -52,7 +54,10 @@ def _read_batch_lines(
         file_lines, _encoding, _ending = _validate_and_read_file(str(path))
         return file_lines
     except (OSError, ValueError) as read_error:
-        logger.debug("Could not read batch file %s: %s", path, read_error)
+        if warn_on_read_failure:
+            logger.warning("Could not read batch file %s: %s", path, read_error)
+        else:
+            logger.debug("Could not read batch file %s: %s", path, read_error)
         return None
 
 
@@ -272,6 +277,10 @@ def _build_call_dependency_graph(
         if file_path in memo:
             return set(memo[file_path])
         if file_path in visiting:
+            logger.warning(
+                "Circular CALL dependency detected at %s; stopping traversal",
+                file_path,
+            )
             return set()
         if depth > MAX_FOLLOW_CALL_DEPTH:
             logger.warning(
@@ -350,7 +359,9 @@ def _collect_vars_from_dependencies(
             continue
 
         cached_lines = get_cached_lines(lines_cache, dep_file)
-        called_lines = _read_batch_lines(dep_file, lines=cached_lines)
+        called_lines = _read_batch_lines(
+            dep_file, lines=cached_lines, warn_on_read_failure=True
+        )
         if called_lines is None:
             continue
 
@@ -380,6 +391,7 @@ def _collect_vars_from_script(
         Set of variable names defined in the called script
     """
     if not (script_path.exists() and script_path.is_file()):
+        logger.warning("Could not read called script %s: file not found", script_path)
         return set()
 
     if script_path.resolve() == batch_file_resolved:
@@ -390,7 +402,9 @@ def _collect_vars_from_script(
         return set()
 
     cached_lines = get_cached_lines(lines_cache, script_path)
-    called_lines = _read_batch_lines(script_path, lines=cached_lines)
+    called_lines = _read_batch_lines(
+        script_path, lines=cached_lines, warn_on_read_failure=True
+    )
     if called_lines is None:
         return set()
 
@@ -433,7 +447,6 @@ def _vars_from_call_line(
 
 def _collect_called_vars(
     batch_file: Path,
-    dependency_graph: Optional[Dict[Path, Set[Path]]] = None,
     scan_root: Optional[str] = None,
     lines: Optional[List[str]] = None,
     lines_cache: Optional[Dict[Path, List[str]]] = None,
@@ -444,32 +457,16 @@ def _collect_called_vars(
     This function implements position-aware variable tracking: variables from called scripts
     are only considered "defined" for lines AFTER the CALL statement that invokes them.
 
-    When a dependency_graph is provided (from folder scanning with --follow-calls), this
-    function collects variables from all dependencies in the graph, making them available
-    from line 0 (start of file) since we're treating the entire folder as interconnected.
-
     Args:
         batch_file: Path to the batch file to analyze
-        dependency_graph: Optional pre-built graph of file dependencies from folder scan
         scan_root: Optional root directory; paths outside it are skipped
 
     Returns:
         Dictionary mapping line numbers to sets of variables available after that line.
         For example, if line 10 has a CALL to a script that defines VAR1 and VAR2,
         the returned dict will have {10: {'VAR1', 'VAR2'}}.
-
-        When dependency_graph is provided, returns {0: all_vars} where all_vars includes
-        variables from all dependencies in the graph.
     """
     batch_file_resolved = batch_file.resolve()
-
-    if dependency_graph is not None:
-        return _collect_vars_from_dependencies(
-            batch_file_resolved,
-            dependency_graph,
-            scan_root=scan_root,
-            lines_cache=lines_cache,
-        )
 
     called_vars_by_line: Dict[int, Set[str]] = {}
     call_ctx = _CallLineContext(
