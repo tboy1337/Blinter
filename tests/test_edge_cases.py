@@ -2379,6 +2379,20 @@ class TestSpecializedEdgeCases:
         issues = _check_enhanced_security_rules(lines)
         assert not [issue for issue in issues if issue.rule.code == "SEC013"]
 
+    def test_if_compare_paren_set_not_sec013(self) -> None:
+        """IF compare (SET & SET) chains should not trigger SEC013."""
+        lines = ["if %winbuild% LEQ 6300 (set _slexe=SLsvc.exe& set _slser=SLsvc)"]
+        issues = _check_enhanced_security_rules(lines)
+        assert not [issue for issue in issues if issue.rule.code == "SEC013"]
+
+    def test_chained_set_at_vars_not_sec013(self) -> None:
+        """Chained SET @var=...& SET @var=... should not trigger SEC013."""
+        lines = [
+            "SET @TIMED_FORMAT=!@BACKUP_ROOT!\\%COMPUTERNAME%_!@SOURCENAME!.ZIP& SET @TIMED_FORMAT=!@TIMED_FORMAT:%COMPUTERNAME%=!"
+        ]
+        issues = _check_enhanced_security_rules(lines)
+        assert not [issue for issue in issues if issue.rule.code == "SEC013"]
+
     def test_enhanced_performance_function(self) -> None:
         """Test _check_enhanced_performance function."""
         lines = [

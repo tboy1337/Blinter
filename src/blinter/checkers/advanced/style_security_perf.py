@@ -16,7 +16,30 @@ from blinter.parsing.structure import _is_in_subroutine_context
 from blinter.rules.registry import RULES
 
 _REDIRECT_MACRO_VARS: frozenset[str] = frozenset(
-    {"nul", "nul1", "nul2", "nul3", "nul6", "_silent", "psc", "ps"}
+    {
+        "nul",
+        "nul1",
+        "nul2",
+        "nul3",
+        "nul6",
+        "_silent",
+        "psc",
+        "ps",
+        "red",
+        "white",
+        "gray",
+        "grey",
+        "blue",
+        "yellow",
+        "green",
+        "magenta",
+        "cyan",
+        "black",
+        "_red",
+        "_yellow",
+        "_gray",
+        "_grey",
+    }
 )
 
 
@@ -600,6 +623,20 @@ def _get_safe_command_patterns() -> List[str]:
         r"^for\s+.*\bdo\s+\(%psc%\s+\"",
         # reg/find with redirect macro before conditional block
         r"reg\s+query\b.*%nul\d+%\s*\|\s*find\b.*%nul\d+%\s*&&\s*\(",
+        r"^if\s+%[^%]+%\s+(?:EQU|NEQ|LSS|LEQ|GEQ|GTR)\s+\S+\s+\(set\s+",
+        r"^if\s+%[^%]+%\s+(?:LSS|LEQ|GEQ|GTR)\s+\d+\s+if\s+exist\s+",
+        r"^if\s+%[^%]+%\s+(?:LSS|LEQ)\s+\d+\s+\(set\s+.*&exit\b",
+        r"^if\s+/i\s+\"%[^%]+%\"==\"\S+\"\s+\(set\s+",
+        r"^if\s+defined\s+\S+\s+\(call\s+:",
+        r"^if\s+defined\s+\S+\s+\(if\s+exist\s+",
+        r"^%nul%\s+reg\s+query\b",
+        r"^find\b.*/i\b.*%nul\d+%\s*&&\s*set\b",
+        r"^if\s+%[^%]+%==\d+\s+timeout\b.*&\s*exit\b",
+        r"^if\s+![^!]+!==\d+\s+start\b.*&\s*goto\b",
+        r"^if\s+%[^%]+%\s+(?:EQU|NEQ)\s+\d+\s+set\s+\"\w+=for\s+/f",
+        r"^(?:if\s+%[^%]+%\s+(?:EQU|NEQ)\s+\d+\s+)?wmic\b.*%nul\d+%\s*\|\s*find\b",
+        r"^set\s+\"\w+=[^\"]*&(?:call|echo)\b",
+        r"^set\s+@\w+=.*&\s*set\s+@",
     ]
 
 
