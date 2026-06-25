@@ -10,6 +10,7 @@ from typing import (
     Tuple,
 )
 
+from blinter.constants import LARGE_FILE_LINE_THRESHOLD
 from blinter.models import LintIssue
 from blinter.parsing.context import _is_comment_line
 from blinter.rules.helpers import _add_issue
@@ -155,8 +156,13 @@ def _check_new_global_rules(lines: List[str], file_path: str) -> List[LintIssue]
     """Check for new global rules that require full file context."""
     issues: List[LintIssue] = []
 
-    # Split complex function into smaller focused functions
     issues.extend(_check_bat_cmd_differences(lines, file_path))
+
+    if len(lines) > LARGE_FILE_LINE_THRESHOLD:
+        issues.extend(_check_setlocal_redundancy(lines))
+        issues.extend(_check_error_handling_warnings(lines))
+        return issues
+
     issues.extend(_check_advanced_global_patterns(lines, file_path))
     issues.extend(_check_code_documentation(lines))
     issues.extend(_check_setlocal_redundancy(lines))
@@ -460,6 +466,17 @@ def _should_skip_line_for_var_check(stripped: str) -> bool:
     return False
 
 
+def _dominant_naming_style(styles: DefaultDict[str, int]) -> str:
+    """Return the most frequently used naming style label."""
+    dominant_style = ""
+    highest_count = -1
+    for style, count in styles.items():
+        if count > highest_count:
+            highest_count = count
+            dominant_style = style
+    return dominant_style
+
+
 def _check_var_naming(lines: List[str]) -> List[LintIssue]:
     """Check for inconsistent variable naming conventions."""
     issues: List[LintIssue] = []
@@ -488,13 +505,7 @@ def _check_var_naming(lines: List[str]) -> List[LintIssue]:
     if len(variable_names) >= 3:
         used_styles = sum(1 for count in naming_styles.values() if count > 0)
         if used_styles > 1:
-            dominant_style = max(naming_styles, key=naming_styles.get)  # type: ignore[arg-type]
-            _add_issue(
-                issues,
-                line_number=1,
-                rule_code="S006",
-                context="Variable names should follow one consistent naming convention",
-            )
+            dominant_style = _dominant_naming_style(naming_styles)
             _add_issue(
                 issues,
                 line_number=1,

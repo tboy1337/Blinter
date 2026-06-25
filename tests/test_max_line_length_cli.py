@@ -53,7 +53,7 @@ class TestMaxLineLengthCLI:
         temp_file = self.create_temp_batch_file(content)
 
         try:
-            # Test with max_line_length=120 (should not trigger S011)
+            # Test with max_line_length=120 (should not trigger S020)
             with patch("sys.argv", ["blinter", temp_file, "--max-line-length", "120"]):
                 with patch("sys.exit") as mock_exit:
                     with patch("builtins.print"):
@@ -63,25 +63,25 @@ class TestMaxLineLengthCLI:
         finally:
             os.unlink(temp_file)
 
-    def test_cli_max_line_length_triggers_s011(self) -> None:
-        """Test that --max-line-length correctly affects S011 rule."""
+    def test_cli_max_line_length_triggers_s020(self) -> None:
+        """Test that --max-line-length correctly affects S020 rule."""
         # Create a batch file with line of 100 characters
         line_content = "REM " + "x" * 96  # 100 characters total
         content = f"@echo off\n{line_content}\n"
         temp_file = self.create_temp_batch_file(content)
 
         try:
-            # Test with max_line_length=90 (should trigger S011)
+            # Test with max_line_length=90 (should trigger S020)
             config = BlinterConfig(max_line_length=90)
             issues = lint_batch_file(temp_file, config=config)
-            s011_issues = [i for i in issues if i.rule.code == "S011"]
-            assert len(s011_issues) > 0
+            s020_issues = [i for i in issues if i.rule.code == "S020"]
+            assert len(s020_issues) > 0
 
-            # Test with max_line_length=110 (should not trigger S011)
+            # Test with max_line_length=110 (should not trigger S020)
             config = BlinterConfig(max_line_length=110)
             issues = lint_batch_file(temp_file, config=config)
-            s011_issues = [i for i in issues if i.rule.code == "S011"]
-            assert len(s011_issues) == 0
+            s020_issues = [i for i in issues if i.rule.code == "S020"]
+            assert len(s020_issues) == 0
         finally:
             os.unlink(temp_file)
 
@@ -196,7 +196,7 @@ class TestMaxLineLengthCLI:
         temp_file = self.create_temp_batch_file(content)
 
         try:
-            # Test with max_line_length=1 (should trigger S011 for most lines)
+            # Test with max_line_length=1 (should trigger S020 for most lines)
             with patch("sys.argv", ["blinter", temp_file, "--max-line-length", "1"]):
                 with patch("sys.exit"):
                     with patch("builtins.print"):
@@ -214,9 +214,9 @@ class TestMaxLineLengthCLI:
             # Test with max_line_length=9999
             config = BlinterConfig(max_line_length=9999)
             issues = lint_batch_file(temp_file, config=config)
-            # Should not trigger S011 for normal lines
-            s011_issues = [i for i in issues if i.rule.code == "S011"]
-            assert len(s011_issues) == 0
+            # Should not trigger S020 for normal lines
+            s020_issues = [i for i in issues if i.rule.code == "S020"]
+            assert len(s020_issues) == 0
         finally:
             os.unlink(temp_file)
 
@@ -244,17 +244,17 @@ max_line_length = 100
             config_from_file = load_config(config_file_path)
             assert config_from_file.max_line_length == 100
 
-            # Test that CLI override to 90 triggers S011
+            # Test that CLI override to 90 triggers S020
             config_cli_override = BlinterConfig(max_line_length=90)
             issues = lint_batch_file(temp_file, config=config_cli_override)
-            s011_issues = [i for i in issues if i.rule.code == "S011"]
-            assert len(s011_issues) > 0
+            s020_issues = [i for i in issues if i.rule.code == "S020"]
+            assert len(s020_issues) > 0
 
-            # Test that file config at 100 doesn't trigger S011
+            # Test that file config at 100 doesn't trigger S020
             config_from_file = BlinterConfig(max_line_length=100)
             issues = lint_batch_file(temp_file, config=config_from_file)
-            s011_issues = [i for i in issues if i.rule.code == "S011"]
-            assert len(s011_issues) == 0
+            s020_issues = [i for i in issues if i.rule.code == "S020"]
+            assert len(s020_issues) == 0
         finally:
             os.unlink(temp_file)
             try:
@@ -332,7 +332,7 @@ max_line_length = 100
                 assert "--max-line-length" in help_output
 
     def test_cli_max_line_length_boundary_values(self) -> None:
-        """Test S011 boundary behavior at explicit limits (not the 100-char default)."""
+        """Test S020 boundary behavior at explicit limits (not the 100-char default)."""
         # 88-character line used to verify limit-1/limit/limit+1 behavior
         line_content = "REM " + "x" * 84  # 88 characters total
         content = f"@echo off\n{line_content}\n"
@@ -342,20 +342,20 @@ max_line_length = 100
             # At limit 88 - should not trigger
             config_88 = BlinterConfig(max_line_length=88)
             issues_88 = lint_batch_file(temp_file, config=config_88)
-            s011_issues_88 = [i for i in issues_88 if i.rule.code == "S011"]
-            assert len(s011_issues_88) == 0
+            s020_issues_88 = [i for i in issues_88 if i.rule.code == "S020"]
+            assert len(s020_issues_88) == 0
 
             # At 87 (one below) - should trigger
             config_87 = BlinterConfig(max_line_length=87)
             issues_87 = lint_batch_file(temp_file, config=config_87)
-            s011_issues_87 = [i for i in issues_87 if i.rule.code == "S011"]
-            assert len(s011_issues_87) > 0
+            s020_issues_87 = [i for i in issues_87 if i.rule.code == "S020"]
+            assert len(s020_issues_87) > 0
 
             # At 89 (one above) - should not trigger
             config_89 = BlinterConfig(max_line_length=89)
             issues_89 = lint_batch_file(temp_file, config=config_89)
-            s011_issues_89 = [i for i in issues_89 if i.rule.code == "S011"]
-            assert len(s011_issues_89) == 0
+            s020_issues_89 = [i for i in issues_89 if i.rule.code == "S020"]
+            assert len(s020_issues_89) == 0
         finally:
             os.unlink(temp_file)
 
@@ -373,16 +373,16 @@ echo test
             # Test with max_line_length=80
             config_80 = BlinterConfig(max_line_length=80)
             issues_80 = lint_batch_file(temp_file, config=config_80)
-            s011_issues_80 = [i for i in issues_80 if i.rule.code == "S011"]
+            s020_issues_80 = [i for i in issues_80 if i.rule.code == "S020"]
             # Should detect lines 3 and 4 (90 and 110 characters)
-            assert len(s011_issues_80) >= 2
+            assert len(s020_issues_80) >= 2
 
             # Test with max_line_length=100
             config_100 = BlinterConfig(max_line_length=100)
             issues_100 = lint_batch_file(temp_file, config=config_100)
-            s011_issues_100 = [i for i in issues_100 if i.rule.code == "S011"]
+            s020_issues_100 = [i for i in issues_100 if i.rule.code == "S020"]
             # Should detect only line 4 (110 characters)
-            assert len(s011_issues_100) >= 1
+            assert len(s020_issues_100) >= 1
         finally:
             os.unlink(temp_file)
 
@@ -394,14 +394,14 @@ echo test
         temp_file = self.create_temp_batch_file(content)
 
         try:
-            # Test via main() with --max-line-length 120 (should not error on S011)
+            # Test via main() with --max-line-length 120 (should not error on S020)
             with patch("sys.argv", ["blinter", temp_file, "--max-line-length", "120"]):
                 with patch("sys.exit") as mock_exit:
                     with patch("builtins.print"):
                         main()
                         assert mock_exit.called
 
-            # Test via main() with --max-line-length 90 (should error on S011)
+            # Test via main() with --max-line-length 90 (should error on S020)
             with patch("sys.argv", ["blinter", temp_file, "--max-line-length", "90"]):
                 with patch("sys.exit") as mock_exit:
                     with patch("builtins.print"):
@@ -543,17 +543,17 @@ class TestMaxLineLengthEdgeCases:
             return temp_file.name
 
     def test_max_line_length_empty_lines(self) -> None:
-        """Test that empty lines don't trigger S011."""
+        """Test that empty lines don't trigger S020."""
         content = "@echo off\n\n\n\necho test\n"
         temp_file = self.create_temp_batch_file(content)
 
         try:
             config = BlinterConfig(max_line_length=1)
             issues = lint_batch_file(temp_file, config=config)
-            # Empty lines should not trigger S011
-            s011_issues = [i for i in issues if i.rule.code == "S011"]
+            # Empty lines should not trigger S020
+            s020_issues = [i for i in issues if i.rule.code == "S020"]
             # Should not report empty lines
-            for issue in s011_issues:
+            for issue in s020_issues:
                 assert issue.line_number != 2
                 assert issue.line_number != 3
                 assert issue.line_number != 4
@@ -568,8 +568,8 @@ class TestMaxLineLengthEdgeCases:
         try:
             config = BlinterConfig(max_line_length=50)
             issues = lint_batch_file(temp_file, config=config)
-            s011_issues = [i for i in issues if i.rule.code == "S011"]
-            whitespace_line_issues = [i for i in s011_issues if i.line_number == 2]
+            s020_issues = [i for i in issues if i.rule.code == "S020"]
+            whitespace_line_issues = [i for i in s020_issues if i.line_number == 2]
             assert len(whitespace_line_issues) == 1
         finally:
             os.unlink(temp_file)
@@ -589,7 +589,7 @@ class TestMaxLineLengthEdgeCases:
             os.unlink(temp_file)
 
     def test_max_line_length_rule_explanation_updates(self) -> None:
-        """Test that S011 rule explanation reflects custom max_line_length."""
+        """Test that S020 context reflects custom max_line_length."""
         config = BlinterConfig(max_line_length=100)
         # Create a line that exceeds the custom limit
         line_content = "REM " + "x" * 100  # 104 characters
@@ -598,12 +598,9 @@ class TestMaxLineLengthEdgeCases:
 
         try:
             issues = lint_batch_file(temp_file, config=config)
-            s011_issues = [i for i in issues if i.rule.code == "S011"]
-            if s011_issues:
-                # Check that the explanation reflects the custom value
-                issue = s011_issues[0]
-                assert "100" in issue.rule.explanation or "100" in str(
-                    issue.context or ""
-                )
+            s020_issues = [i for i in issues if i.rule.code == "S020"]
+            if s020_issues:
+                issue = s020_issues[0]
+                assert "100" in str(issue.context or "")
         finally:
             os.unlink(temp_file)

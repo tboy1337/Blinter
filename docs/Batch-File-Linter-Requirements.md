@@ -2,7 +2,7 @@
 
 ## Rule Categories Summary
 
-**Blinter** provides comprehensive static analysis with **148 Built-in Rules** across 5 severity levels:
+**Blinter** provides comprehensive static analysis with **147 Built-in Rules** across 5 severity levels:
 
 ### Error Level Rules (E001-E999)
 **Critical issues that will cause script failure**
@@ -93,7 +93,6 @@
 - **S003**: Inconsistent command capitalization
 - **S004**: Trailing whitespace
 - **S005**: Mixed line endings
-- **S006**: Inconsistent variable naming
 - **S007**: BAT extension used instead of CMD for newer Windows
 - **S008**: Missing comments for complex code
 - **S009**: Magic numbers used

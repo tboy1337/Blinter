@@ -195,16 +195,16 @@ def _line_is_inside_for_block(lines: List[str], line_number: int) -> bool:
     """Return True when line_number appears inside a FOR loop block."""
     depth = 0
     in_for = False
-    for index, loop_line in enumerate(lines, start=1):
+    for index in range(1, line_number + 1):
+        loop_line = lines[index - 1]
         lowered = loop_line.strip().lower()
         if lowered.startswith("for "):
             in_for = True
-        if in_for:
-            depth += lowered.count("(") - lowered.count(")")
-            if index == line_number:
-                return depth >= 0
-            if depth <= 0 and index > line_number:
-                return False
+        if not in_for:
+            continue
+        depth += lowered.count("(") - lowered.count(")")
+        if index == line_number:
+            return depth >= 0
     return False
 
 

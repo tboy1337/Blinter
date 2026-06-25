@@ -96,9 +96,11 @@ def _check_style_issues(
     # S009: Magic numbers used (simple heuristic)
     issues.extend(_check_timeout_ping_numbers(stripped, line_num))
 
-    # S011: Line exceeds maximum length
+    # S011: Long line with caret used for escaping (not continuation).
+    # S020 covers long lines without continuation; avoid duplicate reports.
     line_length = len(line.rstrip("\r\n"))
-    if line_length > max_line_length:
+    line_body = line.rstrip("\r\n")
+    if line_length > max_line_length and line_body.rstrip().endswith("^"):
         issues.append(
             LintIssue(
                 line_number=line_num,

@@ -91,10 +91,14 @@ def _check_undefined_variables(
     var_usage_pattern = re.compile(
         r"%([A-Z][A-Z0-9_]*)%|!([A-Z][A-Z0-9_]*)!", re.IGNORECASE
     )
-    string_op_pattern = re.compile(r"%[A-Z]+:[^%]*%", re.IGNORECASE)
+    string_op_pattern = re.compile(
+        r"%[A-Z0-9_]+:[^%]*%|![A-Z0-9_]+:[^!]*!",
+        re.IGNORECASE,
+    )
+    macro_temp_pattern = re.compile(r"^[A-Z]\d+$")
 
     for i, line in enumerate(lines, start=1):
-        # Skip lines with string operations like %DATE:/=-%
+        # Skip lines with string operations like %DATE:/=-% or !VAR:"=!
         if string_op_pattern.search(line):
             continue
 
@@ -102,6 +106,9 @@ def _check_undefined_variables(
 
         for match in var_usage_pattern.finditer(line):
             var_name: str = (match.group(1) or match.group(2) or "").upper()
+
+            if macro_temp_pattern.match(var_name):
+                continue
 
             if _should_check_variable(var_name, uses_dynamic_vars, available_vars):
                 _add_issue(

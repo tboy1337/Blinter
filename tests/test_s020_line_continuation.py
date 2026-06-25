@@ -228,9 +228,8 @@ def test_s020_github_line_109() -> None:
         s020_issues = [issue for issue in issues if issue.rule.code == "S020"]
         s011_issues = [issue for issue in issues if issue.rule.code == "S011"]
 
-        # Both S011 and S020 should trigger
-        assert len(s011_issues) >= 1  # S011 triggers for line too long
-        assert len(s020_issues) == 1  # S020 should now trigger (this was the bug)
+        assert len(s011_issues) == 0
+        assert len(s020_issues) == 1
         assert s020_issues[0].line_number == 2
     finally:
         temp_path.unlink()
@@ -255,9 +254,8 @@ def test_s020_github_line_111() -> None:
         s020_issues = [issue for issue in issues if issue.rule.code == "S020"]
         s011_issues = [issue for issue in issues if issue.rule.code == "S011"]
 
-        # Both S011 and S020 should trigger
-        assert len(s011_issues) >= 1  # S011 triggers for line too long
-        assert len(s020_issues) == 1  # S020 should trigger
+        assert len(s011_issues) == 0
+        assert len(s020_issues) == 1
         assert s020_issues[0].line_number == 2
     finally:
         temp_path.unlink()
@@ -351,8 +349,8 @@ def test_s020_and_s011_consistency() -> None:
         issues_90 = blinter.lint_batch_file(str(temp_path), config=config_90)
         s020_issues_90 = [issue for issue in issues_90 if issue.rule.code == "S020"]
         s011_issues_90 = [issue for issue in issues_90 if issue.rule.code == "S011"]
-        assert len(s020_issues_90) == 1  # Should trigger
-        assert len(s011_issues_90) == 1  # Should trigger
+        assert len(s020_issues_90) == 1
+        assert len(s011_issues_90) == 0
 
         # Test with max_line_length=110: neither should trigger
         config_110 = blinter.BlinterConfig(max_line_length=110)

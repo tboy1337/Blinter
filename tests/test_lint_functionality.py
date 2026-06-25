@@ -9,7 +9,7 @@ from blinter import (
     lint_batch_file,
 )
 from blinter.patterns import DANGEROUS_COMMAND_PATTERNS
-from blinter.rules.registry import RULES
+from blinter.rules.registry import RULE_COUNT, RULES
 
 # pylint: disable=too-many-lines
 
@@ -305,7 +305,7 @@ echo Normal line
         try:
             issues = lint_batch_file(temp_file)
             rule_codes = [issue.rule.code for issue in issues]
-            assert "S011" in rule_codes  # Line exceeds maximum length
+            assert "S020" in rule_codes  # Long line without continuation
         finally:
             os.unlink(temp_file)
 
@@ -901,7 +901,7 @@ echo Done
 
         # Test RULES structure
         assert isinstance(RULES, dict)
-        assert len(RULES) == 148
+        assert len(RULES) == RULE_COUNT
 
         for rule_code, rule in RULES.items():
             assert isinstance(rule_code, str)
@@ -974,7 +974,7 @@ echo Done
         try:
             issues = lint_batch_file(temp_file)
             rule_codes = [issue.rule.code for issue in issues]
-            assert "S011" in rule_codes  # Line exceeds maximum length
+            assert "S020" in rule_codes  # Long line without continuation
         finally:
             os.unlink(temp_file)
 

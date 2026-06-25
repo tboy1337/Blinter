@@ -240,6 +240,38 @@ def _check_advanced_vars(lines: List[str]) -> List[LintIssue]:
     return issues
 
 
+_VALID_SET_A_OPERATOR_PAIRS: frozenset[str] = frozenset(
+    {
+        "+=",
+        "-=",
+        "*=",
+        "/=",
+        "%=",
+        "==",
+        "!=",
+        ">=",
+        "<=",
+        "&&",
+        "||",
+        "<<",
+        ">>",
+    }
+)
+
+
+def _set_a_has_bad_ops(expression: str) -> bool:
+    """Return True when expression contains an invalid adjacent operator pair."""
+    operator_chars = "=+-*/%<>!&|"
+    for index in range(len(expression) - 1):
+        first = expression[index]
+        second = expression[index + 1]
+        if first in operator_chars and second in operator_chars:
+            pair = first + second
+            if pair not in _VALID_SET_A_OPERATOR_PAIRS:
+                return True
+    return False
+
+
 def _check_set_a_arithmetic(stripped: str, line_number: int) -> List[LintIssue]:
     """Check SET /A arithmetic syntax (E022)."""
     issues: List[LintIssue] = []
@@ -252,23 +284,12 @@ def _check_set_a_arithmetic(stripped: str, line_number: int) -> List[LintIssue]:
     if expr_match:
         expression = expr_match.group(1).strip()
 
-    if re.search(r"[=+\-*/%<>!][=+\-*/%<>!]", expression):
+    if _set_a_has_bad_ops(expression):
         issues.append(
             LintIssue(
                 line_number=line_number,
                 rule=RULES["E022"],
                 context="Invalid operator sequence in SET /A expression",
-            )
-        )
-
-    if re.search(r"[a-zA-Z_]", expression) and not re.search(
-        r"0x[0-9a-fA-F]+", expression
-    ):
-        issues.append(
-            LintIssue(
-                line_number=line_number,
-                rule=RULES["E022"],
-                context="SET /A expression contains invalid alphabetic tokens",
             )
         )
 

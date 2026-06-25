@@ -370,13 +370,6 @@ RULES: Dict[str, Rule] = {
             "for Windows batch files"
         ),
     ),
-    "S006": Rule(
-        code="S006",
-        name="Inconsistent variable naming",
-        severity=RuleSeverity.STYLE,
-        explanation="Variable names should follow consistent naming conventions",
-        recommendation="Use consistent naming: either ALL_CAPS or camelCase throughout",
-    ),
     "S007": Rule(
         code="S007",
         name="BAT extension used instead of CMD for newer Windows",
@@ -1272,3 +1265,5 @@ RULES: Dict[str, Rule] = {
         ),
     ),
 }
+
+RULE_COUNT = len(RULES)

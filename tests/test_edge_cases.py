@@ -557,16 +557,28 @@ class TestGlobalFunctionChecking:
         issues = _check_missing_pause(lines)
         assert len(issues) == 0
 
-    def test_check_inconsistent_indentation_mixed(self) -> None:
-        """Test mixed tabs and spaces in same line."""
+    def test_check_inconsistent_indentation_block_style(self) -> None:
+        """Tab plus single space before commands is standard block indentation."""
         lines = [
             "echo start",
-            "\t echo mixed indentation",  # Tab followed by space - mixed within line
-            "  echo other indentation",  # Just spaces
+            "\t echo mixed indentation",
+            "  echo other indentation",
         ]
 
         issues = _check_inconsistent_indentation(lines)
-        assert len(issues) >= 1  # Should detect mixed indentation
+        s012_issues = [i for i in issues if i.rule.code == "S012"]
+        assert len(s012_issues) == 1
+        assert "File mixes" in s012_issues[0].context
+
+    def test_check_inconsistent_indentation_mixed(self) -> None:
+        """Test mixed tabs and spaces within the same indent unit."""
+        lines = [
+            "echo start",
+            "\t  echo mixed indentation",
+            "  echo other indentation",
+        ]
+
+        issues = _check_inconsistent_indentation(lines)
         s012_issues = [i for i in issues if i.rule.code == "S012"]
         assert len(s012_issues) >= 1
 

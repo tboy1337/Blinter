@@ -116,8 +116,8 @@ class TestRealWorldErrorHandling:
 
         try:
             issues = lint_batch_file(temp_path)
-            # Should detect S011 (line exceeds maximum length)
-            long_line_issues = [i for i in issues if i.rule.code == "S011"]
+            # Should detect S020 (long line without continuation)
+            long_line_issues = [i for i in issues if i.rule.code == "S020"]
             assert len(long_line_issues) >= 1
         finally:
             os.unlink(temp_path)

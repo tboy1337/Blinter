@@ -250,7 +250,7 @@ EXIT /B 0
             os.unlink(temp_path)
 
     def test_concurrent_lint_different_line_lengths(self) -> None:
-        """Concurrent lint calls must not share mutable S011 rule state."""
+        """Concurrent lint calls must not share mutable S020 rule state."""
         long_line = "echo " + ("x" * 120) + "\n"
         content = f"@ECHO OFF\n{long_line}"
 
@@ -277,15 +277,15 @@ EXIT /B 0
                 long_results = [future.result() for future in long_futures]
 
             for issues in short_results:
-                s011_issues = [issue for issue in issues if issue.rule.code == "S011"]
-                assert s011_issues, "Expected S011 for 80-character limit"
+                s020_issues = [issue for issue in issues if issue.rule.code == "S020"]
+                assert s020_issues, "Expected S020 for 80-character limit"
                 assert all(
-                    "max 80" in issue.context for issue in s011_issues
-                ), f"Unexpected S011 context: {s011_issues[0].context}"
+                    "80" in issue.context for issue in s020_issues
+                ), f"Unexpected S020 context: {s020_issues[0].context}"
 
             for issues in long_results:
-                s011_issues = [issue for issue in issues if issue.rule.code == "S011"]
-                assert not s011_issues, "Did not expect S011 for 200-character limit"
+                s020_issues = [issue for issue in issues if issue.rule.code == "S020"]
+                assert not s020_issues, "Did not expect S020 for 200-character limit"
 
         finally:
             os.unlink(temp_path)

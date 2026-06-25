@@ -1,6 +1,6 @@
 # Blinter
 
-**Blinter** is a linter for Windows batch files (`.bat` and `.cmd`). It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems. Blinter helps you write safer, more reliable and maintainable batch scripts. Even in 2025, batch files deserve professional tooling! 💻
+**Blinter** is a linter for Windows batch files (`.bat` and `.cmd`). It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems. Blinter helps you write safer, more reliable and maintainable batch scripts. Even in 2026, batch files deserve professional tooling!
 
 - ✅ **Configurable Options** - Configurable rules, `--verbose`/`--quiet` logging, robust error handling
 - ✅ **Unicode Support** - Support for international characters and filenames
@@ -9,7 +9,7 @@
 ## Features ✨
 
 ### 🔍 **Rule Categories**
-- **148 Built-in Rules** across 5 severity levels
+- **147 Built-in Rules** across 5 severity levels
 - **Error Level (E001-E999)**: Critical syntax errors that prevent execution
 - **Warning Level (W001-W999)**: Potential runtime issues and bad practices
 - **Style Level (S001-S999)**: Code formatting and readability improvements
@@ -203,6 +203,8 @@ blinter --version
 | `[general]` | `min_severity` | Minimum severity level to report | None (all) |
 | `[rules]` | `enabled_rules` | Comma-separated list of rules to enable exclusively | None (all enabled) |
 | `[rules]` | `disabled_rules` | Comma-separated list of rules to disable | None |
+
+**Rule migration:** Style rule `S006` was merged into `S022`. If your `blinter.ini` references `S006` in `enabled_rules` or `disabled_rules`, use `S022` instead.
 
 ### Command Line Override
 

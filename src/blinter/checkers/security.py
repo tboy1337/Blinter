@@ -51,7 +51,7 @@ def _check_input_validation_sec(
 
     # SEC002: Unsafe SET command usage - only flag unquoted SET commands
     # Skip ANSI escape sequences, color definitions, and constant declarations
-    set_match = re.match(r"set\s+([A-Za-z0-9_]+)=(.+)", stripped, re.IGNORECASE)
+    set_match = re.match(r"set\s+([A-Za-z0-9_@]+)=(.+)", stripped, re.IGNORECASE)
     if set_match:
         var_name: str = set_match.group(1)
         var_val_text: str = set_match.group(2)
@@ -68,8 +68,10 @@ def _check_input_validation_sec(
             )  # Skip simple constants like filename.ext, VARNAME
         )
 
-        if not is_ansi_or_color and not (
-            var_val.startswith('"') and var_val.endswith('"')
+        if (
+            not var_name.startswith("@")
+            and not is_ansi_or_color
+            and not (var_val.startswith('"') and var_val.endswith('"'))
         ):
             issues.append(
                 LintIssue(

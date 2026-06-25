@@ -1,5 +1,3 @@
-batch-script-examples/
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -215,3 +213,5 @@ secrets.json
 # Pylint report
 pylint-report.txt
 pylint-output.txt
+batch-examples-*.json
+batch-script-examples/

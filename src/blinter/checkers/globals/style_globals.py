@@ -9,6 +9,7 @@ from typing import (
     Tuple,
 )
 
+from blinter.constants import LARGE_FILE_LINE_THRESHOLD
 from blinter.models import LintIssue
 from blinter.parsing.context import _is_comment_line
 from blinter.patterns import COMMAND_CASING_KEYWORDS
@@ -44,9 +45,24 @@ def _check_redundant_operations(lines: List[str]) -> List[LintIssue]:
     return issues
 
 
+def _duplication_report_threshold(script_size: int) -> int:
+    """Return minimum repeated-command count before flagging duplication."""
+    if script_size < 100:
+        return 3
+    if script_size < 500:
+        return 5
+    if script_size < 2000:
+        return 10
+    return 20
+
+
 def _check_code_duplication(lines: List[str]) -> List[LintIssue]:
     """Check for code duplication that could be refactored."""
     issues: List[LintIssue] = []
+
+    # Very large scripts: skip expensive similarity scan (dominates lint time).
+    if len(lines) > LARGE_FILE_LINE_THRESHOLD:
+        return issues
 
     # Simple heuristic: look for repeated command patterns
     command_blocks: Dict[str, List[int]] = defaultdict(list)
@@ -81,17 +97,8 @@ def _check_code_duplication(lines: List[str]) -> List[LintIssue]:
             ):  # Only consider substantial commands (increased from 20)
                 command_blocks[normalized].append(i + 1)
 
-    # Calculate appropriate threshold based on script size
-    # For larger scripts, allow more repetition before flagging
     script_size = len(lines)
-    if script_size < 100:
-        threshold = 3  # Small scripts: flag 3+ occurrences
-    elif script_size < 500:
-        threshold = 5  # Medium scripts: flag 5+ occurrences
-    elif script_size < 2000:
-        threshold = 10  # Large scripts: flag 10+ occurrences
-    else:
-        threshold = 20  # Very large scripts: flag 20+ occurrences
+    threshold = _duplication_report_threshold(script_size)
 
     for _normalized_cmd, line_numbers in command_blocks.items():
         if len(line_numbers) >= threshold:  # Found threshold+ similar commands
@@ -155,13 +162,46 @@ def _collect_indented_lines(lines: List[str]) -> List[Tuple[int, str]]:
     return indented_lines
 
 
+def _normalize_block_indent(whitespace: str) -> str:
+    """Collapse tab + optional single space used before block commands.
+
+    Professional batch files often indent IF/FOR bodies as tab then one space
+    before the command (e.g. ``\\t SET ...``). That is not inconsistent mixing.
+    """
+    normalized: List[str] = []
+    index = 0
+    while index < len(whitespace):
+        char = whitespace[index]
+        if char == "\t":
+            normalized.append("\t")
+            index += 1
+            if index < len(whitespace) and whitespace[index] == " ":
+                index += 1
+        else:
+            normalized.append(char)
+            index += 1
+    return "".join(normalized)
+
+
+def _leading_indent_uses_tabs(whitespace: str) -> bool:
+    """Return True when normalized leading indent is tab-based."""
+    return "\t" in _normalize_block_indent(whitespace)
+
+
+def _leading_indent_uses_spaces(whitespace: str) -> bool:
+    """Return True when normalized leading indent is space-based."""
+    normalized = _normalize_block_indent(whitespace)
+    return " " in normalized and "\t" not in normalized
+
+
 def _find_single_line_mixed_indent(
     indented_lines: List[Tuple[int, str]],
 ) -> List[LintIssue]:
     """Check for mixed tabs and spaces within single lines."""
     issues: List[LintIssue] = []
     for line_num, whitespace in indented_lines:
-        if "\t" in whitespace and " " in whitespace:
+        normalized = _normalize_block_indent(whitespace)
+        if "\t" in normalized and " " in normalized:
             issues.append(
                 LintIssue(
                     line_number=line_num,
@@ -182,11 +222,11 @@ def _find_file_mixed_indent(
     first_space_line = 0
 
     for line_num, whitespace in indented_lines:
-        if "\t" in whitespace:
+        if _leading_indent_uses_tabs(whitespace):
             uses_tabs = True
             if first_tab_line == 0:
                 first_tab_line = line_num
-        if " " in whitespace:
+        if _leading_indent_uses_spaces(whitespace):
             uses_spaces = True
             if first_space_line == 0:
                 first_space_line = line_num
@@ -217,15 +257,12 @@ def _check_inconsistent_indentation(
     if len(indented_lines) < 2:
         return issues
 
-    # Check for mixed patterns within single lines first
     single_line_issues = _find_single_line_mixed_indent(indented_lines)
     issues.extend(single_line_issues)
 
-    # Check for inconsistent indentation across file only if no single-line mixing found
-    if not single_line_issues:
-        file_issue = _find_file_mixed_indent(indented_lines)
-        if file_issue:
-            issues.append(file_issue)
+    file_issue = _find_file_mixed_indent(indented_lines)
+    if file_issue is not None:
+        issues.append(file_issue)
 
     return issues
 

@@ -21,7 +21,7 @@ version_info = {
     'company_name': 'tboy1337',
     'file_description': 'Blinter - Professional Batch File Linter for Windows',
     'internal_name': 'Blinter',
-    'legal_copyright': '© 2026 tboy1337. Licensed under AGPL-3.0.',
+    'legal_copyright': '© 2026 tboy1337. Licensed under AGPL-3.0-or-later.',
     'original_filename': 'Blinter.exe',
     'product_name': 'Blinter',
     'product_version': '1.0.0.0',  # Will be overridden by build script

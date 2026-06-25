@@ -487,6 +487,11 @@ def main() -> None:
     except Exception:
         logger.exception("Unexpected error during CLI execution")
         print("Error: An unexpected internal error occurred.", file=sys.stderr)
+        if logger.getEffectiveLevel() > logging.DEBUG:
+            print(
+                "Re-run with --verbose for a full traceback.",
+                file=sys.stderr,
+            )
         raise SystemExit(2) from None
 
 

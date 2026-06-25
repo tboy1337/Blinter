@@ -431,19 +431,18 @@ class TestConfigurationIntegration:
             batch_file.close()  # Close file before reading on Windows
 
         try:
-            # Test with default config (should include S011)
+            # Test with default config (should include S020 for long lines)
             config_default = BlinterConfig()
             issues_default = lint_batch_file(batch_file.name, config=config_default)
-            s011_issues_default = [i for i in issues_default if i.rule.code == "S011"]
+            s020_issues_default = [i for i in issues_default if i.rule.code == "S020"]
 
-            # Test with S011 disabled
-            config_no_s011 = BlinterConfig(disabled_rules={"S011"})
-            issues_no_s011 = lint_batch_file(batch_file.name, config=config_no_s011)
-            s011_issues_filtered = [i for i in issues_no_s011 if i.rule.code == "S011"]
+            # Test with S020 disabled
+            config_no_s020 = BlinterConfig(disabled_rules={"S020"})
+            issues_no_s020 = lint_batch_file(batch_file.name, config=config_no_s020)
+            s020_issues_filtered = [i for i in issues_no_s020 if i.rule.code == "S020"]
 
-            # S011 should be present in default but not in filtered
-            assert len(s011_issues_default) > 0
-            assert len(s011_issues_filtered) == 0
+            assert len(s020_issues_default) > 0
+            assert len(s020_issues_filtered) == 0
 
         finally:
             try:
@@ -466,19 +465,18 @@ class TestConfigurationIntegration:
             batch_file.close()  # Close file before reading on Windows
 
         try:
-            # Test with max_line_length = 120 (should not trigger S011)
+            # Test with max_line_length = 120 (should not trigger S020)
             config_120 = BlinterConfig(max_line_length=120)
             issues_120 = lint_batch_file(batch_file.name, config=config_120)
-            s011_issues_120 = [i for i in issues_120 if i.rule.code == "S011"]
+            s020_issues_120 = [i for i in issues_120 if i.rule.code == "S020"]
 
-            # Test with max_line_length = 80 (should trigger S011)
+            # Test with max_line_length = 80 (should trigger S020)
             config_80 = BlinterConfig(max_line_length=80)
             issues_80 = lint_batch_file(batch_file.name, config=config_80)
-            s011_issues_80 = [i for i in issues_80 if i.rule.code == "S011"]
+            s020_issues_80 = [i for i in issues_80 if i.rule.code == "S020"]
 
-            # S011 should not trigger with 120 limit but should with 80 limit
-            assert len(s011_issues_120) == 0
-            assert len(s011_issues_80) > 0
+            assert len(s020_issues_120) == 0
+            assert len(s020_issues_80) > 0
 
         finally:
             try:
