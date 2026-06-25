@@ -87,22 +87,26 @@ def _is_in_subroutine_context(  # pylint: disable=unused-argument
     return False
 
 
+_SET_VAR_NAME = r"[A-Za-z0-9_@]+"
+
+
 def _collect_set_variables(lines: List[str]) -> Set[str]:
     """Collect all variables that are set in the script."""
     set_vars: Set[str] = set()
+    vn = _SET_VAR_NAME
     for line in lines:
         # Match different SET patterns, including quoted variable names
         # Use re.search instead of re.match to find SET commands anywhere in the line
         # This handles cases like: if not defined VAR set "VAR=value"
         patterns = [
-            r"\bset\s+([A-Za-z0-9_]+)=",  # Regular set: set VAR=value
-            r'\bset\s+"([A-Za-z0-9_]+)=',  # Quoted set: set "VAR=value"
-            r"\bset\s+/p\s+([A-Za-z0-9_]+)=",  # Set with prompt: set /p VAR=
-            r'\bset\s+/p\s+"([A-Za-z0-9_]+)=',  # Quoted set with prompt: set /p "VAR="
-            r"\bset\s+/a\s+([A-Za-z0-9_]+)=",  # Arithmetic set: set /a VAR=
-            r'\bset\s+/a\s+"([A-Za-z0-9_]+)=',  # Quoted arithmetic set: set /a "VAR="
-            r"\bset\s+/a\s+([A-Za-z0-9_]+)[+\-*/%]?=",  # Compound: set /a VAR+=1
-            r'\bset\s+/a\s+"([A-Za-z0-9_]+)[+\-*/%]?=',  # Quoted compound set /a
+            rf"\bset\s+({vn})=",  # Regular set: set VAR=value
+            rf'\bset\s+"({vn})=',  # Quoted set: set "VAR=value"
+            rf"\bset\s+/p\s+({vn})=",  # Set with prompt: set /p VAR=
+            rf'\bset\s+/p\s+"({vn})=',  # Quoted set with prompt: set /p "VAR="
+            rf"\bset\s+/a\s+({vn})=",  # Arithmetic set: set /a VAR=
+            rf'\bset\s+/a\s+"({vn})=',  # Quoted arithmetic set: set /a "VAR="
+            rf"\bset\s+/a\s+({vn})[+\-*/%]?=",  # Compound: set /a VAR+=1
+            rf'\bset\s+/a\s+"({vn})[+\-*/%]?=',  # Quoted compound set /a
         ]
 
         stripped_line = line.strip()
@@ -111,8 +115,14 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
                 var_name_text: str = set_match.group(1)
                 set_vars.add(var_name_text.upper())
 
+        for call_match in re.finditer(
+            r"\bcall\s+:getrepairsetup\s+([A-Za-z0-9_]+)",
+            stripped_line,
+            re.IGNORECASE,
+        ):
+            set_vars.add(str(call_match.group(1)).upper())
+
         # Handle dynamic variable assignments in FOR loops: set "%%~b=value"
-        # This pattern is commonly used to dynamically create variables based on loop iteration
         # Example: for %%a in (list) do (set "%%~a=value")
         dynamic_set_match = re.search(
             r'\bset\s+"%%~[a-zA-Z]=', line.strip(), re.IGNORECASE
@@ -176,6 +186,8 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
         "ONEDRIVECONSUMER",  # Consumer OneDrive
         "ONEDRIVECOMMERCIAL",  # Business OneDrive
         "DEBUG",  # Optional script-control flag from callers
+        "COMMONPROGRAMW6432",  # 64-bit common files on 64-bit Windows
+        "SAFEBOOT_OPTION",  # Set when Windows is in Safe Mode
     }
     set_vars.update(common_env_vars)
 

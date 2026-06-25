@@ -67,6 +67,15 @@ def _should_check_variable(
     return var_name not in available_vars
 
 
+def _is_doubled_percent_literal(line: str, match: re.Match[str]) -> bool:
+    """Return True when %VAR% is a batch-escaped literal (%%VAR%%) not expansion."""
+    start = match.start()
+    end = match.end()
+    if start > 0 and line[start - 1] == "%":
+        return True
+    return end < len(line) and line[end] == "%"
+
+
 def _check_undefined_variables(
     lines: List[str],
     set_vars: Set[str],
@@ -109,6 +118,9 @@ def _check_undefined_variables(
         available_vars = _get_available_vars_at_line(i, set_vars, called_scripts_vars)
 
         for match in var_usage_pattern.finditer(line):
+            if _is_doubled_percent_literal(line, match):
+                continue
+
             var_name: str = (match.group(1) or match.group(2) or "").upper()
 
             if macro_temp_pattern.match(var_name):

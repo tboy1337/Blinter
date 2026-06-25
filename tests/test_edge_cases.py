@@ -1511,6 +1511,38 @@ class TestGlobalChecks:
         issues = lint_batch_file(str(batch_file))
         assert not [i for i in issues if i.rule.code == "E006"]
 
+    def test_doubled_percent_literal_not_e006(self, tmp_path: Path) -> None:
+        """%%VAR%% in WMIC/WQL strings should not be treated as batch expansion."""
+        content = (
+            "@echo off\n"
+            "wmic path SoftwareLicensingProduct where "
+            "(Description like '%%KMSCLIENT%%') get ID\n"
+        )
+        batch_file = tmp_path / "wmic.cmd"
+        batch_file.write_text(content, encoding="utf-8")
+        issues = lint_batch_file(str(batch_file))
+        assert not [i for i in issues if i.rule.code == "E006"]
+
+    def test_call_subroutine_sets_variable_name(self, tmp_path: Path) -> None:
+        """CALL :label varname with set \"%%1=\" should define varname for E006."""
+        content = (
+            "@echo off\n"
+            "call :getrepairsetup myrepair 14\n"
+            'if exist "%myrepair%" echo ok\n'
+            ":getrepairsetup\n"
+            'set "%1=C:\\setup.exe"\n'
+            "exit /b\n"
+        )
+        batch_file = tmp_path / "repair.cmd"
+        batch_file.write_text(content, encoding="utf-8")
+        issues = lint_batch_file(str(batch_file))
+        assert not [i for i in issues if i.rule.code == "E006"]
+
+    def test_at_prefixed_set_variable_tracked(self) -> None:
+        """SET @VAR= should be collected for undefined-variable analysis."""
+        variables = _collect_set_variables(["SET @ZIPSTAMP=20260101"])
+        assert "@ZIPSTAMP" in variables
+
     def test_check_unreachable_code_after_exit(self) -> None:
         """Test unreachable code detection after EXIT."""
         lines = ["echo start", "exit /b 0", "echo unreachable"]

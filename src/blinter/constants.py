@@ -63,6 +63,8 @@ BUILTIN_VARS: Set[str] = {
     "ONEDRIVECOMMERCIAL",  # Business OneDrive
     # Optional script-control environment variables (often passed by callers)
     "DEBUG",
+    "COMMONPROGRAMW6432",  # 64-bit common files on 64-bit Windows
+    "SAFEBOOT_OPTION",  # Set when Windows is in Safe Mode
 }
 
 MAGIC_NUMBER_EXCEPTIONS: Set[str] = {
