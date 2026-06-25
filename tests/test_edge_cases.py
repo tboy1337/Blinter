@@ -35,6 +35,7 @@ from blinter.checkers.globals import (
     _check_inconsistent_indentation,
     _check_missing_header_doc,
     _check_missing_pause,
+    _check_nested_paren_mismatch,
     _check_new_global_rules,
     _check_redundant_operations,
     _check_unreachable_code,
@@ -1259,6 +1260,36 @@ class TestSecurityChecking:
             issues = _check_security_issues(line, 1)
             assert not [i for i in issues if i.rule.code == "SEC002"], line
 
+    def test_nested_if_else_blocks_not_e001(self) -> None:
+        """IF/ELSE parenthesis transitions should balance without E001."""
+        lines = [
+            "if %errorlevel% neq 0 (",
+            "    echo fail",
+            ") else (",
+            "    set ADMIN=1",
+            ")",
+        ]
+        issues = _check_nested_paren_mismatch(lines)
+        assert not issues
+
+    def test_for_do_with_in_clause_not_e001(self) -> None:
+        """FOR IN () DO () should not double-count the IN-clause parenthesis."""
+        lines = [
+            "for %%p in (!pow!) do (",
+            '    if "!str:~%%p,1!" neq "" (',
+            "        set /a len+=%%p",
+            "    )",
+            ")",
+        ]
+        issues = _check_nested_paren_mismatch(lines)
+        assert not issues
+
+    def test_unmatched_if_block_still_e001(self) -> None:
+        """A missing closing parenthesis should still trigger E001."""
+        issues = _check_nested_paren_mismatch(["if exist file.txt ("])
+        assert len(issues) == 1
+        assert issues[0].rule.code == "E001"
+
     def test_admin_privilege_commands(self) -> None:
         """Test detection of commands requiring admin privileges."""
         admin_commands = [
@@ -2296,6 +2327,18 @@ class TestSpecializedEdgeCases:
 
         issues = _check_enhanced_security_rules(lines)
         assert isinstance(issues, list)
+
+    def test_nul_macro_conditional_block_not_sec013(self) -> None:
+        """Redirect macros before && ( should not trigger SEC013."""
+        lines = ['sc query gcs | find /i "RUNNING" %nul% && (']
+        issues = _check_enhanced_security_rules(lines)
+        assert not [issue for issue in issues if issue.rule.code == "SEC013"]
+
+    def test_menu_setlocal_call_not_sec013(self) -> None:
+        """Menu dispatch via setlocal & call should not trigger SEC013."""
+        lines = ["if %_erl%==5 setlocal & call :KMSActivation"]
+        issues = _check_enhanced_security_rules(lines)
+        assert not [issue for issue in issues if issue.rule.code == "SEC013"]
 
     def test_enhanced_performance_function(self) -> None:
         """Test _check_enhanced_performance function."""

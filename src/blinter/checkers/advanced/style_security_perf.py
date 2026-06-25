@@ -15,6 +15,10 @@ from blinter.parsing.context import _is_comment_line
 from blinter.parsing.structure import _is_in_subroutine_context
 from blinter.rules.registry import RULES
 
+_REDIRECT_MACRO_VARS: frozenset[str] = frozenset(
+    {"nul", "nul1", "nul2", "nul3", "nul6", "_silent"}
+)
+
 
 def _check_advanced_security(
     line: str, line_number: int, lines: List[str], labels: Dict[str, int]
@@ -575,6 +579,10 @@ def _get_safe_command_patterns() -> List[str]:
         r"^[^&|]*\b(rd|md|mkdir|rmdir)\s+[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*>[^&|]*$",
         # Safe operations with multiple variables but no chaining
         r"^[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*%[a-zA-Z_][a-zA-Z0-9_]*%[^&|]*>[^&|]*$",
+        # Redirect macros used before conditional blocks (e.g. %nul% && ()
+        r"%[a-zA-Z_][a-zA-Z0-9_]*%\s*(?:&&|\|\|)\s*\(\s*$",
+        # Menu dispatch: if %_erl%==5 setlocal & call :subroutine
+        r"^if\s+%[^%]+%==\S+\s+setlocal\s*&\s*call\s+:\w+",
     ]
 
 
@@ -587,7 +595,10 @@ def _is_safe_command_injection(stripped: str) -> bool:
         List[str], re.findall(r"%([a-zA-Z_][a-zA-Z0-9_()]*)%", stripped)
     )
     uses_only_system_vars = all(
-        var in system_variables or var.startswith("~") or var.isdigit()
+        var in system_variables
+        or var.lower() in _REDIRECT_MACRO_VARS
+        or var.startswith("~")
+        or var.isdigit()
         for var in variables_in_line
     )
 

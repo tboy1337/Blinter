@@ -93,6 +93,41 @@ def _check_missing_exit_statement(  # pylint: disable=too-many-branches
     return issues
 
 
+def _has_executable_after(lines: List[str], start_index: int) -> bool:
+    """Return True when executable commands appear after start_index."""
+    for line in lines[start_index + 1 :]:
+        if _is_truly_executable_command(line.strip().lower()):
+            return True
+    return False
+
+
+def _is_else_transition(stripped: str) -> bool:
+    """Return True when a line closes a block and opens an ELSE branch."""
+    close_match = re.match(r"^\)(?:\s*(?:>>|[12]>|[<>]))?", stripped)
+    if not close_match:
+        return False
+    remainder = stripped[close_match.end() :].strip()
+    return bool(re.match(r"else\b", remainder, re.IGNORECASE))
+
+
+def _if_else_block_exits_reach_eof(
+    previous_depth: int,
+    paren_depth: int,
+    branch_state: tuple[bool, bool],
+    lines: List[str],
+    index: int,
+) -> bool:
+    """Return True when a completed IF/ELSE always exits and has no code after."""
+    if_branch_exited, else_branch_exited = branch_state
+    return (
+        previous_depth == 1
+        and paren_depth == 0
+        and if_branch_exited
+        and else_branch_exited
+        and not _has_executable_after(lines, index)
+    )
+
+
 def _can_main_execution_reach_eof(lines: List[str]) -> bool:
     """Determine if the main execution path can reach end-of-file without EXIT.
 
@@ -106,8 +141,11 @@ def _can_main_execution_reach_eof(lines: List[str]) -> bool:
     # Track whether we're in reachable code
     reachable = True
     paren_depth = 0
+    if_branch_exited = False
+    else_branch_exited = False
+    in_else_branch = False
 
-    for line in lines:
+    for index, line in enumerate(lines):
         stripped = line.strip().lower()
 
         # Skip empty lines and comments
@@ -119,30 +157,36 @@ def _can_main_execution_reach_eof(lines: List[str]) -> bool:
             reachable = True
             continue
 
-        # Update parentheses depth for IF/FOR blocks
+        previous_depth = paren_depth
         paren_depth = _update_paren_depth(stripped, paren_depth)
+        if paren_depth > previous_depth and re.search(
+            r"\bif\b", stripped, re.IGNORECASE
+        ):
+            if_branch_exited = False
+            else_branch_exited = False
+            in_else_branch = False
+        elif _is_else_transition(stripped):
+            in_else_branch = True
 
-        # Check for EXIT statements
         if re.match(r"exit\b", stripped):
-            # EXIT makes code unreachable
-            # But only if we're at the top level (not inside IF/FOR blocks)
             if paren_depth == 0:
                 reachable = False
                 continue
-
-        # Check for unconditional GOTO (not inside IF statement)
-        # GOTO at top level redirects control flow
-        if paren_depth == 0 and re.match(r"goto\s+", stripped):
-            # Check if it's GOTO :EOF (which is like EXIT)
-            if re.match(r"goto\s+:eof\b", stripped):
-                reachable = False
-                continue
-            # Other GOTO statements redirect flow, making subsequent code unreachable
-            # until we hit a label
+            if in_else_branch:
+                else_branch_exited = True
+            else:
+                if_branch_exited = True
+        elif _if_else_block_exits_reach_eof(
+            previous_depth,
+            paren_depth,
+            (if_branch_exited, else_branch_exited),
+            lines,
+            index,
+        ):
             reachable = False
-            continue
+        elif paren_depth == 0 and re.match(r"goto\s+", stripped):
+            reachable = False
 
-    # If we finished the scan and code is still reachable, we can reach EOF
     return reachable
 
 
@@ -268,15 +312,26 @@ def _scan_for_unreachable_code(
 
 def _update_paren_depth(line: str, current_depth: int) -> int:
     """Update parentheses depth based on the line content."""
-    # Match IF or FOR statements with opening parentheses
-    if re.search(r"\b(?:if|for)\b.*\(", line):
+    close_match = re.match(r"^\)(?:\s*(?:>>|[12]>|[<>]))?", line)
+    if close_match:
+        current_depth -= 1
+        remainder = line[close_match.end() :].strip()
+        if re.match(r"else\b", remainder, re.IGNORECASE) and re.search(
+            r"\(", remainder
+        ):
+            current_depth += 1
+        return current_depth
+
+    if re.search(r"\bfor\b", line, re.IGNORECASE):
+        if re.search(r"\bdo\s*\(\s*$", line, re.IGNORECASE):
+            return current_depth + 1
+        if re.search(r"\bfor\b.*\(", line, re.IGNORECASE):
+            return current_depth + 1
+        return current_depth
+
+    if re.search(r"\bif\b", line, re.IGNORECASE) and re.search(r"\(\s*$", line):
         return current_depth + 1
-    # Match closing parenthesis even with redirect operators
-    # Examples: ), ) >>file.txt, ) 2>&1, ) >>file.log 2>&1, ) >nul 2>&1
-    # Pattern: ) followed by optional whitespace and optional redirects
-    # Order matters: >> must be checked before > to avoid partial match
-    if re.match(r"^\)(?:\s*(?:>>|[12]>|[<>]))?", line):
-        return current_depth - 1
+
     return current_depth
 
 
