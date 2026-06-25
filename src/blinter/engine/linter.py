@@ -35,7 +35,6 @@ from blinter.parsing.structure import (
 def lint_batch_file(  # pylint: disable=too-many-locals
     file_path: str,
     config: Optional[BlinterConfig] = None,
-    dependency_graph: Optional[Dict[Path, Set[Path]]] = None,
     lines_cache: Optional[Dict[Path, List[str]]] = None,
 ) -> List[LintIssue]:
     """
@@ -53,8 +52,6 @@ def lint_batch_file(  # pylint: disable=too-many-locals
         file_path: Path to the batch file (.bat or .cmd) to lint.
                   Can be absolute or relative path.
         config: BlinterConfig object with configuration settings. If None, uses defaults.
-        dependency_graph: Reserved for CLI file traversal with ``--follow-calls``.
-                         Not used for variable availability during per-file linting.
         lines_cache: Optional shared dict mapping resolved file paths to line lists.
                      Reads and writes are synchronized for concurrent linting.
 
@@ -85,8 +82,6 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     # Use provided config or create default
     if config is None:
         config = BlinterConfig()
-
-    _ = dependency_graph  # Reserved for CLI file traversal; unused during linting.
 
     scan_root = config.scan_root
     if scan_root is None:

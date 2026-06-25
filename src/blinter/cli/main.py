@@ -4,11 +4,9 @@ import logging
 from pathlib import Path
 import sys
 from typing import (
-    Dict,
     List,
     NoReturn,
     Optional,
-    Set,
     Tuple,
 )
 
@@ -16,10 +14,7 @@ from blinter._version import __version__
 from blinter.cli.args import _parse_cli_arguments
 from blinter.config.loader import load_config
 from blinter.constants import MAX_FOLLOW_CALL_DEPTH, MAX_FOLLOW_CALL_FILES
-from blinter.engine.dependencies import (
-    _build_call_dependency_graph,
-    _extract_called_scripts,
-)
+from blinter.engine.dependencies import _extract_called_scripts
 from blinter.engine.lines_cache import get_cached_lines
 from blinter.engine.linter import lint_batch_file
 from blinter.io.discovery import find_batch_files, is_path_under_root
@@ -98,7 +93,6 @@ def _process_single_called_script(
     config: BlinterConfig,
     state: ProcessingState,
     parent_path: str,
-    dependency_graph: Optional[Dict[Path, Set[Path]]] = None,
 ) -> Tuple[int, int]:
     """
     Process a single called script.
@@ -131,7 +125,6 @@ def _process_single_called_script(
         called_issues = lint_batch_file(
             str(called_script),
             config=config,
-            dependency_graph=dependency_graph,
             lines_cache=state.lines_cache,
         )
         state.file_results[str(called_script)] = called_issues
@@ -168,7 +161,6 @@ def _process_called_scripts(
     config: BlinterConfig,
     state: ProcessingState,
     depth: int = 0,
-    dependency_graph: Optional[Dict[Path, Set[Path]]] = None,
 ) -> Tuple[int, int]:
     """
     Process all called scripts for a batch file.
@@ -210,7 +202,6 @@ def _process_called_scripts(
             config,
             state,
             str(batch_file),
-            dependency_graph=dependency_graph,
         )
         files_processed += result[0]
         files_with_errors += result[1]
@@ -219,7 +210,6 @@ def _process_called_scripts(
             config,
             state,
             depth + 1,
-            dependency_graph=dependency_graph,
         )
         files_processed += nested[0]
         files_with_errors += nested[1]
@@ -258,14 +248,6 @@ def _process_batch_files(
     files_with_errors = 0
     skipped_files: List[Tuple[str, str]] = []
 
-    dependency_graph: Optional[Dict[Path, Set[Path]]] = None
-    if config.follow_calls:
-        dependency_graph = _build_call_dependency_graph(
-            batch_files,
-            scan_root=config.scan_root,
-            lines_cache=state.lines_cache,
-        )
-
     for batch_file in batch_files:
         if batch_file.resolve() in state.processed_files:
             continue
@@ -274,7 +256,6 @@ def _process_batch_files(
             issues = lint_batch_file(
                 str(batch_file),
                 config=config,
-                dependency_graph=dependency_graph,
                 lines_cache=state.lines_cache,
             )
             state.file_results[str(batch_file)] = issues
@@ -291,7 +272,6 @@ def _process_batch_files(
                     batch_file,
                     config,
                     state,
-                    dependency_graph=dependency_graph,
                 )
                 total_files_processed += called_results[0]
                 files_with_errors += called_results[1]
@@ -427,17 +407,15 @@ def _plural(count: int, suffix: str = "s") -> str:
     return "" if count == 1 else suffix
 
 
-def _handle_skipped_files_exit(results: ProcessingResults, fatal_count: int) -> bool:
-    """Print skipped-file warning and exit when required. Returns True if exited."""
+def _handle_skipped_files_exit(results: ProcessingResults) -> None:
+    """Print skipped-file warning and exit with code 1 when any primary file was skipped."""
     if not results.skipped_files:
-        return False
+        return
     print(
         f"\nWARNING  {len(results.skipped_files)} batch file"
         f"{_plural(len(results.skipped_files))} could not be processed."
     )
-    if results.total_files_processed == 0 or fatal_count > 0:
-        sys.exit(1)
-    return False
+    sys.exit(1)
 
 
 def _exit_directory_results(results: ProcessingResults, fatal_count: int) -> None:
@@ -488,7 +466,7 @@ def _exit_single_file_results(results: ProcessingResults, fatal_count: int) -> N
 def _exit_with_results(results: ProcessingResults, target_path: str) -> None:
     """Exit with appropriate code based on results."""
     fatal_count = _count_fatal_issues(results.all_issues)
-    _handle_skipped_files_exit(results, fatal_count)
+    _handle_skipped_files_exit(results)
 
     if Path(target_path).is_dir():
         _exit_directory_results(results, fatal_count)

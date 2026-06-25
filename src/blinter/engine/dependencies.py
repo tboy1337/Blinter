@@ -383,6 +383,97 @@ def _collect_vars_from_dependencies(
     return {0: all_vars} if all_vars else {}
 
 
+@dataclass
+class _TransitiveVarContext:
+    """Shared state for transitive SET variable collection across CALL targets."""
+
+    batch_file_resolved: Path
+    scan_root: Optional[str]
+    lines_cache: Optional[Dict[Path, List[str]]]
+    visiting: Set[Path]
+    files_read: Set[Path]
+
+
+def _var_collect_blocked(
+    resolved_script: Path,
+    depth: int,
+    ctx: _TransitiveVarContext,
+) -> bool:
+    """Return True when variable collection must not proceed for resolved_script."""
+    if resolved_script == ctx.batch_file_resolved:
+        return True
+    if not _is_within_scan_root(resolved_script, ctx.scan_root):
+        logger.debug("Skipping called script outside scan root: %s", resolved_script)
+        return True
+    if depth > MAX_FOLLOW_CALL_DEPTH:
+        logger.warning(
+            "CALL dependency depth exceeded %d at %s; stopping variable collection",
+            MAX_FOLLOW_CALL_DEPTH,
+            resolved_script,
+        )
+        return True
+    if resolved_script in ctx.visiting:
+        logger.warning(
+            "Circular CALL dependency detected at %s; stopping variable collection",
+            resolved_script,
+        )
+        return True
+    if len(ctx.files_read) >= MAX_FOLLOW_CALL_FILES:
+        _warn_call_file_limit()
+        return True
+    return False
+
+
+def _collect_script_vars_deep(
+    script_path: Path,
+    depth: int,
+    ctx: _TransitiveVarContext,
+) -> Set[str]:
+    """Collect SET variables from script_path and reachable callees."""
+    if not (script_path.exists() and script_path.is_file()):
+        logger.warning("Could not read called script %s: file not found", script_path)
+        return set()
+
+    try:
+        resolved_script = script_path.resolve()
+    except (ValueError, OSError):
+        return set()
+
+    if _var_collect_blocked(resolved_script, depth, ctx):
+        return set()
+
+    ctx.visiting.add(resolved_script)
+    ctx.files_read.add(resolved_script)
+
+    cached_lines = get_cached_lines(ctx.lines_cache, resolved_script)
+    called_lines = _read_batch_lines(
+        script_path, lines=cached_lines, warn_on_read_failure=True
+    )
+    called_vars: Set[str] = set()
+    if called_lines is not None:
+        called_vars = _collect_set_variables(called_lines)
+        called_vars.discard("__DYNAMIC_VARS__")
+
+        for nested_script in _extract_called_scripts(
+            script_path,
+            scan_root=ctx.scan_root,
+            lines=called_lines,
+        ):
+            if len(ctx.files_read) >= MAX_FOLLOW_CALL_FILES:
+                _warn_call_file_limit()
+                break
+            called_vars.update(
+                _collect_script_vars_deep(
+                    nested_script,
+                    depth + 1,
+                    ctx,
+                )
+            )
+
+    ctx.visiting.discard(resolved_script)
+    return called_vars
+
+
 def _collect_vars_from_script(
     script_path: Path,
     batch_file_resolved: Path,
@@ -390,7 +481,10 @@ def _collect_vars_from_script(
     lines_cache: Optional[Dict[Path, List[str]]] = None,
 ) -> Set[str]:
     """
-    Collect variables from a called script.
+    Collect variables from a called script and its reachable callees.
+
+    Transitive collection respects ``MAX_FOLLOW_CALL_DEPTH`` and
+    ``MAX_FOLLOW_CALL_FILES`` using the same limits as CLI follow-call traversal.
 
     Args:
         script_path: Path to the called script
@@ -398,29 +492,16 @@ def _collect_vars_from_script(
         scan_root: Optional root directory; paths outside it are skipped
 
     Returns:
-        Set of variable names defined in the called script
+        Set of variable names defined in the script and its reachable callees
     """
-    if not (script_path.exists() and script_path.is_file()):
-        logger.warning("Could not read called script %s: file not found", script_path)
-        return set()
-
-    if script_path.resolve() == batch_file_resolved:
-        return set()
-
-    if not _is_within_scan_root(script_path, scan_root):
-        logger.debug("Skipping called script outside scan root: %s", script_path)
-        return set()
-
-    cached_lines = get_cached_lines(lines_cache, script_path)
-    called_lines = _read_batch_lines(
-        script_path, lines=cached_lines, warn_on_read_failure=True
+    ctx = _TransitiveVarContext(
+        batch_file_resolved=batch_file_resolved,
+        scan_root=scan_root,
+        lines_cache=lines_cache,
+        visiting=set(),
+        files_read=set(),
     )
-    if called_lines is None:
-        return set()
-
-    called_vars = _collect_set_variables(called_lines)
-    called_vars.discard("__DYNAMIC_VARS__")
-    return called_vars
+    return _collect_script_vars_deep(script_path, 0, ctx)
 
 
 def _vars_from_call_line(

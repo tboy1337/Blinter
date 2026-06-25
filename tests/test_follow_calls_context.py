@@ -185,6 +185,99 @@ class TestFollowCallsVariableContext:
             assert len(var1_issues) == 0, "VAR1 should be recognized as defined"
             assert len(var2_issues) == 0, "VAR2 should be recognized as defined"
 
+    def test_transitive_variable_from_nested_call_no_error(self) -> None:
+        """Variables defined in a transitively called script are recognized."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            deep_script = os.path.join(tmpdir, "deep.bat")
+            with open(deep_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write("SET DEEP_VAR=deep_value\n")
+                file_handle.write("EXIT /b 0\n")
+
+            helper_script = os.path.join(tmpdir, "helper.bat")
+            with open(helper_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write(f'CALL "{deep_script}"\n')
+                file_handle.write("EXIT /b 0\n")
+
+            main_script = os.path.join(tmpdir, "main.bat")
+            with open(main_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write(f'CALL "{helper_script}"\n')
+                file_handle.write("ECHO Using deep variable: %DEEP_VAR%\n")
+                file_handle.write("EXIT /b 0\n")
+
+            config = BlinterConfig(follow_calls=True)
+            issues = lint_batch_file(main_script, config=config)
+
+            e006_issues = [
+                i for i in issues if i.rule.code == "E006" and "DEEP_VAR" in i.context
+            ]
+            assert (
+                len(e006_issues) == 0
+            ), "DEEP_VAR should be recognized via transitive CALL"
+
+    def test_transitive_variable_respects_depth_limit(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Variables beyond MAX_FOLLOW_CALL_DEPTH remain undefined."""
+        monkeypatch.setattr("blinter.engine.dependencies.MAX_FOLLOW_CALL_DEPTH", 0)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            deep_script = os.path.join(tmpdir, "deep.bat")
+            with open(deep_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write("SET DEEP_VAR=deep_value\n")
+                file_handle.write("EXIT /b 0\n")
+
+            helper_script = os.path.join(tmpdir, "helper.bat")
+            with open(helper_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write(f'CALL "{deep_script}"\n')
+                file_handle.write("EXIT /b 0\n")
+
+            main_script = os.path.join(tmpdir, "main.bat")
+            with open(main_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write(f'CALL "{helper_script}"\n')
+                file_handle.write("ECHO Using deep variable: %DEEP_VAR%\n")
+                file_handle.write("EXIT /b 0\n")
+
+            config = BlinterConfig(follow_calls=True)
+            issues = lint_batch_file(main_script, config=config)
+
+            e006_issues = [
+                i for i in issues if i.rule.code == "E006" and "DEEP_VAR" in i.context
+            ]
+            assert len(e006_issues) == 1
+
+    def test_transitive_variable_respects_file_limit(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Transitive variable collection stops at MAX_FOLLOW_CALL_FILES."""
+        monkeypatch.setattr("blinter.engine.dependencies.MAX_FOLLOW_CALL_FILES", 1)
+
+        helper_c = tmp_path / "c.bat"
+        helper_c.write_text("@ECHO OFF\nSET C_VAR=2\n", encoding="utf-8")
+        helper_b = tmp_path / "b.bat"
+        helper_b.write_text(
+            f'@ECHO OFF\nSET B_VAR=1\nCALL "{helper_c}"\n',
+            encoding="utf-8",
+        )
+        main_script = tmp_path / "main.bat"
+        main_script.write_text(
+            f'@ECHO OFF\nCALL "{helper_b}"\nECHO %B_VAR% %C_VAR%\n',
+            encoding="utf-8",
+        )
+
+        config = BlinterConfig(follow_calls=True)
+        issues = lint_batch_file(str(main_script), config=config)
+
+        e006_c = [i for i in issues if i.rule.code == "E006" and "C_VAR" in i.context]
+        assert len(e006_c) == 1
+        e006_b = [i for i in issues if i.rule.code == "E006" and "B_VAR" in i.context]
+        assert len(e006_b) == 0
+
     def test_nonexistent_called_script_graceful_handling(self) -> None:
         """Should handle gracefully when called script doesn't exist."""
         with tempfile.TemporaryDirectory() as tmpdir:

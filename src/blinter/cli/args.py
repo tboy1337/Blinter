@@ -140,9 +140,19 @@ class _ArgParseState:  # pylint: disable=too-many-instance-attributes
     config_path: Optional[str] = None
 
 
+def _warn_severity_flag_deprecated() -> _ArgHandlerResult:
+    """Warn that ``--severity`` is deprecated and has no effect."""
+    print(
+        "Warning: --severity is deprecated and has no effect. "
+        "Use min_severity in blinter.ini instead.",
+        file=sys.stderr,
+    )
+    return (None, None, None, None, None)
+
+
 _ARG_HANDLERS: Dict[str, Callable[[], _ArgHandlerResult]] = {
     "--summary": lambda: (None, None, True, None, None),
-    "--severity": lambda: (None, None, None, None, None),
+    "--severity": _warn_severity_flag_deprecated,
     "--no-recursive": lambda: (None, None, None, False, None),
     "--no-config": lambda: (None, False, None, None, None),
     "--follow-calls": lambda: (None, None, None, None, True),

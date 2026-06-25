@@ -67,9 +67,9 @@ python -m venv venv
 venv\Scripts\activate.bat
 ```
 
-3. (Optional but recommended) Install dependencies:
+3. Install development dependencies (includes runtime deps):
 ```cmd
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 ### Prerequisites
@@ -181,10 +181,10 @@ blinter --version
 
 - `<path>`: Path to a batch file (`.bat` or `.cmd`) OR directory containing batch files
 - `--summary`: Display summary statistics of issues found
-- `--severity`: Legacy flag (no effect); severity breakdown is always shown in output
+- `--severity`: Deprecated legacy flag (emits a warning, no effect); use `min_severity` in `blinter.ini` instead
 - `--max-line-length <n>`: Set maximum line length for S011 rule (default: 100)
 - `--no-recursive`: When processing directories, only analyze files in the specified directory (not subdirectories)
-- `--follow-calls`: Automatically analyze scripts called by CALL statements and merge their variable context. When enabled, variables defined in called scripts are recognized as "defined" in the calling script (position-aware: only after the CALL statement). This eliminates false positive undefined variable errors for configuration scripts
+- `--follow-calls`: Automatically analyze scripts called by CALL statements and merge their variable context. When enabled, variables defined in called scripts (including transitively called scripts within depth and file limits) are recognized as "defined" in the calling script (position-aware: only after the CALL statement). This eliminates false positive undefined variable errors for configuration scripts
 - `--config <path>`: Load settings from a custom configuration file instead of `blinter.ini` in the current directory
 - `--no-config`: Don't use configuration file (blinter.ini) even if it exists
 - `--create-config`: Create a default blinter.ini configuration file and exit
@@ -428,8 +428,8 @@ The `blinter` CLI exit codes:
 
 | Code | Meaning |
 |------|---------|
-| **0** | Success: no Error or Security findings, and at least one file was processed (skipped files may still be reported with a warning) |
-| **1** | Lint failure: any **Error** or **Security** finding, CLI/path errors, no processable files, skipped files together with fatal findings, or all discovered files failed to read |
+| **0** | Success: no Error or Security findings, and every discovered primary file was processed |
+| **1** | Lint failure: any **Error** or **Security** finding, CLI/path errors, no processable files, any skipped primary target files, or all discovered files failed to read |
 | **2** | Unexpected internal error |
 
 Warnings and style issues alone do not fail the run when exit code would otherwise be 0.

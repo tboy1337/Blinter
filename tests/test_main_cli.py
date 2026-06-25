@@ -18,7 +18,7 @@ from blinter import (
     find_batch_files,
     main,
 )
-from blinter.cli.args import _parse_cli_arguments
+from blinter.cli.args import _parse_cli_arguments, _parse_regular_arguments
 from blinter.cli.main import (
     _apply_cli_config_overrides,
     _configure_cli_logging,
@@ -684,7 +684,6 @@ class TestCommandLineIntegration:
         def selective_lint(
             file_path: str,
             config: BlinterConfig | None = None,
-            dependency_graph: dict[Path, set[Path]] | None = None,
             lines_cache: dict[Path, list[str]] | None = None,
         ) -> list[LintIssue]:
             if Path(file_path).name == "bad.bat":
@@ -692,7 +691,6 @@ class TestCommandLineIntegration:
             return engine_lint_batch_file(
                 file_path,
                 config=config,
-                dependency_graph=dependency_graph,
                 lines_cache=lines_cache,
             )
 
@@ -702,11 +700,9 @@ class TestCommandLineIntegration:
                     main()
 
         captured = capsys.readouterr()
-        assert exit_info.value.code == 0
+        assert exit_info.value.code == 1
         assert "internal lint error" in captured.err
         assert "Processed 1 batch file" in captured.out
-
-    def test_main_entry_point_execution(self) -> None:
         """Test python -m blinter entry point via subprocess."""
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".bat", delete=False, encoding="utf-8"
@@ -1852,13 +1848,12 @@ class TestFollowCallsProcessing:  # pylint: disable=too-few-public-methods
         assert (processed, errors) == (0, 0)
         assert helper.resolve() not in state.processed_files
 
-    def test_process_single_called_script_passes_shared_cache_and_graph(
+    def test_process_single_called_script_passes_shared_cache(
         self, tmp_path: Path
     ) -> None:
-        """Called scripts receive the shared lines_cache and dependency_graph."""
+        """Called scripts receive the shared lines_cache."""
         helper = tmp_path / "helper.bat"
         helper.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
-        graph: Dict[Path, Set[Path]] = {helper.resolve(): set()}
 
         state = ProcessingState(
             processed_files=set(),
@@ -1875,13 +1870,11 @@ class TestFollowCallsProcessing:  # pylint: disable=too-few-public-methods
                 config,
                 state,
                 "parent.bat",
-                dependency_graph=graph,
             )
 
         mock_lint.assert_called_once_with(
             str(helper),
             config=config,
-            dependency_graph=graph,
             lines_cache=state.lines_cache,
         )
 
@@ -1912,6 +1905,16 @@ class TestCLIArgumentValidation:  # pylint: disable=too-few-public-methods
                 with pytest.raises(SystemExit) as exc_info:
                     _parse_cli_arguments()
                 assert exc_info.value.code == 1
+
+    def test_severity_flag_emits_deprecation_warning(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """--severity emits a deprecation warning and has no effect."""
+        with patch.object(sys, "argv", ["blinter.py", "test.bat", "--severity"]):
+            _parse_regular_arguments()
+        captured = capsys.readouterr()
+        assert "deprecated" in captured.err.lower()
+        assert "min_severity" in captured.err
 
     def test_create_config_writes_default_file(self) -> None:
         """--create-config should write blinter.ini and exit early."""
@@ -2061,8 +2064,8 @@ class TestCliFatalExitCodes:  # pylint: disable=too-few-public-methods
 class TestCliSkippedFilesExitCodes:  # pylint: disable=too-few-public-methods
     """Test CLI exit codes when some files cannot be processed."""
 
-    def test_cli_exits_0_when_some_files_skipped_but_others_ok(self) -> None:
-        """Partial skips warn but exit 0 when remaining files lint cleanly."""
+    def test_cli_exits_1_when_some_files_skipped_but_others_ok(self) -> None:
+        """Partial skips exit 1 even when remaining files lint cleanly."""
         with tempfile.TemporaryDirectory() as tmpdir:
             good_bat = os.path.join(tmpdir, "good.bat")
             bad_bat = os.path.join(tmpdir, "bad.bat")
@@ -2084,7 +2087,7 @@ class TestCliSkippedFilesExitCodes:  # pylint: disable=too-few-public-methods
                 with patch.object(sys, "argv", ["blinter", tmpdir]):
                     with pytest.raises(SystemExit) as exc_info:
                         main()
-                    assert exc_info.value.code == 0
+                    assert exc_info.value.code == 1
 
     def test_cli_exits_0_when_all_files_processed(self) -> None:
         """All files processed successfully with no fatal findings exits 0."""
@@ -2175,7 +2178,7 @@ class TestCliStdioAndModuleEntry:
                     with pytest.raises(SystemExit) as exit_info:
                         main()
 
-            assert exit_info.value.code == 0
+            assert exit_info.value.code == 1
             captured = capsys.readouterr()
             assert "Skipped files" in captured.out
             assert "bad.bat" in captured.out
