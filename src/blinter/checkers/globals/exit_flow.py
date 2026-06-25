@@ -2,8 +2,10 @@
 
 import re
 from typing import (
+    Dict,
     List,
     Optional,
+    Set,
 )
 
 from blinter.models import LintIssue
@@ -70,7 +72,7 @@ def _check_missing_exit_statement(  # pylint: disable=too-many-branches
 
     # Now check if the main execution path reaches EOF without EXIT
     # Scan backwards from end of file to find if we can reach EOF
-    can_reach_eof = _can_main_execution_reach_eof(lines)
+    can_reach_eof = _can_execution_reach_eof(lines)
 
     if can_reach_eof:
         # Find the last line of executable code to report the issue there
@@ -128,25 +130,71 @@ def _if_else_block_exits_reach_eof(
     )
 
 
+def _build_label_index(lines: List[str]) -> Dict[str, int]:
+    """Map normalized label names to zero-based line indices."""
+    labels: Dict[str, int] = {}
+    for index, line in enumerate(lines):
+        stripped = line.strip().lower()
+        if not stripped.startswith(":") or stripped.startswith("::"):
+            continue
+        label_content = stripped[1:]
+        if re.search(r"[a-zA-Z0-9]", label_content):
+            labels[stripped] = index
+    return labels
+
+
+def _normalize_goto_target(target: str) -> str:
+    """Normalize a GOTO target to lowercase label form ``:name``."""
+    normalized = target.lower().strip()
+    if not normalized.startswith(":"):
+        normalized = f":{normalized}"
+    return normalized
+
+
+def _parse_goto_target(stripped: str) -> Optional[str]:
+    """Extract and normalize the label target from a GOTO line."""
+    match = re.match(r"goto\s+(\S+)", stripped, re.IGNORECASE)
+    if match is None:
+        return None
+    return _normalize_goto_target(match.group(1))
+
+
+def _is_goto_eof_target(target: str) -> bool:
+    """Return True when GOTO targets the implicit end-of-file label."""
+    return target.lstrip(":") == "eof"
+
+
 def _can_main_execution_reach_eof(lines: List[str]) -> bool:
-    """Determine if the main execution path can reach end-of-file without EXIT.
+    """Determine if the main execution path can reach EOF without EXIT."""
+    return _can_execution_reach_eof(lines)
+
+
+def _can_execution_reach_eof(  # pylint: disable=too-many-branches,too-many-return-statements
+    lines: List[str],
+    start_index: int = 0,
+    visiting_labels: Optional[Set[str]] = None,
+) -> bool:
+    """Determine if execution from start_index can reach EOF without EXIT.
 
     This performs a forward scan through the script tracking whether we can
     reach EOF. It considers:
     - EXIT statements (blocks path to EOF)
-    - GOTO statements (may redirect control flow)
+    - GOTO statements (follows label targets when resolvable)
     - Labels (can be jumped to)
     - Conditional blocks (IF/FOR with parentheses)
     """
-    # Track whether we're in reachable code
+    if visiting_labels is None:
+        visiting_labels = set()
+
+    labels = _build_label_index(lines)
     reachable = True
     paren_depth = 0
     if_branch_exited = False
     else_branch_exited = False
     in_else_branch = False
 
-    for index, line in enumerate(lines):
-        stripped = line.strip().lower()
+    for index in range(start_index, len(lines)):
+        stripped = lines[index].strip().lower()
 
         # Skip empty lines and comments
         if not stripped or stripped.startswith("rem") or stripped.startswith("::"):
@@ -170,8 +218,7 @@ def _can_main_execution_reach_eof(lines: List[str]) -> bool:
 
         if re.match(r"exit\b", stripped):
             if paren_depth == 0:
-                reachable = False
-                continue
+                return False
             if in_else_branch:
                 else_branch_exited = True
             else:
@@ -183,9 +230,22 @@ def _can_main_execution_reach_eof(lines: List[str]) -> bool:
             lines,
             index,
         ):
-            reachable = False
+            return False
         elif paren_depth == 0 and re.match(r"goto\s+", stripped):
-            reachable = False
+            target = _parse_goto_target(stripped)
+            if target is None or _is_goto_eof_target(target):
+                return False
+            if target in visiting_labels:
+                return False
+            label_index = labels.get(target)
+            if label_index is None:
+                return False
+            visiting_labels.add(target)
+            return _can_execution_reach_eof(
+                lines,
+                start_index=label_index,
+                visiting_labels=visiting_labels,
+            )
 
     return reachable
 

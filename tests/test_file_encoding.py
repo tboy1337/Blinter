@@ -14,7 +14,7 @@ from blinter import (
     lint_batch_file,
     read_file_with_encoding,
 )
-from blinter.constants import MAX_FILE_SIZE_BYTES
+from blinter.constants import MAX_FILE_SIZE_BYTES, MAX_LINE_LENGTH
 from blinter.io.encoding import _validate_and_read_file
 
 _VALIDATE_FILE_PATCH = patch(
@@ -744,6 +744,23 @@ class TestFileSizeLimit:  # pylint: disable=too-few-public-methods
 
         with pytest.raises(ValueError, match="exceeds maximum size"):
             read_file_with_encoding(str(big_file))
+
+
+class TestLineLengthLimit:  # pylint: disable=too-few-public-methods
+    """Test maximum per-line length enforcement."""
+
+    def test_rejects_line_exceeding_max_length(self, tmp_path: Path) -> None:
+        """Lines longer than MAX_LINE_LENGTH are rejected at read time."""
+        within_limit = "A" * (MAX_LINE_LENGTH - 1) + "\n"
+        overflow = "B" * MAX_LINE_LENGTH + "\n"
+        bat_file = tmp_path / "longline.bat"
+        bat_file.write_text(f"@echo off\n{within_limit}{overflow}", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="exceeds maximum length"):
+            _validate_and_read_file(str(bat_file))
+
+        with pytest.raises(ValueError, match="exceeds maximum length"):
+            read_file_with_encoding(str(bat_file))
 
 
 class TestLineEndingStandaloneDetection:

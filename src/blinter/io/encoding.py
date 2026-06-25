@@ -11,7 +11,11 @@ from typing import (
 
 from charset_normalizer import from_bytes
 
-from blinter.constants import LARGE_FILE_WARNING_BYTES, MAX_FILE_SIZE_BYTES
+from blinter.constants import (
+    LARGE_FILE_WARNING_BYTES,
+    MAX_FILE_SIZE_BYTES,
+    MAX_LINE_LENGTH,
+)
 from blinter.logging_config import logger
 
 LineEndingInfo = Tuple[str, bool, int, int, int]
@@ -226,6 +230,16 @@ def _detect_charset_norm_bytes(raw_data: bytes, encodings_list: List[str]) -> Li
     return encodings_list
 
 
+def _validate_line_lengths(lines: List[str], file_path: str) -> None:
+    """Reject files containing lines longer than MAX_LINE_LENGTH."""
+    for line_num, line in enumerate(lines, start=1):
+        if len(line) > MAX_LINE_LENGTH:
+            raise ValueError(
+                f"Line {line_num} exceeds maximum length of {MAX_LINE_LENGTH} "
+                f"characters in file: {file_path}"
+            )
+
+
 def _try_decode_bytes(raw_data: bytes, encoding: str) -> Optional[List[str]]:
     """Attempt to decode bytes with a specific encoding."""
     try:
@@ -260,6 +274,7 @@ def _read_lines_from_bytes(file_path: str, raw_data: bytes) -> Tuple[List[str], 
     for encoding in encodings_to_try:
         lines = _try_decode_bytes(raw_data, encoding)
         if lines is not None:
+            _validate_line_lengths(lines, file_path)
             return lines, encoding
 
     raise OSError(

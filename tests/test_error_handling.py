@@ -20,6 +20,7 @@ from blinter import (
 from blinter.checkers.security import _check_security_issues
 from blinter.checkers.syntax import _check_syntax_errors
 from blinter.checkers.warnings import _check_warning_issues
+from blinter.io.discovery import is_path_under_root
 from blinter.io.encoding import _detect_line_endings
 
 
@@ -119,6 +120,23 @@ class TestRealWorldErrorHandling:
             # Should detect S020 (long line without continuation)
             long_line_issues = [i for i in issues if i.rule.code == "S020"]
             assert len(long_line_issues) >= 1
+        finally:
+            os.unlink(temp_path)
+
+    def test_rejects_file_with_line_exceeding_max_length(self) -> None:
+        """Files with a single line beyond MAX_LINE_LENGTH must be rejected."""
+        from blinter.constants import MAX_LINE_LENGTH
+
+        content = "@ECHO OFF\n" + ("A" * (MAX_LINE_LENGTH + 1)) + "\n"
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8"
+        ) as temp_file:
+            temp_file.write(content)
+            temp_path = temp_file.name
+
+        try:
+            with pytest.raises(ValueError, match="exceeds maximum length"):
+                lint_batch_file(temp_path)
         finally:
             os.unlink(temp_path)
 
@@ -543,3 +561,23 @@ class TestDiscoverySandbox:  # pylint: disable=too-few-public-methods
         text_file.write_text("@echo off\n", encoding="utf-8")
         with pytest.raises(ValueError, match="not a batch file"):
             lint_batch_file(str(text_file))
+
+    def test_is_path_under_root_rejects_relative_symlink_outside_root(
+        self, tmp_path: Path
+    ) -> None:
+        """Relative symlink targets resolving outside scan_root are rejected."""
+        scan_root = tmp_path / "project"
+        outside_dir = tmp_path / "outside"
+        scan_root.mkdir()
+        outside_dir.mkdir()
+
+        outside_file = outside_dir / "secret.bat"
+        outside_file.write_text("@echo off\n", encoding="utf-8")
+
+        escape_link = scan_root / "escape.bat"
+        try:
+            os.symlink("../../outside/secret.bat", escape_link)
+        except OSError:
+            pytest.skip("symlink creation not supported on this platform")
+
+        assert is_path_under_root(escape_link, scan_root) is False

@@ -52,8 +52,8 @@ def _check_advanced_security(
 
     # SEC014: Unescaped user input in command execution
     # Only check if we're NOT in a subroutine context
-    # In subroutines, %1, %2, etc. refer to subroutine parameters, not user input
-    if "%1" in stripped or "%2" in stripped or "%*" in stripped:
+    # In subroutines, %1-%9 and %* refer to subroutine parameters, not user input
+    if re.search(r"%([1-9]|\*)", stripped):
         # Skip this check if we're inside a subroutine
         if not _is_in_subroutine_context(lines, line_number, labels):
             # Check for user parameters used without proper escaping

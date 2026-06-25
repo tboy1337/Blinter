@@ -21,10 +21,12 @@ from blinter import (
 from blinter.engine.dependencies import (
     _build_call_dependency_graph,
     _collect_called_vars,
+    _collect_vars_from_dependencies,
     _extract_called_scripts,
     _is_within_scan_root,
     _read_batch_lines,
     _resolve_script_path,
+    _try_add_dependency,
 )
 from blinter.io.discovery import is_path_under_root
 
@@ -880,3 +882,68 @@ class TestDependenciesInternals:
             side_effect=ValueError("too large"),
         ):
             assert _read_batch_lines(script) is None
+
+    def test_resolve_script_path_d0_expansion(self, tmp_path: Path) -> None:
+        """%~d0 expands to the drive letter of the batch file directory."""
+        resolved = _resolve_script_path(
+            "%~d0\\subdir\\helper.bat", tmp_path / "scripts"
+        )
+        expected_drive = (tmp_path / "scripts").drive
+        assert resolved == Path(f"{expected_drive}\\subdir\\helper.bat")
+
+    def test_extract_called_scripts_deduplicates(self, tmp_path: Path) -> None:
+        """Duplicate CALL targets appear only once in the result list."""
+        helper = tmp_path / "helper.bat"
+        helper.write_text("@ECHO OFF\n", encoding="utf-8")
+        main_script = tmp_path / "main.bat"
+        main_script.write_text(
+            f'CALL "{helper}"\nCALL "{helper}"\n',
+            encoding="utf-8",
+        )
+        called = _extract_called_scripts(main_script, scan_root=str(tmp_path))
+        assert len(called) == 1
+        assert called[0].resolve() == helper.resolve()
+
+    def test_try_add_dependency_skips_outside_scan_root(self) -> None:
+        """Dependencies outside scan_root are not added."""
+        with tempfile.TemporaryDirectory() as outer:
+            scan_root = Path(outer) / "project"
+            outside = Path(outer) / "outside.bat"
+            scan_root.mkdir()
+            outside.write_text("@ECHO OFF\n", encoding="utf-8")
+            deps: set[Path] = set()
+            _try_add_dependency(
+                outside,
+                (scan_root / "main.bat").resolve(),
+                deps,
+                scan_root=str(scan_root),
+            )
+            assert deps == set()
+
+    def test_collect_vars_from_dependencies_respects_file_limit(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Variable collection stops at MAX_FOLLOW_CALL_FILES."""
+        monkeypatch.setattr(
+            "blinter.engine.dependencies.MAX_FOLLOW_CALL_FILES",
+            1,
+        )
+        helper_b = tmp_path / "b.bat"
+        helper_b.write_text("@ECHO OFF\nSET B_VAR=1\n", encoding="utf-8")
+        helper_c = tmp_path / "c.bat"
+        helper_c.write_text("@ECHO OFF\nSET C_VAR=2\n", encoding="utf-8")
+        main_script = tmp_path / "main.bat"
+        main_script.write_text(
+            f'CALL "{helper_b}"\nCALL "{helper_c}"\n',
+            encoding="utf-8",
+        )
+        graph = _build_call_dependency_graph([main_script], scan_root=str(tmp_path))
+        called_vars = _collect_vars_from_dependencies(
+            main_script.resolve(),
+            graph,
+            scan_root=str(tmp_path),
+        )
+        assert 0 in called_vars
+        collected = called_vars[0]
+        assert ("B_VAR" in collected) ^ ("C_VAR" in collected)
+        assert not ("B_VAR" in collected and "C_VAR" in collected)

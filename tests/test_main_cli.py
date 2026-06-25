@@ -23,9 +23,10 @@ from blinter.cli.args import _parse_cli_arguments
 from blinter.cli.main import (
     _apply_cli_config_overrides,
     _configure_cli_logging,
+    _process_single_called_script,
     main as cli_main,
 )
-from blinter.models import BlinterConfig, CliArguments
+from blinter.models import BlinterConfig, CliArguments, ProcessingState
 
 # pylint: disable=too-many-lines,redefined-outer-name,reimported
 
@@ -1676,6 +1677,74 @@ class TestCliLogging:  # pylint: disable=too-few-public-methods
         blinter_logger.handlers.clear()
         _configure_cli_logging(logging.ERROR)
         assert blinter_logger.level == logging.ERROR
+
+    def test_configure_cli_logging_removes_closed_handler(self) -> None:
+        """Closed CLI stream handlers are replaced with a fresh stderr handler."""
+        import io
+
+        blinter_logger = logging.getLogger("blinter")
+        blinter_logger.handlers.clear()
+
+        closed_stream = io.StringIO()
+        closed_stream.close()
+        stale_handler = logging.StreamHandler(closed_stream)
+        setattr(stale_handler, "blinter_cli_handler", True)
+        blinter_logger.addHandler(stale_handler)
+
+        _configure_cli_logging()
+        assert len(blinter_logger.handlers) == 1
+        handler = blinter_logger.handlers[0]
+        assert isinstance(handler, logging.StreamHandler)
+        assert handler.stream is sys.stderr
+
+
+class TestFollowCallsProcessing:  # pylint: disable=too-few-public-methods
+    """Test follow-calls processing limits in CLI."""
+
+    def test_process_single_called_script_skips_at_file_limit(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Called scripts are skipped once MAX_FOLLOW_CALL_FILES is reached."""
+        monkeypatch.setattr("blinter.cli.main.MAX_FOLLOW_CALL_FILES", 1)
+
+        helper = tmp_path / "helper.bat"
+        helper.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+        existing = tmp_path / "existing.bat"
+
+        state = ProcessingState(
+            processed_files={existing.resolve()},
+            all_issues=[],
+            file_results={},
+            processed_file_paths=[],
+        )
+        config = BlinterConfig(follow_calls=True, scan_root=str(tmp_path))
+
+        processed, errors = _process_single_called_script(
+            helper, config, state, "parent.bat"
+        )
+        assert (processed, errors) == (0, 0)
+
+    def test_process_single_called_script_skips_outside_scan_root(
+        self, tmp_path: Path
+    ) -> None:
+        """Called scripts outside scan_root are skipped without error."""
+        scan_root = tmp_path / "project"
+        scan_root.mkdir()
+        outside = tmp_path / "outside.bat"
+        outside.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+
+        state = ProcessingState(
+            processed_files=set(),
+            all_issues=[],
+            file_results={},
+            processed_file_paths=[],
+        )
+        config = BlinterConfig(follow_calls=True, scan_root=str(scan_root))
+
+        processed, errors = _process_single_called_script(
+            outside, config, state, "parent.bat"
+        )
+        assert (processed, errors) == (0, 0)
 
 
 class TestCliArgumentValidation:  # pylint: disable=too-few-public-methods

@@ -1925,6 +1925,69 @@ GOTO :EOF
         finally:
             os.unlink(temp_file)
 
+    def test_sec014_main_script_percent5_should_trigger(self) -> None:
+        """Test SEC014: %5 in main script with special chars should trigger."""
+        content = """@ECHO OFF
+SET VAR=%5& ECHO %VAR%
+GOTO :EOF
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            assert "SEC014" in rule_codes
+        finally:
+            os.unlink(temp_file)
+
+    def test_sec014_subroutine_percent5_no_false_positive(self) -> None:
+        """Test SEC014: %5 inside a subroutine should not trigger."""
+        content = """@ECHO OFF
+CALL :MySub fifth
+GOTO :EOF
+
+:MySub
+SET @V=%5& ECHO %@V%
+GOTO :EOF
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            assert "SEC014" not in rule_codes
+        finally:
+            os.unlink(temp_file)
+
+    def test_script_with_goto_main_without_exit_should_warn(self) -> None:
+        """Test W001: GOTO :main where :main lacks EXIT should still warn."""
+        content = """@echo off
+GOTO :main
+:main
+echo still running
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            assert "W001" in rule_codes
+        finally:
+            os.unlink(temp_file)
+
+    def test_script_with_goto_main_with_exit_no_warning(self) -> None:
+        """Test W001: GOTO :main where :main exits should not warn."""
+        content = """@echo off
+GOTO :main
+:main
+echo done
+EXIT /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            assert "W001" not in rule_codes
+        finally:
+            os.unlink(temp_file)
+
     def test_e030_for_command_string_no_false_positive(self) -> None:
         """Test E030: Carets in FOR command strings should NOT be flagged as improper escaping."""
         # Reproduces the issue found in real batch files where FOR /F IN ('command 2^>NUL')

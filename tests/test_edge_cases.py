@@ -3302,6 +3302,17 @@ class TestAdvancedSecurityPerformanceRules:
         codes = {issue.rule.code for issue in issues}
         assert "SEC014" in codes
 
+    def test_sec014_flags_unescaped_percent5(self) -> None:
+        """SEC014 triggers for unescaped %5 with special characters."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_advanced_security,
+        )
+
+        lines = ["@echo off\n", "echo %5 & dir\n"]
+        issues = _check_advanced_security(lines[1], 2, lines, {})
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC014" in codes
+
     def test_sec017_flags_predictable_temp_file(self) -> None:
         """SEC017 triggers for temp files without randomness."""
         from blinter.checkers.advanced.style_security_perf import (
@@ -3398,3 +3409,44 @@ class TestLineEndingCheckerRules:  # pylint: disable=too-few-public-methods
         assert "E018" in codes
         assert "W018" in codes
         assert "W019" in codes
+
+
+class TestExitFlowW001Goto:  # pylint: disable=too-few-public-methods
+    """W001 control-flow tests for GOTO label resolution."""
+
+    def test_goto_main_without_exit_triggers_w001(self) -> None:
+        """GOTO :main where the label falls through to EOF should warn."""
+        from blinter.checkers.globals.exit_flow import _check_missing_exit_statement
+
+        lines = [
+            "@echo off\n",
+            "GOTO :main\n",
+            ":main\n",
+            "echo still running\n",
+        ]
+        issues = _check_missing_exit_statement(lines)
+        codes = {issue.rule.code for issue in issues}
+        assert "W001" in codes
+
+    def test_goto_main_with_exit_does_not_trigger_w001(self) -> None:
+        """GOTO :main where the label exits should not warn."""
+        from blinter.checkers.globals.exit_flow import _check_missing_exit_statement
+
+        lines = [
+            "@echo off\n",
+            "GOTO :main\n",
+            ":main\n",
+            "EXIT /b 0\n",
+        ]
+        issues = _check_missing_exit_statement(lines)
+        codes = {issue.rule.code for issue in issues}
+        assert "W001" not in codes
+
+    def test_goto_eof_does_not_trigger_w001(self) -> None:
+        """GOTO :EOF should not produce a missing-exit warning."""
+        from blinter.checkers.globals.exit_flow import _check_missing_exit_statement
+
+        lines = ["@echo off\n", "echo done\n", "GOTO :EOF\n"]
+        issues = _check_missing_exit_statement(lines)
+        codes = {issue.rule.code for issue in issues}
+        assert "W001" not in codes
