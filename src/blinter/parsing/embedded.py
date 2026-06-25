@@ -270,7 +270,7 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals
             continue
 
         # Track labels (potential start of embedded script block)
-        if re.match(r"^:[a-zA-Z_][\w]*:", stripped):
+        if re.match(r"^:[a-zA-Z_][\w]*(?:\s|$)", stripped):
             last_label_line = i
             block_states = {"powershell": False, "vbscript": False, "csharp": False}
             continue

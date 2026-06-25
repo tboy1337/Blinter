@@ -12,6 +12,7 @@ from typing import Sequence, cast
 # Portable directory names (no platform-specific separators).
 _CHECK_DIRS: tuple[str, ...] = ("src", "tests", "scripts")
 _VERIFY_SCRIPT = Path("scripts") / "verify.py"
+_CORPUS_LINT_SCRIPT = Path("scripts") / "corpus_lint.py"
 _PACKAGE_DIR = Path("src") / "blinter"
 _PYPROJECT = "pyproject.toml"
 _PYLINT_OUTPUT = "pylint-output.txt"
@@ -85,6 +86,7 @@ def main() -> None:
     root = _repo_root()
     pylint_report = root / _PYLINT_OUTPUT
     verify_script = str(_VERIFY_SCRIPT)
+    corpus_lint_script = str(_CORPUS_LINT_SCRIPT)
     package_dir = str(_PACKAGE_DIR)
 
     subprocess_steps_before_pylint: list[tuple[str, list[str]]] = [
@@ -93,7 +95,13 @@ def main() -> None:
         ("black", _python_m("black", "--check", *_CHECK_DIRS)),
         (
             "mypy",
-            _python_m("mypy", package_dir, "tests", verify_script),
+            _python_m(
+                "mypy",
+                package_dir,
+                "tests",
+                verify_script,
+                corpus_lint_script,
+            ),
         ),
     ]
 
@@ -101,7 +109,7 @@ def main() -> None:
         ("pylint (verify)", _python_m("pylint", verify_script)),
         (
             "bandit",
-            _python_m("bandit", "-r", package_dir, "-c", _PYPROJECT, "-q"),
+            _python_m("bandit", "-r", package_dir, "-c", _PYPROJECT, "-ll", "-q"),
         ),
         (
             "pip-audit",

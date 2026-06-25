@@ -29,6 +29,7 @@ from blinter.parsing.structure import (
     _collect_labels,
     _collect_set_variables,
     _parse_suppression_comments,
+    clear_invocation_prefix_cache,
 )
 
 
@@ -94,6 +95,8 @@ def lint_batch_file(  # pylint: disable=too-many-locals
 
     if not lines:
         return []  # Empty file, no issues
+
+    clear_invocation_prefix_cache()
 
     # Detect embedded PowerShell/VBScript blocks to avoid false positives
     skip_lines = _detect_embedded_script_blocks(lines)

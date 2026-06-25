@@ -402,6 +402,32 @@ def _count_fatal_issues(issues: List[LintIssue]) -> int:
     return sum(1 for issue in issues if _is_fatal_severity(issue.rule.severity))
 
 
+def _normalized_path(path: str) -> str:
+    """Return a resolved, comparable path string."""
+    return str(Path(path).resolve())
+
+
+def _primary_target_paths(results: ProcessingResults) -> set[str]:
+    """Return normalized paths for primary lint targets (not follow-call callees)."""
+    return {
+        _normalized_path(file_path)
+        for file_path, called_by_parent in results.processed_file_paths
+        if called_by_parent is None
+    }
+
+
+def _count_fatal_issues_for_exit(results: ProcessingResults) -> int:
+    """Count fatal issues on primary targets only; callee findings are informational."""
+    primary_paths = _primary_target_paths(results)
+    return sum(
+        1
+        for issue in results.all_issues
+        if _is_fatal_severity(issue.rule.severity)
+        and issue.file_path is not None
+        and _normalized_path(issue.file_path) in primary_paths
+    )
+
+
 def _plural(count: int, suffix: str = "s") -> str:
     """Return plural suffix when count is not 1."""
     return "" if count == 1 else suffix
@@ -465,7 +491,7 @@ def _exit_single_file_results(results: ProcessingResults, fatal_count: int) -> N
 
 def _exit_with_results(results: ProcessingResults, target_path: str) -> None:
     """Exit with appropriate code based on results."""
-    fatal_count = _count_fatal_issues(results.all_issues)
+    fatal_count = _count_fatal_issues_for_exit(results)
     _handle_skipped_files_exit(results)
 
     if Path(target_path).is_dir():

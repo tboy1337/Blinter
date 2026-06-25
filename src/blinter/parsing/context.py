@@ -26,6 +26,27 @@ def _is_comment_line(line: str) -> bool:
     )
 
 
+def _is_comment_or_label(line: str) -> bool:
+    """Return True when the line is a comment or label definition."""
+    stripped = line.strip().lower()
+    return _is_comment_line(line) or stripped.startswith(":")
+
+
+def _is_echo_statement(stripped: str) -> bool:
+    """Return True when the line is an ECHO output statement."""
+    return stripped.startswith(("echo ", "echo\t", "@echo ", "@echo\t"))
+
+
+def _set_line_without_dangerous_substitution(stripped: str) -> bool:
+    """Return True when a SET line has no dangerous command substitution."""
+    if not stripped.startswith(("set ", "set\t")):
+        return False
+    dangerous_in_substitution = re.search(
+        rf"where\s+({_DANGEROUS_CMDS_REGEX})", stripped
+    ) or re.search(rf"['\(]\s*({_DANGEROUS_CMDS_REGEX})\s+", stripped)
+    return dangerous_in_substitution is None
+
+
 def _is_command_in_safe_context(line: str) -> bool:
     """
     Check if a potentially dangerous command is in a safe context.
@@ -43,33 +64,17 @@ def _is_command_in_safe_context(line: str) -> bool:
     """
     stripped = line.strip().lower()
 
-    # Check if line is a comment (REM or ::)
-    if _is_comment_line(line):
+    if _is_comment_or_label(line):
         return True
 
-    # Check if line is a label definition (starts with :)
-    if stripped.startswith(":"):
+    if _is_echo_statement(stripped):
         return True
 
-    # Check if line starts with ECHO or @ECHO (output statements)
-    if stripped.startswith(("echo ", "echo\t", "@echo ", "@echo\t")):
-        return True
-
-    # Check if line contains GOTO statement (navigation to labels)
-    # or IF DEFINED for variable checks
     if re.search(r"\bgoto\s+:", stripped) or re.search(r"\bif\s+defined\s+", stripped):
         return True
 
-    # Check if line is a SET statement (environment variable assignment)
-    # But NOT if it contains dangerous commands in command substitution
-    if stripped.startswith(("set ", "set\t")):
-        # Check for any dangerous command pattern in command substitution
-        # Common patterns: WHERE <dangerous_cmd>, or the dangerous command itself in quotes
-        dangerous_in_substitution = re.search(
-            rf"where\s+({_DANGEROUS_CMDS_REGEX})", stripped
-        ) or re.search(rf"['\(]\s*({_DANGEROUS_CMDS_REGEX})\s+", stripped)
-        if not dangerous_in_substitution:
-            return True
+    if _set_line_without_dangerous_substitution(stripped):
+        return True
 
     return False
 
@@ -101,12 +106,10 @@ def _is_safe_ctx_for_privilege(line: str) -> bool:
     """
     stripped = line.strip().lower()
 
-    # Check if line is a comment (REM or ::) or label definition (starts with :)
-    if _is_comment_line(line) or stripped.startswith(":"):
+    if _is_comment_or_label(line):
         return True
 
-    # Check if line starts with ECHO or @ECHO (output statements)
-    if stripped.startswith(("echo ", "echo\t", "@echo ", "@echo\t")):
+    if _is_echo_statement(stripped):
         return True
 
     # Check if line contains IF/IF DEFINED with ECHO as the actual command
@@ -129,20 +132,10 @@ def _is_safe_ctx_for_privilege(line: str) -> bool:
         if is_echo_command or is_variable_check:
             return True
 
-    # Check if line contains GOTO statement (navigation to labels)
-    # NOTE: IF DEFINED is NOT included here for privilege checks
     if re.search(r"\bgoto\s+:", stripped):
         return True
 
-    # Check if line is a SET statement (environment variable assignment)
-    # But NOT if it contains dangerous commands in command substitution
-    if stripped.startswith(("set ", "set\t")):
-        # Check for any dangerous command pattern in command substitution
-        # Common patterns: WHERE <dangerous_cmd>, or the dangerous command itself in quotes
-        dangerous_in_substitution = re.search(
-            rf"where\s+({_DANGEROUS_CMDS_REGEX})", stripped
-        ) or re.search(rf"['\(]\s*({_DANGEROUS_CMDS_REGEX})\s+", stripped)
-        if not dangerous_in_substitution:
-            return True
+    if _set_line_without_dangerous_substitution(stripped):
+        return True
 
     return False

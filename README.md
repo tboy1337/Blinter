@@ -450,7 +450,7 @@ Optional manual steps (same checks as `verify.py`):
 ```bash
 py -m pytest
 py -m mypy src/blinter tests
-py -m pylint src/blinter --output-format=text > pylint-report.txt
+py -m pylint src/blinter --output-format=text > pylint-output.txt
 py -m bandit -r src/blinter
 py -m pip-audit -r requirements.txt -r requirements-dev.txt
 py -m black --check src tests

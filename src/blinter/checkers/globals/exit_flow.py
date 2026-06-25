@@ -208,75 +208,84 @@ def _follow_goto_target(
     )
 
 
+@dataclass
+class _ReachabilityScanState:
+    """Mutable state while scanning for paths that reach EOF."""
+
+    reachable: bool = True
+    paren_depth: int = 0
+    if_branch_exited: bool = False
+    else_branch_exited: bool = False
+    in_else_branch: bool = False
+
+
+def _update_reachability_for_line(
+    state: _ReachabilityScanState,
+    stripped: str,
+    previous_depth: int,
+) -> None:
+    """Update branch-tracking state for the current line."""
+    state.paren_depth = _update_paren_depth(stripped, state.paren_depth)
+    if state.paren_depth > previous_depth and re.search(
+        r"\bif\b", stripped, re.IGNORECASE
+    ):
+        state.if_branch_exited = False
+        state.else_branch_exited = False
+        state.in_else_branch = False
+    elif _is_else_transition(stripped):
+        state.in_else_branch = True
+
+
 def _can_execution_reach_eof(
     lines: List[str],
     start_index: int = 0,
     visiting_labels: Optional[Set[str]] = None,
 ) -> bool:
-    """Determine if execution from start_index can reach EOF without EXIT.
-
-    This performs a forward scan through the script tracking whether we can
-    reach EOF. It considers:
-    - EXIT statements (blocks path to EOF)
-    - GOTO statements (follows label targets when resolvable)
-    - Labels (can be jumped to)
-    - Conditional blocks (IF/FOR with parentheses)
-    """
+    """Determine if execution from start_index can reach EOF without EXIT."""
     if visiting_labels is None:
         visiting_labels = set()
 
     labels = _build_label_index(lines)
-    reachable = True
-    paren_depth = 0
-    if_branch_exited = False
-    else_branch_exited = False
-    in_else_branch = False
+    state = _ReachabilityScanState()
 
     for index in range(start_index, len(lines)):
         stripped = lines[index].strip().lower()
 
-        # Skip empty lines and comments
         if not stripped or stripped.startswith("rem") or stripped.startswith("::"):
             continue
 
-        # Labels make code reachable again
         if stripped.startswith(":") and not stripped.startswith("::"):
-            reachable = True
+            state.reachable = True
             continue
 
-        previous_depth = paren_depth
-        paren_depth = _update_paren_depth(stripped, paren_depth)
-        if paren_depth > previous_depth and re.search(
-            r"\bif\b", stripped, re.IGNORECASE
-        ):
-            if_branch_exited = False
-            else_branch_exited = False
-            in_else_branch = False
-        elif _is_else_transition(stripped):
-            in_else_branch = True
+        previous_depth = state.paren_depth
+        _update_reachability_for_line(state, stripped, previous_depth)
 
         if re.match(r"exit\b", stripped):
-            if_branch_exited, else_branch_exited, stop_result = (
+            state.if_branch_exited, state.else_branch_exited, stop_result = (
                 _apply_exit_to_branch_state(
-                    paren_depth, in_else_branch, if_branch_exited, else_branch_exited
+                    state.paren_depth,
+                    state.in_else_branch,
+                    state.if_branch_exited,
+                    state.else_branch_exited,
                 )
             )
             if stop_result is not None:
                 return stop_result
         elif _if_else_block_exits_reach_eof(
             previous_depth,
-            paren_depth,
-            (if_branch_exited, else_branch_exited),
+            state.paren_depth,
+            (state.if_branch_exited, state.else_branch_exited),
             lines,
             index,
         ):
             return False
-        elif paren_depth == 0:
+        elif state.paren_depth == 0:
             goto_result = _follow_goto_target(stripped, labels, visiting_labels, lines)
             if goto_result is not None:
                 return goto_result
 
-    return reachable
+    return state.reachable
 
 
 def _check_nested_paren_mismatch(lines: List[str]) -> List[LintIssue]:

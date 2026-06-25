@@ -49,7 +49,7 @@ EXIT /b 0
                 issue for issue in issues if issue.rule.severity == RuleSeverity.ERROR
             ]
             # Should have minimal critical errors
-            assert len(error_issues) <= 1  # Allow for potential edge case detections
+            assert len(error_issues) == 0
         finally:
             os.unlink(temp_file)
 
@@ -2048,6 +2048,32 @@ GOTO :EOF
             issues = lint_batch_file(temp_file)
             rule_codes = [issue.rule.code for issue in issues]
             assert "SEC014" not in rule_codes
+        finally:
+            os.unlink(temp_file)
+
+    def test_sec014_fallthrough_between_labels_should_trigger(self) -> None:
+        """SEC014 fires when main code falls through into an uninvoked label block."""
+        content = """@ECHO OFF
+:first
+echo between labels
+:second
+SET VAR=%1& ECHO %VAR%
+GOTO :EOF
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            assert "SEC014" in rule_codes
+        finally:
+            os.unlink(temp_file)
+
+    def test_lint_empty_file_returns_no_issues(self) -> None:
+        """Empty batch files produce no lint issues."""
+        temp_file = self.create_temp_batch_file("")
+        try:
+            issues = lint_batch_file(temp_file)
+            assert issues == []
         finally:
             os.unlink(temp_file)
 

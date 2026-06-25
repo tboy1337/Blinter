@@ -4,15 +4,22 @@ import re
 from typing import (
     Dict,
     List,
+    Optional,
     Set,
     Tuple,
 )
 
+from blinter.constants import BUILTIN_VARS
 from blinter.models import LintIssue
 from blinter.patterns import (
     _COMPILED_SETLOCAL_DISABLE,
 )
 from blinter.rules.helpers import _add_issue
+
+_LABEL_TARGET_PATTERN = re.compile(
+    r"\b(?:call|goto)\s+(:[^\s]+)",
+    re.IGNORECASE,
+)
 
 
 def _collect_labels(lines: List[str]) -> Tuple[Dict[str, int], List[LintIssue]]:
@@ -49,49 +56,106 @@ def _collect_labels(lines: List[str]) -> Tuple[Dict[str, int], List[LintIssue]]:
     return labels, issues
 
 
-def _is_in_subroutine_context(  # pylint: disable=unused-argument
+def _normalize_label_target(raw_target: str) -> str:
+    """Normalize CALL/GOTO label targets to match ``labels`` dict keys."""
+    target = raw_target.strip().lower()
+    if not target.startswith(":"):
+        target = f":{target}"
+    return target
+
+
+_INVOCATION_PREFIX_CACHE: Dict[int, List[Set[str]]] = {}
+
+
+def clear_invocation_prefix_cache() -> None:
+    """Clear cached invocation-prefix data between lint passes."""
+    _INVOCATION_PREFIX_CACHE.clear()
+
+
+def _build_invocation_prefix(lines: List[str]) -> List[Set[str]]:
+    """
+    For each line index, return labels invoked on all prior lines.
+
+    ``prefix[i]`` contains CALL/GOTO targets from lines ``0..i-1`` (0-based).
+    """
+    prefix: List[Set[str]] = []
+    targeted: Set[str] = set()
+    for line in lines:
+        prefix.append(set(targeted))
+        for match in _LABEL_TARGET_PATTERN.finditer(line):
+            targeted.add(_normalize_label_target(match.group(1)))
+    return prefix
+
+
+def _invocation_prefix_for_lines(lines: List[str]) -> List[Set[str]]:
+    """Return cached invocation prefix for ``lines`` within a single lint pass."""
+    lines_id = id(lines)
+    cached = _INVOCATION_PREFIX_CACHE.get(lines_id)
+    if cached is None:
+        cached = _build_invocation_prefix(lines)
+        _INVOCATION_PREFIX_CACHE[lines_id] = cached
+    return cached
+
+
+def _labels_targeted_before(lines: List[str], before_line: int) -> Set[str]:
+    """Collect label names referenced by CALL/GOTO before ``before_line``."""
+    if before_line <= 1:
+        return set()
+    prefix = _invocation_prefix_for_lines(lines)
+    return prefix[before_line - 1]
+
+
+def _label_block_for_line(
+    line_number: int, sorted_labels: List[Tuple[str, int]], total_lines: int
+) -> Optional[Tuple[str, int]]:
+    """
+    Return (label_name, label_line) for the block containing ``line_number``.
+
+    Label bodies span from the line after the label until the next label (exclusive).
+    """
+    for index, (label_name, label_line) in enumerate(sorted_labels):
+        next_label_line = (
+            sorted_labels[index + 1][1]
+            if index + 1 < len(sorted_labels)
+            else total_lines + 1
+        )
+        if label_line < line_number < next_label_line:
+            return label_name, label_line
+    return None
+
+
+def _label_sort_key(item: tuple[str, int]) -> int:
+    """Sort label entries by line number."""
+    return item[1]
+
+
+def _is_in_subroutine_context(
     lines: List[str], line_number: int, labels: Dict[str, int]
 ) -> bool:
     """
-    Determine if a line is within a subroutine context.
+    Determine if a line is within an invoked subroutine context.
 
-    A line is considered to be in a subroutine if:
-    1. There is a label defined before it (indicating start of a subroutine)
-    2. The line comes after the first label in the file (main script is before any labels)
-
-    Args:
-        lines: All lines in the batch file (reserved for future enhancement)
-        line_number: The current line number (1-indexed)
-        labels: Dictionary mapping label names to line numbers
-
-    Returns:
-        True if the line is within a subroutine context
+    A line is in subroutine context when it falls inside a label block that was
+    reached via an earlier ``CALL :label`` or ``GOTO :label``. Main-line fall-through
+    into a label without a prior transfer is not treated as subroutine context.
     """
-    if not labels:
+    if not labels or line_number < 1:
         return False
 
-    # Find the minimum label line number (first subroutine starts after this)
-    min_label_line = min(labels.values())
-
-    # If we're before the first label, we're in the main script
-    if line_number < min_label_line:
+    sorted_labels = sorted(labels.items(), key=_label_sort_key)
+    block = _label_block_for_line(line_number, sorted_labels, len(lines))
+    if block is None:
         return False
 
-    # Check if there's a label defined before the current line
-    # This indicates we're inside a subroutine
-    for label_line in labels.values():
-        if label_line < line_number:
-            # Found a label before this line, so we're in a subroutine
-            return True
-
-    return False
+    label_name, label_line = block
+    return label_name in _labels_targeted_before(lines, line_number)
 
 
 _SET_VAR_NAME = r"[A-Za-z0-9_@]+"
-_CALL_SETS_FIRST_ARG_PATTERNS: tuple[str, ...] = (
-    r"\bcall\s+:getrepairsetup\s+([A-Za-z0-9_]+)",
-    r"\bcall\s+:getc2rrepair\s+([A-Za-z0-9_]+)",
-    r"\bcall\s+:_taskgetids\s+([A-Za-z0-9_]+)",
+# CALL :label varname — first argument names a variable set via SET "%1=" in :label
+_CALL_LABEL_VAR_PATTERN = re.compile(
+    rf"\bcall\s+:\w+\s+({_SET_VAR_NAME})\b",
+    re.IGNORECASE,
 )
 
 
@@ -120,9 +184,8 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
                 var_name_text: str = set_match.group(1)
                 set_vars.add(var_name_text.upper())
 
-        for call_pattern in _CALL_SETS_FIRST_ARG_PATTERNS:
-            for call_match in re.finditer(call_pattern, stripped_line, re.IGNORECASE):
-                set_vars.add(str(call_match.group(1)).upper())
+        for call_match in _CALL_LABEL_VAR_PATTERN.finditer(stripped_line):
+            set_vars.add(str(call_match.group(1)).upper())
 
         # Handle dynamic variable assignments in FOR loops: set "%%~b=value"
         # Example: for %%a in (list) do (set "%%~a=value")
@@ -136,62 +199,7 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
             # and be more lenient with undefined variable warnings
             set_vars.add("__DYNAMIC_VARS__")
 
-    # Add common environment variables that are typically available
-    common_env_vars = {
-        "PATH",
-        "TEMP",
-        "TMP",
-        "USERPROFILE",
-        "USERNAME",
-        "COMPUTERNAME",
-        "PROCESSOR_ARCHITECTURE",
-        "PROCESSOR_ARCHITEW6432",  # WOW64 - native architecture on 64-bit when running 32-bit
-        "PROCESSOR_IDENTIFIER",
-        "ERRORLEVEL",
-        "CD",
-        "DATE",
-        "TIME",
-        "RANDOM",
-        "CMDEXTVERSION",
-        "COMSPEC",
-        "HOMEDRIVE",
-        "HOMEPATH",
-        "LOGONSERVER",
-        "NUMBER_OF_PROCESSORS",
-        "OS",
-        "PATHEXT",
-        "PROGRAMFILES",
-        "PROGRAMFILES(X86)",  # 32-bit program files on 64-bit systems
-        "PROGRAMW6432",  # 64-bit program files folder on 64-bit systems
-        "SYSTEMDRIVE",
-        "SYSTEMROOT",
-        "WINDIR",
-        "ALLUSERSPROFILE",
-        "APPDATA",
-        "LOCALAPPDATA",
-        "PROGRAMDATA",
-        "PUBLIC",
-        # Additional commonly used environment variables
-        "PROCESSOR_LEVEL",
-        "PROCESSOR_REVISION",
-        "USERDOMAIN",
-        "USERDNSDOMAIN",
-        "SESSIONNAME",
-        "CLIENTNAME",
-        "COMMONPROGRAMFILES",
-        "COMMONPROGRAMFILES(X86)",
-        # Optional environment variables that may or may not be set
-        "SUDO_USER",  # Set by newer Windows sudo command
-        "ORIGINAL_USER",  # Sometimes set by scripts for elevation tracking
-        "DRIVERDATA",  # Driver data directory (Windows 10+)
-        "ONEDRIVE",  # OneDrive directory if configured
-        "ONEDRIVECONSUMER",  # Consumer OneDrive
-        "ONEDRIVECOMMERCIAL",  # Business OneDrive
-        "DEBUG",  # Optional script-control flag from callers
-        "COMMONPROGRAMW6432",  # 64-bit common files on 64-bit Windows
-        "SAFEBOOT_OPTION",  # Set when Windows is in Safe Mode
-    }
-    set_vars.update(common_env_vars)
+    set_vars.update(BUILTIN_VARS)
 
     return set_vars
 

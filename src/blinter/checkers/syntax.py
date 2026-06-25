@@ -292,11 +292,51 @@ def _should_skip_e009_quote_check(stripped: str) -> bool:
     return False
 
 
+def _count_unmatched_batch_quotes(line: str) -> int:
+    """Count unpaired double quotes respecting batch escape rules."""
+    quote_count = 0
+    index = 0
+    while index < len(line):
+        char = line[index]
+        if char != '"':
+            index += 1
+            continue
+        if index > 0 and line[index - 1] == "^":
+            index += 1
+            continue
+        if index + 1 < len(line) and line[index + 1] == '"':
+            index += 2
+            continue
+        remaining = line[index + 1 :].strip()
+        if remaining == "^":
+            index += 1
+            continue
+        quote_count += 1
+        index += 1
+    return quote_count
+
+
+def _is_e009_special_case_exemption(stripped: str, line: str) -> bool:
+    """Return True when E009 should not fire despite odd quoting."""
+    if "!" in line and re.search(r"\bset\s", stripped, re.IGNORECASE):
+        return True
+    if re.search(r"call\s+:[^:]+", stripped, re.IGNORECASE):
+        return True
+    if re.search(r"![^!]+:[^=]*\"[^=]*=[^!]*!", line) or re.search(
+        r"![^!]+:[^=]*=[^!]*\"[^!]*!", line
+    ):
+        return True
+    if re.search(r"%[^%]+:[^=]*\"[^=]*=[^%]*%", line) or re.search(
+        r"%[^%]+:[^=]*=[^%]*\"[^%]*%", line
+    ):
+        return True
+    return False
+
+
 def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
     """Check for mismatched quotes (E009)."""
     issues: List[LintIssue] = []
 
-    # Skip REM comments and :: documentation comments - they can contain any characters
     stripped = line.strip()
     if (
         stripped.lower().startswith("rem ")
@@ -305,88 +345,19 @@ def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
     ):
         return issues
 
-    # Skip echo statements that are displaying documentation/help text
-    # about special characters. These often contain unmatched quotes as examples.
-    # Pattern: ECHO followed by spaces and text containing "Represents" or "...."
     if re.match(r"\s*echo\s+.*\.\.\.\.", stripped, re.IGNORECASE) or re.match(
         r"\s*echo\s+.*represents", stripped, re.IGNORECASE
     ):
-        # This is documentation text explaining special characters
         return issues
 
     if _should_skip_e009_quote_check(stripped):
         return issues
 
-    # Count quotes with comprehensive handling of batch file quoting rules
-    # Handle: escaped quotes (""), caret escaping (^"), continuation lines,
-    # and context-aware parsing
-    quote_count = 0
-    i = 0
-    in_parentheses = 0  # Track parentheses depth for FOR/IF blocks
-
-    while i < len(line):
-        char = line[i]
-
-        # Track parentheses depth to understand context
-        if char == "(":
-            in_parentheses += 1
-        elif char == ")":
-            in_parentheses = max(0, in_parentheses - 1)
-
-        # Handle quote characters
-        elif char == '"':
-            # Check if this is a caret-escaped quote (^")
-            if i > 0 and line[i - 1] == "^":
-                # This is an escaped quote, skip it
-                i += 1
-                continue
-
-            # Check if this is an escaped quote ("")
-            if i + 1 < len(line) and line[i + 1] == '"':
-                # Skip both quotes in the pair
-                i += 2
-                continue
-
-            # Check for line continuation (^ at end)
-            # If the quote is followed by ^ at end of line, it may be incomplete
-            remaining = line[i + 1 :].strip()
-            if remaining == "^":
-                # Line continuation - don't count as unmatched
-                i += 1
-                continue
-
-            # This is a regular quote
-            quote_count += 1
-
-        i += 1
-
-    # Only report unmatched quotes if we're not in a complex parentheses block
-    # and the line doesn't end with continuation character
+    quote_count = _count_unmatched_batch_quotes(line)
     line_continues = line.rstrip().endswith("^")
 
     if quote_count % 2 != 0 and not line_continues:
-        # Additional check: verify this isn't a special case like delayed expansion
-        # or variable substitution that might have intentional single quotes
-        has_delayed_expansion = "!" in line and re.search(
-            r"\bset\s", stripped, re.IGNORECASE
-        )
-        has_call_substitution = re.search(r"call\s+:[^:]+", stripped, re.IGNORECASE)
-        # Check for string replacement syntax like !VAR:"=! or %VAR:"=%
-        # Delayed expansion: !VAR:"=! or !VAR:searchString=replaceString!
-        has_delayed_string_replacement = re.search(
-            r"![^!]+:[^=]*\"[^=]*=[^!]*!", line
-        ) or re.search(r"![^!]+:[^=]*=[^!]*\"[^!]*!", line)
-        # Old-style expansion: %VAR:"=% or %VAR:searchString=replaceString%
-        has_percent_string_replacement = re.search(
-            r"%[^%]+:[^=]*\"[^=]*=[^%]*%", line
-        ) or re.search(r"%[^%]+:[^=]*=[^%]*\"[^%]*%", line)
-
-        if not (
-            has_delayed_expansion
-            or has_call_substitution
-            or has_delayed_string_replacement
-            or has_percent_string_replacement
-        ):
+        if not _is_e009_special_case_exemption(stripped, line):
             issues.append(
                 LintIssue(
                     line_number=line_num,
@@ -530,15 +501,19 @@ def _check_subroutine_call(
     # Labels are stored with colon prefix in lowercase (e.g., ":mylabel")
     potential_label = ":" + first_word
 
-    # Check if this matches a defined label
     if potential_label in labels:
-        issues.append(
-            LintIssue(
-                line_number=line_num,
-                rule=RULES["E012"],
-                context=f"Attempting to call label '{first_word}' without CALL or GOTO",
+        remainder = stripped[first_word_match.end() :].strip()
+        if remainder:
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["E012"],
+                    context=(
+                        f"Attempting to call label '{first_word}' "
+                        "without CALL or GOTO"
+                    ),
+                )
             )
-        )
 
     return issues
 

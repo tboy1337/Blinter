@@ -3516,6 +3516,21 @@ class TestEmbeddedScriptEdgeCases:
         assert 3 in skip_lines
         assert 4 in skip_lines
 
+    def test_label_resets_embedded_block_state(self) -> None:
+        """Batch labels after embedded blocks resume batch linting."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            "powershell -Command \"Write-Host 'hi'\"",
+            ":afterblock",
+            "echo resumed batch line",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 2 in skip_lines
+        assert 4 not in skip_lines
+        assert 5 not in skip_lines
+
     def test_vbscript_block_ends_on_batch_line(self) -> None:
         """VBScript blocks end when batch syntax resumes."""
         from blinter.parsing.embedded import _detect_embedded_script_blocks

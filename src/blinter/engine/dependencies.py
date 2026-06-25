@@ -24,7 +24,7 @@ _CALL_SCRIPT_PATTERN = re.compile(
 )
 
 
-@dataclass(frozen=True)
+@dataclass
 class _CallLineContext:
     """Shared path context for resolving CALL statements on a single line."""
 
@@ -32,6 +32,7 @@ class _CallLineContext:
     batch_file_resolved: Path
     scan_root: Optional[str]
     lines_cache: Optional[Dict[Path, List[str]]]
+    script_vars_cache: Dict[Path, Set[str]]
 
 
 def _is_within_scan_root(path: Path, scan_root: Optional[str]) -> bool:
@@ -310,19 +311,19 @@ def _build_call_dependency_graph(
             return set()
 
         visiting.add(file_path)
-        all_deps = set(_direct_deps_for(file_path))
-        if len(all_deps) > MAX_FOLLOW_CALL_FILES:
-            _warn_call_file_limit()
-            all_deps = set(sorted(all_deps, key=str)[:MAX_FOLLOW_CALL_FILES])
+        all_deps: Set[Path] = set()
 
-        for dep in list(all_deps):
+        for dep in sorted(_direct_deps_for(file_path), key=str):
+            all_deps.add(dep)
             if len(all_deps) >= MAX_FOLLOW_CALL_FILES:
                 _warn_call_file_limit()
                 break
-            all_deps.update(get_all_deps(dep, visiting, depth + 1))
-            if len(all_deps) >= MAX_FOLLOW_CALL_FILES:
-                _warn_call_file_limit()
-                break
+            if depth + 1 <= MAX_FOLLOW_CALL_DEPTH:
+                all_deps.update(get_all_deps(dep, visiting, depth + 1))
+                if len(all_deps) >= MAX_FOLLOW_CALL_FILES:
+                    _warn_call_file_limit()
+                    all_deps = set(sorted(all_deps, key=str)[:MAX_FOLLOW_CALL_FILES])
+                    break
 
         visiting.remove(file_path)
         memo[file_path] = all_deps
@@ -479,6 +480,7 @@ def _collect_vars_from_script(
     batch_file_resolved: Path,
     scan_root: Optional[str] = None,
     lines_cache: Optional[Dict[Path, List[str]]] = None,
+    script_vars_cache: Optional[Dict[Path, Set[str]]] = None,
 ) -> Set[str]:
     """
     Collect variables from a called script and its reachable callees.
@@ -490,10 +492,19 @@ def _collect_vars_from_script(
         script_path: Path to the called script
         batch_file_resolved: Resolved path to the calling batch file
         scan_root: Optional root directory; paths outside it are skipped
+        script_vars_cache: Optional per-lint cache of resolved script variables
 
     Returns:
         Set of variable names defined in the script and its reachable callees
     """
+    try:
+        resolved_script = script_path.resolve()
+    except (ValueError, OSError):
+        return set()
+
+    if script_vars_cache is not None and resolved_script in script_vars_cache:
+        return set(script_vars_cache[resolved_script])
+
     ctx = _TransitiveVarContext(
         batch_file_resolved=batch_file_resolved,
         scan_root=scan_root,
@@ -501,39 +512,41 @@ def _collect_vars_from_script(
         visiting=set(),
         files_read=set(),
     )
-    return _collect_script_vars_deep(script_path, 0, ctx)
+    collected = _collect_script_vars_deep(script_path, 0, ctx)
+    if script_vars_cache is not None:
+        script_vars_cache[resolved_script] = set(collected)
+    return collected
 
 
 def _vars_from_call_line(
     line: str,
     line_num: int,
     ctx: _CallLineContext,
-) -> Optional[Tuple[int, Set[str]]]:
-    """Return line number and variables when a line contains a resolvable CALL."""
+) -> Set[str]:
+    """Return variables defined by all resolvable CALL targets on a line."""
     stripped = line.strip().lower()
     if stripped.startswith("rem ") or stripped.startswith("::"):
-        return None
+        return set()
 
-    call_match = _CALL_SCRIPT_PATTERN.search(line)
-    if not call_match:
-        return None
+    merged_vars: Set[str] = set()
+    for call_match in _CALL_SCRIPT_PATTERN.finditer(line):
+        script_path_str = call_match.group(1) or call_match.group(2)
+        script_path = _resolve_script_path(
+            script_path_str, ctx.batch_dir, scan_root=ctx.scan_root
+        )
+        if script_path is None:
+            continue
 
-    script_path_str = call_match.group(1) or call_match.group(2)
-    script_path = _resolve_script_path(
-        script_path_str, ctx.batch_dir, scan_root=ctx.scan_root
-    )
-    if script_path is None:
-        return None
+        called_vars = _collect_vars_from_script(
+            script_path,
+            ctx.batch_file_resolved,
+            scan_root=ctx.scan_root,
+            lines_cache=ctx.lines_cache,
+            script_vars_cache=ctx.script_vars_cache,
+        )
+        merged_vars.update(called_vars)
 
-    called_vars = _collect_vars_from_script(
-        script_path,
-        ctx.batch_file_resolved,
-        scan_root=ctx.scan_root,
-        lines_cache=ctx.lines_cache,
-    )
-    if not called_vars:
-        return None
-    return line_num, called_vars
+    return merged_vars
 
 
 def _collect_called_vars(
@@ -560,11 +573,13 @@ def _collect_called_vars(
     batch_file_resolved = batch_file.resolve()
 
     called_vars_by_line: Dict[int, Set[str]] = {}
+    script_vars_cache: Dict[Path, Set[str]] = {}
     call_ctx = _CallLineContext(
         batch_dir=batch_file.parent,
         batch_file_resolved=batch_file_resolved,
         scan_root=scan_root,
         lines_cache=lines_cache,
+        script_vars_cache=script_vars_cache,
     )
 
     file_lines = _read_batch_lines(batch_file, lines=lines)
@@ -573,7 +588,7 @@ def _collect_called_vars(
 
     for line_num, line in enumerate(file_lines, start=1):
         call_vars = _vars_from_call_line(line, line_num, call_ctx)
-        if call_vars is not None:
-            called_vars_by_line[call_vars[0]] = call_vars[1]
+        if call_vars:
+            called_vars_by_line.setdefault(line_num, set()).update(call_vars)
 
     return called_vars_by_line

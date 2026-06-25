@@ -42,66 +42,55 @@ def _check_unicode_handling_issue(stripped: str, line_num: int) -> Optional[Lint
     return None
 
 
-def _check_echo_unicode_risk(stripped: str) -> bool:
-    """Check for Unicode risks in echo commands."""
-    # Extract the actual echo content (text after the command)
-    echo_content = ""
+def _extract_echo_content(stripped: str) -> str:
+    """Return text after the ECHO command."""
     match = re.match(r"echo\s+(.*)", stripped, re.IGNORECASE)
-    if match:
-        echo_content = match.group(1)
+    return match.group(1) if match else ""
 
-    # Check for complex variable expansions within individual variables
+
+def _find_complex_echo_variables(echo_content: str) -> List[str]:
+    """Find unusual percent-expansions in echo content."""
     complex_vars: List[str] = []
-    # Match %VARNAME% patterns and extract variable names
-    # This will match: %red%, %under%, etc., and also false positives like %a % from %%a %%b
     variables: List[str] = re.findall(r"%([^%]+)%", echo_content)
     for var_content in variables:
-        # Filter out false positives from FOR loop variables (%%a %%b matches as %a %)
-        # These will contain spaces or be very short with spaces
         if " " in var_content or "\t" in var_content:
-            continue  # Skip false matches across FOR loop variables
-
-        # var_content is the variable name without % signs
-        # Allow: alphanumeric, underscore, tilde, @ (common for internal vars), and # (also used)
-        # Strip trailing non-alphanumeric characters that might be adjacent literals
-        # e.g., %@DIVIDER-% should be treated as %@DIVIDER% followed by a literal -
+            continue
         var_name = re.match(r"^([A-Z0-9_~@#]+)", var_content, re.IGNORECASE)
         if var_name:
-            # This is a valid simple variable name, not complex
             continue
-
-        # Check for parameter expansions like %~n1, %~dp0
         if re.match(r"^~[a-z]*\d*$", var_content, re.IGNORECASE):
             continue
-
-        # If we get here, it's a complex/unusual variable expansion
         complex_vars.append(var_content)
+    return complex_vars
 
-    # Check if this is safe file redirection (output to files, not complex shell operations)
+
+def _echo_has_unsafe_redirection(stripped: str) -> bool:
+    """Return True when echo uses unsafe shell redirection."""
     has_safe_redirection = bool(
         re.search(
             r">\s*(nul|\"[^\"]*\"|[^\s&|<>]+)(\s*2>&1)?\s*$", stripped, re.IGNORECASE
         )
     )
-
-    # Check for escaped angle brackets (^< or ^>) which are safe
     has_escaped_brackets = bool(re.search(r"\^[<>]", stripped))
-
-    # Only flag echo if it has real Unicode issues
     return (
-        not all(
-            ord(c) < 128 for c in echo_content if c.strip()
-        )  # Contains non-ASCII in actual content
-        or (
-            bool(re.search(r"[<>]", stripped))
-            and not has_safe_redirection
-            and not has_escaped_brackets
-        )  # Has unsafe redirection (not escaped)
-        or len(complex_vars) > 0  # Has truly complex variable expansion
-        or bool(
-            re.search(r"[\x00-\x1f\x7f-\xff]", echo_content)
-        )  # Control chars in content
+        bool(re.search(r"[<>]", stripped))
+        and not has_safe_redirection
+        and not has_escaped_brackets
     )
+
+
+def _check_echo_unicode_risk(stripped: str) -> bool:
+    """Check for Unicode risks in echo commands."""
+    echo_content = _extract_echo_content(stripped)
+    if echo_content.strip() and not all(
+        ord(c) < 128 for c in echo_content if c.strip()
+    ):
+        return True
+    if _echo_has_unsafe_redirection(stripped):
+        return True
+    if _find_complex_echo_variables(echo_content):
+        return True
+    return bool(re.search(r"[\x00-\x1f\x7f-\xff]", echo_content))
 
 
 def _check_search_unicode_risk(stripped: str) -> bool:

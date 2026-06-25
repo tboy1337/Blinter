@@ -89,84 +89,99 @@ def _is_safe_unquoted_set_value(var_val: str) -> bool:
     return re.match(r"^[%!\w\\.:~\-,+/()=]+$", var_val) is not None
 
 
+def _check_sec001_user_input_in_command(
+    stripped: str, line_num: int
+) -> Optional[LintIssue]:
+    """SEC001: Potential command injection vulnerability."""
+    if not re.search(r"set\s+/p\s+[^=]+=.*%.*%", stripped, re.IGNORECASE):
+        return None
+    return LintIssue(
+        line_number=line_num,
+        rule=RULES["SEC001"],
+        context="User input used in command without validation",
+    )
+
+
+def _check_sec002_unquoted_set(stripped: str, line_num: int) -> Optional[LintIssue]:
+    """SEC002: Unsafe SET command usage."""
+    set_match = re.match(r"set\s+([A-Za-z0-9_@]+)=(.+)", stripped, re.IGNORECASE)
+    if not set_match:
+        return None
+    var_name: str = set_match.group(1)
+    var_val_text: str = _first_set_value_text(set_match.group(2))
+    var_val: str = var_val_text.strip()
+    is_ansi_or_color = (
+        "ESC" in var_name.upper()
+        or "COLOR" in var_name.upper()
+        or "%ESC%" in var_val
+        or var_val.startswith("(")
+        or var_val.upper().startswith("FOR ")
+    )
+    if (
+        var_name.startswith("@")
+        or is_ansi_or_color
+        or _is_safe_unquoted_set_value(var_val)
+        or (var_val.startswith('"') and var_val.endswith('"'))
+    ):
+        return None
+    return LintIssue(
+        line_number=line_num,
+        rule=RULES["SEC002"],
+        context="SET command value should be quoted for safety",
+    )
+
+
+def _check_sec003_dangerous_commands(
+    line: str, stripped: str, line_num: int
+) -> Optional[LintIssue]:
+    """SEC003: Dangerous command without confirmation."""
+    if _is_command_in_safe_context(line):
+        return None
+    for pattern, rule_code in DANGEROUS_COMMAND_PATTERNS:
+        if re.search(pattern, stripped, re.IGNORECASE):
+            return LintIssue(
+                line_number=line_num,
+                rule=RULES[rule_code],
+                context="Destructive command should have user confirmation",
+            )
+    return None
+
+
+def _check_sec003_where_substitution(
+    stripped: str, line_num: int
+) -> Optional[LintIssue]:
+    """SEC003: WHERE with dangerous commands in command substitution."""
+    where_match = re.search(
+        rf"where\s+({_DANGEROUS_CMDS_REGEX})", stripped, re.IGNORECASE
+    )
+    if not where_match:
+        return None
+    cmd = str(where_match.group(1)).upper()
+    return LintIssue(
+        line_number=line_num,
+        rule=RULES["SEC003"],
+        context=f"Checking for {cmd} command should have user confirmation",
+    )
+
+
 def _check_input_validation_sec(
     line: str, line_num: int, stripped: str
 ) -> List[LintIssue]:
     """Check for input validation and command security issues (SEC001-SEC003)."""
     issues: List[LintIssue] = []
-
-    # SEC001: Potential command injection vulnerability
-    if re.search(r"set\s+/p\s+[^=]+=.*%.*%", stripped, re.IGNORECASE):
-        issues.append(
-            LintIssue(
-                line_number=line_num,
-                rule=RULES["SEC001"],
-                context="User input used in command without validation",
-            )
-        )
-
-    # SEC002: Unsafe SET command usage - only flag unquoted SET commands
-    # Skip ANSI escape sequences, color definitions, and constant declarations
-    set_match = re.match(r"set\s+([A-Za-z0-9_@]+)=(.+)", stripped, re.IGNORECASE)
-    if set_match:
-        var_name: str = set_match.group(1)
-        var_val_text: str = _first_set_value_text(set_match.group(2))
-        var_val: str = var_val_text.strip()
-
-        # Skip if it's an ANSI escape sequence or color definition
-        is_ansi_or_color = (
-            "ESC" in var_name.upper()
-            or "COLOR" in var_name.upper()
-            or "%ESC%" in var_val
-            or var_val.startswith("(")  # Skip tuple/list definitions like colors=(...)
-            or var_val.upper().startswith("FOR ")  # Macro builder assignments
-        )
-        is_safe_unquoted = _is_safe_unquoted_set_value(var_val)
-
-        if (
-            not var_name.startswith("@")
-            and not is_ansi_or_color
-            and not is_safe_unquoted
-            and not (var_val.startswith('"') and var_val.endswith('"'))
-        ):
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["SEC002"],
-                    context="SET command value should be quoted for safety",
-                )
-            )
-
-    # SEC003: Dangerous command without confirmation
-    if not _is_command_in_safe_context(line):
-        for pattern, rule_code in DANGEROUS_COMMAND_PATTERNS:
-            if re.search(pattern, stripped, re.IGNORECASE):
-                issues.append(
-                    LintIssue(
-                        line_number=line_num,
-                        rule=RULES[rule_code],
-                        context="Destructive command should have user confirmation",
-                    )
-                )
-                break
-
-    # SEC003: Special check for WHERE with dangerous commands in command substitution
-    # This checks for dangerous command existence and should be flagged
-    # But skip if it's in a comment line
+    sec001 = _check_sec001_user_input_in_command(stripped, line_num)
+    if sec001 is not None:
+        issues.append(sec001)
+    sec002 = _check_sec002_unquoted_set(stripped, line_num)
+    if sec002 is not None:
+        issues.append(sec002)
+    sec003 = _check_sec003_dangerous_commands(line, stripped, line_num)
+    if sec003 is not None:
+        issues.append(sec003)
     if not _is_comment_line(line):
-        where_match = re.search(
-            rf"where\s+({_DANGEROUS_CMDS_REGEX})", stripped, re.IGNORECASE
-        )
-        if where_match:
-            cmd = str(where_match.group(1)).upper()
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["SEC003"],
-                    context=f"Checking for {cmd} command should have user confirmation",
-                )
-            )
-
+        where_issue = _check_sec003_where_substitution(stripped, line_num)
+        if where_issue is not None:
+            issues.append(where_issue)
     return issues
 
 

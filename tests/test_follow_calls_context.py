@@ -185,6 +185,30 @@ class TestFollowCallsVariableContext:
             assert len(var1_issues) == 0, "VAR1 should be recognized as defined"
             assert len(var2_issues) == 0, "VAR2 should be recognized as defined"
 
+    def test_chained_calls_on_one_line_union_variables(self) -> None:
+        """CALL a.bat & CALL b.bat on one line unions variables from both scripts."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            helper1 = os.path.join(tmpdir, "helper1.bat")
+            with open(helper1, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\nSET VAR1=value1\nEXIT /b 0\n")
+
+            helper2 = os.path.join(tmpdir, "helper2.bat")
+            with open(helper2, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\nSET VAR2=value2\nEXIT /b 0\n")
+
+            main_script = os.path.join(tmpdir, "main.bat")
+            with open(main_script, "w", encoding="utf-8") as file_handle:
+                file_handle.write("@ECHO OFF\n")
+                file_handle.write(f'CALL "{helper1}" & CALL "{helper2}"\n')
+                file_handle.write("ECHO %VAR1% %VAR2%\n")
+                file_handle.write("EXIT /b 0\n")
+
+            config = BlinterConfig(follow_calls=True)
+            issues = lint_batch_file(main_script, config=config)
+            e006_issues = [i for i in issues if i.rule.code == "E006"]
+            assert not [i for i in e006_issues if "VAR1" in i.context]
+            assert not [i for i in e006_issues if "VAR2" in i.context]
+
     def test_transitive_variable_from_nested_call_no_error(self) -> None:
         """Variables defined in a transitively called script are recognized."""
         with tempfile.TemporaryDirectory() as tmpdir:

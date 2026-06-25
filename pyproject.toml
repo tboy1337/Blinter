@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Blinter"
-version = "1.0.149"
+version = "1.0.150"
 description = "Blinter is a linter for Windows batch files. It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -69,7 +69,10 @@ where = ["src"]
 include-package-data = true
 
 [tool.setuptools.data-files]
-"share/doc/blinter" = ["docs/Batch-File-Linter-Requirements.md"]
+"share/doc/blinter" = [
+    "docs/Batch-File-Linter-Requirements.md",
+    "docs/Architecture.md",
+]
 
 [tool.setuptools.package-data]
 blinter = ["py.typed"]
@@ -131,5 +134,6 @@ color_output = false
 
 [tool.bandit]
 exclude_dirs = ["tests", ".venv", "venv", "build", "dist"]
-# B101: assert in tests; B108: SEC007 uses hardcoded strings as scan patterns only
+# B101: assert used in tests only (tests excluded above)
+# B108: hardcoded temp paths in SEC007 scan patterns, not runtime file I/O
 skips = ["B101", "B108"]

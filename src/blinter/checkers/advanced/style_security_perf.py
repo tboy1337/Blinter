@@ -83,53 +83,73 @@ def _has_unescaped_user_args(stripped: str) -> bool:
     return re.search(r"\^[&|><^]", stripped) is None
 
 
+def _check_sec014_unescaped_input(
+    line: str, line_number: int, lines: List[str], labels: Dict[str, int]
+) -> Optional[LintIssue]:
+    """SEC014: Unescaped user input in command execution."""
+    if _is_in_subroutine_context(lines, line_number, labels):
+        return None
+    stripped = line.strip()
+    if not _has_unescaped_user_args(stripped):
+        return None
+    return LintIssue(
+        line_number,
+        RULES["SEC014"],
+        context="User input parameters should be escaped",
+    )
+
+
+def _check_sec017_predictable_temp(line: str, line_number: int) -> Optional[LintIssue]:
+    """SEC017: Temporary file creation in predictable location."""
+    stripped = line.strip()
+    lowered = stripped.lower()
+    if "temp" not in lowered or (".tmp" not in stripped and ".temp" not in stripped):
+        return None
+    if "%random%" in lowered or "%time%" in lowered:
+        return None
+    return LintIssue(
+        line_number,
+        RULES["SEC017"],
+        context="Temp files should use %RANDOM% or timestamp",
+    )
+
+
+_SEC018_REDIRECTION_PATTERNS: tuple[str, ...] = (
+    r">\s*c:\\temp",
+    r">\s*c:\\windows\\temp",
+    r">\s*\\\\.*\\share",
+)
+
+
+def _check_sec018_insecure_redirection(
+    line: str, line_number: int
+) -> Optional[LintIssue]:
+    """SEC018: Command output redirection to insecure location."""
+    stripped_lower = line.strip().lower()
+    for pattern in _SEC018_REDIRECTION_PATTERNS:
+        if re.search(pattern, stripped_lower):
+            return LintIssue(
+                line_number,
+                RULES["SEC018"],
+                context="Output redirected to potentially insecure location",
+            )
+    return None
+
+
 def _check_advanced_security(
     line: str, line_number: int, lines: List[str], labels: Dict[str, int]
 ) -> List[LintIssue]:
     """Check for advanced security patterns."""
     issues: List[LintIssue] = []
-    stripped = line.strip()
-
-    # SEC014: Unescaped user input in command execution
-    # Only check if we're NOT in a subroutine context
-    # In subroutines, %1-%9 and %* refer to subroutine parameters, not user input
-    if not _is_in_subroutine_context(lines, line_number, labels):
-        if _has_unescaped_user_args(stripped):
-            issues.append(
-                LintIssue(
-                    line_number,
-                    RULES["SEC014"],
-                    context="User input parameters should be escaped",
-                )
-            )
-
-    # SEC017: Temporary file creation in predictable location
-    if "temp" in stripped.lower() and (".tmp" in stripped or ".temp" in stripped):
-        if "%random%" not in stripped.lower() and "%time%" not in stripped.lower():
-            issues.append(
-                LintIssue(
-                    line_number,
-                    RULES["SEC017"],
-                    context="Temp files should use %RANDOM% or timestamp",
-                )
-            )
-
-    # SEC018: Command output redirection to insecure location
-    redirection_patterns = [
-        r">\s*c:\\temp",
-        r">\s*c:\\windows\\temp",
-        r">\s*\\\\.*\\share",
-    ]
-    for pattern in redirection_patterns:
-        if re.search(pattern, stripped.lower()):
-            issues.append(
-                LintIssue(
-                    line_number,
-                    RULES["SEC018"],
-                    context="Output redirected to potentially insecure location",
-                )
-            )
-
+    sec014 = _check_sec014_unescaped_input(line, line_number, lines, labels)
+    if sec014 is not None:
+        issues.append(sec014)
+    sec017 = _check_sec017_predictable_temp(line, line_number)
+    if sec017 is not None:
+        issues.append(sec017)
+    sec018 = _check_sec018_insecure_redirection(line, line_number)
+    if sec018 is not None:
+        issues.append(sec018)
     return issues
 
 

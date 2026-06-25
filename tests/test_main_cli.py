@@ -1613,6 +1613,28 @@ class TestFollowCallsCLI:
                 # Should exit with error code due to errors
                 assert exc_info.value.code in [0, 1]
 
+    def test_cli_callee_fatal_issues_do_not_change_parent_exit(self) -> None:
+        """Fatal findings in called scripts must not fail the primary target exit code."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            helper_script = os.path.join(tmpdir, "helper.cmd")
+            with open(helper_script, "w", encoding="utf-8") as bat_file:
+                bat_file.write("@ECHO OFF\n")
+                bat_file.write("if ( unclosed syntax\n")
+                bat_file.write("EXIT /b 0\n")
+
+            main_script = os.path.join(tmpdir, "main.cmd")
+            with open(main_script, "w", encoding="utf-8") as bat_file:
+                bat_file.write("@ECHO OFF\n")
+                bat_file.write("CALL helper.cmd\n")
+                bat_file.write("EXIT /b 0\n")
+
+            with patch.object(
+                sys, "argv", ["blinter.py", main_script, "--follow-calls"]
+            ):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                assert exc_info.value.code == 0
+
     def test_cli_follow_calls_outside_root_no_crash(self) -> None:
         """Directory scan with follow_calls must not crash on outside paths."""
         with tempfile.TemporaryDirectory() as outer:

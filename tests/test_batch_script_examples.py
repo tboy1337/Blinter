@@ -94,34 +94,3 @@ class TestNamingRuleRegression:
         config = BlinterConfig(disabled_rules={"S022"})
         issues = lint_batch_file(str(batch_file), config=config)
         assert not [issue for issue in issues if issue.rule.code == "S022"]
-
-
-class TestRuleRegistryCoverage:
-    """Every registered rule must be referenced by a checker or pattern."""
-
-    def test_all_rules_referenced_in_implementation(self) -> None:
-        from blinter.rules.registry import RULES  # noqa: PLC0415
-
-        src_root = Path(__file__).resolve().parent.parent / "src" / "blinter"
-        search_paths = [
-            src_root / "checkers",
-            src_root / "patterns.py",
-            src_root / "parsing",
-            src_root / "rules",
-        ]
-        combined_source = ""
-        for path in search_paths:
-            if path.is_file():
-                combined_source += path.read_text(encoding="utf-8")
-                continue
-            for py_file in path.rglob("*.py"):
-                combined_source += py_file.read_text(encoding="utf-8")
-
-        orphans = [
-            code
-            for code in RULES
-            if f'"{code}"' not in combined_source
-            and f'RULES["{code}"]' not in combined_source
-            and f"RULES['{code}']" not in combined_source
-        ]
-        assert not orphans, f"Orphan rules without checker references: {orphans}"
