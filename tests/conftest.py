@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import tomllib
-from typing import Any, Callable, Generator
+from typing import Any, Generator
 from unittest.mock import MagicMock, patch
 import warnings
 
@@ -45,18 +45,6 @@ def get_project_version() -> str:
     if not isinstance(version_object, str) or not version_object:
         raise ValueError("pyproject.toml [project].version must be a non-empty string")
     return version_object
-
-
-@pytest.fixture
-def write_batch_file(tmp_path: Path) -> Callable[[str, str], Path]:
-    """Write batch script content to a file under the pytest tmp directory."""
-
-    def _write(content: str, name: str = "test.bat") -> Path:
-        script_path = tmp_path / name
-        script_path.write_text(content, encoding="utf-8")
-        return script_path
-
-    return _write
 
 
 @pytest.fixture(autouse=True)

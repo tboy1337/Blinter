@@ -791,3 +791,31 @@ class TestLineEndingStandaloneDetection:
         assert dominant_type in {"CRLF", "LF", "MIXED"}
         assert crlf_count + lf_only >= 1
         assert isinstance(has_mixed, bool)
+
+    def test_detect_line_endings_from_lines_lf_content(self) -> None:
+        """In-memory line lists derive LF endings without re-reading disk."""
+        from blinter.io.encoding import _detect_line_endings_from_lines
+
+        ending_type, has_mixed, crlf_count, lf_only, cr_only = (
+            _detect_line_endings_from_lines(["@echo off", "exit /b 0"])
+        )
+        assert ending_type == "LF"
+        assert lf_only >= 1
+        assert crlf_count == 0
+        assert cr_only == 0
+        assert has_mixed is False
+
+    def test_check_line_ending_rules_without_ending_info(self) -> None:
+        """Line-ending rules work when ending_info is omitted but lines are provided."""
+        from blinter.checkers.line_endings import _check_line_ending_rules
+
+        lines = ["@echo off", "exit /b 0"]
+        issues = _check_line_ending_rules(lines, "memory.bat", ending_info=None)
+        e018_issues = [issue for issue in issues if issue.rule.code == "E018"]
+        assert e018_issues, "Expected E018 for LF-style in-memory lines"
+
+    def test_check_line_ending_rules_empty_lines(self) -> None:
+        """Empty line lists produce no line-ending issues."""
+        from blinter.checkers.line_endings import _check_line_ending_rules
+
+        assert _check_line_ending_rules([], "empty.bat") == []

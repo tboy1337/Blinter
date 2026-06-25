@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Blinter"
-version = "1.0.144"
+version = "1.0.145"
 description = "Blinter is a linter for Windows batch files. It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems."
 readme = "README.md"
 license = "AGPL-3.0-or-later"

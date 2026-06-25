@@ -2,8 +2,9 @@
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
+from pathlib import Path
 import tempfile
-from typing import List
+from typing import Dict, List
 
 import pytest
 
@@ -248,6 +249,39 @@ EXIT /B 0
 
         finally:
             os.unlink(temp_path)
+
+    def test_concurrent_shared_lines_cache_with_follow_calls(
+        self, tmp_path: Path
+    ) -> None:
+        """Shared lines_cache must stay consistent under concurrent follow_calls linting."""
+        caller = tmp_path / "caller.bat"
+        helper = tmp_path / "helper.bat"
+        caller.write_text(
+            "@ECHO OFF\n" f'call "{helper.name}"\n' "echo %HELPER_VAR%\n",
+            encoding="utf-8",
+        )
+        helper.write_text(
+            '@ECHO OFF\nset "HELPER_VAR=ok"\n',
+            encoding="utf-8",
+        )
+        shared_cache: Dict[Path, List[str]] = {}
+        config = BlinterConfig(follow_calls=True, scan_root=str(tmp_path.resolve()))
+
+        def lint_worker() -> int:
+            issues = lint_batch_file(
+                str(caller),
+                config=config,
+                lines_cache=shared_cache,
+            )
+            return len(issues)
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(lint_worker) for _ in range(24)]
+            results = [future.result() for future in as_completed(futures)]
+
+        assert len(results) == 24
+        assert len(set(results)) == 1
+        assert caller.resolve() in shared_cache
 
     def test_concurrent_lint_different_line_lengths(self) -> None:
         """Concurrent lint calls must not share mutable S020 rule state."""

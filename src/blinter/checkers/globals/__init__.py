@@ -17,7 +17,6 @@ from blinter.checkers.globals.analysis import (
 )
 from blinter.checkers.globals.exit_flow import (
     _calculate_exit_paren_depth,
-    _can_main_execution_reach_eof,
     _check_missing_exit_statement,
     _check_nested_paren_mismatch,
     _check_unreachable_code,
@@ -57,7 +56,6 @@ __all__ = [
     "_check_setlocal_redundancy",
     "_check_missing_exit_statement",
     "_check_nested_paren_mismatch",
-    "_can_main_execution_reach_eof",
     "_check_unreachable_code",
     "_find_truly_unreachable_code",
     "_calculate_exit_paren_depth",

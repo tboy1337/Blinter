@@ -1,7 +1,6 @@
 """Main lint orchestration entry point for single batch files."""
 
 from pathlib import Path
-import threading
 from typing import (
     Dict,
     List,
@@ -19,6 +18,7 @@ from blinter.checkers.orchestration import (
     _process_file_checks,
 )
 from blinter.engine.dependencies import _collect_called_vars
+from blinter.engine.lines_cache import store_cached_lines
 from blinter.io.encoding import _validate_and_read_file
 from blinter.logging_config import logger
 from blinter.models import BlinterConfig, LintIssue, RuleSeverity
@@ -29,8 +29,6 @@ from blinter.parsing.structure import (
     _collect_set_variables,
     _parse_suppression_comments,
 )
-
-_LINES_CACHE_LOCK = threading.Lock()
 
 
 def lint_batch_file(  # pylint: disable=too-many-locals
@@ -55,6 +53,8 @@ def lint_batch_file(  # pylint: disable=too-many-locals
         config: BlinterConfig object with configuration settings. If None, uses defaults.
         dependency_graph: Optional pre-built dependency graph from folder scanning.
                          When provided, enables cross-file variable tracking.
+        lines_cache: Optional shared dict mapping resolved file paths to line lists.
+                     Reads and writes are synchronized for concurrent linting.
 
     Returns:
         List of LintIssue objects containing detailed issue information.
@@ -91,9 +91,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     # Read and validate file
     lines, _encoding_used, line_ending_info = _validate_and_read_file(file_path)
     if lines_cache is not None:
-        resolved_path = Path(file_path).resolve()
-        with _LINES_CACHE_LOCK:
-            lines_cache[resolved_path] = lines
+        store_cached_lines(lines_cache, Path(file_path), lines)
 
     if not lines:
         return []  # Empty file, no issues

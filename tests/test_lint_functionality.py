@@ -161,9 +161,11 @@ if "%var%" echo This is missing ==
         temp_file = self.create_temp_batch_file(content)
         try:
             issues = lint_batch_file(temp_file)
-            # The last line should trigger E003 for improper IF formatting
-            contexts = [issue.context for issue in issues if issue.rule.code == "E003"]
-            assert len(contexts) >= 0  # May or may not catch this heuristic case
+            rule_codes = [issue.rule.code for issue in issues]
+            assert len(issues) > 0
+            assert any(
+                code.startswith("E") or code.startswith("W") for code in rule_codes
+            )
         finally:
             os.unlink(temp_file)
 
@@ -501,16 +503,12 @@ echo Process finished
         temp_file = self.create_temp_batch_file(content)
         try:
             issues = lint_batch_file(temp_file)
-            # This should be a well-formed script with minimal critical issues
-            # Filter out any style-only issues
             critical_issues = [
                 issue
                 for issue in issues
                 if issue.rule.severity in [RuleSeverity.ERROR, RuleSeverity.WARNING]
             ]
-            # Allow for issues that the linter correctly identifies
-            # The linter is working as intended by finding issues
-            assert len(critical_issues) >= 0  # Just ensure it doesn't crash
+            assert isinstance(critical_issues, list)
         finally:
             os.unlink(temp_file)
 

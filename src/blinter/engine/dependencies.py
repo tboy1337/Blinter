@@ -12,6 +12,7 @@ from typing import (
 )
 
 from blinter.constants import MAX_FOLLOW_CALL_DEPTH, MAX_FOLLOW_CALL_FILES
+from blinter.engine.lines_cache import get_cached_lines
 from blinter.io.discovery import is_path_under_root
 from blinter.io.encoding import _validate_and_read_file
 from blinter.logging_config import logger
@@ -45,7 +46,7 @@ def _read_batch_lines(
     try:
         file_lines, _encoding, _ending = _validate_and_read_file(str(path))
         return file_lines
-    except (OSError, ValueError, UnicodeDecodeError) as read_error:
+    except (OSError, ValueError) as read_error:
         logger.debug("Could not read batch file %s: %s", path, read_error)
         return None
 
@@ -200,8 +201,8 @@ def _extract_direct_dependencies(
     """
     deps: Set[Path] = set()
     cached_lines = lines
-    if cached_lines is None and lines_cache is not None:
-        cached_lines = lines_cache.get(batch_file_resolved)
+    if cached_lines is None:
+        cached_lines = get_cached_lines(lines_cache, batch_file_resolved)
     file_lines = _read_batch_lines(batch_file, lines=cached_lines)
     if file_lines is None:
         return deps
@@ -351,9 +352,7 @@ def _collect_vars_from_dependencies(
             logger.debug("Skipping dependency outside scan root: %s", dep_file)
             continue
 
-        cached_lines = (
-            lines_cache.get(dep_file.resolve()) if lines_cache is not None else None
-        )
+        cached_lines = get_cached_lines(lines_cache, dep_file)
         called_lines = _read_batch_lines(dep_file, lines=cached_lines)
         if called_lines is None:
             continue
@@ -393,9 +392,7 @@ def _collect_vars_from_script(
         logger.debug("Skipping called script outside scan root: %s", script_path)
         return set()
 
-    cached_lines = (
-        lines_cache.get(script_path.resolve()) if lines_cache is not None else None
-    )
+    cached_lines = get_cached_lines(lines_cache, script_path)
     called_lines = _read_batch_lines(script_path, lines=cached_lines)
     if called_lines is None:
         return set()

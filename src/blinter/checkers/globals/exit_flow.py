@@ -164,11 +164,6 @@ def _is_goto_eof_target(target: str) -> bool:
     return target.lstrip(":") == "eof"
 
 
-def _can_main_execution_reach_eof(lines: List[str]) -> bool:
-    """Determine if the main execution path can reach EOF without EXIT."""
-    return _can_execution_reach_eof(lines)
-
-
 def _can_execution_reach_eof(  # pylint: disable=too-many-branches,too-many-return-statements
     lines: List[str],
     start_index: int = 0,

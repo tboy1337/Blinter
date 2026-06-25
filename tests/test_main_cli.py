@@ -23,10 +23,12 @@ from blinter.cli.args import _parse_cli_arguments
 from blinter.cli.main import (
     _apply_cli_config_overrides,
     _configure_cli_logging,
+    _process_called_scripts,
     _process_single_called_script,
     main as cli_main,
 )
-from blinter.models import BlinterConfig, CliArguments, ProcessingState
+from blinter.engine.linter import lint_batch_file as engine_lint_batch_file
+from blinter.models import BlinterConfig, CliArguments, LintIssue, ProcessingState
 
 # pylint: disable=too-many-lines,redefined-outer-name,reimported
 
@@ -670,6 +672,40 @@ class TestCommandLineIntegration:
             if temp_file and os.path.exists(temp_file):
                 os.unlink(temp_file)
 
+    def test_internal_lint_error_skips_file_and_continues(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Internal checker failures skip one file without aborting the whole run."""
+        good_file = tmp_path / "good.bat"
+        bad_file = tmp_path / "bad.bat"
+        good_file.write_text("@echo off\necho ok\n", encoding="utf-8")
+        bad_file.write_text("@echo off\necho bad\n", encoding="utf-8")
+
+        def selective_lint(
+            file_path: str,
+            config: BlinterConfig | None = None,
+            dependency_graph: dict[Path, set[Path]] | None = None,
+            lines_cache: dict[Path, list[str]] | None = None,
+        ) -> list[LintIssue]:
+            if Path(file_path).name == "bad.bat":
+                raise KeyError("simulated checker bug")
+            return engine_lint_batch_file(
+                file_path,
+                config=config,
+                dependency_graph=dependency_graph,
+                lines_cache=lines_cache,
+            )
+
+        with patch("blinter.cli.main.lint_batch_file", side_effect=selective_lint):
+            with patch("sys.argv", ["blinter.py", str(tmp_path)]):
+                with pytest.raises(SystemExit) as exit_info:
+                    main()
+
+        captured = capsys.readouterr()
+        assert exit_info.value.code == 1
+        assert "internal lint error" in captured.err
+        assert "Processed 1 batch file" in captured.out
+
     def test_main_entry_point_execution(self) -> None:
         """Test python -m blinter entry point via subprocess."""
         with tempfile.NamedTemporaryFile(
@@ -1266,18 +1302,19 @@ class TestMainFunctionEdgeCases:
                         with pytest.raises(SystemExit):
                             main()
 
-                        # Test UnicodeDecodeError
+                        # Test UnicodeDecodeError (skipped like other per-file failures)
                         mock_lint.side_effect = UnicodeDecodeError(
                             "utf-8", b"", 0, 1, "invalid start byte"
                         )
-                        with pytest.raises(SystemExit):
+                        with pytest.raises(SystemExit) as exc_info:
                             main()
+                        assert exc_info.value.code == 1
 
-                        # Test generic Exception (unexpected internal error)
+                        # Test generic Exception (per-file internal errors are skipped)
                         mock_lint.side_effect = Exception("Generic error")
                         with pytest.raises(SystemExit) as exc_info:
                             main()
-                        assert exc_info.value.code == 2
+                        assert exc_info.value.code == 1
             finally:
                 sys.argv = original_argv
 
@@ -1746,8 +1783,77 @@ class TestFollowCallsProcessing:  # pylint: disable=too-few-public-methods
         )
         assert (processed, errors) == (0, 0)
 
+    def test_process_called_scripts_stops_at_depth_limit(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Nested follow-calls stop when MAX_FOLLOW_CALL_DEPTH is exceeded."""
+        monkeypatch.setattr("blinter.cli.main.MAX_FOLLOW_CALL_DEPTH", 0)
 
-class TestCliArgumentValidation:  # pylint: disable=too-few-public-methods
+        root_script = tmp_path / "root.bat"
+        child_script = tmp_path / "child.bat"
+        root_script.write_text(
+            f'@ECHO OFF\ncall "{child_script.name}"\n', encoding="utf-8"
+        )
+        child_script.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+
+        state = ProcessingState(
+            processed_files={root_script.resolve()},
+            all_issues=[],
+            file_results={},
+            processed_file_paths=[(str(root_script), None)],
+        )
+        config = BlinterConfig(follow_calls=True, scan_root=str(tmp_path))
+
+        processed, errors = _process_called_scripts(root_script, config, state, depth=1)
+
+        assert (processed, errors) == (0, 0)
+
+    def test_process_single_called_script_skips_already_processed(
+        self, tmp_path: Path
+    ) -> None:
+        """Called scripts already in processed_files are not linted again."""
+        helper = tmp_path / "helper.bat"
+        helper.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+
+        state = ProcessingState(
+            processed_files={helper.resolve()},
+            all_issues=[],
+            file_results={},
+            processed_file_paths=[],
+        )
+        config = BlinterConfig(follow_calls=True, scan_root=str(tmp_path))
+
+        processed, errors = _process_single_called_script(
+            helper, config, state, "parent.bat"
+        )
+        assert (processed, errors) == (0, 0)
+
+    def test_process_single_called_script_internal_error_is_skipped(
+        self, tmp_path: Path
+    ) -> None:
+        """Internal errors linting a called script do not abort follow-calls."""
+        helper = tmp_path / "helper.bat"
+        helper.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+
+        state = ProcessingState(
+            processed_files=set(),
+            all_issues=[],
+            file_results={},
+            processed_file_paths=[],
+        )
+        config = BlinterConfig(follow_calls=True, scan_root=str(tmp_path))
+
+        with patch(
+            "blinter.cli.main.lint_batch_file",
+            side_effect=RuntimeError("simulated internal failure"),
+        ):
+            processed, errors = _process_single_called_script(
+                helper, config, state, "parent.bat"
+            )
+
+        assert (processed, errors) == (0, 0)
+        assert helper.resolve() not in state.processed_files
+
     """Test CLI argument validation edge cases."""
 
     def test_multiple_positional_paths_rejected(self) -> None:

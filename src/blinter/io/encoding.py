@@ -129,6 +129,14 @@ def _detect_line_endings(file_path: str) -> LineEndingInfo:
     return dominant_type, has_mixed, crlf_count, lf_only_count, cr_only_count
 
 
+def _detect_line_endings_from_lines(lines: List[str]) -> LineEndingInfo:
+    """Derive line-ending statistics from an already-read line list."""
+    if not lines:
+        return "NONE", False, 0, 0, 0
+    content = "\n".join(lines).encode("utf-8")
+    return _line_ending_stats_from_bytes(content)
+
+
 def _has_multibyte_chars(lines: List[str]) -> Tuple[bool, List[int]]:
     """
     Check for multi-byte UTF-8 characters in batch file lines.

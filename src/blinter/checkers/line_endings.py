@@ -9,17 +9,16 @@ from typing import (
 
 from blinter.io.encoding import (
     LineEndingInfo,
-    _detect_line_endings,
+    _detect_line_endings_from_lines,
     _has_multibyte_chars,
 )
-from blinter.logging_config import logger
 from blinter.models import LintIssue
 from blinter.rules.registry import RULES
 
 
 def _check_line_ending_rules(
     lines: List[str],
-    file_path: str,
+    _file_path: str,
     ending_info: Optional[LineEndingInfo] = None,
 ) -> List[LintIssue]:
     """
@@ -38,24 +37,17 @@ def _check_line_ending_rules(
     if not lines:
         return []
 
-    try:
-        return _analyze_line_endings(lines, file_path, ending_info=ending_info)
-    except OSError as line_ending_error:
-        logger.warning(
-            "Could not analyze line endings for %s: %s", file_path, line_ending_error
-        )
-        return []
+    return _analyze_line_endings(lines, ending_info=ending_info)
 
 
 def _analyze_line_endings(
     lines: List[str],
-    file_path: str,
     ending_info: Optional[LineEndingInfo] = None,
 ) -> List[LintIssue]:
     """Analyze line endings and return related issues."""
     issues: List[LintIssue] = []
     if ending_info is None:
-        ending_info = _detect_line_endings(file_path)
+        ending_info = _detect_line_endings_from_lines(lines)
     ending_type = ending_info[0]
 
     # Check basic line ending issues

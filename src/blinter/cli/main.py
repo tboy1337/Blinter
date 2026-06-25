@@ -20,6 +20,7 @@ from blinter.engine.dependencies import (
     _build_call_dependency_graph,
     _extract_called_scripts,
 )
+from blinter.engine.lines_cache import get_cached_lines
 from blinter.engine.linter import lint_batch_file
 from blinter.io.discovery import find_batch_files, is_path_under_root
 from blinter.logging_config import logger
@@ -83,6 +84,15 @@ def _is_fatal_severity(severity: RuleSeverity) -> bool:
     return severity in (RuleSeverity.ERROR, RuleSeverity.SECURITY)
 
 
+_FILE_PROCESSING_ERRORS: Tuple[type[BaseException], ...] = (
+    FileNotFoundError,
+    PermissionError,
+    OSError,
+    ValueError,
+    TypeError,
+)
+
+
 def _process_single_called_script(
     called_script: Path,
     config: BlinterConfig,
@@ -132,18 +142,18 @@ def _process_single_called_script(
         )
         return (1, 1 if has_fatal else 0)
 
-    except (
-        FileNotFoundError,
-        PermissionError,
-        OSError,
-        ValueError,
-        TypeError,
-    ) as called_error:
+    except _FILE_PROCESSING_ERRORS as called_error:
         error_msg = (
             f"Warning: Could not process called script "
             f"'{called_script}': {called_error}"
         )
         logger.warning(error_msg)
+        return (0, 0)
+    except Exception:
+        logger.exception(
+            "Internal error linting called script '%s'",
+            called_script,
+        )
         return (0, 0)
 
 
@@ -177,7 +187,7 @@ def _process_called_scripts(
     called_scripts = _extract_called_scripts(
         batch_file,
         scan_root=config.scan_root,
-        lines=state.lines_cache.get(batch_file.resolve()),
+        lines=get_cached_lines(state.lines_cache, batch_file),
     )
 
     for called_script in called_scripts:
@@ -267,14 +277,16 @@ def _process_batch_files(
                 total_files_processed += called_results[0]
                 files_with_errors += called_results[1]
 
-        except (
-            FileNotFoundError,
-            PermissionError,
-            OSError,
-            ValueError,
-            TypeError,
-        ) as file_error:
+        except _FILE_PROCESSING_ERRORS as file_error:
             _record_skipped_file(skipped_files, batch_file, str(file_error))
+            continue
+        except Exception as internal_error:
+            logger.exception("Internal error linting '%s'", batch_file)
+            _record_skipped_file(
+                skipped_files,
+                batch_file,
+                f"internal lint error: {internal_error}",
+            )
             continue
 
     if total_files_processed == 0:

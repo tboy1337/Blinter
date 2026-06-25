@@ -653,15 +653,7 @@ EXIT /b 0
         try:
             config = BlinterConfig()
             issues = lint_batch_file(temp_file, config=config)
-            # Should detect excessive nesting (any warning about depth)
             assert isinstance(issues, list)
-            # Deep nesting should be flagged
-            nesting_issues = [
-                i
-                for i in issues
-                if "nesting" in i.rule.name.lower() or "depth" in i.rule.name.lower()
-            ]
-            assert len(nesting_issues) >= 0  # May or may not have specific nesting rule
         finally:
             os.unlink(temp_file)
 

@@ -632,6 +632,22 @@ class TestSymlinkSandbox:  # pylint: disable=too-few-public-methods
             outside_file.write_text("@ECHO OFF\n", encoding="utf-8")
             assert is_path_under_root(outside_file, scan_root) is False
 
+    def test_is_path_under_root_accepts_symlink_inside_scan_root(
+        self, tmp_path: Path
+    ) -> None:
+        """Symlinks that resolve inside scan_root are accepted."""
+        scan_root = tmp_path / "project"
+        scan_root.mkdir()
+        real_file = scan_root / "real.bat"
+        real_file.write_text("@echo off\n", encoding="utf-8")
+        link = scan_root / "link.bat"
+        try:
+            os.symlink(real_file.name, link)
+        except OSError:
+            pytest.skip("symlink creation not supported on this platform")
+
+        assert is_path_under_root(link, scan_root) is True
+
     def test_find_batch_files_filters_outside_scan_root(self) -> None:
         """find_batch_files with root skips files outside scan_root."""
         with tempfile.TemporaryDirectory() as outer:
