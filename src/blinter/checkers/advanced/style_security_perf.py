@@ -16,7 +16,7 @@ from blinter.parsing.structure import _is_in_subroutine_context
 from blinter.rules.registry import RULES
 
 _REDIRECT_MACRO_VARS: frozenset[str] = frozenset(
-    {"nul", "nul1", "nul2", "nul3", "nul6", "_silent"}
+    {"nul", "nul1", "nul2", "nul3", "nul6", "_silent", "psc", "ps"}
 )
 
 
@@ -589,6 +589,17 @@ def _get_safe_command_patterns() -> List[str]:
         r"^if\s+defined\s+\S+\s+\(set\s+",
         # findstr with redirect macro and conditional assignment
         r"findstr\b.*%nul\d*%.*&&\s*set\b",
+        # MAS menu: if %_erl%==N (set ... & goto:label)
+        r"^if\s+%[^%]+%==\S+\s+\(set\s+",
+        r"^if\s+%[^%]+%==\S+\s+\(start\s+.*&\s*(?:goto|exit)\b",
+        r"^if\s+!errorlevel!==\d+\s+\(start\s+.*&\s*exit\b",
+        # echo piped to find inside IF
+        r"^if\s+defined\s+\S+\s+echo\s+\".*\"\s*\|\s*find\b",
+        # PowerShell helper invocations
+        r"^%psc%\s+\"",
+        r"^for\s+.*\bdo\s+\(%psc%\s+\"",
+        # reg/find with redirect macro before conditional block
+        r"reg\s+query\b.*%nul\d+%\s*\|\s*find\b.*%nul\d+%\s*&&\s*\(",
     ]
 
 

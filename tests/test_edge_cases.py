@@ -2363,6 +2363,22 @@ class TestSpecializedEdgeCases:
         issues = _check_enhanced_security_rules(lines)
         assert not [issue for issue in issues if issue.rule.code == "SEC013"]
 
+    def test_psc_invocation_not_sec013(self) -> None:
+        """PowerShell helper lines should not trigger SEC013."""
+        lines = [
+            '%psc% "Start-Job { Restart-Service ClipSVC } | Wait-Job -Timeout 20 | Out-Null"'
+        ]
+        issues = _check_enhanced_security_rules(lines)
+        assert not [issue for issue in issues if issue.rule.code == "SEC013"]
+
+    def test_if_erl_paren_set_menu_not_sec013(self) -> None:
+        """Menu SET chains inside IF ( ) should not trigger SEC013."""
+        lines = [
+            'if %_erl%==8 (set "_oem=TSforge" & set "para=/Z-Windows" &goto:Extract$OEM$3)'
+        ]
+        issues = _check_enhanced_security_rules(lines)
+        assert not [issue for issue in issues if issue.rule.code == "SEC013"]
+
     def test_enhanced_performance_function(self) -> None:
         """Test _check_enhanced_performance function."""
         lines = [
