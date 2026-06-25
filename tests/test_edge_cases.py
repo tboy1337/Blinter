@@ -1284,6 +1284,17 @@ class TestSecurityChecking:
         issues = _check_nested_paren_mismatch(lines)
         assert not issues
 
+    def test_bare_paren_redirect_block_not_e001(self) -> None:
+        """Parenthesized command groups redirected to a log file should balance."""
+        lines = [
+            "( rem -- Write to Log",
+            "    echo hello",
+            "    echo world",
+            ') >>"%@LOGFILE%"',
+        ]
+        issues = _check_nested_paren_mismatch(lines)
+        assert not issues
+
     def test_unmatched_if_block_still_e001(self) -> None:
         """A missing closing parenthesis should still trigger E001."""
         issues = _check_nested_paren_mismatch(["if exist file.txt ("])
@@ -2337,6 +2348,18 @@ class TestSpecializedEdgeCases:
     def test_menu_setlocal_call_not_sec013(self) -> None:
         """Menu dispatch via setlocal & call should not trigger SEC013."""
         lines = ["if %_erl%==5 setlocal & call :KMSActivation"]
+        issues = _check_enhanced_security_rules(lines)
+        assert not [issue for issue in issues if issue.rule.code == "SEC013"]
+
+    def test_menu_start_goto_not_sec013(self) -> None:
+        """Menu start URL chains with goto should not trigger SEC013."""
+        lines = ["if %_erl%==2 start %mas%genuine-installation-media & goto :Extras"]
+        issues = _check_enhanced_security_rules(lines)
+        assert not [issue for issue in issues if issue.rule.code == "SEC013"]
+
+    def test_if_defined_compound_set_not_sec013(self) -> None:
+        """Compound SET inside IF ( ) should not trigger SEC013."""
+        lines = ["if defined altkey (set key=%altkey%&set changekey=1&set notworking=)"]
         issues = _check_enhanced_security_rules(lines)
         assert not [issue for issue in issues if issue.rule.code == "SEC013"]
 

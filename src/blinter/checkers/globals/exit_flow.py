@@ -310,9 +310,40 @@ def _scan_for_unreachable_code(
     return None
 
 
+_BLOCK_CLOSE_PATTERN = re.compile(
+    r"^\)(?:\s*(?:"
+    r">>?\s*(?:\"[^\"]*\"|\S+)?|"
+    r"[12]>&?[12]?|"
+    r">\s*(?:\"[^\"]*\"|\S+)"
+    r"))?",
+    re.IGNORECASE,
+)
+
+
+def _is_bare_paren_block_open(line: str) -> bool:
+    """Return True for ``( command `` groups that are not IF/FOR headers."""
+    if not re.match(r"^\(", line):
+        return False
+    return re.search(r"\b(?:if|for)\b", line, re.IGNORECASE) is None
+
+
+def _line_opens_block_depth(line: str) -> int:
+    """Return how many IF/FOR/(group) blocks open on this line."""
+    if _is_bare_paren_block_open(line):
+        return 1
+    if re.search(r"\bfor\b", line, re.IGNORECASE) and (
+        re.search(r"\bdo\s*\(\s*$", line, re.IGNORECASE)
+        or re.search(r"\bfor\b.*\(", line, re.IGNORECASE)
+    ):
+        return 1
+    if re.search(r"\bif\b", line, re.IGNORECASE) and re.search(r"\(\s*$", line):
+        return 1
+    return 0
+
+
 def _update_paren_depth(line: str, current_depth: int) -> int:
     """Update parentheses depth based on the line content."""
-    close_match = re.match(r"^\)(?:\s*(?:>>|[12]>|[<>]))?", line)
+    close_match = _BLOCK_CLOSE_PATTERN.match(line)
     if close_match:
         current_depth -= 1
         remainder = line[close_match.end() :].strip()
@@ -322,17 +353,7 @@ def _update_paren_depth(line: str, current_depth: int) -> int:
             current_depth += 1
         return current_depth
 
-    if re.search(r"\bfor\b", line, re.IGNORECASE):
-        if re.search(r"\bdo\s*\(\s*$", line, re.IGNORECASE):
-            return current_depth + 1
-        if re.search(r"\bfor\b.*\(", line, re.IGNORECASE):
-            return current_depth + 1
-        return current_depth
-
-    if re.search(r"\bif\b", line, re.IGNORECASE) and re.search(r"\(\s*$", line):
-        return current_depth + 1
-
-    return current_depth
+    return current_depth + _line_opens_block_depth(line)
 
 
 def _line_makes_code_reachable(line: str) -> bool:

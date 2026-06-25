@@ -583,6 +583,12 @@ def _get_safe_command_patterns() -> List[str]:
         r"%[a-zA-Z_][a-zA-Z0-9_]*%\s*(?:&&|\|\|)\s*\(\s*$",
         # Menu dispatch: if %_erl%==5 setlocal & call :subroutine
         r"^if\s+%[^%]+%==\S+\s+setlocal\s*&\s*call\s+:\w+",
+        # Menu lines: if %_erl%==N start %url% & goto :label
+        r"^if\s+%[^%]+%==\S+\s+start\s+.*&\s*goto\s*:",
+        # Compound SET assignments inside IF blocks
+        r"^if\s+defined\s+\S+\s+\(set\s+",
+        # findstr with redirect macro and conditional assignment
+        r"findstr\b.*%nul\d*%.*&&\s*set\b",
     ]
 
 
