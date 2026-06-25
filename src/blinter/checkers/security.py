@@ -35,6 +35,33 @@ _STRING_REPLACE_ONLY = re.compile(
     r"^[%!][A-Za-z0-9_@]+:[^%!]+[%!]$",
     re.IGNORECASE,
 )
+_HARDCODED_TEMP_PATH_BOUNDARY_BEFORE = frozenset(" \t\"'=")
+
+
+def _matches_hardcoded_temp_path(stripped: str) -> bool:
+    """Return True when ``stripped`` contains a hardcoded temp directory path."""
+    lowered = stripped.lower()
+    for temp_path in _HARDCODED_TEMP_PATH_PATTERNS:
+        temp_lower = temp_path.lower()
+        search_from = 0
+        while True:
+            pos = lowered.find(temp_lower, search_from)
+            if pos == -1:
+                break
+            before_ok = (
+                pos == 0 or stripped[pos - 1] in _HARDCODED_TEMP_PATH_BOUNDARY_BEFORE
+            )
+            after_pos = pos + len(temp_path)
+            if after_pos >= len(stripped):
+                after_ok = True
+            elif temp_path.startswith("/"):
+                after_ok = stripped[after_pos] in "/ \t\"'"
+            else:
+                after_ok = stripped[after_pos] in "\\ \t\"'"
+            if before_ok and after_ok:
+                return True
+            search_from = pos + 1
+    return False
 
 
 def _first_set_value_text(var_val_text: str) -> str:
@@ -152,6 +179,22 @@ def _has_priv_check_before(lines: List[str], target_line_num: int) -> bool:
     return False
 
 
+def _should_skip_sec005(lines: Optional[List[str]], line_num: int) -> bool:
+    """Return True when an earlier privilege check makes SEC005 unnecessary."""
+    return bool(lines and _has_priv_check_before(lines, line_num))
+
+
+def _append_sec005_issue(issues: List[LintIssue], line_num: int, context: str) -> None:
+    """Append a SEC005 issue to the issues list."""
+    issues.append(
+        LintIssue(
+            line_number=line_num,
+            rule=RULES["SEC005"],
+            context=context,
+        )
+    )
+
+
 def _check_privilege_security(
     stripped: str, line_num: int, lines: Optional[List[str]] = None, line: str = ""
 ) -> List[LintIssue]:
@@ -165,17 +208,11 @@ def _check_privilege_security(
 
     for cmd in _ADMIN_COMMANDS:
         if cmd in stripped.lower():
-            # Check if there's already a privilege check earlier in the script
-            if lines and _has_priv_check_before(lines, line_num):
-                # Privilege check already performed, skip this check
-                pass
-            else:
-                issues.append(
-                    LintIssue(
-                        line_number=line_num,
-                        rule=RULES["SEC005"],
-                        context=f"Command '{cmd.strip()}' may require administrator privileges",
-                    )
+            if not _should_skip_sec005(lines, line_num):
+                _append_sec005_issue(
+                    issues,
+                    line_num,
+                    f"Command '{cmd.strip()}' may require administrator privileges",
                 )
             break
 
@@ -186,19 +223,12 @@ def _check_privilege_security(
             re.search(pattern, stripped.lower())
             for pattern in _NET_PRIVILEGE_CHECK_PATTERNS
         )
-        if not is_privilege_check:
-            # Check if there's already a privilege check earlier in the script
-            if lines and _has_priv_check_before(lines, line_num):
-                # Privilege check already performed, skip this check
-                pass
-            else:
-                issues.append(
-                    LintIssue(
-                        line_number=line_num,
-                        rule=RULES["SEC005"],
-                        context="NET command may require administrator privileges",
-                    )
-                )
+        if not is_privilege_check and not _should_skip_sec005(lines, line_num):
+            _append_sec005_issue(
+                issues,
+                line_num,
+                "NET command may require administrator privileges",
+            )
 
     return issues
 
@@ -230,16 +260,14 @@ def _check_path_security(line: str, stripped: str, line_num: int) -> List[LintIs
             break
 
     # SEC007: Hardcoded temporary directory (patterns scanned by this rule, not runtime paths)
-    for temp_path in _HARDCODED_TEMP_PATH_PATTERNS:
-        if temp_path in stripped:
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["SEC007"],
-                    context="Use %TEMP% instead of hardcoded temporary paths",
-                )
+    if _matches_hardcoded_temp_path(stripped):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["SEC007"],
+                context="Use %TEMP% instead of hardcoded temporary paths",
             )
-            break
+        )
 
     # SEC020: UNC path without UAC elevation check
     unc_operations = ["pushd", "copy", "xcopy", "robocopy", "move"]
@@ -305,9 +333,37 @@ def _check_info_disclosure_sec(
     return issues
 
 
-def _check_malware_security(stripped: str, line_num: int) -> List[LintIssue]:
+_MALWARE_HIGH_CONFIDENCE_PATTERNS: tuple[str, ...] = (
+    r"%systemroot%",
+    r"drivers\\etc\\hosts",
+    r"autorun\.inf",
+    r'start\s+""\s*%0',
+    r"start\s+%0",
+    r"start\s+cmd\s*/c\s*%0",
+    r"copy\s+%0\s+[a-z]:",
+    r"xcopy.*%0.*[a-z]:",
+)
+
+
+def _is_malware_check_suppressed(line: str) -> bool:
+    """Return True when malware heuristics should not run on a documentation line."""
+    if _is_comment_line(line):
+        return True
+    stripped = line.strip().lower()
+    if any(
+        re.search(pattern, stripped, re.IGNORECASE)
+        for pattern in _MALWARE_HIGH_CONFIDENCE_PATTERNS
+    ):
+        return False
+    return _is_command_in_safe_context(line)
+
+
+def _check_malware_security(line: str, stripped: str, line_num: int) -> List[LintIssue]:
     """Check for malware-like behavior security issues (SEC021-SEC024)."""
     issues: List[LintIssue] = []
+
+    if _is_malware_check_suppressed(line):
+        return issues
 
     # SEC021: Fork bomb pattern detected
     if (
@@ -374,6 +430,6 @@ def _check_security_issues(
     issues.extend(_check_privilege_security(stripped, line_num, lines=lines, line=line))
     issues.extend(_check_path_security(line, stripped, line_num))
     issues.extend(_check_info_disclosure_sec(line, stripped, line_num))
-    issues.extend(_check_malware_security(stripped, line_num))
+    issues.extend(_check_malware_security(line, stripped, line_num))
 
     return issues

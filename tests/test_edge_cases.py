@@ -1423,6 +1423,33 @@ class TestSecurityChecking:
                 len(temp_issues) == 0
             ), f"Safe context should not trigger SEC007: {cmd}"
 
+        # Substring paths like C:\temporal must not trigger SEC007
+        false_positive_cases = [
+            "SET desc=C:\\temporal\\folder",
+            "move C:\\temporal\\file.txt dest",
+        ]
+        for cmd in false_positive_cases:
+            issues = _check_security_issues(cmd, 1)
+            temp_issues = [i for i in issues if i.rule.code == "SEC007"]
+            assert (
+                len(temp_issues) == 0
+            ), f"Substring path should not trigger SEC007: {cmd}"
+
+    def test_malware_rules_skip_safe_context(self) -> None:
+        """SEC021-SEC024 should not fire in REM/ECHO documentation lines."""
+        safe_cases = [
+            "REM start %0 recursive example",
+            "ECHO >> hosts file modification example",
+            "echo copy %0 to removable drive example",
+        ]
+        for cmd in safe_cases:
+            issues = _check_security_issues(cmd, 1)
+            malware_codes = {"SEC021", "SEC022", "SEC023", "SEC024"}
+            flagged = [i.rule.code for i in issues if i.rule.code in malware_codes]
+            assert (
+                flagged == []
+            ), f"Safe context should not trigger malware rules: {cmd}"
+
 
 class TestPerformanceChecking:
     """Test performance level checking edge cases."""

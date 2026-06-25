@@ -422,65 +422,78 @@ def _count_fatal_issues(issues: List[LintIssue]) -> int:
     return sum(1 for issue in issues if _is_fatal_severity(issue.rule.severity))
 
 
+def _plural(count: int, suffix: str = "s") -> str:
+    """Return plural suffix when count is not 1."""
+    return "" if count == 1 else suffix
+
+
+def _handle_skipped_files_exit(results: ProcessingResults, fatal_count: int) -> bool:
+    """Print skipped-file warning and exit when required. Returns True if exited."""
+    if not results.skipped_files:
+        return False
+    print(
+        f"\nWARNING  {len(results.skipped_files)} batch file"
+        f"{_plural(len(results.skipped_files))} could not be processed."
+    )
+    if results.total_files_processed == 0 or fatal_count > 0:
+        sys.exit(1)
+    return False
+
+
+def _exit_directory_results(results: ProcessingResults, fatal_count: int) -> None:
+    """Exit with the appropriate code for directory analysis."""
+    if fatal_count > 0:
+        print(
+            f"\nWARNING  Found {fatal_count} critical issue{_plural(fatal_count)} "
+            f"(errors or security) across {results.files_with_errors} "
+            f"file{_plural(results.files_with_errors)} that must be fixed."
+        )
+        sys.exit(1)
+    elif results.all_issues:
+        print(
+            f"\nOK No critical errors found, but {len(results.all_issues)} "
+            f"total issue{_plural(len(results.all_issues))} detected across "
+            f"{results.total_files_processed} "
+            f"file{_plural(results.total_files_processed)}."
+        )
+        sys.exit(0)
+    else:
+        print(
+            f"\n* No issues found! All {results.total_files_processed} "
+            f"batch file{_plural(results.total_files_processed)} "
+            f"look{'s' if results.total_files_processed == 1 else ''} great!"
+        )
+        sys.exit(0)
+
+
+def _exit_single_file_results(results: ProcessingResults, fatal_count: int) -> None:
+    """Exit with the appropriate code for single-file analysis."""
+    if fatal_count > 0:
+        print(
+            f"\nWARNING  Found {fatal_count} critical issue{_plural(fatal_count)} "
+            f"(errors or security) that must be fixed."
+        )
+        sys.exit(1)
+    elif results.all_issues:
+        print(
+            f"\nOK No critical errors found, but {len(results.all_issues)} "
+            f"issue{_plural(len(results.all_issues))} detected."
+        )
+        sys.exit(0)
+    else:
+        print("\nNo issues found! Your batch file looks great!")
+        sys.exit(0)
+
+
 def _exit_with_results(results: ProcessingResults, target_path: str) -> None:
     """Exit with appropriate code based on results."""
     fatal_count = _count_fatal_issues(results.all_issues)
+    _handle_skipped_files_exit(results, fatal_count)
 
-    if results.skipped_files:
-        skipped_text = "s" if len(results.skipped_files) != 1 else ""
-        print(
-            f"\nWARNING  {len(results.skipped_files)} batch file{skipped_text} "
-            f"could not be processed."
-        )
-        if results.total_files_processed == 0 or fatal_count > 0:
-            sys.exit(1)
-
-    is_directory = Path(target_path).is_dir()
-
-    if is_directory:
-        if fatal_count > 0:
-            error_text = "s" if fatal_count != 1 else ""
-            file_text = "s" if results.files_with_errors != 1 else ""
-            print(
-                f"\nWARNING  Found {fatal_count} critical issue{error_text} "
-                f"(errors or security) across {results.files_with_errors} "
-                f"file{file_text} that must be fixed."
-            )
-            sys.exit(1)
-        elif results.all_issues:
-            issue_text = "s" if len(results.all_issues) != 1 else ""
-            file_text = "s" if results.total_files_processed != 1 else ""
-            print(
-                f"\nOK No critical errors found, but {len(results.all_issues)} "
-                f"total issue{issue_text} detected across "
-                f"{results.total_files_processed} file{file_text}."
-            )
-            sys.exit(0)
-        else:
-            file_text = "s" if results.total_files_processed != 1 else ""
-            look_text = "s" if results.total_files_processed == 1 else ""
-            print(
-                f"\n* No issues found! All {results.total_files_processed} "
-                f"batch file{file_text} look{look_text} great!"
-            )
-            sys.exit(0)
+    if Path(target_path).is_dir():
+        _exit_directory_results(results, fatal_count)
     else:
-        if fatal_count > 0:
-            print(
-                f"\nWARNING  Found {fatal_count} critical "
-                f"issue{'s' if fatal_count != 1 else ''} "
-                f"(errors or security) that must be fixed."
-            )
-            sys.exit(1)
-        elif results.all_issues:
-            print(
-                f"\nOK No critical errors found, but {len(results.all_issues)} "
-                f"issue{'s' if len(results.all_issues) != 1 else ''} detected."
-            )
-            sys.exit(0)
-        else:
-            print("\nNo issues found! Your batch file looks great!")
-            sys.exit(0)
+        _exit_single_file_results(results, fatal_count)
 
 
 def _apply_cli_config_overrides(

@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 from blinter.checkers.orchestration import (
+    _dedupe_temp_path_issues,
     _filter_issues_by_config,
     _process_file_checks,
 )
@@ -123,3 +124,43 @@ class TestProcessFileChecks:
                 config,
             )
             mock_security.assert_not_called()
+
+
+class TestDedupeTempPathIssues:
+    """Tests for SEC007/SEC012/SEC017 deduplication."""
+
+    def test_suppresses_sec007_when_sec012_present(self) -> None:
+        issues = [
+            LintIssue(line_number=1, rule=RULES["SEC007"]),
+            LintIssue(line_number=1, rule=RULES["SEC012"]),
+        ]
+        deduped = _dedupe_temp_path_issues(issues)
+        codes = [issue.rule.code for issue in deduped]
+        assert codes == ["SEC012"]
+
+    def test_suppresses_sec007_when_sec017_present(self) -> None:
+        issues = [
+            LintIssue(line_number=2, rule=RULES["SEC007"]),
+            LintIssue(line_number=2, rule=RULES["SEC017"]),
+        ]
+        deduped = _dedupe_temp_path_issues(issues)
+        codes = [issue.rule.code for issue in deduped]
+        assert codes == ["SEC017"]
+
+    def test_keeps_highest_priority_when_sec012_and_sec017_present(self) -> None:
+        issues = [
+            LintIssue(line_number=3, rule=RULES["SEC017"]),
+            LintIssue(line_number=3, rule=RULES["SEC012"]),
+        ]
+        deduped = _dedupe_temp_path_issues(issues)
+        codes = [issue.rule.code for issue in deduped]
+        assert codes == ["SEC012"]
+
+    def test_keeps_sec007_on_other_lines(self) -> None:
+        issues = [
+            LintIssue(line_number=1, rule=RULES["SEC007"]),
+            LintIssue(line_number=2, rule=RULES["SEC012"]),
+        ]
+        deduped = _dedupe_temp_path_issues(issues)
+        codes = [issue.rule.code for issue in deduped]
+        assert codes == ["SEC007", "SEC012"]

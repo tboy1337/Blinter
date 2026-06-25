@@ -230,6 +230,82 @@ max_scan_files = 50
                 except (OSError, PermissionError):
                     pass
 
+    def test_load_config_with_follow_calls(self) -> None:
+        """Test loading follow_calls from configuration."""
+        config_content = """
+[general]
+follow_calls = true
+"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".ini", delete=False
+        ) as config_file:
+            config_file.write(config_content)
+            config_file.flush()
+            config_file.close()
+
+            try:
+                config = load_config(config_file.name)
+                assert config.follow_calls is True
+            finally:
+                try:
+                    os.unlink(config_file.name)
+                except (OSError, PermissionError):
+                    pass
+
+    def test_load_config_invalid_max_scan_files_keeps_default(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Invalid max_scan_files in INI logs a warning and keeps the default."""
+        config_content = """
+[general]
+max_scan_files = -1
+"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".ini", delete=False
+        ) as config_file:
+            config_file.write(config_content)
+            config_file.flush()
+            config_file.close()
+
+            try:
+                with caplog.at_level("WARNING"):
+                    config = load_config(config_file.name)
+                assert config.max_scan_files == 1000
+                assert any(
+                    "max_scan_files" in record.message for record in caplog.records
+                )
+            finally:
+                try:
+                    os.unlink(config_file.name)
+                except (OSError, PermissionError):
+                    pass
+
+    def test_load_config_unknown_rule_code_warns(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Unknown rule codes in INI are ignored with a warning."""
+        config_content = """
+[rules]
+disabled_rules = FAKE001,E001
+"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".ini", delete=False
+        ) as config_file:
+            config_file.write(config_content)
+            config_file.flush()
+            config_file.close()
+
+            try:
+                with caplog.at_level("WARNING"):
+                    config = load_config(config_file.name)
+                assert config.disabled_rules == {"E001"}
+                assert any("FAKE001" in record.message for record in caplog.records)
+            finally:
+                try:
+                    os.unlink(config_file.name)
+                except (OSError, PermissionError):
+                    pass
+
     def test_load_config_with_rule_settings(self) -> None:
         """Test loading configuration with rule settings."""
         config_content = """
@@ -594,11 +670,11 @@ EXIT /b 0
         try:
             # Only enable specific rules
             config = BlinterConfig()
-            config.enabled_rules = {"STY001", "E001"}
+            config.enabled_rules = {"S001", "E001"}
             issues = lint_batch_file(temp_file, config=config)
             # Should only report issues for enabled rules
             for issue in issues:
-                assert issue.rule.code in ["STY001", "E001"]
+                assert issue.rule.code in ["S001", "E001"]
         finally:
             os.unlink(temp_file)
 
@@ -613,11 +689,11 @@ EXIT /b 0
         try:
             # Disable specific rules
             config = BlinterConfig()
-            config.disabled_rules = {"STY001", "STY002"}
+            config.disabled_rules = {"S001", "S002"}
             issues = lint_batch_file(temp_file, config=config)
             # Should not report disabled rules
             for issue in issues:
-                assert issue.rule.code not in ["STY001", "STY002"]
+                assert issue.rule.code not in ["S001", "S002"]
         finally:
             os.unlink(temp_file)
 
@@ -632,10 +708,10 @@ EXIT /b 0
         try:
             config = BlinterConfig()
             # Use disabled_rules to disable specific rules
-            config.disabled_rules = {"STY001"}
+            config.disabled_rules = {"S001"}
             issues = lint_batch_file(temp_file, config=config)
-            sty001_issues = [i for i in issues if i.rule.code == "STY001"]
-            assert len(sty001_issues) == 0
+            s001_issues = [i for i in issues if i.rule.code == "S001"]
+            assert len(s001_issues) == 0
         finally:
             os.unlink(temp_file)
 
@@ -708,8 +784,10 @@ class TestFollowCallsConfiguration:
             config = BlinterConfig(follow_calls=True)
             issues = lint_batch_file(main_script, config=config)
 
-            # Should lint both files
-            assert isinstance(issues, list)
+            e006_issues = [
+                i for i in issues if i.rule.code == "E006" and "HELPER_VAR" in i.context
+            ]
+            assert len(e006_issues) == 0
 
     def test_follow_calls_with_nonexistent_script(self) -> None:
         """Test follow_calls when called script doesn't exist."""

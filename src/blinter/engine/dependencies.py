@@ -118,6 +118,14 @@ def _extract_called_scripts(
     return called_scripts
 
 
+def _warn_call_file_limit() -> None:
+    """Log when CALL dependency traversal hits the configured file limit."""
+    logger.warning(
+        "CALL dependency file limit (%d) reached; stopping traversal",
+        MAX_FOLLOW_CALL_FILES,
+    )
+
+
 def _resolve_script_path(
     script_path_str: str,
     batch_dir: Path,
@@ -272,6 +280,17 @@ def _build_call_dependency_graph(
     transitive_deps: Dict[Path, Set[Path]] = {}
     memo: Dict[Path, Set[Path]] = {}
 
+    def _direct_deps_for(file_path: Path) -> Set[Path]:
+        """Return direct CALL dependencies, computing them lazily when needed."""
+        if file_path not in direct_deps:
+            direct_deps[file_path] = _extract_direct_dependencies(
+                file_path,
+                file_path,
+                scan_root=scan_root,
+                lines_cache=lines_cache,
+            )
+        return direct_deps[file_path]
+
     def get_all_deps(file_path: Path, visiting: Set[Path], depth: int = 0) -> Set[Path]:
         """Recursively get all dependencies (direct and transitive)."""
         if file_path in memo:
@@ -291,27 +310,18 @@ def _build_call_dependency_graph(
             return set()
 
         visiting.add(file_path)
-        all_deps = set(direct_deps.get(file_path, set()))
+        all_deps = set(_direct_deps_for(file_path))
         if len(all_deps) > MAX_FOLLOW_CALL_FILES:
-            logger.warning(
-                "CALL dependency file limit (%d) reached; stopping traversal",
-                MAX_FOLLOW_CALL_FILES,
-            )
+            _warn_call_file_limit()
             all_deps = set(sorted(all_deps, key=str)[:MAX_FOLLOW_CALL_FILES])
 
         for dep in list(all_deps):
             if len(all_deps) >= MAX_FOLLOW_CALL_FILES:
-                logger.warning(
-                    "CALL dependency file limit (%d) reached; stopping traversal",
-                    MAX_FOLLOW_CALL_FILES,
-                )
+                _warn_call_file_limit()
                 break
             all_deps.update(get_all_deps(dep, visiting, depth + 1))
             if len(all_deps) >= MAX_FOLLOW_CALL_FILES:
-                logger.warning(
-                    "CALL dependency file limit (%d) reached; stopping traversal",
-                    MAX_FOLLOW_CALL_FILES,
-                )
+                _warn_call_file_limit()
                 break
 
         visiting.remove(file_path)

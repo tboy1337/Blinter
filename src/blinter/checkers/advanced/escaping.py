@@ -112,7 +112,7 @@ def _check_double_percent_escaping(stripped: str, line_number: int) -> List[Lint
         # Check for percentage signs that might need escaping (number followed by %)
         # But exclude variable references %VAR%
         line_without_vars = re.sub(r"%[A-Za-z_][A-Za-z0-9_]*%", "", stripped)
-        if re.search(r"\b\d+%(?!%)\b", line_without_vars):
+        if re.search(r"\b\d+%(?!%)", line_without_vars):
             issues.append(
                 LintIssue(
                     line_number,

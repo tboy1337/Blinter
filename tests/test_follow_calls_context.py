@@ -834,6 +834,46 @@ class TestFollowCallsLimits:
             deps = graph[script_a.resolve()]
             assert len(deps) <= 1
 
+    def test_dependency_graph_handles_mutual_circular_calls(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Mutual CALL cycles are detected and traversal stops safely."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_a = Path(tmpdir) / "a.bat"
+            script_b = Path(tmpdir) / "b.bat"
+            script_b.write_text(f'CALL "{script_a}"\n', encoding="utf-8")
+            script_a.write_text(f'CALL "{script_b}"\n', encoding="utf-8")
+
+            with caplog.at_level("WARNING", logger="blinter"):
+                graph = _build_call_dependency_graph([script_a], scan_root=tmpdir)
+
+            assert script_b.resolve() in graph[script_a.resolve()]
+            assert any(
+                "Circular CALL dependency" in record.message
+                for record in caplog.records
+            )
+
+    def test_dependency_graph_includes_transitive_dependencies(self) -> None:
+        """CALL dependency graph includes transitive dependencies for root files."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_d = Path(tmpdir) / "d.bat"
+            script_d.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+            script_b = Path(tmpdir) / "b.bat"
+            script_b.write_text(f'CALL "{script_d}"\n', encoding="utf-8")
+            script_c = Path(tmpdir) / "c.bat"
+            script_c.write_text(f'CALL "{script_d}"\n', encoding="utf-8")
+            script_a = Path(tmpdir) / "a.bat"
+            script_a.write_text(
+                f'CALL "{script_b}"\nCALL "{script_c}"\n',
+                encoding="utf-8",
+            )
+
+            graph = _build_call_dependency_graph([script_a], scan_root=tmpdir)
+            deps = graph[script_a.resolve()]
+            assert script_b.resolve() in deps
+            assert script_c.resolve() in deps
+            assert script_d.resolve() in deps
+
 
 class TestDependenciesInternals:
     """Direct unit tests for dependency helper functions."""

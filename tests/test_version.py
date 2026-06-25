@@ -2,6 +2,7 @@
 
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+import re
 
 import pytest
 from pytest_mock import MockerFixture
@@ -66,5 +67,8 @@ class TestVersion:
     def test_readme_rule_count_matches_registry(self) -> None:
         """README should reference the live RULE_COUNT from the registry."""
         readme = (_pyproject_path().parent / "README.md").read_text(encoding="utf-8")
-        assert str(RULE_COUNT) in readme
         assert "RULE_COUNT" in readme
+        assert re.search(
+            rf"\*\*{RULE_COUNT}\*\* rules",
+            readme,
+        ), f"README must state **{RULE_COUNT}** rules explicitly"

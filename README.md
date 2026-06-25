@@ -181,12 +181,16 @@ blinter --version
 
 - `<path>`: Path to a batch file (`.bat` or `.cmd`) OR directory containing batch files
 - `--summary`: Display summary statistics of issues found
-- `--severity`: Show detailed severity level breakdown (always included)
+- `--severity`: Legacy flag (no effect); severity breakdown is always shown in output
 - `--max-line-length <n>`: Set maximum line length for S011 rule (default: 100)
 - `--no-recursive`: When processing directories, only analyze files in the specified directory (not subdirectories)
 - `--follow-calls`: Automatically analyze scripts called by CALL statements and merge their variable context. When enabled, variables defined in called scripts are recognized as "defined" in the calling script (position-aware: only after the CALL statement). This eliminates false positive undefined variable errors for configuration scripts
+- `--config <path>`: Load settings from a custom configuration file instead of `blinter.ini` in the current directory
 - `--no-config`: Don't use configuration file (blinter.ini) even if it exists
 - `--create-config`: Create a default blinter.ini configuration file and exit
+- `--create-config --force`: Overwrite an existing blinter.ini when creating the default configuration
+- `--verbose`: Show detailed logging output (INFO level)
+- `--quiet`: Suppress non-error logging output (ERROR level only)
 - `--help`: Show help menu and rule categories
 - `--version`: Display version information
 
@@ -199,6 +203,7 @@ blinter --version
 | `[general]` | `recursive` | Search subdirectories when analyzing folders | `true` |
 | `[general]` | `show_summary` | Display summary statistics after analysis | `false` |
 | `[general]` | `max_line_length` | Maximum line length for S011 rule | `100` |
+| `[general]` | `max_scan_files` | Maximum batch files to scan in a directory | `1000` |
 | `[general]` | `follow_calls` | Analyze scripts called by CALL statements with shared variable context | `false` |
 | `[general]` | `min_severity` | Minimum severity level to report | None (all) |
 | `[rules]` | `enabled_rules` | Comma-separated list of rules to enable exclusively | None (all enabled) |

@@ -140,8 +140,8 @@ class TestRealWorldErrorHandling:
         finally:
             os.unlink(temp_path)
 
-    def test_concurrent_file_access(self) -> None:
-        """Test handling concurrent access to the same file."""
+    def test_sequential_repeated_file_access(self) -> None:
+        """Test repeated linting of the same file returns consistent results."""
         content = "@ECHO OFF\necho test\nEXIT /B 0\n"
 
         with tempfile.NamedTemporaryFile(
@@ -151,7 +151,6 @@ class TestRealWorldErrorHandling:
             temp_path = temp_file.name
 
         try:
-            # Multiple concurrent accesses should work
             issues1 = lint_batch_file(temp_path)
             issues2 = lint_batch_file(temp_path)
             assert len(issues1) == len(issues2)

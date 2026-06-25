@@ -1443,7 +1443,7 @@ class TestMainFunctionEdgeCases:
             temp_path = temp_file.name
 
         try:
-            # Test the success path (lines 3995-3999 in blinter.py)
+            # Test the success path when no issues are found
             with patch("sys.argv", ["blinter", temp_path]):
                 with patch("sys.exit") as mock_exit:
                     with patch("builtins.print") as mock_print:
@@ -1465,13 +1465,11 @@ class TestMainFunctionEdgeCases:
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".bat", delete=False
         ) as temp_file:
-            temp_file.write(
-                'echo "unclosed quote\n'
-            )  # This should cause critical errors
+            temp_file.write("@echo off\n" "goto :missing_label\n")
             temp_path = temp_file.name
 
         try:
-            # Test the error path (lines 4001-4004 in blinter.py)
+            # Test the error path when critical issues are found
             with patch("sys.argv", ["blinter", temp_path]):
                 with patch("sys.exit") as mock_exit:
                     with patch("builtins.print") as mock_print:

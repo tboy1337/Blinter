@@ -46,6 +46,39 @@ _WARNING_RULES = _rule_codes_with_prefix("W")
 _STYLE_RULES = _rule_codes_with_prefix("S")
 _SECURITY_RULES = _rule_codes_with_prefix("SEC")
 _PERFORMANCE_RULES = _rule_codes_with_prefix("P")
+_TEMP_PATH_RULE_PRIORITY: tuple[str, ...] = ("SEC012", "SEC017", "SEC007")
+
+
+def _dedupe_temp_path_issues(issues: List[LintIssue]) -> List[LintIssue]:
+    """Keep at most one temp-path SEC rule per line (most specific wins)."""
+    winners_by_line: Dict[int, str] = {}
+    for issue in issues:
+        if issue.rule.code not in _TEMP_PATH_RULE_PRIORITY:
+            continue
+        current = winners_by_line.get(issue.line_number)
+        if current is None:
+            winners_by_line[issue.line_number] = issue.rule.code
+            continue
+        if _TEMP_PATH_RULE_PRIORITY.index(
+            issue.rule.code
+        ) < _TEMP_PATH_RULE_PRIORITY.index(current):
+            winners_by_line[issue.line_number] = issue.rule.code
+
+    if not winners_by_line:
+        return issues
+
+    seen_winners: Set[tuple[int, str]] = set()
+    result: List[LintIssue] = []
+    for issue in issues:
+        if issue.rule.code not in _TEMP_PATH_RULE_PRIORITY:
+            result.append(issue)
+            continue
+        winner = winners_by_line.get(issue.line_number)
+        key = (issue.line_number, winner or "")
+        if winner == issue.rule.code and key not in seen_winners:
+            seen_winners.add(key)
+            result.append(issue)
+    return result
 
 
 def _append_line_checks(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
@@ -222,6 +255,9 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
         run_security=run_security,
         run_performance=run_performance,
     )
+
+    if run_security:
+        issues[:] = _dedupe_temp_path_issues(issues)
 
     return issues
 

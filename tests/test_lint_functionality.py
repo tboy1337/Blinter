@@ -1806,6 +1806,54 @@ xcopy %0 F:\\ /Y
         finally:
             os.unlink(temp_file)
 
+    def test_sec021_not_flagged_in_rem_comment(self) -> None:
+        """SEC021 should not fire for fork-bomb text in REM comments."""
+        content = """@ECHO OFF
+REM start %0 is a fork bomb pattern example
+echo done
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            assert "SEC021" not in rule_codes
+        finally:
+            os.unlink(temp_file)
+
+    def test_sec022_not_flagged_in_echo_documentation(self) -> None:
+        """SEC022 should not fire for hosts-file text in ECHO documentation."""
+        content = """@ECHO OFF
+ECHO >> hosts file modification is dangerous
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
+            assert "SEC022" not in rule_codes
+        finally:
+            os.unlink(temp_file)
+
+    def test_temp_path_rules_deduplicated_on_same_line(self) -> None:
+        """SEC007 is suppressed when SEC012 or SEC017 fires on the same line."""
+        content = """@ECHO OFF
+copy x C:\\temp\\foo.tmp dest
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            line1_codes = [
+                issue.rule.code for issue in issues if issue.line_number == 2
+            ]
+            temp_related = [
+                code for code in line1_codes if code in {"SEC007", "SEC012", "SEC017"}
+            ]
+            assert (
+                len(temp_related) == 1
+            ), f"Expected one temp-path rule on line 2, got {temp_related}"
+            assert temp_related[0] == "SEC012"
+        finally:
+            os.unlink(temp_file)
+
     def test_p015_inefficient_delays(self) -> None:
         """Test P015: Inefficient delay implementation."""
         content = """@ECHO OFF
@@ -1941,6 +1989,47 @@ GOTO :EOF
             issues = lint_batch_file(temp_file)
             rule_codes = [issue.rule.code for issue in issues]
             assert "SEC014" in rule_codes
+        finally:
+            os.unlink(temp_file)
+
+    def test_e031_invalid_multilevel_escaping(self) -> None:
+        """Test E031: Invalid multilevel escaping (caret count not 2^n-1)."""
+        content = """@ECHO OFF
+echo test ^^& more
+echo valid ^^^& more
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e031_issues = [issue for issue in issues if issue.rule.code == "E031"]
+            assert len(e031_issues) == 1
+            assert e031_issues[0].line_number == 2
+        finally:
+            os.unlink(temp_file)
+
+    def test_e032_caret_with_trailing_spaces(self) -> None:
+        """Test E032: Continuation caret must not be followed by trailing spaces."""
+        content = "echo continued^ \necho done\n"
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e032_issues = [issue for issue in issues if issue.rule.code == "E032"]
+            assert len(e032_issues) == 1
+            assert e032_issues[0].line_number == 1
+        finally:
+            os.unlink(temp_file)
+
+    def test_e033_double_percent_in_echo(self) -> None:
+        """Test E033: Literal percentages in ECHO need double escaping."""
+        content = """echo Progress: 50%
+echo Value is %MYVAR%
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e033_issues = [issue for issue in issues if issue.rule.code == "E033"]
+            assert len(e033_issues) == 1
+            assert e033_issues[0].line_number == 1
         finally:
             os.unlink(temp_file)
 
