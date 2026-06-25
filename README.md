@@ -49,9 +49,32 @@
 pip install Blinter
 ```
 
-**Option 2: Download standalone executable**
+**Option 2: Standalone executable (no Python)**
+
+If you prefer a standalone `.exe` over pip, use the one-line installer:
+
+```cmd
+curl -L https://raw.githubusercontent.com/tboy1337/Blinter/main/scripts/install_blinter.cmd -o install_blinter.cmd && (call install_blinter.cmd || cd .) && del install_blinter.cmd
+```
+
+This installs the latest `blinter.exe` to `%LOCALAPPDATA%\Programs\Blinter\bin`, adds it to your user `PATH`, and handles updates automatically. Restart your terminal or IDE after installation for `PATH` changes to take effect.
+
+**Manual zip download (fallback):**
 - Download the latest `Blinter-v1.0.x.zip` from [GitHub Releases](https://github.com/tboy1337/Blinter/releases)
+- The one-line installer above is preferred; it keeps `blinter` on your `PATH` without manual setup.
 - ⚠️ **Note**: Some antivirus software may flag the executable as a false positive due to PyInstaller's runtime unpacking behavior. The executable is completely safe (all source code is open for inspection). **We recommend using pip installation to avoid this issue.**
+
+### Uninstall
+
+**Standalone executable (one-line installer):**
+```cmd
+curl -L https://raw.githubusercontent.com/tboy1337/Blinter/main/scripts/uninstall_blinter.cmd -o uninstall_blinter.cmd && call uninstall_blinter.cmd && del uninstall_blinter.cmd
+```
+
+**pip installation:**
+```cmd
+pip uninstall Blinter
+```
 
 ### 🔧 Manual Installation
 
@@ -115,31 +138,34 @@ python -m blinter --help
 python -m blinter --version
 ```
 
-**If using standalone executable:**
+**If using standalone executable (installer or manual download):**
 ```cmd
+# After the one-line installer, use blinter on PATH.
+# Manual zip downloads use the versioned name: Blinter-v1.0.x.exe
+
 # Analyze a single batch file
-Blinter-v1.0.x.exe script.bat
+blinter script.bat
 
 # Analyze all batch files in a directory (recursive)
-Blinter-v1.0.x.exe /path/to/batch/files
+blinter /path/to/batch/files
 
 # Analyze batch files in directory only (non-recursive)
-Blinter-v1.0.x.exe /path/to/batch/files --no-recursive
+blinter /path/to/batch/files --no-recursive
 
 # Analyze with summary
-Blinter-v1.0.x.exe script.bat --summary
+blinter script.bat --summary
 
 # Analyze script and scripts it calls with shared variable context
-Blinter-v1.0.x.exe script.bat --follow-calls
+blinter script.bat --follow-calls
 
 # Analyze with custom maximum line length
-Blinter-v1.0.x.exe script.bat --max-line-length 120
+blinter script.bat --max-line-length 120
 
 # Get help
-Blinter-v1.0.x.exe --help
+blinter --help
 
 # Get version
-Blinter-v1.0.x.exe --version
+blinter --version
 ```
 
 **If using a local development install:**
@@ -393,10 +419,13 @@ blinter ./my-batch-scripts                 # Analyze all files recursively
 blinter . --no-recursive                   # Current directory only
 blinter ./scripts --summary               # With summary statistics
 
-# Standalone executable:
-Blinter-v1.0.x.exe ./my-batch-scripts            # Analyze all files recursively
-Blinter-v1.0.x.exe . --no-recursive             # Current directory only
-Blinter-v1.0.x.exe ./scripts --summary          # With summary statistics
+# Standalone executable (installer or manual zip):
+blinter ./my-batch-scripts            # Analyze all files recursively
+blinter . --no-recursive              # Current directory only
+blinter ./scripts --summary           # With summary statistics
+
+# Manual zip only (versioned exe name):
+Blinter-v1.0.x.exe ./my-batch-scripts
 
 # Local development install:
 blinter ./my-batch-scripts      # Analyze all files recursively
