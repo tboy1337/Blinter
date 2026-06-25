@@ -374,3 +374,43 @@ class TestEdgeCasesAndRegressions:
         assert (
             len(e009_issues) == 0
         ), "Nested string replacement should not trigger E009"
+
+
+class TestE009LegitimateQuoteContexts:
+    """E009 should not flag known legitimate single-quote patterns."""
+
+    def test_powershell_here_string_closer(self, tmp_path: Path) -> None:
+        content = '@echo off\n$xml = @"\nline\n"@\n'
+        test_file = tmp_path / "ps.cmd"
+        test_file.write_text(content, encoding="utf-8")
+        issues = lint_batch_file(str(test_file))
+        e009 = [i for i in issues if i.rule.code == "E009"]
+        assert not [i for i in e009 if i.line_number == 3]
+
+    def test_echo_decorative_leading_quote(self, tmp_path: Path) -> None:
+        content = '@echo off\nECHO   " MONTHLY Archive: %@MAKE_MONTHLY%\n'
+        test_file = tmp_path / "help.cmd"
+        test_file.write_text(content, encoding="utf-8")
+        issues = lint_batch_file(str(test_file))
+        assert not [i for i in issues if i.rule.code == "E009"]
+
+    def test_echo_ansi_color_art(self, tmp_path: Path) -> None:
+        content = "@echo off\n" 'echo %lyel% foo %lred% bar %lyel%,=".%def%\n'
+        test_file = tmp_path / "art.cmd"
+        test_file.write_text(content, encoding="utf-8")
+        issues = lint_batch_file(str(test_file))
+        assert not [i for i in issues if i.rule.code == "E009"]
+
+    def test_echo_usage_delayed_expansion_trailing_quote(self, tmp_path: Path) -> None:
+        content = '@echo off\nECHO  %~n0 SpecialBackups!@SS_EXT!"\n'
+        test_file = tmp_path / "usage.cmd"
+        test_file.write_text(content, encoding="utf-8")
+        issues = lint_batch_file(str(test_file))
+        assert not [i for i in issues if i.rule.code == "E009"]
+
+    def test_real_extra_quote_still_flagged(self, tmp_path: Path) -> None:
+        content = '@echo off\nECHO *** SKIPPING %@FOLDER%" ***\n'
+        test_file = tmp_path / "bad.cmd"
+        test_file.write_text(content, encoding="utf-8")
+        issues = lint_batch_file(str(test_file))
+        assert [i for i in issues if i.rule.code == "E009"]

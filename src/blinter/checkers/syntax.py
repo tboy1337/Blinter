@@ -274,6 +274,24 @@ def _check_path_syntax(stripped: str, line_num: int) -> List[LintIssue]:
     return issues
 
 
+def _should_skip_e009_quote_check(stripped: str) -> bool:
+    """Return True when odd quote counts are expected on this line."""
+    if re.match(r'^\s*"@\s*$', stripped):
+        return True
+
+    if re.match(r"\s*echo\s+", stripped, re.IGNORECASE):
+        quote_count = stripped.count('"')
+        if quote_count == 1 and re.match(r'\s*echo\s+"\s+\S', stripped, re.IGNORECASE):
+            return True
+        percent_vars: list[str] = re.findall(r"%[A-Za-z@][\w]*%", stripped)
+        if len(percent_vars) >= 2:
+            return True
+        if re.search(r'\becho\b.*![^!]+!"\s*$', stripped, re.IGNORECASE):
+            return True
+
+    return False
+
+
 def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
     """Check for mismatched quotes (E009)."""
     issues: List[LintIssue] = []
@@ -294,6 +312,9 @@ def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
         r"\s*echo\s+.*represents", stripped, re.IGNORECASE
     ):
         # This is documentation text explaining special characters
+        return issues
+
+    if _should_skip_e009_quote_check(stripped):
         return issues
 
     # Count quotes with comprehensive handling of batch file quoting rules

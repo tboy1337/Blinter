@@ -52,7 +52,7 @@ class TestBatchScriptExamplesCorpus:
 
         assert rule_counts.get("S012", 0) < 500
         assert overlap_lines == 0
-        assert rule_counts.get("E009", 0) <= 16
+        assert rule_counts.get("E009", 0) <= 3
         assert sum(rule_counts.values()) < 14_000
 
     def test_acopy_s012_not_per_line_spam(self) -> None:
