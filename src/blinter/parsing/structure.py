@@ -101,14 +101,15 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
             r'\bset\s+/p\s+"([A-Za-z0-9_]+)=',  # Quoted set with prompt: set /p "VAR="
             r"\bset\s+/a\s+([A-Za-z0-9_]+)=",  # Arithmetic set: set /a VAR=
             r'\bset\s+/a\s+"([A-Za-z0-9_]+)=',  # Quoted arithmetic set: set /a "VAR="
+            r"\bset\s+/a\s+([A-Za-z0-9_]+)[+\-*/%]?=",  # Compound: set /a VAR+=1
+            r'\bset\s+/a\s+"([A-Za-z0-9_]+)[+\-*/%]?=',  # Quoted compound set /a
         ]
 
+        stripped_line = line.strip()
         for pattern in patterns:
-            set_match = re.search(pattern, line.strip(), re.IGNORECASE)
-            if set_match:
+            for set_match in re.finditer(pattern, stripped_line, re.IGNORECASE):
                 var_name_text: str = set_match.group(1)
                 set_vars.add(var_name_text.upper())
-                break
 
         # Handle dynamic variable assignments in FOR loops: set "%%~b=value"
         # This pattern is commonly used to dynamically create variables based on loop iteration
@@ -174,6 +175,7 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
         "ONEDRIVE",  # OneDrive directory if configured
         "ONEDRIVECONSUMER",  # Consumer OneDrive
         "ONEDRIVECOMMERCIAL",  # Business OneDrive
+        "DEBUG",  # Optional script-control flag from callers
     }
     set_vars.update(common_env_vars)
 

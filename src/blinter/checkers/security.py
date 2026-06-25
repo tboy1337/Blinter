@@ -21,7 +21,6 @@ from blinter.patterns import (
 from blinter.rules.registry import RULES
 
 _ADMIN_COMMANDS: tuple[str, ...] = ("reg add hklm", "reg delete hklm", "sc ")
-# SEC007 scan patterns (detection literals, not runtime temp paths)
 _HARDCODED_TEMP_PATH_PATTERNS: tuple[str, ...] = (
     r"C:\temp",
     r"C:\tmp",
@@ -31,6 +30,19 @@ _NET_PRIVILEGE_CHECK_PATTERNS: tuple[str, ...] = (
     r"net\s+session\s*>",  # net session redirected (used for checking)
     r"net\s+session\s*$",  # net session at end of line (used for checking)
 )
+
+
+def _is_safe_unquoted_set_value(var_val: str) -> bool:
+    """Return True when an unquoted SET value is unlikely to need quoting."""
+    if " " in var_val or "\t" in var_val:
+        return False
+    if re.search(r"[&|<>`;]", var_val):
+        return False
+    if re.match(r"^[\w.]+$", var_val):
+        return True
+    if var_val.lower().startswith(("http://", "https://")):
+        return True
+    return re.match(r"^[%!\w\\.:~\-,+/()]+$", var_val) is not None
 
 
 def _check_input_validation_sec(
@@ -63,14 +75,13 @@ def _check_input_validation_sec(
             or "COLOR" in var_name.upper()
             or "%ESC%" in var_val
             or var_val.startswith("(")  # Skip tuple/list definitions like colors=(...)
-            or re.match(
-                r"^[\w.]+$", var_val
-            )  # Skip simple constants like filename.ext, VARNAME
         )
+        is_safe_unquoted = _is_safe_unquoted_set_value(var_val)
 
         if (
             not var_name.startswith("@")
             and not is_ansi_or_color
+            and not is_safe_unquoted
             and not (var_val.startswith('"') and var_val.endswith('"'))
         ):
             issues.append(

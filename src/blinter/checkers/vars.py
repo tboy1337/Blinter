@@ -102,6 +102,10 @@ def _check_undefined_variables(
         if string_op_pattern.search(line):
             continue
 
+        # CALL SET with %% indirection defines variables dynamically
+        if re.search(r"\bcall\s+set\s", line, re.IGNORECASE) and "%%" in line:
+            continue
+
         available_vars = _get_available_vars_at_line(i, set_vars, called_scripts_vars)
 
         for match in var_usage_pattern.finditer(line):

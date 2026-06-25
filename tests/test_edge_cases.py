@@ -27,6 +27,7 @@ from blinter.checkers.advanced import (
     _check_line_length,
     _check_magic_numbers,
 )
+from blinter.checkers.advanced.vars_syntax import _check_set_a_arithmetic
 from blinter.checkers.globals import (
     _check_cmd_case_consistency,
     _check_code_duplication,
@@ -1177,6 +1178,33 @@ class TestStyleChecking:
             contexts = [issue.context for issue in casing_issues]
             assert any(keyword in context.lower() for context in contexts)
 
+    def test_chained_set_on_one_line_not_e006(self, tmp_path: Path) -> None:
+        """All SET commands on a chained line should be tracked for E006."""
+        content = (
+            "@echo off\n"
+            "if 1==1 (set _int=1&set ping_f= failed)\n"
+            "echo ok%ping_f%\n"
+        )
+        batch_file = tmp_path / "chained.cmd"
+        batch_file.write_text(content, encoding="utf-8")
+        issues = lint_batch_file(str(batch_file))
+        assert not [i for i in issues if i.rule.code == "E006"]
+
+
+class TestSetAArithmeticE022:
+    """SET /A expressions common in admin scripts should not false-positive E022."""
+
+    def test_corpus_set_a_patterns_not_e022(self) -> None:
+        valid_lines = [
+            "SET /A @DD_DIV_2=%@DD:~-1% %% 2",
+            "SET /A @WATCHCOUNT+=%%c",
+            "SET /A %~2=%%~M + 2",
+            'set /a "gprdays=(!gpr!+1440-1)/1440"',
+        ]
+        for line in valid_lines:
+            issues = _check_set_a_arithmetic(line.strip(), 1)
+            assert not issues, line
+
 
 class TestSecurityChecking:
     """Test security level checking edge cases."""
@@ -1198,6 +1226,22 @@ class TestSecurityChecking:
         issues = _check_security_issues('set "MYVAR=some value with spaces"', 1)
         unsafe_set_issues = [i for i in issues if i.rule.code == "SEC002"]
         assert len(unsafe_set_issues) == 0
+
+    def test_safe_unquoted_path_and_url_not_sec002(self) -> None:
+        """Paths, URLs, and expansions without metacharacters should not trigger SEC002."""
+        safe_lines = [
+            "set FOUNDRY_DIR=%LOCALAPPDATA%\\Programs\\Foundry",
+            "set FOUNDRY_URL=https://github.com/foundry-rs/foundry/releases",
+            "set timestamp=%datetime:~0,8%-%datetime:~8,6%",
+        ]
+        for line in safe_lines:
+            issues = _check_security_issues(line, 1)
+            assert not [i for i in issues if i.rule.code == "SEC002"], line
+
+    def test_path_append_still_sec002(self) -> None:
+        """PATH append with semicolon should still trigger SEC002."""
+        issues = _check_security_issues("set PATH=%PATH%;C:\\new", 1)
+        assert [i for i in issues if i.rule.code == "SEC002"]
 
     def test_admin_privilege_commands(self) -> None:
         """Test detection of commands requiring admin privileges."""
@@ -1422,6 +1466,14 @@ class TestGlobalChecks:
         assert "VAR2" in variables
         assert "VAR3" in variables
         assert "UPPER" in variables
+        compound_vars = _collect_set_variables(["set /a counter+=1", "SET /A x-=2"])
+        assert "COUNTER" in compound_vars
+        assert "X" in compound_vars
+        chained = _collect_set_variables(
+            ["if !errorlevel!==0 (set _int=1&set ping_f=failed)"]
+        )
+        assert "PING_F" in chained
+        assert "_INT" in chained
         # Should also include common environment variables
         assert "PATH" in variables
         assert "TEMP" in variables
@@ -1434,6 +1486,30 @@ class TestGlobalChecks:
         undefined_issues = [i for i in issues if i.rule.code == "E006"]
         assert len(undefined_issues) == 1
         assert "UNDEFINED_VAR" in undefined_issues[0].context
+
+    def test_set_a_compound_assignment_tracked(self, tmp_path: Path) -> None:
+        """SET /A compound assignments should define variables for E006."""
+        content = "@echo off\nset /a cnt+=1\necho %cnt%\n"
+        batch_file = tmp_path / "compound.cmd"
+        batch_file.write_text(content, encoding="utf-8")
+        issues = lint_batch_file(str(batch_file))
+        assert not [i for i in issues if i.rule.code == "E006"]
+
+    def test_debug_env_var_not_e006(self, tmp_path: Path) -> None:
+        """Optional DEBUG environment variable should not trigger E006."""
+        content = '@echo off\nIF /I "%Debug%"=="TRUE" ECHO debug on\n'
+        batch_file = tmp_path / "debug.cmd"
+        batch_file.write_text(content, encoding="utf-8")
+        issues = lint_batch_file(str(batch_file))
+        assert not [i for i in issues if i.rule.code == "E006"]
+
+    def test_call_set_dynamic_indirection_not_e006(self, tmp_path: Path) -> None:
+        """CALL SET with %% indirection should not flag intermediate names as E006."""
+        content = "@echo off\nCALL SET @WHICHLOG=%%@%%A_LOG%%%~3\n"
+        batch_file = tmp_path / "callset.cmd"
+        batch_file.write_text(content, encoding="utf-8")
+        issues = lint_batch_file(str(batch_file))
+        assert not [i for i in issues if i.rule.code == "E006"]
 
     def test_check_unreachable_code_after_exit(self) -> None:
         """Test unreachable code detection after EXIT."""

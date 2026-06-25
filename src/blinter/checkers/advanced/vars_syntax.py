@@ -259,6 +259,23 @@ _VALID_SET_A_OPERATOR_PAIRS: frozenset[str] = frozenset(
 )
 
 
+_SET_A_ASSIGN_SPLIT = re.compile(
+    r"^(?P<lhs>.+?)(?P<op>=|[+\-*/%]?=)(?P<rhs>.+)$",
+    re.IGNORECASE,
+)
+
+
+def _normalize_set_a_rhs(rhs: str) -> str:
+    """Normalize SET /A RHS before operator validation."""
+    normalized = rhs
+    normalized = re.sub(r"%%[~]?[a-zA-Z0-9]+", "0", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"![^!]+!", "0", normalized)
+    normalized = re.sub(r"%[^%]*%", "0", normalized)
+    normalized = re.sub(r"%~[0-9a-zA-Z]+", "0", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"%%", "%", normalized)
+    return normalized
+
+
 def _set_a_has_bad_ops(expression: str) -> bool:
     """Return True when expression contains an invalid adjacent operator pair."""
     operator_chars = "=+-*/%<>!&|"
@@ -279,12 +296,12 @@ def _check_set_a_arithmetic(stripped: str, line_number: int) -> List[LintIssue]:
     if not seta_match:
         return issues
 
-    expression = seta_match.group(1)
-    expr_match = re.match(r"^([^&|]*?)(?:\s*(?:[^\\^]|^)[&|]|$)", expression)
-    if expr_match:
-        expression = expr_match.group(1).strip()
+    expression = str(seta_match.group(1)).strip().strip('"')
+    assign_match = _SET_A_ASSIGN_SPLIT.match(expression)
+    rhs = assign_match.group("rhs") if assign_match else expression
+    rhs = re.sub(r"^\s*(?:[^\\^]|^)[&|].*$", "", rhs).strip()
 
-    if _set_a_has_bad_ops(expression):
+    if _set_a_has_bad_ops(_normalize_set_a_rhs(rhs)):
         issues.append(
             LintIssue(
                 line_number=line_number,

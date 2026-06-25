@@ -61,6 +61,8 @@ BUILTIN_VARS: Set[str] = {
     "ONEDRIVE",  # OneDrive directory if configured
     "ONEDRIVECONSUMER",  # Consumer OneDrive
     "ONEDRIVECOMMERCIAL",  # Business OneDrive
+    # Optional script-control environment variables (often passed by callers)
+    "DEBUG",
 }
 
 MAGIC_NUMBER_EXCEPTIONS: Set[str] = {
