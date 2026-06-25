@@ -1243,6 +1243,22 @@ class TestSecurityChecking:
         issues = _check_security_issues("set PATH=%PATH%;C:\\new", 1)
         assert [i for i in issues if i.rule.code == "SEC002"]
 
+    def test_args_star_and_string_replace_not_sec002(self) -> None:
+        """%* and substring-replace SET values should not trigger SEC002."""
+        safe_lines = [
+            "set _args=%*",
+            "set _PSarg=%_PSarg:'=''%",
+            "set upver=%masver:.=%",
+            "set slcSKU=%slcSKU: =%",
+            "set winos=!winos:Windows 10=Windows 11!",
+            "set _pridsR=%_pridsR:,= %",
+            'set insoff=!insoff:"=!',
+            "set _slexe=sppsvc.exe& set _slser=sppsvc",
+        ]
+        for line in safe_lines:
+            issues = _check_security_issues(line, 1)
+            assert not [i for i in issues if i.rule.code == "SEC002"], line
+
     def test_admin_privilege_commands(self) -> None:
         """Test detection of commands requiring admin privileges."""
         admin_commands = [
@@ -1534,6 +1550,21 @@ class TestGlobalChecks:
             "exit /b\n"
         )
         batch_file = tmp_path / "repair.cmd"
+        batch_file.write_text(content, encoding="utf-8")
+        issues = lint_batch_file(str(batch_file))
+        assert not [i for i in issues if i.rule.code == "E006"]
+
+    def test_call_taskgetids_sets_target_variable(self, tmp_path: Path) -> None:
+        """CALL :_taskgetids varname should define varname for E006."""
+        content = (
+            "@echo off\n"
+            "call :_taskgetids myids HKLM\\Path token\n"
+            "if defined myids echo ok\n"
+            ":_taskgetids\n"
+            "set %1=\n"
+            "exit /b\n"
+        )
+        batch_file = tmp_path / "taskids.cmd"
         batch_file.write_text(content, encoding="utf-8")
         issues = lint_batch_file(str(batch_file))
         assert not [i for i in issues if i.rule.code == "E006"]

@@ -88,6 +88,11 @@ def _is_in_subroutine_context(  # pylint: disable=unused-argument
 
 
 _SET_VAR_NAME = r"[A-Za-z0-9_@]+"
+_CALL_SETS_FIRST_ARG_PATTERNS: tuple[str, ...] = (
+    r"\bcall\s+:getrepairsetup\s+([A-Za-z0-9_]+)",
+    r"\bcall\s+:getc2rrepair\s+([A-Za-z0-9_]+)",
+    r"\bcall\s+:_taskgetids\s+([A-Za-z0-9_]+)",
+)
 
 
 def _collect_set_variables(lines: List[str]) -> Set[str]:
@@ -115,12 +120,9 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
                 var_name_text: str = set_match.group(1)
                 set_vars.add(var_name_text.upper())
 
-        for call_match in re.finditer(
-            r"\bcall\s+:getrepairsetup\s+([A-Za-z0-9_]+)",
-            stripped_line,
-            re.IGNORECASE,
-        ):
-            set_vars.add(str(call_match.group(1)).upper())
+        for call_pattern in _CALL_SETS_FIRST_ARG_PATTERNS:
+            for call_match in re.finditer(call_pattern, stripped_line, re.IGNORECASE):
+                set_vars.add(str(call_match.group(1)).upper())
 
         # Handle dynamic variable assignments in FOR loops: set "%%~b=value"
         # Example: for %%a in (list) do (set "%%~a=value")

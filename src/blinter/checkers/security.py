@@ -30,19 +30,36 @@ _NET_PRIVILEGE_CHECK_PATTERNS: tuple[str, ...] = (
     r"net\s+session\s*>",  # net session redirected (used for checking)
     r"net\s+session\s*$",  # net session at end of line (used for checking)
 )
+_COMPOUND_SET_SPLIT = re.compile(r"&\s+set\s+", re.IGNORECASE)
+_STRING_REPLACE_ONLY = re.compile(
+    r"^[%!][A-Za-z0-9_@]+:[^%!]+[%!]$",
+    re.IGNORECASE,
+)
+
+
+def _first_set_value_text(var_val_text: str) -> str:
+    """Return RHS of the first SET when a line chains ``set a=1& set b=2``."""
+    match = _COMPOUND_SET_SPLIT.search(var_val_text)
+    if match:
+        return var_val_text[: match.start()]
+    return var_val_text
 
 
 def _is_safe_unquoted_set_value(var_val: str) -> bool:
     """Return True when an unquoted SET value is unlikely to need quoting."""
-    if " " in var_val or "\t" in var_val:
-        return False
-    if re.search(r"[&|<>`;]", var_val):
-        return False
-    if re.match(r"^[\w.]+$", var_val):
+    if (
+        _STRING_REPLACE_ONLY.match(var_val)
+        or var_val == "%*"
+        or re.search(r"%[A-Za-z0-9_]+:'.*'.*%", var_val)
+    ):
         return True
-    if var_val.lower().startswith(("http://", "https://")):
+    if " " in var_val or "\t" in var_val or re.search(r"[&|<>`;]", var_val):
+        return False
+    if re.match(r"^[\w.]+$", var_val) or var_val.lower().startswith(
+        ("http://", "https://")
+    ):
         return True
-    return re.match(r"^[%!\w\\.:~\-,+/()]+$", var_val) is not None
+    return re.match(r"^[%!\w\\.:~\-,+/()=]+$", var_val) is not None
 
 
 def _check_input_validation_sec(
@@ -66,7 +83,7 @@ def _check_input_validation_sec(
     set_match = re.match(r"set\s+([A-Za-z0-9_@]+)=(.+)", stripped, re.IGNORECASE)
     if set_match:
         var_name: str = set_match.group(1)
-        var_val_text: str = set_match.group(2)
+        var_val_text: str = _first_set_value_text(set_match.group(2))
         var_val: str = var_val_text.strip()
 
         # Skip if it's an ANSI escape sequence or color definition
@@ -75,6 +92,7 @@ def _check_input_validation_sec(
             or "COLOR" in var_name.upper()
             or "%ESC%" in var_val
             or var_val.startswith("(")  # Skip tuple/list definitions like colors=(...)
+            or var_val.upper().startswith("FOR ")  # Macro builder assignments
         )
         is_safe_unquoted = _is_safe_unquoted_set_value(var_val)
 
