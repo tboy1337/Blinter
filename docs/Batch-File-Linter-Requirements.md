@@ -2,7 +2,9 @@
 
 ## Rule Categories Summary
 
-**Blinter** provides comprehensive static analysis with **147 Built-in Rules** across 5 severity levels:
+**Blinter** provides comprehensive static analysis with **built-in rules** registered in `blinter.rules.registry` (currently **147** rules; see `RULE_COUNT` in that module). Rule IDs may have gaps where rules were retired or consolidated (for example W041, S025, P011).
+
+Across 5 severity levels:
 
 ### Error Level Rules (E001-E999)
 **Critical issues that will cause script failure**

@@ -7,6 +7,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from blinter._version import _fallback_version, _pyproject_path, get_version
+from blinter.rules.registry import RULE_COUNT
 
 
 class TestVersion:
@@ -61,3 +62,9 @@ class TestVersion:
         pyproject.write_text("[project]\nname = 'x'\n", encoding="utf-8")
         mocker.patch("blinter._version._pyproject_path", return_value=pyproject)
         assert _fallback_version() == "unknown"
+
+    def test_readme_rule_count_matches_registry(self) -> None:
+        """README should reference the live RULE_COUNT from the registry."""
+        readme = (_pyproject_path().parent / "README.md").read_text(encoding="utf-8")
+        assert str(RULE_COUNT) in readme
+        assert "RULE_COUNT" in readme

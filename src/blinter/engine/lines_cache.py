@@ -16,7 +16,10 @@ def get_cached_lines(
         return None
     resolved = path.resolve()
     with _LINES_CACHE_LOCK:
-        return lines_cache.get(resolved)
+        cached = lines_cache.get(resolved)
+        if cached is None:
+            return None
+        return list(cached)
 
 
 def store_cached_lines(
@@ -27,4 +30,4 @@ def store_cached_lines(
     """Store lines for path in the shared cache (thread-safe write)."""
     resolved = path.resolve()
     with _LINES_CACHE_LOCK:
-        lines_cache[resolved] = lines
+        lines_cache[resolved] = list(lines)

@@ -124,6 +124,9 @@ class BlinterConfig:  # pylint: disable=too-many-instance-attributes
         if self.min_severity is None:
             return True
 
+        if self.min_severity == RuleSeverity.ERROR:
+            return severity in (RuleSeverity.ERROR, RuleSeverity.SECURITY)
+
         # Define severity order (higher values = more severe)
         severity_order = {
             RuleSeverity.STYLE: 1,

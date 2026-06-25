@@ -189,7 +189,7 @@ recursive = true
 # Whether to show summary statistics at the end (default: false)  
 show_summary = false
 
-# Maximum line length before triggering S011 rule (default: 100)
+# Maximum line length before triggering S011 and S020 rules (default: 100)
 max_line_length = 100
 
 # Maximum batch files discovered when scanning a directory (default: 1000)
@@ -201,6 +201,7 @@ follow_calls = false
 
 # Minimum severity level to report (default: none - show all)
 # Valid values: ERROR, SECURITY, WARNING, PERFORMANCE, STYLE
+# ERROR includes both ERROR and SECURITY severities (both affect CLI exit code)
 # min_severity = WARNING
 
 [rules]

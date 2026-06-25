@@ -3337,6 +3337,70 @@ class TestAdvancedSecurityPerformanceRules:
         codes = {issue.rule.code for issue in issues}
         assert "SEC018" in codes
 
+    def test_sec011_flags_path_traversal(self) -> None:
+        """SEC011 triggers when path operations contain .."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_enhanced_security_rules,
+        )
+
+        issues = _check_enhanced_security_rules(["@echo off\n", "cd ..\\windows\n"])
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC011" in codes
+
+    def test_sec011_ignores_safe_paths(self) -> None:
+        """SEC011 does not flag normal absolute paths."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_enhanced_security_rules,
+        )
+
+        issues = _check_enhanced_security_rules(
+            ["@echo off\n", "cd C:\\Windows\\System32\n"]
+        )
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC011" not in codes
+
+    def test_sec012_flags_unsafe_temp_file(self) -> None:
+        """SEC012 triggers for predictable temp file paths."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_enhanced_security_rules,
+        )
+
+        issues = _check_enhanced_security_rules(
+            ["@echo off\n", "set outfile=c:\\temp\\out.tmp\n"]
+        )
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC012" in codes
+
+    def test_sec012_ignores_random_temp_file(self) -> None:
+        """SEC012 does not flag temp files using %random%."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_enhanced_security_rules,
+        )
+
+        issues = _check_enhanced_security_rules(
+            ["@echo off\n", "set outfile=%temp%\\%random%.tmp\n"]
+        )
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC012" not in codes
+
+    def test_sec015_flags_unfiltered_taskkill(self) -> None:
+        """SEC015 triggers for TASKKILL /F without /FI filters."""
+        from blinter.checkers.advanced.vars_syntax import _check_advanced_process_mgmt
+
+        issues = _check_advanced_process_mgmt("taskkill /f /im notepad.exe\n", 1)
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC015" in codes
+
+    def test_sec015_ignores_filtered_taskkill(self) -> None:
+        """SEC015 does not flag TASKKILL /F when /FI filters are present."""
+        from blinter.checkers.advanced.vars_syntax import _check_advanced_process_mgmt
+
+        issues = _check_advanced_process_mgmt(
+            'taskkill /f /fi "imagename eq notepad.exe" /im notepad.exe\n', 1
+        )
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC015" not in codes
+
     def test_for_loop_performance_rules(self) -> None:
         """P019 and P022 trigger inside FOR blocks."""
         from blinter.checkers.advanced.style_security_perf import (

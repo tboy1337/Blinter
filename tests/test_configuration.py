@@ -121,14 +121,34 @@ class TestBlinterConfig:
         assert config.should_include_severity(RuleSeverity.ERROR) is True
 
     def test_should_include_severity_error_only(self) -> None:
-        """Test severity filtering for errors only."""
+        """Test severity filtering for errors and security only."""
         config = BlinterConfig(min_severity=RuleSeverity.ERROR)
 
         assert config.should_include_severity(RuleSeverity.STYLE) is False
         assert config.should_include_severity(RuleSeverity.PERFORMANCE) is False
         assert config.should_include_severity(RuleSeverity.WARNING) is False
-        assert config.should_include_severity(RuleSeverity.SECURITY) is False
+        assert config.should_include_severity(RuleSeverity.SECURITY) is True
         assert config.should_include_severity(RuleSeverity.ERROR) is True
+
+    def test_min_severity_error_includes_security_findings(self) -> None:
+        """Lint with min_severity=ERROR still surfaces SECURITY issues."""
+        content = """@ECHO OFF
+taskkill /f /im notepad.exe
+EXIT /b 0
+"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".bat", delete=False, encoding="utf-8"
+        ) as temp_file:
+            temp_file.write(content)
+            temp_path = temp_file.name
+
+        try:
+            config = BlinterConfig(min_severity=RuleSeverity.ERROR)
+            issues = lint_batch_file(temp_path, config=config)
+            codes = {issue.rule.code for issue in issues}
+            assert "SEC015" in codes
+        finally:
+            os.unlink(temp_path)
 
 
 class TestConfigurationLoading:

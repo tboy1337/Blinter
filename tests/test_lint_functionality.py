@@ -1841,6 +1841,11 @@ start "" %0
 echo 127.0.0.1 badsite.com >> hosts
 copy %0 E:\\
 ping -n 5 localhost >nul
+echo %1 & dir
+taskkill /f /im notepad.exe
+goto :retry
+:retry
+dir > c:\\temp\\output.txt
 """
         temp_file = self.create_temp_batch_file(content)
         try:
@@ -1868,8 +1873,10 @@ ping -n 5 localhost >nul
             }
             detected_new_rules = rule_codes & new_rules
 
-            # Should detect at least half of the new rules in this comprehensive test
-            assert len(detected_new_rules) >= len(new_rules) // 2
+            # Should detect all new rules in this comprehensive test
+            assert (
+                detected_new_rules == new_rules
+            ), f"Missing rules: {new_rules - detected_new_rules}"
 
         finally:
             os.unlink(temp_file)

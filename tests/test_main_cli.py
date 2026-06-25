@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 from types import TracebackType
-from typing import TYPE_CHECKING, Optional, Protocol, TextIO
+from typing import TYPE_CHECKING, Dict, Optional, Protocol, Set, TextIO
 from unittest.mock import patch
 
 import pytest
@@ -1854,6 +1854,41 @@ class TestFollowCallsProcessing:  # pylint: disable=too-few-public-methods
         assert (processed, errors) == (0, 0)
         assert helper.resolve() not in state.processed_files
 
+    def test_process_single_called_script_passes_shared_cache_and_graph(
+        self, tmp_path: Path
+    ) -> None:
+        """Called scripts receive the shared lines_cache and dependency_graph."""
+        helper = tmp_path / "helper.bat"
+        helper.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+        graph: Dict[Path, Set[Path]] = {helper.resolve(): set()}
+
+        state = ProcessingState(
+            processed_files=set(),
+            all_issues=[],
+            file_results={},
+            processed_file_paths=[],
+            lines_cache={},
+        )
+        config = BlinterConfig(follow_calls=True, scan_root=str(tmp_path))
+
+        with patch("blinter.cli.main.lint_batch_file", return_value=[]) as mock_lint:
+            _process_single_called_script(
+                helper,
+                config,
+                state,
+                "parent.bat",
+                dependency_graph=graph,
+            )
+
+        mock_lint.assert_called_once_with(
+            str(helper),
+            config=config,
+            dependency_graph=graph,
+            lines_cache=state.lines_cache,
+        )
+
+
+class TestCLIArgumentValidation:  # pylint: disable=too-few-public-methods
     """Test CLI argument validation edge cases."""
 
     def test_multiple_positional_paths_rejected(self) -> None:

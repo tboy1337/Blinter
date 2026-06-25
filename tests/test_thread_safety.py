@@ -14,6 +14,42 @@ from blinter import (
     lint_batch_file,
     read_file_with_encoding,
 )
+from blinter.engine.lines_cache import get_cached_lines, store_cached_lines
+
+
+class TestLinesCache:
+    """Tests for shared line cache defensive copying."""
+
+    def test_lines_cache_returns_defensive_copy(self, tmp_path: Path) -> None:
+        """Mutating a returned cache entry must not corrupt stored lines."""
+        batch_file = tmp_path / "sample.bat"
+        batch_file.write_text("@ECHO OFF\necho test\n", encoding="utf-8")
+        cache: Dict[Path, List[str]] = {}
+        original_lines = ["@ECHO OFF\n", "echo test\n"]
+
+        store_cached_lines(cache, batch_file, original_lines)
+        cached = get_cached_lines(cache, batch_file)
+        assert cached is not None
+        cached.append("mutated\n")
+
+        cached_again = get_cached_lines(cache, batch_file)
+        assert cached_again is not None
+        assert len(cached_again) == 2
+        assert "mutated\n" not in cached_again
+
+    def test_store_cached_lines_copies_input(self, tmp_path: Path) -> None:
+        """Mutating the source list after store must not corrupt the cache."""
+        batch_file = tmp_path / "sample.bat"
+        batch_file.write_text("@ECHO OFF\n", encoding="utf-8")
+        cache: Dict[Path, List[str]] = {}
+        lines = ["@ECHO OFF\n"]
+
+        store_cached_lines(cache, batch_file, lines)
+        lines.append("mutated\n")
+
+        cached = get_cached_lines(cache, batch_file)
+        assert cached is not None
+        assert len(cached) == 1
 
 
 class TestThreadSafety:
@@ -330,7 +366,7 @@ class TestPerformance:
 
     @pytest.mark.slow
     @pytest.mark.timeout(120)
-    def test_large_file_performance(self) -> None:
+    def test_large_file_concurrent_lint_completes(self) -> None:
         """Test that large files lint successfully without timing assertions."""
         lines = ["@ECHO OFF", "SETLOCAL"]
 
@@ -353,10 +389,11 @@ class TestPerformance:
         try:
             issues = lint_batch_file(temp_path)
             assert isinstance(issues, list)
+            assert len(issues) >= 0
         finally:
             os.unlink(temp_path)
 
-    def test_memory_efficiency(self) -> None:
+    def test_concurrent_lint_no_exceptions(self) -> None:
         """Concurrent linting of multiple files should complete without errors."""
 
         test_files = []

@@ -390,13 +390,12 @@ class TestAdditionalErrorHandling:
             lines, encoding = read_file_with_encoding(temp_file_path)
             assert isinstance(lines, list)
             assert isinstance(encoding, str)
-        except (OSError, UnicodeDecodeError, ValueError):
-            pass
+            assert len(lines) >= 1
         finally:
             os.unlink(temp_file_path)
 
     def test_line_1111_encoding_fallback(self) -> None:
-        """Test line 1111 - encoding fallback scenario."""
+        """Test encoding fallback for files with invalid UTF-8 byte sequences."""
         # Create a file that might trigger specific encoding detection failure
         with tempfile.NamedTemporaryFile(
             mode="wb", suffix=".bat", delete=False
@@ -410,8 +409,7 @@ class TestAdditionalErrorHandling:
             lines, encoding_used = read_file_with_encoding(temp_file_path)
             assert isinstance(lines, list)
             assert isinstance(encoding_used, str)
-        except (OSError, UnicodeDecodeError, ValueError):
-            pass
+            assert len(lines) >= 2
         finally:
             os.unlink(temp_file_path)
 
@@ -446,8 +444,7 @@ class TestAdditionalErrorHandling:
             lines, encoding_used = read_file_with_encoding(temp_file_path)
             assert isinstance(lines, list)
             assert isinstance(encoding_used, str)
-        except (OSError, UnicodeDecodeError, ValueError):
-            pass
+            assert any("Niño" in line or "Ni" in line for line in lines)
         finally:
             os.unlink(temp_file_path)
 

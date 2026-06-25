@@ -529,8 +529,9 @@ def _check_line_length(
     """Check for long lines (S020)."""
     issues: List[LintIssue] = []
 
-    line_length = len(line.rstrip("\n"))
-    if line_length > max_line_length and not line.rstrip().endswith("^"):
+    line_body = line.rstrip("\r\n")
+    line_length = len(line_body)
+    if line_length > max_line_length and not line_body.rstrip().endswith("^"):
         issues.append(
             LintIssue(
                 line_number=line_number,

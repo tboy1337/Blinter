@@ -39,7 +39,7 @@ Options:
   --summary           Show a summary section with total errors and most common error.
   --severity          Accepted for compatibility; severity breakdown is always shown.
   --config <path>     Path to blinter.ini configuration file (default: blinter.ini).
-  --max-line-length <n>  Set maximum line length for S011 rule (default: 100).
+  --max-line-length <n>  Set maximum line length for S011 and S020 rules (default: 100).
   --no-recursive      When processing directories, don't search subdirectories (default: recursive).
   --follow-calls      Scan scripts called by CALL statements from each seed file.
                      Variable context may be collected transitively; each seed file

@@ -18,6 +18,11 @@ from blinter.io.encoding import _validate_and_read_file
 from blinter.logging_config import logger
 from blinter.parsing.structure import _collect_set_variables
 
+_CALL_SCRIPT_PATTERN = re.compile(
+    r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|(\S+\.(?:bat|cmd)))',
+    re.IGNORECASE,
+)
+
 
 @dataclass(frozen=True)
 class _CallLineContext:
@@ -79,11 +84,7 @@ def _extract_called_scripts(
         if stripped.startswith("rem ") or stripped.startswith("::"):
             continue
 
-        call_match = re.search(
-            r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|(\S+\.(?:bat|cmd)))',
-            line,
-            re.IGNORECASE,
-        )
+        call_match = _CALL_SCRIPT_PATTERN.search(line)
 
         if not call_match:
             continue
@@ -213,11 +214,7 @@ def _extract_direct_dependencies(
         if stripped.startswith("rem ") or stripped.startswith("::"):
             continue
 
-        call_match = re.search(
-            r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|(\S+\.(?:bat|cmd)))',
-            line,
-            re.IGNORECASE,
-        )
+        call_match = _CALL_SCRIPT_PATTERN.search(line)
 
         if not call_match:
             continue
@@ -412,11 +409,7 @@ def _vars_from_call_line(
     if stripped.startswith("rem ") or stripped.startswith("::"):
         return None
 
-    call_match = re.search(
-        r'\bcall\s+(?:"([^"]+\.(?:bat|cmd))"|(\S+\.(?:bat|cmd)))',
-        line,
-        re.IGNORECASE,
-    )
+    call_match = _CALL_SCRIPT_PATTERN.search(line)
     if not call_match:
         return None
 

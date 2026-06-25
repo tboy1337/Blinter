@@ -98,6 +98,7 @@ def _process_single_called_script(
     config: BlinterConfig,
     state: ProcessingState,
     parent_path: str,
+    dependency_graph: Optional[Dict[Path, Set[Path]]] = None,
 ) -> Tuple[int, int]:
     """
     Process a single called script.
@@ -127,7 +128,12 @@ def _process_single_called_script(
         return (0, 0)
 
     try:
-        called_issues = lint_batch_file(str(called_script), config=config)
+        called_issues = lint_batch_file(
+            str(called_script),
+            config=config,
+            dependency_graph=dependency_graph,
+            lines_cache=state.lines_cache,
+        )
         state.file_results[str(called_script)] = called_issues
         state.all_issues.extend(called_issues)
         state.processed_files.add(called_script.resolve())
@@ -162,6 +168,7 @@ def _process_called_scripts(
     config: BlinterConfig,
     state: ProcessingState,
     depth: int = 0,
+    dependency_graph: Optional[Dict[Path, Set[Path]]] = None,
 ) -> Tuple[int, int]:
     """
     Process all called scripts for a batch file.
@@ -203,10 +210,17 @@ def _process_called_scripts(
             config,
             state,
             str(batch_file),
+            dependency_graph=dependency_graph,
         )
         files_processed += result[0]
         files_with_errors += result[1]
-        nested = _process_called_scripts(called_script, config, state, depth + 1)
+        nested = _process_called_scripts(
+            called_script,
+            config,
+            state,
+            depth + 1,
+            dependency_graph=dependency_graph,
+        )
         files_processed += nested[0]
         files_with_errors += nested[1]
 
@@ -273,7 +287,12 @@ def _process_batch_files(
                 files_with_errors += 1
 
             if config.follow_calls:
-                called_results = _process_called_scripts(batch_file, config, state)
+                called_results = _process_called_scripts(
+                    batch_file,
+                    config,
+                    state,
+                    dependency_graph=dependency_graph,
+                )
                 total_files_processed += called_results[0]
                 files_with_errors += called_results[1]
 
