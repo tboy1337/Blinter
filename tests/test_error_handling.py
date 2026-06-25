@@ -519,3 +519,10 @@ class TestDiscoverySandbox:  # pylint: disable=too-few-public-methods
 
         outside_results = find_batch_files(outside_file, root=scan_dir.resolve())
         assert outside_results == []
+
+    def test_lint_batch_file_rejects_non_batch_extension(self, tmp_path: Path) -> None:
+        """lint_batch_file rejects files that are not .bat or .cmd."""
+        text_file = tmp_path / "script.txt"
+        text_file.write_text("@echo off\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="not a batch file"):
+            lint_batch_file(str(text_file))

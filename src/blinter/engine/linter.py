@@ -77,6 +77,9 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     """
     logger.info("Starting lint analysis of file: %s", file_path)
 
+    if Path(file_path).suffix.lower() not in {".bat", ".cmd"}:
+        raise ValueError(f"File '{file_path}' is not a batch file (.bat or .cmd)")
+
     # Use provided config or create default
     if config is None:
         config = BlinterConfig()

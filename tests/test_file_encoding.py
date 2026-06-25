@@ -82,8 +82,6 @@ class TestFileEncodingDetection:
                 # Allow various encodings - charset_normalizer may detect utf-8 on modern systems
                 # for content that's compatible with both encodings
                 assert encoding.lower() in [
-                    "latin1",
-                    "latin-1",
                     "cp1252",
                     "iso-8859-1",
                     "utf-8",
@@ -225,7 +223,7 @@ class TestFileEncodingDetection:
         def mock_decode_bytes(raw_data: bytes, encoding: str) -> Optional[List[str]]:
             if encoding == "utf-8":
                 return None
-            if encoding == "latin1":
+            if encoding == "cp1252":
                 return ["test content\n"]
             return None
 
@@ -262,13 +260,12 @@ class TestFileEncodingDetection:
             # This should fallback to an encoding that can handle null bytes
             lines, encoding = read_file_with_encoding(temp_file_path)
             assert len(lines) == 1
-            # charset_normalizer may detect utf-8, while chardet detected latin1
+            # charset_normalizer may detect utf-8; cp1252/cp437 handle null bytes
             assert encoding.lower() in [
-                "latin1",
-                "latin-1",
                 "ascii",
                 "iso-8859-1",
                 "cp1252",
+                "cp437",
                 "utf-8",  # charset_normalizer may detect this
             ]
         finally:
@@ -308,7 +305,7 @@ class TestFileEncodingDetection:
         """Test when charset_normalizer detects encoding that exists in our list - should be moved to front."""
         # Mock charset_normalizer to return an encoding that IS in the default list
         mock_result = MagicMock()
-        mock_result.encoding = "latin1"  # This IS in the default list
+        mock_result.encoding = "cp1252"  # This IS in the default list
         mock_result.coherence = 0.85
         mock_from_bytes.return_value.best.return_value = mock_result
 
@@ -316,7 +313,7 @@ class TestFileEncodingDetection:
 
         lines, encoding = read_file_with_encoding("test.bat")
         assert lines == ["test content\n"]
-        assert encoding == "latin1"  # Should use latin1 (moved to front)
+        assert encoding == "cp1252"  # Should use cp1252 (moved to front)
 
     @patch("blinter.io.encoding.from_bytes")
     def test_charset_normalizer_exception_handling(
@@ -402,7 +399,6 @@ class TestEncodingEdgeCases:
                 assert encoding in [
                     "utf-8",
                     "utf-8-sig",
-                    "latin1",
                     "cp1252",
                     "iso-8859-1",
                     "ascii",
@@ -430,7 +426,6 @@ class TestEncodingEdgeCases:
                 assert encoding in [
                     "utf-8",
                     "utf-8-sig",
-                    "latin1",
                     "cp1252",
                     "iso-8859-1",
                     "ascii",
@@ -508,7 +503,6 @@ class TestEncodingFallbackScenarios:
                 assert encoding in [
                     "utf-8",
                     "utf-8-sig",
-                    "latin1",
                     "cp1252",
                     "iso-8859-1",
                     "ascii",
@@ -535,7 +529,6 @@ class TestEncodingFallbackScenarios:
                 assert encoding in [
                     "utf-8",
                     "utf-8-sig",
-                    "latin1",
                     "cp1252",
                     "iso-8859-1",
                     "ascii",
@@ -615,7 +608,6 @@ class TestAdditionalFileEncodingScenarios:
             assert encoding in [
                 "utf-8",
                 "utf-8-sig",
-                "latin1",
                 "cp1252",
                 "iso-8859-1",
                 "ascii",
@@ -637,7 +629,6 @@ class TestAdditionalFileEncodingScenarios:
             assert encoding in [
                 "utf-8",
                 "utf-8-sig",
-                "latin1",
                 "cp1252",
                 "iso-8859-1",
                 "ascii",
@@ -659,7 +650,6 @@ class TestAdditionalFileEncodingScenarios:
             assert encoding in [
                 "utf-8",
                 "utf-8-sig",
-                "latin1",
                 "cp1252",
                 "iso-8859-1",
                 "ascii",
@@ -672,7 +662,7 @@ class TestAdditionalFileEncodingScenarios:
         def mock_decode_bytes(raw_data: bytes, encoding: str) -> Optional[List[str]]:
             if encoding == "utf-8":
                 return None
-            if encoding == "latin1":
+            if encoding == "cp1252":
                 return ["test content\n"]
             return None
 
@@ -694,7 +684,7 @@ class TestAdditionalFileEncodingScenarios:
         def mock_decode_bytes(raw_data: bytes, encoding: str) -> Optional[List[str]]:
             if encoding == "utf-8":
                 return None
-            if encoding == "latin1":
+            if encoding == "cp1252":
                 return ["test content\n"]
             return None
 
@@ -779,7 +769,7 @@ class TestLineEndingStandaloneDetection:
         bat_file.write_bytes(b"line1\r\nline2\n")
         lines, encoding, ending_info = _validate_and_read_file(str(bat_file))
         assert len(lines) == 2
-        assert encoding in {"utf-8", "ascii", "cp1252", "latin1"}
+        assert encoding in {"utf-8", "ascii", "cp1252", "iso-8859-1"}
         dominant_type, has_mixed, crlf_count, lf_only, _cr_only = ending_info
         assert dominant_type in {"CRLF", "LF", "MIXED"}
         assert crlf_count + lf_only >= 1

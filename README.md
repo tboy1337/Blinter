@@ -430,11 +430,18 @@ Install development dependencies and run the quality gate locally before releasi
 ```bash
 pip install -e ".[dev]"
 # Or: pip install -e . && pip install -r requirements-dev.txt
+py scripts/verify.py        # full gate (format, mypy, pylint, bandit, pip-audit, pytest)
+py scripts/verify.py --fix  # auto-fix whitespace and imports first
+```
+
+Optional manual steps (same checks as `verify.py`):
+
+```bash
 py -m pytest
-py -m mypy
-py -m mypy tests
+py -m mypy src/blinter tests
 py -m pylint src/blinter --output-format=text > pylint-report.txt
 py -m bandit -r src/blinter
+py -m pip-audit
 py -m black --check src tests
 py -m isort --check-only src tests
 ```

@@ -75,7 +75,6 @@ class TestFileEncodingEdgeCases:
             assert encoding in [
                 "utf-8",
                 "utf-8-sig",
-                "latin1",
                 "cp1252",
                 "iso-8859-1",
                 "ascii",
@@ -96,7 +95,6 @@ class TestFileEncodingEdgeCases:
             assert encoding in [
                 "utf-8",
                 "utf-8-sig",
-                "latin1",
                 "cp1252",
                 "iso-8859-1",
                 "ascii",
@@ -116,7 +114,6 @@ class TestFileEncodingEdgeCases:
             assert encoding in [
                 "utf-8",
                 "utf-8-sig",
-                "latin1",
                 "cp1252",
                 "iso-8859-1",
                 "ascii",
@@ -129,7 +126,7 @@ class TestFileEncodingEdgeCases:
         def mock_decode_bytes(raw_data: bytes, encoding: str) -> Optional[List[str]]:
             if encoding == "utf-8":
                 return None
-            if encoding == "latin1":
+            if encoding == "cp1252":
                 return ["test content\n"]
             return None
 
@@ -151,7 +148,7 @@ class TestFileEncodingEdgeCases:
         def mock_decode_bytes(raw_data: bytes, encoding: str) -> Optional[List[str]]:
             if encoding == "utf-8":
                 return None
-            if encoding == "latin1":
+            if encoding == "cp1252":
                 return ["test content\n"]
             return None
 
@@ -414,6 +411,26 @@ class TestSecurityIssueChecking:
             # May also trigger SEC008 (credential patterns) for some cases
             sec010_issues = [i for i in issues if i.rule.code == "SEC010"]
             assert len(sec010_issues) == 1
+
+    def test_credential_patterns_skip_comments_and_safe_context(self) -> None:
+        """SEC008/SEC010 must not flag REM or :: documentation lines."""
+        safe_lines = [
+            "REM password=secret123",
+            ":: apikey=hidden",
+        ]
+        for line in safe_lines:
+            issues = _check_security_issues(line, 1)
+            assert not any(issue.rule.code == "SEC008" for issue in issues)
+            assert not any(issue.rule.code == "SEC010" for issue in issues)
+
+        unsafe_lines = [
+            "set password=secret123",
+            "echo Your password is %PASSWORD%",
+        ]
+        for line in unsafe_lines:
+            issues = _check_security_issues(line, 1)
+            codes = {issue.rule.code for issue in issues}
+            assert "SEC008" in codes or "SEC010" in codes
 
 
 class TestPerformanceIssueChecking:
@@ -722,7 +739,8 @@ class TestAdditionalEdgeCaseScenarios:
                     assert len(lines) > 0
                     assert encoding in [
                         "utf-8",
-                        "latin1",
+                        "cp1252",
+                        "iso-8859-1",
                     ]  # Should succeed with some encoding
         finally:
             try:
@@ -2982,6 +3000,30 @@ class TestFindBatchFilesDiscovery:
         (tmp_path / "script.bat").write_text("@ECHO OFF\n", encoding="utf-8")
         found = find_batch_files(tmp_path)
         assert [path.name for path in found] == ["script.bat"]
+
+    def test_find_batch_files_raises_when_scan_limit_exceeded(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Directory scans above MAX_SCAN_FILES raise ValueError."""
+        monkeypatch.setattr("blinter.io.discovery.MAX_SCAN_FILES", 3)
+        for index in range(4):
+            (tmp_path / f"script{index}.bat").write_text(
+                "@ECHO OFF\n", encoding="utf-8"
+            )
+        with pytest.raises(ValueError, match="exceeding the limit"):
+            find_batch_files(tmp_path)
+
+    def test_find_batch_files_allows_scan_up_to_limit(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Directory scans at MAX_SCAN_FILES succeed."""
+        monkeypatch.setattr("blinter.io.discovery.MAX_SCAN_FILES", 3)
+        for index in range(3):
+            (tmp_path / f"script{index}.bat").write_text(
+                "@ECHO OFF\n", encoding="utf-8"
+            )
+        found = find_batch_files(tmp_path)
+        assert len(found) == 3
 
 
 class TestAdvancedSecurityPerformanceRules:

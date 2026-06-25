@@ -222,9 +222,15 @@ def _check_path_security(line: str, stripped: str, line_num: int) -> List[LintIs
     return issues
 
 
-def _check_info_disclosure_sec(stripped: str, line_num: int) -> List[LintIssue]:
+def _check_info_disclosure_sec(
+    line: str, stripped: str, line_num: int
+) -> List[LintIssue]:
     """Check for information disclosure security issues (SEC008-SEC010)."""
     issues: List[LintIssue] = []
+
+    # Skip REM/:: documentation lines only (SET and ECHO may still disclose secrets)
+    if _is_comment_line(line):
+        return issues
 
     # SEC008: Plain text credentials detected
     for pattern in CREDENTIAL_PATTERNS:
@@ -331,7 +337,7 @@ def _check_security_issues(
     issues.extend(_check_input_validation_sec(line, line_num, stripped))
     issues.extend(_check_privilege_security(stripped, line_num, lines=lines, line=line))
     issues.extend(_check_path_security(line, stripped, line_num))
-    issues.extend(_check_info_disclosure_sec(stripped, line_num))
+    issues.extend(_check_info_disclosure_sec(line, stripped, line_num))
     issues.extend(_check_malware_security(stripped, line_num))
 
     return issues

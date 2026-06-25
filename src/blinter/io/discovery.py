@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import List, Optional, Union
 
+from blinter.constants import MAX_SCAN_FILES
 from blinter.logging_config import logger
 
 
@@ -94,6 +95,13 @@ def find_batch_files(
                 for batch_file in batch_files
                 if is_path_under_root(batch_file, root)
             ]
+
+        if len(batch_files) > MAX_SCAN_FILES:
+            raise ValueError(
+                f"Directory scan found {len(batch_files)} batch files, "
+                f"exceeding the limit of {MAX_SCAN_FILES}. "
+                "Use a narrower path or disable recursive scanning."
+            )
 
         # Sort for consistent output
         batch_files.sort()

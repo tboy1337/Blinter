@@ -92,7 +92,7 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
         # Advanced style patterns (S022-S028)
         issues.extend(_check_advanced_style_patterns(line, i, lines))
 
-        # Security level checks (always enabled for safety)
+        # Security level checks (filtered by config like other rules)
         issues.extend(_check_security_issues(line, i, lines))
 
         # Advanced security patterns (SEC014-SEC019)

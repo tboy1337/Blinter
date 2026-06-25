@@ -38,6 +38,25 @@ def _run_step(name: str, args: Sequence[str], *, cwd: Path | None = None) -> Non
         raise SystemExit(f"Step failed: {name} (exit code {result.returncode})")
 
 
+def _run_pylint_package(*, cwd: Path, package_dir: str, report_path: Path) -> None:
+    """Run pylint on the package and write UTF-8 output (avoids Windows UTF-16)."""
+    print("==> pylint (package)")
+    result = subprocess.run(
+        _python_m("pylint", package_dir),
+        cwd=cwd,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    report_path.write_text(result.stdout + result.stderr, encoding="utf-8")
+    if result.returncode != 0:
+        raise SystemExit(
+            f"Step failed: pylint (package) (exit code {result.returncode})"
+        )
+
+
 def _autopep8_args(*, fix: bool) -> list[str]:
     args = _python_m("autopep8", "--select=W291,W293", "-r", *_CHECK_DIRS)
     mode_flag = "--in-place" if fix else "--diff"
@@ -68,7 +87,7 @@ def main() -> None:
     verify_script = str(_VERIFY_SCRIPT)
     package_dir = str(_PACKAGE_DIR)
 
-    steps: list[tuple[str, list[str]]] = [
+    subprocess_steps_before_pylint: list[tuple[str, list[str]]] = [
         ("autopep8 (trailing whitespace)", _autopep8_args(fix=fix)),
         ("isort", _isort_args(fix=fix)),
         ("black", _python_m("black", "--check", *_CHECK_DIRS)),
@@ -76,19 +95,24 @@ def main() -> None:
             "mypy",
             _python_m("mypy", package_dir, "tests", verify_script),
         ),
-        (
-            "pylint (package)",
-            _python_m("pylint", package_dir, f"--output={pylint_report}"),
-        ),
+    ]
+
+    subprocess_steps_after_pylint: list[tuple[str, list[str]]] = [
         ("pylint (verify)", _python_m("pylint", verify_script)),
         (
             "bandit",
             _python_m("bandit", "-r", package_dir, "-c", _PYPROJECT, "-q"),
         ),
+        ("pip-audit", _python_m("pip_audit")),
         ("pytest", _python_m("pytest")),
     ]
 
-    for name, step_args in steps:
+    for name, step_args in subprocess_steps_before_pylint:
+        _run_step(name, step_args, cwd=root)
+
+    _run_pylint_package(cwd=root, package_dir=package_dir, report_path=pylint_report)
+
+    for name, step_args in subprocess_steps_after_pylint:
         _run_step(name, step_args, cwd=root)
 
     print("All verification steps passed.")
