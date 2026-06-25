@@ -441,7 +441,7 @@ py -m pytest
 py -m mypy src/blinter tests
 py -m pylint src/blinter --output-format=text > pylint-report.txt
 py -m bandit -r src/blinter
-py -m pip-audit
+py -m pip-audit -r requirements.txt -r requirements-dev.txt
 py -m black --check src tests
 py -m isort --check-only src tests
 ```

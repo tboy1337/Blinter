@@ -47,6 +47,7 @@ def find_batch_files(
     path: Union[str, Path],
     recursive: bool = True,
     root: Optional[Path] = None,
+    max_scan_files: int = MAX_SCAN_FILES,
 ) -> List[Path]:
     """
     Find all batch files (.bat and .cmd) in a directory or return single file.
@@ -55,6 +56,7 @@ def find_batch_files(
         path: Path to file or directory to search
         recursive: Whether to search subdirectories recursively (default: True)
         root: When set, only return files that resolve inside this directory
+        max_scan_files: Maximum batch files returned from a directory scan (default: 1000)
 
     Returns:
         List of Path objects representing batch files found
@@ -96,11 +98,12 @@ def find_batch_files(
                 if is_path_under_root(batch_file, root)
             ]
 
-        if len(batch_files) > MAX_SCAN_FILES:
+        if len(batch_files) > max_scan_files:
             raise ValueError(
                 f"Directory scan found {len(batch_files)} batch files, "
-                f"exceeding the limit of {MAX_SCAN_FILES}. "
-                "Use a narrower path or disable recursive scanning."
+                f"exceeding the limit of {max_scan_files}. "
+                "Use a narrower path, disable recursive scanning, "
+                "or increase max_scan_files in blinter.ini."
             )
 
         # Sort for consistent output

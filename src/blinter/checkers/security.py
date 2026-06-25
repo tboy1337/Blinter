@@ -173,7 +173,7 @@ def _check_privilege_security(
 
 
 def _check_path_security(line: str, stripped: str, line_num: int) -> List[LintIssue]:
-    """Check for path-related security issues (SEC006-SEC007, SEC014)."""
+    """Check for path-related security issues (SEC006-SEC007, SEC020)."""
     issues: List[LintIssue] = []
 
     # Skip ECHO statements, REM comments, and :: comments as these are typically
@@ -208,7 +208,8 @@ def _check_path_security(line: str, stripped: str, line_num: int) -> List[LintIs
 
     # SEC020: UNC path without UAC elevation check
     unc_operations = ["pushd", "copy", "xcopy", "robocopy", "move"]
-    first_word = stripped.split()[0].lower() if stripped.split() else ""
+    parts = stripped.split()
+    first_word = parts[0].lower() if parts else ""
     if first_word in unc_operations or re.search(r"\\\\[^\\]+\\", stripped):
         if "\\\\" in stripped:
             issues.append(

@@ -267,6 +267,28 @@ echo %var%
             # The main function validates file existence before processing
             assert "Error: Path" in output and "not found" in output
 
+    def test_main_scan_limit_exceeded(self) -> None:
+        """Directory scan above max_scan_files exits with code 1."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for index in range(4):
+                script_path = os.path.join(temp_dir, f"script{index}.bat")
+                with open(script_path, "w", encoding="utf-8") as file_handle:
+                    file_handle.write("@echo off\n")
+
+            config_path = os.path.join(temp_dir, "blinter.ini")
+            with open(config_path, "w", encoding="utf-8") as file_handle:
+                file_handle.write("[general]\nmax_scan_files = 3\n")
+
+            argv = ["blinter.py", "--config", config_path, temp_dir]
+            with patch("sys.argv", argv):
+                with self.capture_stdout() as captured:
+                    with pytest.raises(SystemExit) as exit_info:
+                        main()
+                    output = captured.getvalue()
+
+            assert exit_info.value.code == 1
+            assert "exceeding the limit" in output
+
     def test_main_permission_error(self) -> None:
         """Test main function with permission error."""
         temp_file = self.create_temp_batch_file("@echo off\necho test\n")

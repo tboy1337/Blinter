@@ -103,7 +103,12 @@ def main() -> None:
             "bandit",
             _python_m("bandit", "-r", package_dir, "-c", _PYPROJECT, "-q"),
         ),
-        ("pip-audit", _python_m("pip_audit")),
+        (
+            "pip-audit",
+            _python_m(
+                "pip_audit", "-r", "requirements.txt", "-r", "requirements-dev.txt"
+            ),
+        ),
         ("pytest", _python_m("pytest")),
     ]
 

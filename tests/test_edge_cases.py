@@ -3002,28 +3002,43 @@ class TestFindBatchFilesDiscovery:
         assert [path.name for path in found] == ["script.bat"]
 
     def test_find_batch_files_raises_when_scan_limit_exceeded(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path
     ) -> None:
-        """Directory scans above MAX_SCAN_FILES raise ValueError."""
-        monkeypatch.setattr("blinter.io.discovery.MAX_SCAN_FILES", 3)
+        """Directory scans above max_scan_files raise ValueError."""
         for index in range(4):
             (tmp_path / f"script{index}.bat").write_text(
                 "@ECHO OFF\n", encoding="utf-8"
             )
         with pytest.raises(ValueError, match="exceeding the limit"):
-            find_batch_files(tmp_path)
+            find_batch_files(tmp_path, max_scan_files=3)
 
-    def test_find_batch_files_allows_scan_up_to_limit(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Directory scans at MAX_SCAN_FILES succeed."""
-        monkeypatch.setattr("blinter.io.discovery.MAX_SCAN_FILES", 3)
+    def test_find_batch_files_allows_scan_up_to_limit(self, tmp_path: Path) -> None:
+        """Directory scans at max_scan_files succeed."""
         for index in range(3):
             (tmp_path / f"script{index}.bat").write_text(
                 "@ECHO OFF\n", encoding="utf-8"
             )
-        found = find_batch_files(tmp_path)
+        found = find_batch_files(tmp_path, max_scan_files=3)
         assert len(found) == 3
+
+
+class TestLoggingConfig:
+    """Tests for shared logger configuration."""
+
+    def test_logger_has_null_handler_and_no_duplicates(self) -> None:
+        """Logger uses NullHandler and does not accumulate handlers."""
+        import importlib
+
+        import blinter.logging_config as logging_config
+
+        importlib.reload(logging_config)
+        handler_count = len(logging_config.logger.handlers)
+        importlib.reload(logging_config)
+        assert handler_count == len(logging_config.logger.handlers)
+        assert any(
+            handler.__class__.__name__ == "NullHandler"
+            for handler in logging_config.logger.handlers
+        )
 
 
 class TestAdvancedSecurityPerformanceRules:

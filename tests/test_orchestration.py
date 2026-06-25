@@ -1,7 +1,13 @@
 """Tests for checker orchestration helpers."""
 
-from blinter.checkers.orchestration import _filter_issues_by_config
+from unittest.mock import patch
+
+from blinter.checkers.orchestration import (
+    _filter_issues_by_config,
+    _process_file_checks,
+)
 from blinter.models import BlinterConfig, LintIssue, Rule, RuleSeverity
+from blinter.rules.registry import RULES
 
 
 def _issue(code: str, line: int = 1) -> LintIssue:
@@ -89,3 +95,31 @@ class TestFilterIssuesByConfig:
         suppressions: dict[int, set[str]] = {1: set()}
         filtered = _filter_issues_by_config(issues, config, suppressions)
         assert [issue.rule.code for issue in filtered] == []
+
+
+class TestProcessFileChecks:
+    """Tests for checker orchestration execution."""
+
+    def test_skips_security_checker_when_all_sec_rules_disabled(self) -> None:
+        """Security checkers are not invoked when every SEC rule is disabled."""
+        all_sec_rules = {code for code in RULES if code.startswith("SEC")}
+        config = BlinterConfig(disabled_rules=all_sec_rules)
+        lines = ["net user admin password /add\n"]
+
+        with patch(
+            "blinter.checkers.orchestration._check_security_issues"
+        ) as mock_security:
+            _process_file_checks(
+                lines,
+                {},
+                set(),
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+                config,
+            )
+            mock_security.assert_not_called()

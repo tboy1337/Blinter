@@ -3,7 +3,6 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 import tempfile
-import time
 from typing import List
 
 import pytest
@@ -295,13 +294,12 @@ EXIT /B 0
 class TestPerformance:
     """Test performance characteristics."""
 
+    @pytest.mark.slow
     @pytest.mark.timeout(120)
     def test_large_file_performance(self) -> None:
-        """Test performance with large files."""
-        # Create a large batch file
+        """Test that large files lint successfully without timing assertions."""
         lines = ["@ECHO OFF", "SETLOCAL"]
 
-        # Add many operations
         for i in range(1000):
             lines.append(f'SET "VAR{i}=value{i}"')
             lines.append(f"echo Processing VAR{i}: %VAR{i}%")
@@ -310,7 +308,6 @@ class TestPerformance:
                 lines.append(f"echo Reached checkpoint {i}")
 
         lines.extend(["ENDLOCAL", "EXIT /B 0"])
-
         content = "\n".join(lines)
 
         with tempfile.NamedTemporaryFile(
@@ -320,19 +317,8 @@ class TestPerformance:
             temp_path = temp_file.name
 
         try:
-
-            start_time = time.time()
             issues = lint_batch_file(temp_path)
-            end_time = time.time()
-
-            # Should complete within reasonable time (adjust as needed)
-            processing_time = end_time - start_time
-            assert (
-                processing_time < 120.0
-            ), f"Large file took too long: {processing_time}s"
-
-            assert len(issues) >= 0
-
+            assert isinstance(issues, list)
         finally:
             os.unlink(temp_path)
 

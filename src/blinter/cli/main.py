@@ -523,6 +523,7 @@ def _run_cli() -> None:
             cli_args.target_path,
             recursive=config.recursive,
             root=discovery_root,
+            max_scan_files=config.max_scan_files,
         )
     except FileNotFoundError:
         _cli_error(f"Error: Path '{cli_args.target_path}' not found.")

@@ -11,7 +11,7 @@ from typing import (
     Tuple,
 )
 
-from blinter.constants import MAX_LINE_LENGTH
+from blinter.constants import MAX_LINE_LENGTH, MAX_SCAN_FILES
 
 
 class RuleSeverity(Enum):
@@ -73,6 +73,7 @@ class BlinterConfig:  # pylint: disable=too-many-instance-attributes
     recursive: bool = True
     show_summary: bool = False
     max_line_length: int = 100
+    max_scan_files: int = MAX_SCAN_FILES
     follow_calls: bool = False
     scan_root: Optional[str] = None
 
@@ -98,6 +99,11 @@ class BlinterConfig:  # pylint: disable=too-many-instance-attributes
             raise ValueError(
                 f"max_line_length must be between 1 and {MAX_LINE_LENGTH}, "
                 f"got {self.max_line_length}"
+            )
+
+        if self.max_scan_files <= 0:
+            raise ValueError(
+                f"max_scan_files must be positive, got {self.max_scan_files}"
             )
 
     def is_rule_enabled(self, rule_code: str) -> bool:

@@ -1,9 +1,19 @@
 """Shared helpers for constructing LintIssue instances."""
 
-from typing import List, Optional
+from typing import AbstractSet, List, Optional
 
-from blinter.models import LintIssue, Rule
+from blinter.models import BlinterConfig, LintIssue, Rule
 from blinter.rules.registry import RULES
+
+
+def _has_any_enabled_rules(config: BlinterConfig, rule_codes: AbstractSet[str]) -> bool:
+    """Return True when at least one rule in rule_codes is enabled."""
+    return any(config.is_rule_enabled(code) for code in rule_codes)
+
+
+def _rule_codes_with_prefix(prefix: str) -> frozenset[str]:
+    """Return all registry rule codes that start with prefix."""
+    return frozenset(code for code in RULES if code.startswith(prefix))
 
 
 def _s011_rule(max_line_length: int) -> Rule:

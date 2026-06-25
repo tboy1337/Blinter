@@ -369,12 +369,10 @@ class TestAdditionalErrorHandling:
             temp_file_path = temp_file.name
 
         try:
-            # This should test the encoding fallback mechanisms
             lines, encoding = read_file_with_encoding(temp_file_path)
             assert isinstance(lines, list)
             assert isinstance(encoding, str)
-        except Exception:
-            # If it fails, that's also acceptable for this edge case
+        except (OSError, UnicodeDecodeError, ValueError):
             pass
         finally:
             os.unlink(temp_file_path)
@@ -391,12 +389,10 @@ class TestAdditionalErrorHandling:
             temp_file_path = temp_file.name
 
         try:
-            # Should handle encoding issues gracefully
             lines, encoding_used = read_file_with_encoding(temp_file_path)
             assert isinstance(lines, list)
             assert isinstance(encoding_used, str)
-        except Exception:
-            # If it fails completely, that's also acceptable for this edge case
+        except (OSError, UnicodeDecodeError, ValueError):
             pass
         finally:
             os.unlink(temp_file_path)
@@ -432,11 +428,32 @@ class TestAdditionalErrorHandling:
             lines, encoding_used = read_file_with_encoding(temp_file_path)
             assert isinstance(lines, list)
             assert isinstance(encoding_used, str)
-        except Exception:
-            # Acceptable if encoding detection fails
+        except (OSError, UnicodeDecodeError, ValueError):
             pass
         finally:
             os.unlink(temp_file_path)
+
+    def test_is_path_under_root_returns_false_when_symlink_resolve_fails(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Symlink resolution errors fail closed to outside root."""
+        from pathlib import Path
+
+        from blinter.io.discovery import is_path_under_root
+
+        root = Path("C:/scan_root")
+        candidate = Path("C:/scan_root/link.bat")
+
+        def _raise_oserror(_self: Path) -> Path:
+            raise OSError("simulated resolve failure")
+
+        monkeypatch.setattr(Path, "is_symlink", lambda _self: True)
+        monkeypatch.setattr(
+            Path, "readlink", lambda _self: Path("C:/outside/target.bat")
+        )
+        monkeypatch.setattr(Path, "resolve", _raise_oserror)
+
+        assert is_path_under_root(candidate, root) is False
 
     def test_edge_case_functions_behavior(self) -> None:
         """Test various edge case functions for proper behavior."""

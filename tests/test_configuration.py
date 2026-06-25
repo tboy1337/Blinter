@@ -27,6 +27,7 @@ class TestBlinterConfig:
         assert config.recursive is True
         assert config.show_summary is False
         assert config.max_line_length == 100
+        assert config.max_scan_files == 1000
         assert config.enabled_rules == set()
         assert config.disabled_rules == set()
         assert config.min_severity is None
@@ -38,6 +39,11 @@ class TestBlinterConfig:
 
         with pytest.raises(ValueError, match="max_line_length"):
             BlinterConfig(max_line_length=100_001)
+
+    def test_invalid_max_scan_files_rejected(self) -> None:
+        """max_scan_files must be positive."""
+        with pytest.raises(ValueError, match="max_scan_files"):
+            BlinterConfig(max_scan_files=0)
 
     def test_config_with_custom_values(self) -> None:
         """Test configuration with custom values."""
@@ -180,6 +186,28 @@ min_severity = WARNING
                     os.unlink(config_file.name)
                 except (OSError, PermissionError):
                     pass  # Ignore cleanup errors
+
+    def test_load_config_with_max_scan_files(self) -> None:
+        """Test loading max_scan_files from configuration."""
+        config_content = """
+[general]
+max_scan_files = 50
+"""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".ini", delete=False
+        ) as config_file:
+            config_file.write(config_content)
+            config_file.flush()
+            config_file.close()
+
+            try:
+                config = load_config(config_file.name)
+                assert config.max_scan_files == 50
+            finally:
+                try:
+                    os.unlink(config_file.name)
+                except (OSError, PermissionError):
+                    pass
 
     def test_load_config_with_rule_settings(self) -> None:
         """Test loading configuration with rule settings."""
@@ -371,6 +399,7 @@ class TestCreateDefaultConfigFile:
             assert "recursive" in parser["general"]
             assert "show_summary" in parser["general"]
             assert "max_line_length" in parser["general"]
+            assert "max_scan_files" in parser["general"]
 
     def test_create_default_config_file_permission_error(self) -> None:
         """Test creating config file with permission error."""

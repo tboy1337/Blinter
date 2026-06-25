@@ -1204,3 +1204,34 @@ Line 5: Missing '@ECHO OFF' at top of file (S001)
   SETLOCAL ENABLEEXTENSIONS DISABLEDELAYEDEXPANSION
   SET PATH=%PATH%;C:\Tools
   ```
+
+## Operational Limits and Configuration
+
+Blinter enforces resource limits to keep analysis predictable on large directories and files:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `MAX_FILE_SIZE_BYTES` | 50 MB | Maximum batch file size read from disk |
+| `max_scan_files` (`blinter.ini`) | 1000 | Maximum `.bat`/`.cmd` files discovered in one directory scan |
+| `MAX_FOLLOW_CALL_FILES` | 100 | Maximum scripts traversed when `--follow-calls` is enabled |
+| `MAX_FOLLOW_CALL_DEPTH` | 20 | Maximum CALL depth when following dependencies |
+| `max_line_length` (`blinter.ini`) | 100 | Line length threshold for rule S011 |
+
+When a directory scan exceeds `max_scan_files`, discovery raises an error. Narrow the path, disable recursive scanning, or increase `max_scan_files` in `blinter.ini`.
+
+### Inline Suppressions
+
+Scripts may suppress findings on a line using documentation comments:
+
+- `REM LINT:IGNORE` or `:: LINT:IGNORE` — suppress all rules on that line
+- `REM LINT:IGNORE E001,W001` — suppress specific rule codes on that line
+- `REM LINT:IGNORE-LINE` — alternate form for line-level suppression
+
+### blinter.ini Keys (general section)
+
+- `recursive` — search subdirectories (default: `true`)
+- `show_summary` — print summary statistics (default: `false`)
+- `max_line_length` — S011 threshold (default: `100`)
+- `max_scan_files` — directory scan cap (default: `1000`)
+- `follow_calls` — analyze CALL targets (default: `false`)
+- `min_severity` — minimum severity to report (`ERROR`, `SECURITY`, `WARNING`, `PERFORMANCE`, `STYLE`)

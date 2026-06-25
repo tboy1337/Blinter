@@ -6,7 +6,7 @@ from typing import (
     Optional,
 )
 
-from blinter.constants import MAX_LINE_LENGTH
+from blinter.constants import MAX_LINE_LENGTH, MAX_SCAN_FILES
 from blinter.logging_config import logger
 from blinter.models import BlinterConfig, RuleSeverity
 from blinter.rules.registry import RULES
@@ -35,6 +35,17 @@ def _load_general_settings(
             )
     except ValueError:
         logger.warning("Invalid max_line_length value in config, using default")
+    try:
+        max_scan_files = general.getint("max_scan_files", fallback=MAX_SCAN_FILES)
+        if max_scan_files > 0:
+            config.max_scan_files = max_scan_files
+        else:
+            logger.warning(
+                "Invalid max_scan_files %s in config (must be positive), using default",
+                max_scan_files,
+            )
+    except ValueError:
+        logger.warning("Invalid max_scan_files value in config, using default")
     config.follow_calls = general.getboolean("follow_calls", fallback=False)
 
     severity_str = general.get("min_severity", "").strip()
@@ -180,6 +191,9 @@ show_summary = false
 
 # Maximum line length before triggering S011 rule (default: 100)
 max_line_length = 100
+
+# Maximum batch files discovered when scanning a directory (default: 1000)
+max_scan_files = 1000
 
 # Whether to automatically scan scripts called by CALL statements (default: false)
 # This helps analyze centralized configuration scripts that set variables

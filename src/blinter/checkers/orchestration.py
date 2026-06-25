@@ -38,6 +38,113 @@ from blinter.checkers.syntax import _check_syntax_errors
 from blinter.checkers.vars import _check_undefined_variables
 from blinter.checkers.warnings import _check_warning_issues
 from blinter.models import BlinterConfig, LintIssue
+from blinter.rules.helpers import _has_any_enabled_rules, _rule_codes_with_prefix
+
+_ERROR_RULES = _rule_codes_with_prefix("E")
+_WARNING_RULES = _rule_codes_with_prefix("W")
+_STYLE_RULES = _rule_codes_with_prefix("S")
+_SECURITY_RULES = _rule_codes_with_prefix("SEC")
+_PERFORMANCE_RULES = _rule_codes_with_prefix("P")
+
+
+def _append_line_checks(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+    issues: List[LintIssue],
+    *,
+    lines: List[str],
+    line: str,
+    line_number: int,
+    labels: Dict[str, int],
+    set_vars: Set[str],
+    has_setlocal: bool,
+    has_set_commands: bool,
+    has_delayed_expansion: bool,
+    uses_delayed_vars: bool,
+    has_disable_delayed_expansion: bool,
+    has_literal_exclamations: bool,
+    has_disable_expansion_lines: bool,
+    config: BlinterConfig,
+    run_errors: bool,
+    run_warnings: bool,
+    run_style: bool,
+    run_security: bool,
+    run_performance: bool,
+) -> None:
+    """Run enabled per-line checker groups for a single script line."""
+    if run_errors:
+        issues.extend(_check_syntax_errors(line, line_number, labels))
+        issues.extend(_check_advanced_escaping_rules(line, line_number))
+
+    if run_warnings:
+        issues.extend(
+            _check_warning_issues(line, line_number, set_vars, has_delayed_expansion)
+        )
+        issues.extend(_check_advanced_for_rules(line, line_number))
+        issues.extend(_check_advanced_process_mgmt(line, line_number))
+
+    if run_style:
+        issues.extend(_check_style_issues(line, line_number, config.max_line_length))
+        issues.extend(_check_advanced_style_patterns(line, line_number, lines))
+
+    if run_security:
+        issues.extend(_check_security_issues(line, line_number, lines))
+        issues.extend(_check_advanced_security(line, line_number, lines, labels))
+
+    if run_performance:
+        issues.extend(
+            _check_performance_issues(
+                lines,
+                line_number,
+                line,
+                has_setlocal,
+                has_set_commands,
+                has_delayed_expansion,
+                uses_delayed_vars,
+                has_disable_delayed_expansion,
+                has_literal_exclamations,
+                has_disable_expansion_lines,
+            )
+        )
+        issues.extend(_check_advanced_performance(lines, line_number, line))
+
+
+def _append_global_checks(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    issues: List[LintIssue],
+    *,
+    lines: List[str],
+    set_vars: Set[str],
+    called_scripts_vars: Optional[Dict[int, Set[str]]],
+    config: BlinterConfig,
+    run_errors: bool,
+    run_warnings: bool,
+    run_style: bool,
+    run_security: bool,
+    run_performance: bool,
+) -> None:
+    """Run enabled global checker groups across the full script."""
+    if run_errors:
+        issues.extend(_check_undefined_variables(lines, set_vars, called_scripts_vars))
+        issues.extend(_check_nested_paren_mismatch(lines))
+        issues.extend(_check_advanced_vars(lines))
+
+    if run_warnings:
+        issues.extend(_check_missing_exit_statement(lines))
+        issues.extend(_check_unreachable_code(lines))
+        issues.extend(_check_code_duplication(lines))
+        issues.extend(_check_enhanced_commands(lines))
+        issues.extend(_check_missing_pause(lines))
+
+    if run_security:
+        issues.extend(_check_enhanced_security_rules(lines))
+
+    if run_performance:
+        issues.extend(_check_redundant_operations(lines))
+        issues.extend(_check_enhanced_performance(lines))
+
+    if run_style:
+        issues.extend(_check_inconsistent_indentation(lines))
+        issues.extend(_check_missing_header_doc(lines))
+        issues.extend(_check_cmd_case_consistency(lines))
+        issues.extend(_check_advanced_style_rules(lines, config.max_line_length))
 
 
 def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
@@ -66,82 +173,51 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
     if skip_lines is None:
         skip_lines = set()
 
+    run_errors = _has_any_enabled_rules(config, _ERROR_RULES)
+    run_warnings = _has_any_enabled_rules(config, _WARNING_RULES)
+    run_style = _has_any_enabled_rules(config, _STYLE_RULES)
+    run_security = _has_any_enabled_rules(config, _SECURITY_RULES)
+    run_performance = _has_any_enabled_rules(config, _PERFORMANCE_RULES)
+
     # Check each line with all rule categories
     for i, line in enumerate(lines, start=1):
-        # Skip lines that are part of embedded scripts
         if i in skip_lines:
             continue
 
-        # Error level checks
-        issues.extend(_check_syntax_errors(line, i, labels))
-
-        # Advanced escaping rules (E030-E033)
-        issues.extend(_check_advanced_escaping_rules(line, i))
-
-        # Warning level checks
-        issues.extend(_check_warning_issues(line, i, set_vars, has_delayed_expansion))
-
-        # Advanced FOR command rules (W034-W043)
-        issues.extend(_check_advanced_for_rules(line, i))
-        issues.extend(_check_advanced_process_mgmt(line, i))
-
-        # Style level checks
-        style_issues = _check_style_issues(line, i, config.max_line_length)
-        issues.extend(style_issues)
-
-        # Advanced style patterns (S022-S028)
-        issues.extend(_check_advanced_style_patterns(line, i, lines))
-
-        # Security level checks (filtered by config like other rules)
-        issues.extend(_check_security_issues(line, i, lines))
-
-        # Advanced security patterns (SEC014-SEC019)
-        issues.extend(_check_advanced_security(line, i, lines, labels))
-
-        # Performance level checks
-        perf_issues = _check_performance_issues(
-            lines,
-            i,
-            line,
-            has_setlocal,
-            has_set_commands,
-            has_delayed_expansion,
-            uses_delayed_vars,
-            has_disable_delayed_expansion,
-            has_literal_exclamations,
-            has_disable_expansion_lines,
+        _append_line_checks(
+            issues,
+            lines=lines,
+            line=line,
+            line_number=i,
+            labels=labels,
+            set_vars=set_vars,
+            has_setlocal=has_setlocal,
+            has_set_commands=has_set_commands,
+            has_delayed_expansion=has_delayed_expansion,
+            uses_delayed_vars=uses_delayed_vars,
+            has_disable_delayed_expansion=has_disable_delayed_expansion,
+            has_literal_exclamations=has_literal_exclamations,
+            has_disable_expansion_lines=has_disable_expansion_lines,
+            config=config,
+            run_errors=run_errors,
+            run_warnings=run_warnings,
+            run_style=run_style,
+            run_security=run_security,
+            run_performance=run_performance,
         )
-        issues.extend(perf_issues)
 
-        # Advanced performance patterns (P016-P025)
-        issues.extend(_check_advanced_performance(lines, i, line))
-
-    # Global checks (across all lines)
-    issues.extend(_check_undefined_variables(lines, set_vars, called_scripts_vars))
-    issues.extend(_check_missing_exit_statement(lines))
-    issues.extend(_check_nested_paren_mismatch(lines))
-    issues.extend(_check_unreachable_code(lines))
-    issues.extend(_check_redundant_operations(lines))
-    issues.extend(_check_code_duplication(lines))
-
-    # Enhanced validation checks based on comprehensive batch scripting guide
-    issues.extend(_check_advanced_vars(lines))  # Error level E017-E022
-    issues.extend(_check_enhanced_commands(lines))  # Warning level W020-W025
-    issues.extend(_check_enhanced_security_rules(lines))  # Security level SEC011-SEC013
-
-    # Global checks that depend on configuration flags
-    issues.extend(_check_missing_pause(lines))  # Warning level
-
-    # Style-level global checks
-    issues.extend(_check_inconsistent_indentation(lines))
-    issues.extend(_check_missing_header_doc(lines))
-    issues.extend(_check_cmd_case_consistency(lines))  # S003
-    issues.extend(
-        _check_advanced_style_rules(lines, config.max_line_length)
-    )  # Style level S017-S020
-
-    # Performance-level global checks
-    issues.extend(_check_enhanced_performance(lines))  # Performance level P012-P014
+    _append_global_checks(
+        issues,
+        lines=lines,
+        set_vars=set_vars,
+        called_scripts_vars=called_scripts_vars,
+        config=config,
+        run_errors=run_errors,
+        run_warnings=run_warnings,
+        run_style=run_style,
+        run_security=run_security,
+        run_performance=run_performance,
+    )
 
     return issues
 
