@@ -11,13 +11,18 @@ import sys
 from typing import TypedDict, cast
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
+_SCRIPTS_DIR = Path(__file__).resolve().parent
 _CORPUS_DIR = _REPO_ROOT / "batch-script-examples"
 _DEFAULT_REPORT = _REPO_ROOT / "batch-examples-corpus-summary.json"
+_DEFAULT_BASELINE = _REPO_ROOT / "tests" / "fixtures" / "corpus-baseline.json"
 
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 if str(_REPO_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from blinter import lint_batch_file  # pylint: disable=wrong-import-position
+from corpus_baseline import check_baseline  # pylint: disable=wrong-import-position
 
 
 class CorpusReport(TypedDict):
@@ -106,10 +111,32 @@ def main() -> None:
         default=_DEFAULT_REPORT,
         help="Output JSON report path",
     )
+    parser.add_argument(
+        "--check-baseline",
+        type=Path,
+        nargs="?",
+        const=_DEFAULT_BASELINE,
+        default=None,
+        help="Compare live results to local baseline JSON (default: tests/fixtures/corpus-baseline.json; generate with generate_corpus_baseline.py)",
+    )
     args = parser.parse_args()
     corpus_dir = cast(Path, args.corpus).resolve()
     if not corpus_dir.is_dir():
         print(f"Corpus directory not found: {corpus_dir}", file=sys.stderr)
+        raise SystemExit(0)
+
+    if args.check_baseline is not None:
+        baseline_path = cast(Path, args.check_baseline).resolve()
+        if not baseline_path.is_file():
+            print(f"Baseline file not found: {baseline_path}", file=sys.stderr)
+            raise SystemExit(1)
+        diffs = check_baseline(corpus_dir, baseline_path)
+        if diffs:
+            print("Baseline drift detected:", file=sys.stderr)
+            for diff in diffs:
+                print(f"  {diff}", file=sys.stderr)
+            raise SystemExit(1)
+        print(f"Baseline matches: {baseline_path}")
         raise SystemExit(0)
 
     report = _lint_corpus(corpus_dir)

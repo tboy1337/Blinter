@@ -68,7 +68,7 @@ This installs the latest `blinter.exe` to `%LOCALAPPDATA%\Programs\Blinter\bin`,
 
 **Standalone executable (one-line installer):**
 ```cmd
-curl -L https://raw.githubusercontent.com/tboy1337/Blinter/main/scripts/uninstall_blinter.cmd -o uninstall_blinter.cmd && call uninstall_blinter.cmd && del uninstall_blinter.cmd
+curl -L https://raw.githubusercontent.com/tboy1337/Blinter/main/scripts/uninstall_blinter.cmd -o uninstall_blinter.cmd && (call uninstall_blinter.cmd || cd .) && del uninstall_blinter.cmd
 ```
 
 **pip installation:**
@@ -486,11 +486,30 @@ py -m black --check src tests
 py -m isort --check-only src tests
 ```
 
-Optional corpus regression (requires a local `batch-script-examples/` directory):
+### Optional corpus tests
+
+Some tests depend on a **local, large, varied collection** of `.bat` and `.cmd` files. Neither the scripts nor their lint baseline are included in the repository for privacy reasons. A fresh clone runs the full test suite without them — corpus-related tests skip automatically.
+
+Affected modules:
+
+- [`tests/test_batch_script_examples.py`](tests/test_batch_script_examples.py) — corpus regression and baseline snapshot tests (some marked `@pytest.mark.slow`)
+- [`tests/test_main_cli.py`](tests/test_main_cli.py) — `TestCorpusCli` directory-scan integration
+
+To run optional corpus testing locally:
 
 ```bash
+# 1. Create a private folder at repo root (gitignored)
+mkdir batch-script-examples
+# 2. Add your own .bat / .cmd files
+# 3. Generate a local baseline snapshot (also gitignored)
+py scripts/generate_corpus_baseline.py
+# 4. Run optional corpus tests and checks
+py -m pytest tests/test_batch_script_examples.py -v
 py scripts/corpus_lint.py
+py scripts/corpus_lint.py --check-baseline
 ```
+
+Baseline snapshots are per-machine and only comparable against the same local corpus. Regenerate with `py scripts/generate_corpus_baseline.py` after rule changes or corpus updates.
 
 The test suite enforces 90% branch coverage (`pytest.ini`, `.coveragerc`). CI builds and publishes packages but does not run tests; treat a green local `pytest` run as the release gate.
 

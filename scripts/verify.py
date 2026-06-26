@@ -13,6 +13,7 @@ from typing import Sequence, cast
 _CHECK_DIRS: tuple[str, ...] = ("src", "tests", "scripts")
 _VERIFY_SCRIPT = Path("scripts") / "verify.py"
 _CORPUS_LINT_SCRIPT = Path("scripts") / "corpus_lint.py"
+_CORPUS_DIR = Path("batch-script-examples")
 _PACKAGE_DIR = Path("src") / "blinter"
 _PYPROJECT = "pyproject.toml"
 _PYLINT_OUTPUT = "pylint-output.txt"
@@ -101,6 +102,8 @@ def main() -> None:
                 "tests",
                 verify_script,
                 corpus_lint_script,
+                str(Path("scripts") / "corpus_baseline.py"),
+                str(Path("scripts") / "generate_corpus_baseline.py"),
             ),
         ),
     ]
@@ -127,6 +130,15 @@ def main() -> None:
 
     for name, step_args in subprocess_steps_after_pylint:
         _run_step(name, step_args, cwd=root)
+
+    corpus_dir = root / _CORPUS_DIR
+    baseline_path = root / "tests" / "fixtures" / "corpus-baseline.json"
+    if corpus_dir.is_dir() and baseline_path.is_file():
+        _run_step(
+            "corpus baseline check",
+            [sys.executable, corpus_lint_script, "--check-baseline"],
+            cwd=root,
+        )
 
     print("All verification steps passed.")
 

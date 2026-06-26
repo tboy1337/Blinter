@@ -215,3 +215,4 @@ pylint-report.txt
 pylint-output.txt
 batch-examples-*.json
 batch-script-examples/
+tests/fixtures/corpus-baseline.json
