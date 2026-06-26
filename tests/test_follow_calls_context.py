@@ -991,6 +991,97 @@ class TestFollowCallsLimits:
             assert script_c.resolve() in deps
             assert script_d.resolve() in deps
 
+    def test_dependency_graph_includes_direct_call_targets(self) -> None:
+        """CALL dependency graph includes immediate CALL targets."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_b = Path(tmpdir) / "b.bat"
+            script_b.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+            script_a = Path(tmpdir) / "a.bat"
+            script_a.write_text(f'CALL "{script_b}"\n', encoding="utf-8")
+
+            graph = _build_call_dependency_graph([script_a], scan_root=tmpdir)
+            deps = graph[script_a.resolve()]
+            assert script_b.resolve() in deps
+            assert len(deps) == 1
+
+    def test_dependency_graph_memoizes_shared_transitive_dependencies(self) -> None:
+        """Diamond CALL graphs reuse memoized transitive dependency sets."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_d = Path(tmpdir) / "d.bat"
+            script_d.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+            script_b = Path(tmpdir) / "b.bat"
+            script_b.write_text(f'CALL "{script_d}"\n', encoding="utf-8")
+            script_c = Path(tmpdir) / "c.bat"
+            script_c.write_text(f'CALL "{script_d}"\n', encoding="utf-8")
+            script_a = Path(tmpdir) / "a.bat"
+            script_a.write_text(
+                f'CALL "{script_b}"\nCALL "{script_c}"\n',
+                encoding="utf-8",
+            )
+
+            graph = _build_call_dependency_graph([script_a], scan_root=tmpdir)
+            deps = graph[script_a.resolve()]
+            assert deps == {
+                script_b.resolve(),
+                script_c.resolve(),
+                script_d.resolve(),
+            }
+
+    def test_dependency_graph_lazy_resolves_transitive_callees(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Transitive callees not in the initial file list are resolved lazily."""
+        monkeypatch.setattr(
+            "blinter.engine.dependencies.MAX_FOLLOW_CALL_DEPTH",
+            2,
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_c = Path(tmpdir) / "c.bat"
+            script_c.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+            script_b = Path(tmpdir) / "b.bat"
+            script_b.write_text(f'CALL "{script_c}"\n', encoding="utf-8")
+            script_a = Path(tmpdir) / "a.bat"
+            script_a.write_text(f'CALL "{script_b}"\n', encoding="utf-8")
+
+            graph = _build_call_dependency_graph([script_a], scan_root=tmpdir)
+            deps = graph[script_a.resolve()]
+            assert script_b.resolve() in deps
+            assert script_c.resolve() in deps
+
+    def test_dependency_graph_warns_when_file_limit_truncates(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """CALL graph traversal logs a warning when MAX_FOLLOW_CALL_FILES is hit."""
+        import logging
+
+        monkeypatch.setattr(
+            "blinter.engine.dependencies.MAX_FOLLOW_CALL_FILES",
+            2,
+        )
+        monkeypatch.setattr(
+            "blinter.engine.dependencies.MAX_FOLLOW_CALL_DEPTH",
+            3,
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script_d = Path(tmpdir) / "d.bat"
+            script_d.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+            script_c = Path(tmpdir) / "c.bat"
+            script_c.write_text(f'CALL "{script_d}"\n', encoding="utf-8")
+            script_b = Path(tmpdir) / "b.bat"
+            script_b.write_text(f'CALL "{script_c}"\n', encoding="utf-8")
+            script_a = Path(tmpdir) / "a.bat"
+            script_a.write_text(f'CALL "{script_b}"\n', encoding="utf-8")
+
+            with caplog.at_level(logging.WARNING, logger="blinter"):
+                graph = _build_call_dependency_graph([script_a], scan_root=tmpdir)
+
+            deps = graph[script_a.resolve()]
+            assert len(deps) <= 2
+            assert any(
+                "CALL dependency file limit" in record.message
+                for record in caplog.records
+            )
+
 
 class TestDependenciesInternals:
     """Direct unit tests for dependency helper functions."""

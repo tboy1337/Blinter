@@ -1590,28 +1590,25 @@ class TestFollowCallsCLI:
     def test_cli_follow_calls_with_errors_in_called_script(self) -> None:
         """Test follow_calls when called script has syntax errors."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create helper with errors
-            helper_script = os.path.join(tmpdir, "helper.bat")
+            helper_script = os.path.join(tmpdir, "helper.cmd")
             with open(helper_script, "w", encoding="utf-8") as bat_file:
-                bat_file.write("echo no @\n")
+                bat_file.write("@ECHO OFF\n")
                 bat_file.write("if ( echo bad syntax\n")
                 bat_file.write("EXIT /b 0\n")
 
-            # Create main script
-            main_script = os.path.join(tmpdir, "main.bat")
+            main_script = os.path.join(tmpdir, "main.cmd")
             with open(main_script, "w", encoding="utf-8") as bat_file:
                 bat_file.write("@ECHO OFF\n")
-                bat_file.write(f'CALL "{helper_script}"\n')
+                bat_file.write("CALL helper.cmd\n")
                 bat_file.write("EXIT /b 0\n")
 
-            # Test via CLI - should exit with error code
+            # Callee errors are informational; parent exit stays 0 when primary is clean
             with patch.object(
                 sys, "argv", ["blinter.py", main_script, "--follow-calls"]
             ):
                 with pytest.raises(SystemExit) as exc_info:
                     main()
-                # Should exit with error code due to errors
-                assert exc_info.value.code in [0, 1]
+                assert exc_info.value.code == 0
 
     def test_cli_callee_fatal_issues_do_not_change_parent_exit(self) -> None:
         """Fatal findings in called scripts must not fail the primary target exit code."""
@@ -1620,6 +1617,28 @@ class TestFollowCallsCLI:
             with open(helper_script, "w", encoding="utf-8") as bat_file:
                 bat_file.write("@ECHO OFF\n")
                 bat_file.write("if ( unclosed syntax\n")
+                bat_file.write("EXIT /b 0\n")
+
+            main_script = os.path.join(tmpdir, "main.cmd")
+            with open(main_script, "w", encoding="utf-8") as bat_file:
+                bat_file.write("@ECHO OFF\n")
+                bat_file.write("CALL helper.cmd\n")
+                bat_file.write("EXIT /b 0\n")
+
+            with patch.object(
+                sys, "argv", ["blinter.py", main_script, "--follow-calls"]
+            ):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                assert exc_info.value.code == 0
+
+    def test_cli_callee_security_does_not_change_parent_exit(self) -> None:
+        """Security findings in called scripts must not fail the primary exit code."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            helper_script = os.path.join(tmpdir, "helper.cmd")
+            with open(helper_script, "w", encoding="utf-8") as bat_file:
+                bat_file.write("@ECHO OFF\n")
+                bat_file.write("reg delete HKLM\\Software\\Test /f\n")
                 bat_file.write("EXIT /b 0\n")
 
             main_script = os.path.join(tmpdir, "main.cmd")
@@ -1750,6 +1769,39 @@ class TestCliLogging:  # pylint: disable=too-few-public-methods
         assert isinstance(handler, logging.StreamHandler)
         assert handler.stream is sys.stderr
 
+    def test_configure_cli_logging_reuses_marked_open_handler(self) -> None:
+        """An existing open CLI-marked handler is reused instead of adding another."""
+        blinter_logger = logging.getLogger("blinter")
+        blinter_logger.handlers.clear()
+
+        handler = logging.StreamHandler(sys.stderr)
+        setattr(handler, "blinter_cli_handler", True)
+        blinter_logger.addHandler(handler)
+
+        _configure_cli_logging(logging.INFO)
+
+        assert len(blinter_logger.handlers) == 1
+        assert blinter_logger.handlers[0] is handler
+        assert blinter_logger.level == logging.INFO
+
+    def test_configure_cli_logging_ignores_foreign_handlers(self) -> None:
+        """Handlers without the CLI marker are left in place; a new CLI handler is added."""
+        blinter_logger = logging.getLogger("blinter")
+        blinter_logger.handlers.clear()
+
+        foreign_handler = logging.StreamHandler(sys.stderr)
+        blinter_logger.addHandler(foreign_handler)
+
+        _configure_cli_logging(logging.WARNING)
+
+        cli_handlers = [
+            item
+            for item in blinter_logger.handlers
+            if getattr(item, "blinter_cli_handler", False)
+        ]
+        assert foreign_handler in blinter_logger.handlers
+        assert len(cli_handlers) == 1
+
 
 class TestFollowCallsProcessing:  # pylint: disable=too-few-public-methods
     """Test follow-calls processing limits in CLI."""
@@ -1842,6 +1894,63 @@ class TestFollowCallsProcessing:  # pylint: disable=too-few-public-methods
         processed, errors = _process_single_called_script(
             helper, config, state, "parent.bat"
         )
+        assert (processed, errors) == (0, 0)
+
+    def test_process_single_called_script_file_error_is_skipped(
+        self, tmp_path: Path
+    ) -> None:
+        """Read/lint failures on called scripts are logged and skipped."""
+        helper = tmp_path / "helper.bat"
+        helper.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+
+        state = ProcessingState(
+            processed_files=set(),
+            all_issues=[],
+            file_results={},
+            processed_file_paths=[],
+        )
+        config = BlinterConfig(follow_calls=True, scan_root=str(tmp_path))
+
+        with patch(
+            "blinter.cli.main.lint_batch_file",
+            side_effect=PermissionError("Access denied"),
+        ):
+            processed, errors = _process_single_called_script(
+                helper, config, state, "parent.bat"
+            )
+
+        assert (processed, errors) == (0, 0)
+        assert helper.resolve() not in state.processed_files
+
+    def test_process_called_scripts_stops_at_file_limit(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Follow-calls stops enqueueing callees once MAX_FOLLOW_CALL_FILES is reached."""
+        monkeypatch.setattr("blinter.cli.main.MAX_FOLLOW_CALL_FILES", 1)
+
+        helper_a = tmp_path / "a.bat"
+        helper_b = tmp_path / "b.bat"
+        helper_a.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+        helper_b.write_text("@ECHO OFF\nEXIT /b 0\n", encoding="utf-8")
+        root_script = tmp_path / "root.bat"
+        root_script.write_text(
+            f'@ECHO OFF\nCALL "{helper_a.name}"\nCALL "{helper_b.name}"\n',
+            encoding="utf-8",
+        )
+
+        state = ProcessingState(
+            processed_files={root_script.resolve()},
+            all_issues=[],
+            file_results={},
+            processed_file_paths=[(str(root_script), None)],
+            lines_cache={
+                root_script.resolve(): root_script.read_text().splitlines(keepends=True)
+            },
+        )
+        config = BlinterConfig(follow_calls=True, scan_root=str(tmp_path))
+
+        processed, errors = _process_called_scripts(root_script, config, state)
+
         assert (processed, errors) == (0, 0)
 
     def test_process_single_called_script_internal_error_is_skipped(

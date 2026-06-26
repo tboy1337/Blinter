@@ -469,6 +469,23 @@ class TestAdditionalErrorHandling:
 
         assert is_path_under_root(candidate, root) is False
 
+    def test_is_path_under_root_returns_false_when_candidate_resolve_fails(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """Path resolution failures fail closed to outside root."""
+        root = tmp_path / "scan"
+        root.mkdir()
+        candidate = root / "script.bat"
+        candidate.write_text("@ECHO OFF\n", encoding="utf-8")
+
+        def _raise_oserror(_self: Path) -> Path:
+            raise OSError("simulated resolve failure")
+
+        monkeypatch.setattr(Path, "is_symlink", lambda _self: False)
+        monkeypatch.setattr(Path, "resolve", _raise_oserror)
+
+        assert is_path_under_root(candidate, root) is False
+
     def test_edge_case_functions_behavior(self) -> None:
         """Test various edge case functions for proper behavior."""
         # Test file finding with edge cases
