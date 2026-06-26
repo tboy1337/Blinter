@@ -1085,6 +1085,35 @@ class TestDependenciesInternals:
         assert called_vars == {}
         assert any("Could not read" in record.message for record in caplog.records)
 
+    def test_collect_vars_from_script_logs_debug_on_resolve_failure(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Path resolution failures during follow-calls are logged at DEBUG."""
+        import logging
+        from unittest.mock import MagicMock
+
+        from blinter.engine.dependencies import _collect_vars_from_script
+
+        main_script = tmp_path / "main.bat"
+        main_script.write_text('CALL "helper.bat"\n', encoding="utf-8")
+        script_path = MagicMock()
+        script_path.exists.return_value = True
+        script_path.is_file.return_value = True
+        script_path.resolve.side_effect = OSError("permission denied")
+
+        with caplog.at_level(logging.DEBUG, logger="blinter"):
+            collected = _collect_vars_from_script(
+                script_path,
+                main_script.resolve(),
+                scan_root=str(tmp_path),
+            )
+
+        assert collected == set()
+        assert any(
+            "Could not resolve called script path" in record.message
+            for record in caplog.records
+        )
+
     def test_collect_called_vars_is_position_aware_with_call_line(
         self, tmp_path: Path
     ) -> None:

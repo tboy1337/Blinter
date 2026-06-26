@@ -98,6 +98,8 @@ When adding or moving a checker function:
 
 `lint_batch_file` and `read_file_with_encoding` are designed for concurrent use: they use local state and immutable global rule metadata. The CLI runs single-threaded. `RULES` is read-only at runtime.
 
+Per-lint invocation-prefix data (subroutine reachability for rules such as SEC014) is stored in a `contextvars.ContextVar` cache that is reset at the start of each `lint_batch_file` call, so concurrent lints in different threads do not share or clear each other's prefix state. Shared `lines_cache` reads and writes are synchronized via a lock in `engine/lines_cache.py`.
+
 ## `--follow-calls` and `scan_root`
 
 When `follow_calls` is enabled, Blinter resolves `CALL` targets to read variables and lint called scripts recursively. Variable context is position-aware (available only after each `CALL` line) and includes variables from transitively called scripts within `MAX_FOLLOW_CALL_DEPTH` and `MAX_FOLLOW_CALL_FILES`. The CLI sets `BlinterConfig.scan_root` to the target directory (or the parent of a single file) so paths outside the scan root are not read or processed. `lint_batch_file()` defaults `scan_root` to the batch file's parent directory when unset, matching CLI containment for library callers. Follow-call lint failures on callee scripts are best-effort (logged, no exit impact); skipped primary discovery targets exit with code 1.

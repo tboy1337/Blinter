@@ -1,5 +1,6 @@
 """Label collection, script structure, and subroutine detection."""
 
+from contextvars import ContextVar
 import re
 from typing import (
     Dict,
@@ -64,12 +65,14 @@ def _normalize_label_target(raw_target: str) -> str:
     return target
 
 
-_INVOCATION_PREFIX_CACHE: Dict[int, List[Set[str]]] = {}
+_invocation_prefix_cache_var: ContextVar[Optional[Dict[int, List[Set[str]]]]] = (
+    ContextVar("invocation_prefix_cache", default=None)
+)
 
 
-def clear_invocation_prefix_cache() -> None:
-    """Clear cached invocation-prefix data between lint passes."""
-    _INVOCATION_PREFIX_CACHE.clear()
+def _begin_invocation_prefix_pass() -> None:
+    """Start a per-lint invocation-prefix cache for the current execution context."""
+    _invocation_prefix_cache_var.set({})
 
 
 def _build_invocation_prefix(lines: List[str]) -> List[Set[str]]:
@@ -89,11 +92,14 @@ def _build_invocation_prefix(lines: List[str]) -> List[Set[str]]:
 
 def _invocation_prefix_for_lines(lines: List[str]) -> List[Set[str]]:
     """Return cached invocation prefix for ``lines`` within a single lint pass."""
+    cache = _invocation_prefix_cache_var.get()
+    if cache is None:
+        return _build_invocation_prefix(lines)
     lines_id = id(lines)
-    cached = _INVOCATION_PREFIX_CACHE.get(lines_id)
+    cached = cache.get(lines_id)
     if cached is None:
         cached = _build_invocation_prefix(lines)
-        _INVOCATION_PREFIX_CACHE[lines_id] = cached
+        cache[lines_id] = cached
     return cached
 
 
@@ -147,7 +153,7 @@ def _is_in_subroutine_context(
     if block is None:
         return False
 
-    label_name, label_line = block
+    label_name, _ = block
     return label_name in _labels_targeted_before(lines, line_number)
 
 

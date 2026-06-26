@@ -206,23 +206,14 @@ def _check_if_exist_mixing(stripped: str, line_num: int) -> List[LintIssue]:
     return issues
 
 
-def _check_path_syntax(stripped: str, line_num: int) -> List[LintIssue]:
-    """Check for invalid path syntax (E005)."""
-    issues: List[LintIssue] = []
-    # Check if line contains PowerShell, VBScript, or other scripting commands
-    # Now also checks for common PowerShell variable patterns (%psc%, %ps%, etc.)
-    has_script_command = re.search(
-        r"(for\s+|powershell\s+|cscript\s+|wscript\s+|msiexec\s+|%ps[c]?%|%powershell%)",
-        stripped,
-        re.IGNORECASE,
-    )
+_SCRIPT_COMMAND_PATTERN = re.compile(
+    r"(for\s+|powershell\s+|cscript\s+|wscript\s+|msiexec\s+|%ps[c]?%|%powershell%)",
+    re.IGNORECASE,
+)
 
-    if has_script_command:
-        return issues
-
-    # Skip lines that look like they're part of PowerShell/C#/VBScript code
-    # or output commands (echo, Write-Output, etc.)
-    script_indicators = [
+_SCRIPT_INDICATOR_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
         r"\$\w+\s*=",  # PowerShell variable assignment
         r"-match\s+",  # PowerShell match operator
         r"\.Matches\(",  # Regex.Matches
@@ -236,42 +227,72 @@ def _check_path_syntax(stripped: str, line_num: int) -> List[LintIssue]:
         r"Write-Host\s+",  # PowerShell Write-Host
         r"^echo\s+",  # echo command at line start
         r"^\s*\$\w+",  # PowerShell variable at line start
+    )
+)
+
+_XML_OR_MARKUP_PATTERN = re.compile(
+    r"<\?xml|^\s*<\w+[\s>]|['\"]<\w+\s",
+    re.IGNORECASE,
+)
+
+_QUOTED_PATH_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r'"([^"]*[<>|*?][^"]*)",'),
+    re.compile(r"'([^']*[<>|*?][^']*)'"),
+)
+
+_SCRIPT_STRING_SKIP_PATTERN = re.compile(
+    r"(::|scriptblock|split\s|regex)",
+    re.IGNORECASE,
+)
+
+
+def _line_has_script_command(stripped: str) -> bool:
+    """Return True when the line invokes an external scripting runtime."""
+    return _SCRIPT_COMMAND_PATTERN.search(stripped) is not None
+
+
+def _line_looks_like_embedded_script(stripped: str) -> bool:
+    """Return True when the line resembles embedded PowerShell or .NET code."""
+    return any(pattern.search(stripped) for pattern in _SCRIPT_INDICATOR_PATTERNS)
+
+
+def _line_has_xml_or_markup_prefix(stripped: str) -> bool:
+    """Return True when the line starts XML/HTML-like markup."""
+    return _XML_OR_MARKUP_PATTERN.search(stripped) is not None
+
+
+def _quoted_path_has_invalid_chars(stripped: str) -> bool:
+    """Return True when a quoted path segment contains invalid redirection chars."""
+    for pattern in _QUOTED_PATH_PATTERNS:
+        match = pattern.search(stripped)
+        if not match:
+            continue
+        path_content = match.group(1)
+        escaped_content = re.sub(r"\^[<>|]", "", path_content)
+        if _SCRIPT_STRING_SKIP_PATTERN.search(escaped_content):
+            continue
+        if re.search(r"[<>|]", escaped_content):
+            return True
+    return False
+
+
+def _check_path_syntax(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check for invalid path syntax (E005)."""
+    if _line_has_script_command(stripped):
+        return []
+    if _line_looks_like_embedded_script(stripped):
+        return []
+    if _line_has_xml_or_markup_prefix(stripped):
+        return []
+    if not _quoted_path_has_invalid_chars(stripped):
+        return []
+    return [
+        LintIssue(
+            line_number=line_num,
+            rule=RULES["E005"],
+            context="Path contains invalid characters",
+        )
     ]
-
-    for indicator in script_indicators:
-        if re.search(indicator, stripped, re.IGNORECASE):
-            return issues
-
-    # Check for XML/HTML content - must be at start of string or after whitespace/quote
-    # to avoid false positives with paths like "file<test>"
-    if re.search(r"<\?xml|^\s*<\w+[\s>]|['\"]<\w+\s", stripped, re.IGNORECASE):
-        return issues
-
-    path_patterns = [r'"([^"]*[<>|*?][^"]*)",', r"'([^']*[<>|*?][^']*)'"]
-    for pattern in path_patterns:
-        match = re.search(pattern, stripped)
-        if match:
-            path_content = match.group(1)
-            # Allow escaped redirections like ^> ^| ^< in command strings
-            escaped_content = re.sub(r"\^[<>|]", "", path_content)
-            # Skip if this looks like a PowerShell or script command string
-            # (contains :: for regex, scriptblock syntax, etc.)
-            if re.search(
-                r"(::|scriptblock|split\s|regex)", escaped_content, re.IGNORECASE
-            ):
-                continue
-            # Wildcards (* and ?) are VALID in file paths for pattern matching
-            # Only flag < > | as truly invalid
-            if re.search(r"[<>|]", escaped_content):
-                issues.append(
-                    LintIssue(
-                        line_number=line_num,
-                        rule=RULES["E005"],
-                        context="Path contains invalid characters",
-                    )
-                )
-                break
-    return issues
 
 
 def _should_skip_e009_quote_check(stripped: str) -> bool:

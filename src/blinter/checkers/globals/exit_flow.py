@@ -236,6 +236,51 @@ def _update_reachability_for_line(
         state.in_else_branch = True
 
 
+def _scan_line_for_reachability(
+    state: _ReachabilityScanState,
+    stripped: str,
+    index: int,
+    lines: List[str],
+    labels: Dict[str, int],
+    visiting_labels: Set[str],
+) -> Optional[bool]:
+    """Process one line; return True/False to stop, or None to continue scanning."""
+    if not stripped or stripped.startswith("rem") or stripped.startswith("::"):
+        return None
+
+    if stripped.startswith(":") and not stripped.startswith("::"):
+        state.reachable = True
+        return None
+
+    previous_depth = state.paren_depth
+    _update_reachability_for_line(state, stripped, previous_depth)
+
+    if re.match(r"exit\b", stripped):
+        state.if_branch_exited, state.else_branch_exited, stop_result = (
+            _apply_exit_to_branch_state(
+                state.paren_depth,
+                state.in_else_branch,
+                state.if_branch_exited,
+                state.else_branch_exited,
+            )
+        )
+        return stop_result
+
+    if _if_else_block_exits_reach_eof(
+        previous_depth,
+        state.paren_depth,
+        (state.if_branch_exited, state.else_branch_exited),
+        lines,
+        index,
+    ):
+        return False
+
+    if state.paren_depth == 0:
+        return _follow_goto_target(stripped, labels, visiting_labels, lines)
+
+    return None
+
+
 def _can_execution_reach_eof(
     lines: List[str],
     start_index: int = 0,
@@ -250,40 +295,16 @@ def _can_execution_reach_eof(
 
     for index in range(start_index, len(lines)):
         stripped = lines[index].strip().lower()
-
-        if not stripped or stripped.startswith("rem") or stripped.startswith("::"):
-            continue
-
-        if stripped.startswith(":") and not stripped.startswith("::"):
-            state.reachable = True
-            continue
-
-        previous_depth = state.paren_depth
-        _update_reachability_for_line(state, stripped, previous_depth)
-
-        if re.match(r"exit\b", stripped):
-            state.if_branch_exited, state.else_branch_exited, stop_result = (
-                _apply_exit_to_branch_state(
-                    state.paren_depth,
-                    state.in_else_branch,
-                    state.if_branch_exited,
-                    state.else_branch_exited,
-                )
-            )
-            if stop_result is not None:
-                return stop_result
-        elif _if_else_block_exits_reach_eof(
-            previous_depth,
-            state.paren_depth,
-            (state.if_branch_exited, state.else_branch_exited),
-            lines,
+        scan_result = _scan_line_for_reachability(
+            state,
+            stripped,
             index,
-        ):
-            return False
-        elif state.paren_depth == 0:
-            goto_result = _follow_goto_target(stripped, labels, visiting_labels, lines)
-            if goto_result is not None:
-                return goto_result
+            lines,
+            labels,
+            visiting_labels,
+        )
+        if scan_result is not None:
+            return scan_result
 
     return state.reachable
 

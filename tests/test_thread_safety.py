@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 from pathlib import Path
 import tempfile
+import threading
 from typing import Dict, List
 
 import pytest
@@ -318,6 +319,68 @@ EXIT /B 0
         assert len(results) == 24
         assert len(set(results)) == 1
         assert caller.resolve() in shared_cache
+
+    def test_concurrent_invocation_prefix_cache_isolation(self, tmp_path: Path) -> None:
+        """Concurrent lints must not cross-contaminate invocation-prefix state."""
+        called_content = """@ECHO OFF
+CALL :MySub fifth
+GOTO :EOF
+
+:MySub
+SET @V=%5& ECHO %@V%
+GOTO :EOF
+"""
+        fallthrough_content = """@ECHO OFF
+:first
+echo between labels
+:second
+SET VAR=%1& ECHO %VAR%
+GOTO :EOF
+"""
+        called_file = tmp_path / "called.bat"
+        fallthrough_file = tmp_path / "fallthrough.bat"
+        called_file.write_text(called_content, encoding="utf-8")
+        fallthrough_file.write_text(fallthrough_content, encoding="utf-8")
+
+        expected_called_codes = [
+            issue.rule.code for issue in lint_batch_file(str(called_file))
+        ]
+        expected_fallthrough_codes = [
+            issue.rule.code for issue in lint_batch_file(str(fallthrough_file))
+        ]
+        assert "SEC014" not in expected_called_codes
+        assert "SEC014" in expected_fallthrough_codes
+
+        barrier = threading.Barrier(8)
+        errors: List[str] = []
+
+        def lint_worker(file_path: Path, expected_has_sec014: bool) -> None:
+            for _ in range(50):
+                barrier.wait()
+                rule_codes = [
+                    issue.rule.code for issue in lint_batch_file(str(file_path))
+                ]
+                has_sec014 = "SEC014" in rule_codes
+                if has_sec014 != expected_has_sec014:
+                    errors.append(
+                        f"{file_path.name}: SEC014={has_sec014}, "
+                        f"expected {expected_has_sec014}, codes={rule_codes}"
+                    )
+                barrier.wait()
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = []
+            for index in range(8):
+                if index % 2 == 0:
+                    futures.append(executor.submit(lint_worker, called_file, False))
+                else:
+                    futures.append(executor.submit(lint_worker, fallthrough_file, True))
+            for future in as_completed(futures):
+                future.result()
+
+        assert not errors, "Invocation-prefix cache race detected:\n" + "\n".join(
+            errors
+        )
 
     def test_concurrent_lint_different_line_lengths(self) -> None:
         """Concurrent lint calls must not share mutable S020 rule state."""

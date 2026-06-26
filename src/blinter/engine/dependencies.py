@@ -8,7 +8,6 @@ from typing import (
     List,
     Optional,
     Set,
-    Tuple,
 )
 
 from blinter.constants import MAX_FOLLOW_CALL_DEPTH, MAX_FOLLOW_CALL_FILES
@@ -437,7 +436,12 @@ def _collect_script_vars_deep(
 
     try:
         resolved_script = script_path.resolve()
-    except (ValueError, OSError):
+    except (ValueError, OSError) as resolve_error:
+        logger.debug(
+            "Could not resolve called script path %s: %s",
+            script_path,
+            resolve_error,
+        )
         return set()
 
     if _var_collect_blocked(resolved_script, depth, ctx):
@@ -499,7 +503,12 @@ def _collect_vars_from_script(
     """
     try:
         resolved_script = script_path.resolve()
-    except (ValueError, OSError):
+    except (ValueError, OSError) as resolve_error:
+        logger.debug(
+            "Could not resolve called script path %s: %s",
+            script_path,
+            resolve_error,
+        )
         return set()
 
     if script_vars_cache is not None and resolved_script in script_vars_cache:
@@ -520,7 +529,7 @@ def _collect_vars_from_script(
 
 def _vars_from_call_line(
     line: str,
-    line_num: int,
+    _line_num: int,
     ctx: _CallLineContext,
 ) -> Set[str]:
     """Return variables defined by all resolvable CALL targets on a line."""

@@ -26,10 +26,10 @@ from blinter.models import BlinterConfig, LintIssue, RuleSeverity
 from blinter.parsing.embedded import _detect_embedded_script_blocks
 from blinter.parsing.structure import (
     _analyze_script_structure,
+    _begin_invocation_prefix_pass,
     _collect_labels,
     _collect_set_variables,
     _parse_suppression_comments,
-    clear_invocation_prefix_cache,
 )
 
 
@@ -96,7 +96,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     if not lines:
         return []  # Empty file, no issues
 
-    clear_invocation_prefix_cache()
+    _begin_invocation_prefix_pass()
 
     # Detect embedded PowerShell/VBScript blocks to avoid false positives
     skip_lines = _detect_embedded_script_blocks(lines)
