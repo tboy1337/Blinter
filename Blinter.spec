@@ -33,6 +33,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('src/blinter/py.typed', 'blinter'),
+        ('pyproject.toml', '.'),
     ],
     hiddenimports=['blinter', 'charset_normalizer'],
     hookspath=[],

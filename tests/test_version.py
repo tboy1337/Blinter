@@ -64,6 +64,17 @@ class TestVersion:
         mocker.patch("blinter._version._pyproject_path", return_value=pyproject)
         assert _fallback_version() == "unknown"
 
+    def test_pyproject_path_uses_meipass_when_frozen(
+        self, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """Test frozen executables resolve version from bundled pyproject.toml."""
+        bundled = tmp_path / "pyproject.toml"
+        bundled.write_text('[project]\nversion = "9.9.9"\n', encoding="utf-8")
+        mocker.patch("blinter._version.sys.frozen", True, create=True)
+        mocker.patch("blinter._version.sys._MEIPASS", str(tmp_path), create=True)
+        assert _pyproject_path() == bundled
+        assert get_version() == "9.9.9"
+
     def test_readme_rule_count_matches_registry(self) -> None:
         """README should reference the live RULE_COUNT from the registry."""
         readme = (_pyproject_path().parent / "README.md").read_text(encoding="utf-8")
