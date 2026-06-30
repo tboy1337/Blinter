@@ -273,7 +273,6 @@ endlocal
 exit /b 1
 
 :end
-timeout /t 5 /nobreak
 endlocal
 exit /b 0
 

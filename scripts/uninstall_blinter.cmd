@@ -181,11 +181,10 @@ echo +==========================================================+
 echo + Uninstallation failed. Please review the errors above. +
 echo +==========================================================+
 echo.
-timeout /t 15 /nobreak
+timeout /t 5 /nobreak
 endlocal
 exit /b 1
 
 :end
-timeout /t 15 /nobreak
 endlocal
 exit /b 0
