@@ -414,3 +414,15 @@ class TestE009LegitimateQuoteContexts:
         test_file.write_text(content, encoding="utf-8")
         issues = lint_batch_file(str(test_file))
         assert [i for i in issues if i.rule.code == "E009"]
+
+    def test_for_f_findstr_line_anchor_quotes(self, tmp_path: Path) -> None:
+        content = (
+            "@echo off\n"
+            'for /f "tokens=1,* delims=:" %%a in (\'findstr /N "^" "%fixture%"\') do (\n'
+            "    echo %%a\n"
+            ")\n"
+        )
+        test_file = tmp_path / "findstr_for.cmd"
+        test_file.write_text(content, encoding="utf-8")
+        issues = lint_batch_file(str(test_file))
+        assert not [i for i in issues if i.rule.code == "E009"]

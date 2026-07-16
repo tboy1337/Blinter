@@ -2359,7 +2359,7 @@ class TestCliStdioAndModuleEntry:
         assert "Blinter" in result.stdout or "usage" in result.stdout.lower()
 
 
-from corpus_support import CORPUS_DIR, CORPUS_SKIP_REASON, corpus_available
+from tests.corpus_support import CORPUS_DIR, CORPUS_SKIP_REASON, corpus_available
 
 
 @pytest.mark.needs_corpus

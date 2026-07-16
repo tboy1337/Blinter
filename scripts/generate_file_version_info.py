@@ -3,29 +3,29 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 import sys
 import tomllib
-from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = ROOT / "file_version_info.txt"
 FILE_DESCRIPTION = "Blinter - Professional Batch File Linter for Windows"
-LEGAL_COPYRIGHT = (
-    "\\xa9 2026 tboy1337. Licensed under AGPL-3.0-or-later."
-)
+LEGAL_COPYRIGHT = "\\xa9 2026 tboy1337. Licensed under AGPL-3.0-or-later."
 
 
 def _read_project_version(pyproject_path: Path) -> str:
     """Return [project].version from pyproject.toml."""
     with pyproject_path.open("rb") as pyproject_file:
-        data = tomllib.load(pyproject_file)
-    project = data.get("project")
-    if not isinstance(project, dict):
+        data_object: object = tomllib.load(pyproject_file)
+    if not isinstance(data_object, dict):
         raise ValueError("Missing [project] table in pyproject.toml")
-    version = project.get("version")
-    if not isinstance(version, str) or not version:
+    project_object: object = data_object.get("project")
+    if not isinstance(project_object, dict):
+        raise ValueError("Missing [project] table in pyproject.toml")
+    version_object: object = project_object.get("version")
+    if not isinstance(version_object, str) or not version_object:
         raise ValueError("Missing project.version in pyproject.toml")
-    return version
+    return version_object
 
 
 def _version_tuple(version: str) -> tuple[int, int, int]:

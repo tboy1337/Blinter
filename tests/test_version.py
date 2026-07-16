@@ -118,13 +118,18 @@ class TestGenerateFileVersionInfo:
         from tests.conftest import get_project_version
 
         repo_root = Path(__file__).resolve().parent.parent
-        assert _read_project_version(repo_root / "pyproject.toml") == get_project_version()
+        assert (
+            _read_project_version(repo_root / "pyproject.toml") == get_project_version()
+        )
 
     def test_generate_script_writes_version_file(self) -> None:
         """CLI entry point should write file_version_info.txt in the repo root."""
         repo_root = Path(__file__).resolve().parent.parent
         result = subprocess.run(
-            [sys.executable, str(repo_root / "scripts" / "generate_file_version_info.py")],
+            [
+                sys.executable,
+                str(repo_root / "scripts" / "generate_file_version_info.py"),
+            ],
             cwd=repo_root,
             check=False,
             capture_output=True,

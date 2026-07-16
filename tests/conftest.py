@@ -1,7 +1,6 @@
 """pytest configuration and shared fixtures for blinter tests."""
 
 import builtins
-import io
 import os
 from pathlib import Path
 import tomllib
@@ -11,7 +10,7 @@ import warnings
 
 import pytest
 
-from corpus_support import (
+from tests.corpus_support import (
     CORPUS_SKIP_REASON,
     corpus_available,
     corpus_files,
@@ -55,11 +54,11 @@ def _write_batch_files_with_crlf(monkeypatch: pytest.MonkeyPatch) -> None:
         return original_write_text(self, data, *args, **kwargs)
 
     def open_crlf(
-        file: object,
+        file: str | os.PathLike[str] | int,
         mode: str = "r",
-        *args: object,
-        **kwargs: object,
-    ) -> io.TextIOWrapper | io.BufferedWriter | io.BufferedReader | io.FileIO:
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
         if (
             _is_batch_path(file)
             and "b" not in mode

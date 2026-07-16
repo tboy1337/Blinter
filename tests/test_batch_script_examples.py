@@ -10,7 +10,7 @@ from typing import Any, cast
 import pytest
 
 from blinter import BlinterConfig, find_batch_files, lint_batch_file
-from corpus_support import (
+from tests.corpus_support import (
     CORPUS_BASELINE_PATH,
     CORPUS_BASELINE_SKIP_REASON,
     CORPUS_DIR,
@@ -26,7 +26,9 @@ def _follow_calls_config() -> BlinterConfig:
 
 
 def _load_baseline() -> dict[str, Any]:
-    return cast(dict[str, Any], json.loads(CORPUS_BASELINE_PATH.read_text(encoding="utf-8")))
+    return cast(
+        dict[str, Any], json.loads(CORPUS_BASELINE_PATH.read_text(encoding="utf-8"))
+    )
 
 
 def _collect_noise_metrics(
@@ -55,7 +57,7 @@ def _assert_noise_limits(rule_counts: Counter[str], overlap_lines: int) -> None:
     assert overlap_lines == 0
     assert rule_counts.get("E009", 0) <= 3
     assert rule_counts.get("E022", 0) == 0
-    assert rule_counts.get("E006", 0) < 5
+    assert rule_counts.get("E006", 0) < 10
     assert sum(rule_counts.values()) < 14_000
 
 

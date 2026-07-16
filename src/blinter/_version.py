@@ -1,8 +1,8 @@
 """Package version resolution."""
 
-import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+import sys
 
 __author__ = "tboy1337"
 
@@ -13,10 +13,13 @@ _PACKAGE_NAME = "Blinter"
 
 def _pyproject_path() -> Path:
     """Return pyproject.toml for source trees or PyInstaller bundles."""
-    if getattr(sys, "frozen", False):
-        bundled = Path(getattr(sys, "_MEIPASS", "")) / "pyproject.toml"
-        if bundled.is_file():
-            return bundled
+    frozen_raw: object = getattr(sys, "frozen", False)
+    if frozen_raw is True:
+        meipass_raw: object = getattr(sys, "_MEIPASS", "")
+        if isinstance(meipass_raw, str) and meipass_raw:
+            bundled = Path(meipass_raw) / "pyproject.toml"
+            if bundled.is_file():
+                return bundled
     return Path(__file__).resolve().parent.parent.parent / "pyproject.toml"
 
 

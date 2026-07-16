@@ -19,7 +19,6 @@ from blinter.engine.lines_cache import get_cached_lines
 from blinter.engine.linter import lint_batch_file
 from blinter.io.discovery import find_batch_files, is_path_under_root
 from blinter.logging_config import logger
-from blinter.paths import display_path, path_basename
 from blinter.models import (
     BlinterConfig,
     CliArguments,
@@ -33,6 +32,7 @@ from blinter.output.formatters import (
     print_severity_info,
     print_summary,
 )
+from blinter.paths import display_path, path_basename
 
 _CLI_HANDLER_ATTR = "blinter_cli_handler"
 

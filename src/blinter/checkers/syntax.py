@@ -323,8 +323,13 @@ def _count_unmatched_batch_quotes(line: str) -> int:
             index += 1
             continue
         if index > 0 and line[index - 1] == "^":
-            index += 1
-            continue
+            # Caret escapes a literal quote (e.g. content=^"%%b^"), but in "^"
+            # the caret is quoted content, not an escape for the closing quote.
+            if index > 1 and line[index - 2] == '"':
+                pass
+            else:
+                index += 1
+                continue
         if index + 1 < len(line) and line[index + 1] == '"':
             index += 2
             continue
@@ -349,6 +354,11 @@ def _is_e009_special_case_exemption(stripped: str, line: str) -> bool:
         return True
     if re.search(r"%[^%]+:[^=]*\"[^=]*=[^%]*%", line) or re.search(
         r"%[^%]+:[^=]*=[^%]*\"[^%]*%", line
+    ):
+        return True
+    if re.search(r"\bfor\s+/f\b", stripped, re.IGNORECASE) and re.search(
+        r"\(\^\"",
+        stripped,
     ):
         return True
     return False
