@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Blinter"
-version = "1.0.157"
+version = "1.0.158"
 description = "Blinter is a linter for Windows batch files. It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -22,6 +22,7 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
@@ -30,7 +31,7 @@ classifiers = [
     "Topic :: System :: Systems Administration",
     "Environment :: Console",
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = ["charset_normalizer"]
 
 [project.optional-dependencies]
@@ -79,7 +80,7 @@ blinter = ["py.typed"]
 
 [tool.black]
 line-length = 88
-target-version = ['py312', 'py313', 'py314']
+target-version = ['py311', 'py312', 'py313', 'py314']
 include = '\.pyi?$'
 extend-exclude = '''
 /(

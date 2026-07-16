@@ -10,31 +10,23 @@ from typing import Any, cast
 import pytest
 
 from blinter import BlinterConfig, find_batch_files, lint_batch_file
-
-_CORPUS_DIR = Path(__file__).resolve().parent.parent / "batch-script-examples"
-_BASELINE_PATH = Path(__file__).resolve().parent / "fixtures" / "corpus-baseline.json"
-
-
-def _corpus_files() -> list[Path]:
-    if not _CORPUS_DIR.is_dir():
-        return []
-    return sorted(
-        path
-        for path in _CORPUS_DIR.glob("**/*")
-        if path.is_file() and path.suffix.lower() in {".bat", ".cmd"}
-    )
-
-
-_CORPUS_PATHS = _corpus_files()
-_BASELINE_AVAILABLE = _BASELINE_PATH.is_file()
+from corpus_support import (
+    CORPUS_BASELINE_PATH,
+    CORPUS_BASELINE_SKIP_REASON,
+    CORPUS_DIR,
+    CORPUS_SKIP_REASON,
+    corpus_available,
+    corpus_baseline_available,
+    corpus_files,
+)
 
 
 def _follow_calls_config() -> BlinterConfig:
-    return BlinterConfig(follow_calls=True, scan_root=str(_CORPUS_DIR.resolve()))
+    return BlinterConfig(follow_calls=True, scan_root=str(CORPUS_DIR.resolve()))
 
 
 def _load_baseline() -> dict[str, Any]:
-    return cast(dict[str, Any], json.loads(_BASELINE_PATH.read_text(encoding="utf-8")))
+    return cast(dict[str, Any], json.loads(CORPUS_BASELINE_PATH.read_text(encoding="utf-8")))
 
 
 def _collect_noise_metrics(
@@ -68,41 +60,37 @@ def _assert_noise_limits(rule_counts: Counter[str], overlap_lines: int) -> None:
 
 
 @pytest.fixture(scope="module")
-def corpus_available() -> bool:
-    return _CORPUS_DIR.is_dir() and bool(_corpus_files())
-
-
-@pytest.fixture(scope="module")
 def corpus_baseline() -> dict[str, Any]:
-    if not _BASELINE_AVAILABLE:
-        pytest.skip("corpus-baseline.json not present")
+    if not corpus_baseline_available():
+        pytest.skip(CORPUS_BASELINE_SKIP_REASON)
     return _load_baseline()
 
 
-@pytest.mark.skipif(not _CORPUS_PATHS, reason="batch-script-examples not present")
+@pytest.mark.needs_corpus
+@pytest.mark.skipif(not corpus_available(), reason=CORPUS_SKIP_REASON)
 class TestBatchScriptExamplesCorpus:
     """Regression limits from real-world admin script corpus."""
 
     def test_all_corpus_files_lint_without_exception(self) -> None:
-        for file_path in _corpus_files():
+        for file_path in corpus_files():
             lint_batch_file(str(file_path))
 
     def test_corpus_noise_limits(self) -> None:
         rule_counts, overlap_lines = _collect_noise_metrics(
-            _corpus_files(),
+            corpus_files(),
             follow_calls=False,
         )
         _assert_noise_limits(rule_counts, overlap_lines)
 
     def test_corpus_noise_limits_follow_calls(self) -> None:
         rule_counts, overlap_lines = _collect_noise_metrics(
-            _corpus_files(),
+            corpus_files(),
             follow_calls=True,
         )
         _assert_noise_limits(rule_counts, overlap_lines)
 
     def test_acopy_s012_not_per_line_spam(self) -> None:
-        file_path = _CORPUS_DIR / "aCopy.BAT"
+        file_path = CORPUS_DIR / "aCopy.BAT"
         if not file_path.is_file():
             pytest.skip("aCopy.BAT not in corpus")
         issues = lint_batch_file(str(file_path))
@@ -110,9 +98,10 @@ class TestBatchScriptExamplesCorpus:
         assert len(s012) <= 1
 
 
+@pytest.mark.needs_corpus
 @pytest.mark.skipif(
-    not _CORPUS_PATHS or not _BASELINE_AVAILABLE,
-    reason="batch-script-examples or corpus-baseline.json not present",
+    not corpus_available() or not corpus_baseline_available(),
+    reason=CORPUS_BASELINE_SKIP_REASON,
 )
 class TestCorpusBaselineSnapshot:
     """Compare live corpus lint results to a local baseline snapshot."""
@@ -122,8 +111,8 @@ class TestCorpusBaselineSnapshot:
         self, corpus_baseline: dict[str, Any]
     ) -> None:
         expected = corpus_baseline["modes"]["default"]["files"]
-        assert corpus_baseline["file_count"] == len(_corpus_files())
-        for file_path in _corpus_files():
+        assert corpus_baseline["file_count"] == len(corpus_files())
+        for file_path in corpus_files():
             issues = lint_batch_file(str(file_path))
             rule_counts = Counter(issue.rule.code for issue in issues)
             entry = expected[file_path.name]
@@ -136,7 +125,7 @@ class TestCorpusBaselineSnapshot:
     ) -> None:
         expected = corpus_baseline["modes"]["follow_calls"]["files"]
         config = _follow_calls_config()
-        for file_path in _corpus_files():
+        for file_path in corpus_files():
             issues = lint_batch_file(str(file_path), config=config)
             rule_counts = Counter(issue.rule.code for issue in issues)
             entry = expected[file_path.name]
@@ -144,27 +133,26 @@ class TestCorpusBaselineSnapshot:
             assert dict(sorted(rule_counts.items())) == entry["rules"], file_path.name
 
 
-@pytest.mark.skipif(not _CORPUS_PATHS, reason="batch-script-examples not present")
-@pytest.mark.parametrize(
-    "file_path", _CORPUS_PATHS, ids=[path.name for path in _CORPUS_PATHS]
-)
+@pytest.mark.needs_corpus
+@pytest.mark.skipif(not corpus_available(), reason=CORPUS_SKIP_REASON)
 @pytest.mark.slow
 class TestCorpusPerFileSmoke:
     """Per-file smoke tests for default and follow-calls lint modes."""
 
-    def test_lint_default_without_exception(self, file_path: Path) -> None:
-        lint_batch_file(str(file_path))
+    def test_lint_default_without_exception(self, corpus_file_path: Path) -> None:
+        lint_batch_file(str(corpus_file_path))
 
-    def test_lint_follow_calls_without_exception(self, file_path: Path) -> None:
-        lint_batch_file(str(file_path), config=_follow_calls_config())
+    def test_lint_follow_calls_without_exception(self, corpus_file_path: Path) -> None:
+        lint_batch_file(str(corpus_file_path), config=_follow_calls_config())
 
 
-@pytest.mark.skipif(not _CORPUS_PATHS, reason="batch-script-examples not present")
+@pytest.mark.needs_corpus
+@pytest.mark.skipif(not corpus_available(), reason=CORPUS_SKIP_REASON)
 class TestCorpusTargetedFiles:
     """High-value corpus files with specific regression assertions."""
 
     def test_mas_aio_no_p026_false_positive(self) -> None:
-        file_path = _CORPUS_DIR / "MAS_AIO.cmd"
+        file_path = CORPUS_DIR / "MAS_AIO.cmd"
         if not file_path.is_file():
             pytest.skip("MAS_AIO.cmd not in corpus")
         issues = lint_batch_file(str(file_path))
@@ -172,7 +160,7 @@ class TestCorpusTargetedFiles:
         assert len(p026) == 0
 
     def test_ops_logs_no_unreachable_false_positive(self) -> None:
-        file_path = _CORPUS_DIR / "OpsLogs.BAT"
+        file_path = CORPUS_DIR / "OpsLogs.BAT"
         if not file_path.is_file():
             pytest.skip("OpsLogs.BAT not in corpus")
         issues = lint_batch_file(str(file_path))
@@ -180,7 +168,7 @@ class TestCorpusTargetedFiles:
         assert len(e008) == 0
 
     def test_percent_mm_cmd_lints_without_error(self) -> None:
-        file_path = _CORPUS_DIR / "%MM%.cmd"
+        file_path = CORPUS_DIR / "%MM%.cmd"
         if not file_path.is_file():
             pytest.skip("%MM%.cmd not in corpus")
         issues = lint_batch_file(str(file_path))
@@ -189,7 +177,7 @@ class TestCorpusTargetedFiles:
     def test_setdrive_callers_bounded_e006_with_follow_calls(self) -> None:
         config = _follow_calls_config()
         for name in ("BackupDHCP.BAT", "aCopy.BAT", "SetDrive.BAT"):
-            file_path = _CORPUS_DIR / name
+            file_path = CORPUS_DIR / name
             if not file_path.is_file():
                 pytest.skip(f"{name} not in corpus")
             issues = lint_batch_file(str(file_path), config=config)
@@ -197,9 +185,9 @@ class TestCorpusTargetedFiles:
             assert len(e006) == 0, name
 
     def test_find_batch_files_includes_special_filenames(self) -> None:
-        discovered = find_batch_files(str(_CORPUS_DIR), recursive=True)
+        discovered = find_batch_files(str(CORPUS_DIR), recursive=True)
         names = {Path(path).name for path in discovered}
-        assert len(names) == len(_corpus_files())
+        assert len(names) == len(corpus_files())
         assert "%MM%.cmd" in names
 
 

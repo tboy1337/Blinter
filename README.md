@@ -96,7 +96,7 @@ pip install -e ".[dev]"
 ```
 
 ### Prerequisites
-- **Python 3.12+** (required for pip installation and development)
+- **Python 3.11+** (required for pip installation and development)
 - **Windows OS** (required for standalone executable)
 
 ## Usage 📟

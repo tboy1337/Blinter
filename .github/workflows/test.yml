@@ -1,0 +1,121 @@
+name: Test
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test-python:
+    name: pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run tests
+        # batch-script-examples/ is not checked out in CI; @pytest.mark.needs_corpus
+        # tests skip automatically when that folder is absent.
+        run: python -m pytest
+
+  test-windows-exe:
+    name: Windows executable smoke tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Create virtual environment
+        run: python -m venv venv
+
+      - name: Install dependencies in virtual environment
+        run: |
+          .\venv\Scripts\Activate.ps1
+          python -m pip install --upgrade pip
+          python -m pip install --upgrade setuptools
+          python -m pip install --upgrade wheel
+          python -m pip install --upgrade pyinstaller
+          python -m pip install --upgrade -r requirements.txt
+        shell: pwsh
+
+      - name: Generate version info file
+        run: |
+          .\venv\Scripts\Activate.ps1
+          python scripts/generate_file_version_info.py
+        shell: pwsh
+
+      - name: Build executable
+        run: |
+          .\venv\Scripts\Activate.ps1
+          pyinstaller Blinter.spec
+        shell: pwsh
+
+      - name: Verify executable exists
+        run: |
+          if (-not (Test-Path -Path "dist\Blinter.exe" -PathType Leaf)) {
+            throw "dist\Blinter.exe was not produced by PyInstaller"
+          }
+        shell: pwsh
+
+      - name: Smoke test executable
+        run: |
+          $exe = ".\dist\Blinter.exe"
+          $expectedVersion = (
+            Select-String -Path "pyproject.toml" -Pattern '^version = "(.+)"' |
+            ForEach-Object { $_.Matches[0].Groups[1].Value }
+          )
+          if (-not $expectedVersion) {
+            throw "Could not read project version from pyproject.toml"
+          }
+
+          $versionOutput = & $exe --version 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) {
+            throw "Blinter.exe --version failed with exit code $LASTEXITCODE"
+          }
+          if ($versionOutput -notmatch [regex]::Escape($expectedVersion)) {
+            throw "Expected version '$expectedVersion' in output: $versionOutput"
+          }
+
+          & $exe --help | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            throw "Blinter.exe --help failed with exit code $LASTEXITCODE"
+          }
+
+          @(
+            "@echo off",
+            "echo hello"
+          ) | Set-Content -Path "sample.bat" -Encoding ASCII
+
+          & $exe sample.bat --summary | Out-Null
+          if ($LASTEXITCODE -notin 0, 1) {
+            throw "Blinter.exe sample.bat --summary failed with exit code $LASTEXITCODE"
+          }
+
+          & $exe missing.bat 2>&1 | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            throw "Blinter.exe missing.bat should fail for a missing file"
+          }
+        shell: pwsh
