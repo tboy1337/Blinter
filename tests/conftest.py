@@ -4,6 +4,7 @@ import builtins
 import io
 import os
 from pathlib import Path
+import tempfile
 import tomllib
 from typing import Any, Generator
 from unittest.mock import MagicMock, patch
@@ -57,11 +58,38 @@ def _apply_crlf_newline(
     return args, normalized_kwargs
 
 
+def _is_batch_suffix(suffix: object) -> bool:
+    return isinstance(suffix, str) and suffix.lower() in _BATCH_SUFFIXES
+
+
+def _ensure_crlf_newline_for_batch(
+    kwargs: dict[str, Any],
+    *,
+    mode: str,
+    suffix: object,
+) -> None:
+    """Set newline=CRLF for text-mode temp batch files (POSIX uses LF by default)."""
+    if _is_batch_suffix(suffix) and "b" not in mode:
+        kwargs["newline"] = "\r\n"
+
+
+def _named_temporary_file_crlf(
+    original: Any,
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
+    mode = kwargs.get("mode", "w+b")
+    suffix = kwargs.get("suffix")
+    _ensure_crlf_newline_for_batch(kwargs, mode=mode, suffix=suffix)
+    return original(*args, **kwargs)
+
+
 @pytest.fixture(autouse=True)
 def _write_batch_files_with_crlf(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure generated .bat/.cmd fixtures use CRLF like real Windows batch files."""
     original_write_text = Path.write_text
     original_open = builtins.open
+    original_named_temporary_file = tempfile.NamedTemporaryFile
 
     def write_text(
         self: Path,
@@ -87,8 +115,16 @@ def _write_batch_files_with_crlf(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(Path, "write_text", write_text)
     monkeypatch.setattr(builtins, "open", open_crlf)
     monkeypatch.setattr(io, "open", open_crlf)
-    # tempfile.NamedTemporaryFile calls _io.open directly on non-Windows platforms.
     monkeypatch.setattr(_io, "open", open_crlf)
+    monkeypatch.setattr(
+        tempfile,
+        "NamedTemporaryFile",
+        lambda *args, **kwargs: _named_temporary_file_crlf(
+            original_named_temporary_file,
+            *args,
+            **kwargs,
+        ),
+    )
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
