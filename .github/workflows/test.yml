@@ -91,18 +91,45 @@ jobs:
             throw "Could not read project version from pyproject.toml"
           }
 
-          $versionOutput = & $exe --version 2>&1
-          if ($LASTEXITCODE -ne 0) {
-            throw "Blinter.exe --version failed with exit code $LASTEXITCODE"
-          }
-          $versionText = ($versionOutput | Out-String)
-          if ($versionText -notmatch [regex]::Escape($expectedVersion)) {
-            throw "Expected version '$expectedVersion' in output: $versionText"
+          function Invoke-BlinterExe {
+            param(
+              [Parameter(Mandatory = $true)]
+              [string[]]$ArgumentList
+            )
+            $stdoutFile = [System.IO.Path]::GetTempFileName()
+            $stderrFile = [System.IO.Path]::GetTempFileName()
+            try {
+              $process = Start-Process `
+                -FilePath $exe `
+                -ArgumentList $ArgumentList `
+                -NoNewWindow `
+                -Wait `
+                -PassThru `
+                -RedirectStandardOutput $stdoutFile `
+                -RedirectStandardError $stderrFile
+              $stdout = Get-Content -Path $stdoutFile -Raw -ErrorAction SilentlyContinue
+              $stderr = Get-Content -Path $stderrFile -Raw -ErrorAction SilentlyContinue
+              return [PSCustomObject]@{
+                ExitCode = $process.ExitCode
+                Output = "$stdout$stderr"
+              }
+            }
+            finally {
+              Remove-Item -Path $stdoutFile, $stderrFile -Force -ErrorAction SilentlyContinue
+            }
           }
 
-          & $exe --help *> $null
-          if ($LASTEXITCODE -ne 0) {
-            throw "Blinter.exe --help failed with exit code $LASTEXITCODE"
+          $versionResult = Invoke-BlinterExe -ArgumentList @("--version")
+          if ($versionResult.ExitCode -ne 0) {
+            throw "Blinter.exe --version failed with exit code $($versionResult.ExitCode): $($versionResult.Output)"
+          }
+          if ($versionResult.Output -notmatch [regex]::Escape($expectedVersion)) {
+            throw "Expected version '$expectedVersion' in output: $($versionResult.Output)"
+          }
+
+          $helpResult = Invoke-BlinterExe -ArgumentList @("--help")
+          if ($helpResult.ExitCode -ne 0) {
+            throw "Blinter.exe --help failed with exit code $($helpResult.ExitCode): $($helpResult.Output)"
           }
 
           @(
@@ -110,13 +137,13 @@ jobs:
             "echo hello"
           ) | Set-Content -Path "sample.bat" -Encoding ASCII
 
-          & $exe sample.bat --summary *> $null
-          if ($LASTEXITCODE -notin 0, 1) {
-            throw "Blinter.exe sample.bat --summary failed with exit code $LASTEXITCODE"
+          $summaryResult = Invoke-BlinterExe -ArgumentList @("sample.bat", "--summary")
+          if ($summaryResult.ExitCode -notin 0, 1) {
+            throw "Blinter.exe sample.bat --summary failed with exit code $($summaryResult.ExitCode): $($summaryResult.Output)"
           }
 
-          & $exe missing.bat *> $null
-          if ($LASTEXITCODE -eq 0) {
+          $missingResult = Invoke-BlinterExe -ArgumentList @("missing.bat")
+          if ($missingResult.ExitCode -eq 0) {
             throw "Blinter.exe missing.bat should fail for a missing file"
           }
         shell: pwsh

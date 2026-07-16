@@ -707,32 +707,6 @@ class TestCommandLineIntegration:
         assert exit_info.value.code == 1
         assert "internal lint error" in captured.err
         assert "Processed 1 batch file" in captured.out
-        """Test python -m blinter entry point via subprocess."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".bat", delete=False, encoding="utf-8"
-        ) as batch_file:
-            batch_file.write("@echo off\n")
-            batch_path = batch_file.name
-
-        try:
-            result = subprocess.run(
-                [sys.executable, "-m", "blinter", batch_path],
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=False,
-                cwd=str(Path(__file__).resolve().parent.parent),
-                env={
-                    **os.environ,
-                    "PYTHONPATH": str(Path(__file__).resolve().parent.parent / "src"),
-                },
-            )
-
-            assert result.returncode == 0
-            assert "Traceback" not in result.stderr
-            assert "Blinter v" in result.stdout
-        finally:
-            os.unlink(batch_path)
 
     def test_main_module_runpy_entry(self) -> None:
         """Test python -m blinter module exposes the CLI entry point."""

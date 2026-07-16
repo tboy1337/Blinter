@@ -1,6 +1,7 @@
 """pytest configuration and shared fixtures for blinter tests."""
 
 import builtins
+import io
 import os
 from pathlib import Path
 import tomllib
@@ -8,6 +9,7 @@ from typing import Any, Generator
 from unittest.mock import MagicMock, patch
 import warnings
 
+import _io
 import pytest
 
 from tests.corpus_support import (
@@ -36,6 +38,25 @@ def _prepare_batch_text(data: str) -> str:
     return data.replace("\r\n", "\n")
 
 
+def _apply_crlf_newline(
+    mode: str,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+) -> tuple[tuple[Any, ...], dict[str, Any]]:
+    """Force CRLF for text-mode batch file writes without duplicate open args."""
+    if "b" in mode:
+        return args, kwargs
+
+    normalized_kwargs = dict(kwargs)
+    normalized_kwargs.pop("newline", None)
+    if len(args) >= 4:
+        return (*args[:3], "\r\n", *args[4:]), normalized_kwargs
+    if len(args) == 3:
+        return (*args, "\r\n"), normalized_kwargs
+    normalized_kwargs["newline"] = "\r\n"
+    return args, normalized_kwargs
+
+
 @pytest.fixture(autouse=True)
 def _write_batch_files_with_crlf(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure generated .bat/.cmd fixtures use CRLF like real Windows batch files."""
@@ -59,16 +80,15 @@ def _write_batch_files_with_crlf(monkeypatch: pytest.MonkeyPatch) -> None:
         *args: Any,
         **kwargs: Any,
     ) -> Any:
-        if (
-            _is_batch_path(file)
-            and "b" not in mode
-            and any(flag in mode for flag in ("w", "a", "x"))
-        ):
-            kwargs = {**kwargs, "newline": "\r\n"}
+        if _is_batch_path(file) and any(flag in mode for flag in ("w", "a", "x")):
+            args, kwargs = _apply_crlf_newline(mode, args, kwargs)
         return original_open(file, mode, *args, **kwargs)
 
     monkeypatch.setattr(Path, "write_text", write_text)
     monkeypatch.setattr(builtins, "open", open_crlf)
+    monkeypatch.setattr(io, "open", open_crlf)
+    # tempfile.NamedTemporaryFile calls _io.open directly on non-Windows platforms.
+    monkeypatch.setattr(_io, "open", open_crlf)
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
