@@ -91,15 +91,16 @@ jobs:
             throw "Could not read project version from pyproject.toml"
           }
 
-          $versionOutput = & $exe --version 2>&1 | Out-String
+          $versionOutput = & $exe --version 2>&1
           if ($LASTEXITCODE -ne 0) {
             throw "Blinter.exe --version failed with exit code $LASTEXITCODE"
           }
-          if ($versionOutput -notmatch [regex]::Escape($expectedVersion)) {
-            throw "Expected version '$expectedVersion' in output: $versionOutput"
+          $versionText = ($versionOutput | Out-String)
+          if ($versionText -notmatch [regex]::Escape($expectedVersion)) {
+            throw "Expected version '$expectedVersion' in output: $versionText"
           }
 
-          & $exe --help | Out-Null
+          & $exe --help *> $null
           if ($LASTEXITCODE -ne 0) {
             throw "Blinter.exe --help failed with exit code $LASTEXITCODE"
           }
@@ -109,12 +110,12 @@ jobs:
             "echo hello"
           ) | Set-Content -Path "sample.bat" -Encoding ASCII
 
-          & $exe sample.bat --summary | Out-Null
+          & $exe sample.bat --summary *> $null
           if ($LASTEXITCODE -notin 0, 1) {
             throw "Blinter.exe sample.bat --summary failed with exit code $LASTEXITCODE"
           }
 
-          & $exe missing.bat 2>&1 | Out-Null
+          & $exe missing.bat *> $null
           if ($LASTEXITCODE -eq 0) {
             throw "Blinter.exe missing.bat should fail for a missing file"
           }

@@ -1,22 +1,27 @@
 # Set default behavior for all files - use auto normalization
 * text=auto
 
-# Windows-centric text files - use CRLF for better Windows compatibility
-*.txt text eol=crlf
-*.md text eol=crlf
-*.json text eol=crlf
-*.xml text eol=crlf
-*.yml text eol=crlf
-*.yaml text eol=crlf
-*.toml text eol=crlf
-*.ini text eol=crlf
-*.cfg text eol=crlf
-*.config text eol=crlf
-*.log text eol=crlf
-*.csv text eol=crlf
-*.tsv text eol=crlf
+# Cross-platform project source and config (LF in repo and on Linux CI)
+*.md text eol=lf
+*.json text eol=lf
+*.xml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+*.config text eol=lf
+*.csv text eol=lf
+*.tsv text eol=lf
+*.spec text eol=lf
+pylintrc text eol=lf
+.coveragerc text eol=lf
 
-# Source code files - CRLF for Windows development
+# Logs and plain text can stay CRLF-friendly for Windows tooling
+*.txt text eol=crlf
+*.log text eol=crlf
+
+# Source code files - CRLF for Windows development (unused languages kept for consistency)
 *.c text eol=crlf
 *.cpp text eol=crlf
 *.cxx text eol=crlf
@@ -31,7 +36,7 @@
 *.java text eol=crlf
 *.kt text eol=crlf
 *.scala text eol=crlf
-*.py text eol=crlf
+*.py text eol=lf
 *.rb text eol=crlf
 *.php text eol=crlf
 *.js text eol=crlf

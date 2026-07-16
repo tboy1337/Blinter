@@ -19,6 +19,7 @@ from blinter.engine.lines_cache import get_cached_lines
 from blinter.engine.linter import lint_batch_file
 from blinter.io.discovery import find_batch_files, is_path_under_root
 from blinter.logging_config import logger
+from blinter.paths import display_path, path_basename
 from blinter.models import (
     BlinterConfig,
     CliArguments,
@@ -324,20 +325,17 @@ def _display_analyzed_scripts(
 
     print("Scripts Analyzed:")
     for idx, (file_path, parent) in enumerate(processed_file_paths, 1):
-        display_path: str
-        if is_directory:
-            try:
-                display_path = str(Path(file_path).relative_to(Path(target_path)))
-            except ValueError:
-                display_path = str(Path(file_path))
-        else:
-            display_path = Path(file_path).name
+        display_path_value = display_path(
+            file_path,
+            target_path,
+            is_directory=is_directory,
+        )
 
         if parent:
-            parent_name = Path(parent).name
-            print(f"  {idx}.   ↳ {display_path} (called by {parent_name})")
+            parent_name = path_basename(parent)
+            print(f"  {idx}.   ↳ {display_path_value} (called by {parent_name})")
         else:
-            print(f"  {idx}. {display_path}")
+            print(f"  {idx}. {display_path_value}")
 
     print()
 

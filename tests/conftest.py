@@ -1,5 +1,8 @@
 """pytest configuration and shared fixtures for blinter tests."""
 
+import builtins
+import io
+import os
 from pathlib import Path
 import tomllib
 from typing import Any, Generator
@@ -20,6 +23,53 @@ try:
     COVERAGE_AVAILABLE = True
 except ImportError:
     COVERAGE_AVAILABLE = False
+
+_BATCH_SUFFIXES = {".bat", ".cmd"}
+
+
+def _is_batch_path(path: object) -> bool:
+    if not isinstance(path, (str, os.PathLike)):
+        return False
+    return Path(path).suffix.lower() in _BATCH_SUFFIXES
+
+
+def _prepare_batch_text(data: str) -> str:
+    return data.replace("\r\n", "\n")
+
+
+@pytest.fixture(autouse=True)
+def _write_batch_files_with_crlf(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure generated .bat/.cmd fixtures use CRLF like real Windows batch files."""
+    original_write_text = Path.write_text
+    original_open = builtins.open
+
+    def write_text(
+        self: Path,
+        data: str,
+        *args: object,
+        **kwargs: object,
+    ) -> int:
+        if isinstance(data, str) and self.suffix.lower() in _BATCH_SUFFIXES:
+            data = _prepare_batch_text(data)
+            kwargs = {**kwargs, "newline": "\r\n"}
+        return original_write_text(self, data, *args, **kwargs)
+
+    def open_crlf(
+        file: object,
+        mode: str = "r",
+        *args: object,
+        **kwargs: object,
+    ) -> io.TextIOWrapper | io.BufferedWriter | io.BufferedReader | io.FileIO:
+        if (
+            _is_batch_path(file)
+            and "b" not in mode
+            and any(flag in mode for flag in ("w", "a", "x"))
+        ):
+            kwargs = {**kwargs, "newline": "\r\n"}
+        return original_open(file, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", write_text)
+    monkeypatch.setattr(builtins, "open", open_crlf)
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

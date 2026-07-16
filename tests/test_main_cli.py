@@ -367,13 +367,17 @@ echo %var%
         temp_file = self.create_temp_batch_file(content)
 
         try:
-            # Test with .bat extension recognition
             test_cases = [
-                ["blinter.py", temp_file.upper()],  # Uppercase path
-                ["blinter.py", temp_file.lower()],  # Lowercase path
-                ["blinter.py", "--summary", temp_file],  # Flag before file
-                ["blinter.py", temp_file, "--summary"],  # Flag after file
+                ["blinter.py", temp_file],
+                ["blinter.py", "--summary", temp_file],
+                ["blinter.py", temp_file, "--summary"],
             ]
+            if sys.platform == "win32":
+                test_cases = [
+                    ["blinter.py", temp_file.upper()],
+                    ["blinter.py", temp_file.lower()],
+                    *test_cases,
+                ]
 
             for test_argv in test_cases:
                 # Make sure file has .bat extension for recognition

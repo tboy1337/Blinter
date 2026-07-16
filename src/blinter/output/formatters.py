@@ -13,6 +13,7 @@ from typing import (
 
 from blinter._version import __version__
 from blinter.models import LintIssue, RuleSeverity
+from blinter.paths import path_basename
 from blinter.rules.registry import RULES
 
 
@@ -197,7 +198,7 @@ def _format_line_numbers_with_files(
     file_lines: Dict[str, List[int]] = defaultdict(list)
     for issue in sorted_issues:
         if issue.file_path:
-            filename = Path(issue.file_path).name
+            filename = path_basename(issue.file_path)
             file_lines[filename].append(issue.line_number)
 
     return (True, dict(file_lines))
