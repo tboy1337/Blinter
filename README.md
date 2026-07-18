@@ -522,7 +522,7 @@ py scripts/corpus_lint.py --check-baseline
 
 Baseline snapshots are per-machine and only comparable against the same local corpus. Regenerate with `py scripts/generate_corpus_baseline.py` after rule changes or corpus updates.
 
-The test suite enforces 90% branch coverage (`pytest.ini`, `.coveragerc`). CI runs pytest on Python 3.11–3.14, static analysis (black, isort, mypy, pylint, bandit), and Windows executable smoke tests on every push and pull request to `main`. Releases are tag-triggered only after bumping `version` in `pyproject.toml`.
+The test suite enforces 90% branch coverage (`pytest.ini`, `.coveragerc`). CI runs pytest on Python 3.11–3.14, static analysis (black, isort, mypy, pylint, bandit), and Windows executable smoke tests on every push and pull request to `main`. Releases run automatically when `version` in `pyproject.toml` is bumped on `main`.
 
 See [docs/Architecture.md](docs/Architecture.md) for module layout and extension points.
 
@@ -530,11 +530,12 @@ See [docs/Architecture.md](docs/Architecture.md) for module layout and extension
 
 Version is defined only in [`pyproject.toml`](pyproject.toml) (`version = "..."`).
 
-1. Bump `version` in `pyproject.toml` and commit to `main`.
-2. Create and push a matching tag: `git tag v1.0.164 && git push origin v1.0.164`
-3. The [Build-Release-PYPI](.github/workflows/Build-Release-PYPI.yml) workflow validates that the tag matches `pyproject.toml`, runs tests and quality checks, then publishes wheels to PyPI and a Windows `.exe` to GitHub Releases.
+1. Bump `version` in `pyproject.toml` and push to `main`.
+2. The [Build-Release-PYPI](.github/workflows/Build-Release-PYPI.yml) workflow runs automatically, verifies tests and quality checks, then publishes wheels to PyPI and a Windows `.exe` to GitHub Releases tagged `v{version}`.
 
-For emergency re-runs of a failed release (without a version bump), use the workflow's manual `workflow_dispatch` trigger.
+No separate git tag is required — the workflow reads the version from `pyproject.toml` and creates the release tag for you.
+
+To re-run a failed release for the current `pyproject.toml` version without bumping it again, use the workflow's manual **Run workflow** (`workflow_dispatch`) button on GitHub Actions.
 
 ## Contributing 🤝
 
