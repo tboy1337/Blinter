@@ -23,6 +23,7 @@ from blinter.models import (
     BlinterConfig,
     CliArguments,
     LintIssue,
+    OutputFormat,
     ProcessingResults,
     ProcessingState,
     RuleSeverity,
@@ -32,6 +33,7 @@ from blinter.output.formatters import (
     print_severity_info,
     print_summary,
 )
+from blinter.output.json_formatter import build_report, print_report, write_report
 from blinter.paths import display_path, path_basename
 
 _CLI_HANDLER_ATTR = "blinter_cli_handler"
@@ -431,71 +433,138 @@ def _plural(count: int, suffix: str = "s") -> str:
     return "" if count == 1 else suffix
 
 
-def _handle_skipped_files_exit(results: ProcessingResults) -> None:
+def _handle_skipped_files_exit(
+    results: ProcessingResults,
+    *,
+    suppress_stdout: bool = False,
+) -> None:
     """Print skipped-file warning and exit with code 1 when any primary file was skipped."""
     if not results.skipped_files:
         return
-    print(
-        f"\nWARNING  {len(results.skipped_files)} batch file"
-        f"{_plural(len(results.skipped_files))} could not be processed."
-    )
+    if not suppress_stdout:
+        print(
+            f"\nWARNING  {len(results.skipped_files)} batch file"
+            f"{_plural(len(results.skipped_files))} could not be processed."
+        )
     sys.exit(1)
 
 
-def _exit_directory_results(results: ProcessingResults, fatal_count: int) -> None:
+def _exit_directory_results(
+    results: ProcessingResults,
+    fatal_count: int,
+    *,
+    suppress_stdout: bool = False,
+) -> None:
     """Exit with the appropriate code for directory analysis."""
     if fatal_count > 0:
-        print(
-            f"\nWARNING  Found {fatal_count} critical issue{_plural(fatal_count)} "
-            f"(errors or security) across {results.files_with_errors} "
-            f"file{_plural(results.files_with_errors)} that must be fixed."
-        )
+        if not suppress_stdout:
+            print(
+                f"\nWARNING  Found {fatal_count} critical issue{_plural(fatal_count)} "
+                f"(errors or security) across {results.files_with_errors} "
+                f"file{_plural(results.files_with_errors)} that must be fixed."
+            )
         sys.exit(1)
     elif results.all_issues:
-        print(
-            f"\nOK No critical errors found, but {len(results.all_issues)} "
-            f"total issue{_plural(len(results.all_issues))} detected across "
-            f"{results.total_files_processed} "
-            f"file{_plural(results.total_files_processed)}."
-        )
+        if not suppress_stdout:
+            print(
+                f"\nOK No critical errors found, but {len(results.all_issues)} "
+                f"total issue{_plural(len(results.all_issues))} detected across "
+                f"{results.total_files_processed} "
+                f"file{_plural(results.total_files_processed)}."
+            )
         sys.exit(0)
     else:
-        print(
-            f"\n* No issues found! All {results.total_files_processed} "
-            f"batch file{_plural(results.total_files_processed)} "
-            f"look{'s' if results.total_files_processed == 1 else ''} great!"
-        )
+        if not suppress_stdout:
+            print(
+                f"\n* No issues found! All {results.total_files_processed} "
+                f"batch file{_plural(results.total_files_processed)} "
+                f"look{'s' if results.total_files_processed == 1 else ''} great!"
+            )
         sys.exit(0)
 
 
-def _exit_single_file_results(results: ProcessingResults, fatal_count: int) -> None:
+def _exit_single_file_results(
+    results: ProcessingResults,
+    fatal_count: int,
+    *,
+    suppress_stdout: bool = False,
+) -> None:
     """Exit with the appropriate code for single-file analysis."""
     if fatal_count > 0:
-        print(
-            f"\nWARNING  Found {fatal_count} critical issue{_plural(fatal_count)} "
-            f"(errors or security) that must be fixed."
-        )
+        if not suppress_stdout:
+            print(
+                f"\nWARNING  Found {fatal_count} critical issue{_plural(fatal_count)} "
+                f"(errors or security) that must be fixed."
+            )
         sys.exit(1)
     elif results.all_issues:
-        print(
-            f"\nOK No critical errors found, but {len(results.all_issues)} "
-            f"issue{_plural(len(results.all_issues))} detected."
-        )
+        if not suppress_stdout:
+            print(
+                f"\nOK No critical errors found, but {len(results.all_issues)} "
+                f"issue{_plural(len(results.all_issues))} detected."
+            )
         sys.exit(0)
     else:
-        print("\nNo issues found! Your batch file looks great!")
+        if not suppress_stdout:
+            print("\nNo issues found! Your batch file looks great!")
         sys.exit(0)
 
 
-def _exit_with_results(results: ProcessingResults, target_path: str) -> None:
+def _exit_with_results(
+    results: ProcessingResults,
+    target_path: str,
+    *,
+    suppress_stdout: bool = False,
+) -> None:
     """Exit with appropriate code based on results."""
     fatal_count = _count_fatal_issues_for_exit(results)
-    _handle_skipped_files_exit(results)
+    _handle_skipped_files_exit(results, suppress_stdout=suppress_stdout)
 
     if Path(target_path).is_dir():
-        _exit_directory_results(results, fatal_count)
+        _exit_directory_results(
+            results,
+            fatal_count,
+            suppress_stdout=suppress_stdout,
+        )
     else:
-        _exit_single_file_results(results, fatal_count)
+        _exit_single_file_results(
+            results,
+            fatal_count,
+            suppress_stdout=suppress_stdout,
+        )
+
+
+def _should_emit_json(cli_args: CliArguments) -> bool:
+    """Return True when a JSON report should be built."""
+    return (
+        cli_args.cli_output_path is not None
+        or cli_args.cli_output_format == OutputFormat.JSON
+    )
+
+
+def _emit_json_report(results: ProcessingResults, cli_args: CliArguments) -> None:
+    """Build and write or print a JSON lint report."""
+    fatal_count = _count_fatal_issues_for_exit(results)
+    report = build_report(
+        results,
+        cli_args.target_path,
+        __version__,
+        fatal_count,
+    )
+    if cli_args.cli_output_path is not None:
+        try:
+            write_report(cli_args.cli_output_path, report)
+        except (OSError, PermissionError) as write_error:
+            print(
+                f"Error: Could not write JSON report: {write_error}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    if (
+        cli_args.cli_output_format == OutputFormat.JSON
+        and cli_args.cli_output_path is None
+    ):
+        print_report(report)
 
 
 def _apply_cli_config_overrides(
@@ -557,7 +626,9 @@ def _run_cli() -> None:
         else logging.WARNING
     )
 
-    print(f"Blinter v{__version__} - Batch File Linter\n")
+    json_output = cli_args.cli_output_format == OutputFormat.JSON
+    if not json_output:
+        print(f"Blinter v{__version__} - Batch File Linter\n")
 
     config = load_config(
         config_path=cli_args.config_path,
@@ -592,5 +663,13 @@ def _run_cli() -> None:
     if results is None:
         sys.exit(1)
 
-    _display_results(results, cli_args.target_path, config)
-    _exit_with_results(results, cli_args.target_path)
+    if _should_emit_json(cli_args):
+        _emit_json_report(results, cli_args)
+
+    if not json_output:
+        _display_results(results, cli_args.target_path, config)
+    _exit_with_results(
+        results,
+        cli_args.target_path,
+        suppress_stdout=json_output,
+    )

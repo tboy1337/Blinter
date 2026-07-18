@@ -45,6 +45,9 @@ Options:
   --follow-calls      Scan scripts called by CALL statements from each seed file.
                      Variable context may be collected transitively; each seed file
                      lints its direct CALL targets only.
+  --output <path>     Write a structured JSON lint report to the given file path.
+  --format json       Suppress human-readable stdout; emit JSON to stdout unless
+                     --output is also set (then JSON is written only to that file).
   --verbose           Show detailed debug logging on stderr.
   --quiet             Show only error-level logging on stderr.
   --no-config         Don't use configuration file (blinter.ini) even if it exists.
@@ -84,6 +87,15 @@ Examples:
   blinter myscript.bat --max-line-length 120
       Analyze with custom maximum line length of 120 characters.
 
+  blinter myscript.bat --output report.json
+      Analyze and write a JSON report while keeping human-readable output.
+
+  blinter myscript.bat --format json
+      Emit a JSON report to stdout (no human-readable output).
+
+  blinter project\\scripts --output results.json --format json
+      Write JSON to a file with no human-readable stdout.
+
   blinter /project/scripts --summary --severity
       Shows summary, detailed errors and severity info for all batch files in directory.
 
@@ -107,6 +119,36 @@ def group_issues(issues: List[LintIssue]) -> DefaultDict[RuleSeverity, List[Lint
     return grouped
 
 
+def compute_severity_counts(
+    issues: List[LintIssue],
+) -> DefaultDict[RuleSeverity, int]:
+    """Count issues grouped by severity level."""
+    severity_counts: DefaultDict[RuleSeverity, int] = defaultdict(int)
+    for issue in issues:
+        severity_counts[issue.rule.severity] += 1
+    return severity_counts
+
+
+def compute_most_common_rule(
+    issues: List[LintIssue],
+) -> Tuple[str, int]:
+    """Return the most frequently occurring rule code and its count."""
+    rule_counts: DefaultDict[str, int] = defaultdict(int)
+    for issue in issues:
+        rule_counts[issue.rule.code] += 1
+
+    if not rule_counts:
+        return ("", 0)
+
+    max_count = 0
+    max_rule = ""
+    for rule_code, count in rule_counts.items():
+        if count > max_count:
+            max_count = count
+            max_rule = rule_code
+    return (max_rule, max_count)
+
+
 def print_summary(issues: List[LintIssue]) -> None:
     """Print summary statistics of linting issues.
 
@@ -115,25 +157,10 @@ def print_summary(issues: List[LintIssue]) -> None:
     """
     total_issues = len(issues)
 
-    # Group by rule for most common error
-    rule_counts: DefaultDict[str, int] = defaultdict(int)
-    for issue in issues:
-        rule_counts[issue.rule.code] += 1
-
-    most_common_rule: Tuple[str, int] = ("", 0)
-    if rule_counts:
-        max_count = 0
-        max_rule = ""
-        for rule_code, count in rule_counts.items():
-            if count > max_count:
-                max_count = count
-                max_rule = rule_code
-        most_common_rule = (max_rule, max_count)
+    most_common_rule = compute_most_common_rule(issues)
 
     # Count by severity
-    severity_counts: DefaultDict[RuleSeverity, int] = defaultdict(int)
-    for issue in issues:
-        severity_counts[issue.rule.severity] += 1
+    severity_counts = compute_severity_counts(issues)
 
     print("\nSUMMARY:")
     print(f"Total issues: {total_issues}")
@@ -314,9 +341,7 @@ def print_severity_info(issues: List[LintIssue]) -> None:
     Args:
         issues: List of LintIssue objects
     """
-    severity_counts: DefaultDict[RuleSeverity, int] = defaultdict(int)
-    for issue in issues:
-        severity_counts[issue.rule.severity] += 1
+    severity_counts = compute_severity_counts(issues)
 
     descriptions: Dict[RuleSeverity, str] = {
         RuleSeverity.ERROR: "Critical issues that will cause script failure or incorrect behavior.",

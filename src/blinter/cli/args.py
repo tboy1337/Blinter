@@ -14,7 +14,7 @@ from typing import (
 
 from blinter.config.loader import create_default_config_file
 from blinter.constants import MAX_LINE_LENGTH
-from blinter.models import CliArguments
+from blinter.models import CliArguments, OutputFormat
 from blinter.output.formatters import print_help, print_version
 
 _DEFAULT_CONFIG_PATH = "blinter.ini"
@@ -107,6 +107,32 @@ def _parse_config_arg(arg_index: int) -> Optional[Tuple[int, str]]:
     return arg_index + 1, sys.argv[arg_index + 1]
 
 
+def _parse_output_arg(arg_index: int) -> Optional[Tuple[int, str]]:
+    """Parse the value following ``--output``."""
+    if arg_index + 1 >= len(sys.argv):
+        _print_cli_error("Error: --output requires a path.\n")
+        print_help()
+        return None
+    return arg_index + 1, sys.argv[arg_index + 1]
+
+
+def _parse_format_arg(arg_index: int) -> Optional[Tuple[int, OutputFormat]]:
+    """Parse the value following ``--format``."""
+    if arg_index + 1 >= len(sys.argv):
+        _print_cli_error("Error: --format requires a value.\n")
+        print_help()
+        return None
+    format_value = sys.argv[arg_index + 1].lower()
+    if format_value == "json":
+        return arg_index + 1, OutputFormat.JSON
+    _print_cli_error(
+        f"Error: Unknown format '{sys.argv[arg_index + 1]}'. "
+        "Supported values: json.\n"
+    )
+    print_help()
+    return None
+
+
 def _apply_handler_flags(
     handler_result: _ArgHandlerResult,
     *,
@@ -138,6 +164,8 @@ class _ArgParseState:  # pylint: disable=too-many-instance-attributes
     cli_verbose: bool = False
     cli_quiet: bool = False
     config_path: Optional[str] = None
+    cli_output_path: Optional[str] = None
+    cli_output_format: OutputFormat = OutputFormat.TEXT
 
 
 def _warn_severity_flag_deprecated() -> _ArgHandlerResult:
@@ -188,6 +216,20 @@ def _process_dash_argument(
         next_index, state.config_path = parsed_config
         return next_index
 
+    if arg == "--output":
+        parsed_output = _parse_output_arg(index)
+        if parsed_output is None:
+            sys.exit(1)
+        next_index, state.cli_output_path = parsed_output
+        return next_index
+
+    if arg == "--format":
+        parsed_format = _parse_format_arg(index)
+        if parsed_format is None:
+            sys.exit(1)
+        next_index, state.cli_output_format = parsed_format
+        return next_index
+
     if arg == "--verbose":
         state.cli_verbose = True
         return index
@@ -225,13 +267,16 @@ def _parse_regular_arguments() -> Tuple[
     Optional[int],
     Optional[int],
     Optional[str],
+    Optional[str],
+    OutputFormat,
 ]:
     """
     Parse regular command-line arguments using a lookup table.
 
     Returns:
         Tuple of (target_path, use_config, cli_show_summary, cli_recursive,
-        cli_follow_calls, cli_max_line_length, cli_log_level, config_path)
+        cli_follow_calls, cli_max_line_length, cli_log_level, config_path,
+        cli_output_path, cli_output_format)
     """
     state = _ArgParseState()
 
@@ -265,6 +310,8 @@ def _parse_regular_arguments() -> Tuple[
         state.cli_max_line_length,
         _resolve_cli_log_level(state.cli_verbose, state.cli_quiet),
         state.config_path,
+        state.cli_output_path,
+        state.cli_output_format,
     )
 
 
@@ -283,6 +330,8 @@ def _parse_cli_arguments() -> Optional[CliArguments]:
         cli_max_line_length,
         cli_log_level,
         config_path,
+        cli_output_path,
+        cli_output_format,
     ) = _parse_regular_arguments()
 
     if not target_path:
@@ -299,4 +348,6 @@ def _parse_cli_arguments() -> Optional[CliArguments]:
         cli_max_line_length,
         cli_log_level,
         config_path=config_path,
+        cli_output_path=cli_output_path,
+        cli_output_format=cli_output_format,
     )

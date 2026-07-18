@@ -215,6 +215,8 @@ blinter --version
 - `--no-config`: Don't use configuration file (blinter.ini) even if it exists
 - `--create-config`: Create a default blinter.ini configuration file and exit
 - `--create-config --force`: Overwrite an existing blinter.ini when creating the default configuration
+- `--output <path>`: Write a structured JSON lint report to the given file path (human-readable output is unchanged unless `--format json` is also set)
+- `--format json`: Suppress human-readable stdout and emit JSON (to stdout, or only to `--output` when both flags are used)
 - `--verbose`: Show detailed logging output (INFO level)
 - `--quiet`: Suppress non-error logging output (ERROR level only)
 - `--help`: Show help menu and rule categories
@@ -260,6 +262,15 @@ python -m blinter myscript.bat --max-line-length 100
 
 # Ignore config file completely
 python -m blinter myscript.bat --no-config
+
+# Write JSON report to a file (human-readable output unchanged)
+python -m blinter myscript.bat --output report.json
+
+# Machine-readable JSON on stdout only
+python -m blinter myscript.bat --format json
+
+# JSON file only, no human-readable stdout
+python -m blinter project\\scripts --output results.json --format json
 ```
 
 ### 🔕 Inline Suppression Comments

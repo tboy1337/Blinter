@@ -38,6 +38,7 @@ src/blinter/
     loader.py          # blinter.ini loading
   output/
     formatters.py      # CLI output formatting
+    json_formatter.py    # JSON report serialization
   cli/
     args.py            # Argument parsing
     main.py            # CLI orchestration and multi-file processing

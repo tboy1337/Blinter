@@ -24,6 +24,13 @@ class RuleSeverity(Enum):
     PERFORMANCE = "Performance"
 
 
+class OutputFormat(Enum):
+    """CLI output format."""
+
+    TEXT = "text"
+    JSON = "json"
+
+
 @dataclass
 class Rule:
     """Represents a linting rule with code, explanation and recommendation."""
@@ -153,6 +160,8 @@ class CliArguments:  # pylint: disable=too-many-instance-attributes  # CLI argum
     cli_max_line_length: Optional[int]
     cli_log_level: Optional[int]
     config_path: Optional[str] = None
+    cli_output_path: Optional[str] = None
+    cli_output_format: OutputFormat = OutputFormat.TEXT
 
 
 @dataclass
