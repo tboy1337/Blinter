@@ -38,7 +38,7 @@ Arguments:
 
 Options:
   --summary           Show a summary section with total errors and most common error.
-  --severity          Accepted for compatibility; severity breakdown is always shown.
+  --severity          Deprecated; has no effect. Use min_severity in blinter.ini instead.
   --config <path>     Path to blinter.ini configuration file (default: blinter.ini).
   --max-line-length <n>  Set maximum line length for S011 and S020 rules (default: 100).
   --no-recursive      When processing directories, don't search subdirectories (default: recursive).

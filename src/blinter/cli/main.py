@@ -397,11 +397,6 @@ def _display_results(
     print_severity_info(results.all_issues)
 
 
-def _count_fatal_issues(issues: List[LintIssue]) -> int:
-    """Count issues that should cause a non-zero exit code."""
-    return sum(1 for issue in issues if _is_fatal_severity(issue.rule.severity))
-
-
 def _normalized_path(path: str) -> str:
     """Return a resolved, comparable path string."""
     return str(Path(path).resolve())

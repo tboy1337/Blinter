@@ -63,7 +63,7 @@ flowchart BT
 2. **Structure** — Labels, SET variables, delayed expansion, and embedded script blocks are analyzed.
 3. **Checkers** — Line and global rules run via `orchestration._process_file_checks`.
 4. **Filter** — `BlinterConfig`, inline `REM LINT:IGNORE` comments, and severity filters apply.
-5. **Output** — `LintIssue` list returned to library callers or formatted by the CLI.
+5. **Output** — `LintIssue` list returned to library callers, or formatted by the CLI as human-readable text (`output/formatters.py`) or structured JSON (`output/json_formatter.py` via `--format json` / `--output`).
 
 ## Public vs internal imports
 

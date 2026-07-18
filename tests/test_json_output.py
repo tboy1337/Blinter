@@ -5,15 +5,15 @@ from __future__ import annotations
 import io
 import json
 import os
+from pathlib import Path
 import sys
 import tempfile
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from blinter import main
 from blinter.cli.main import _count_fatal_issues_for_exit
+from blinter import main
 from blinter.models import LintIssue, ProcessingResults, RuleSeverity
 from blinter.output.formatters import (
     compute_most_common_rule,
@@ -188,7 +188,9 @@ class TestJsonOutputCli:
             old_stdout = sys.stdout
             sys.stdout = captured = io.StringIO()
             try:
-                with patch("sys.argv", ["blinter.py", temp_file, "--output", report_path]):
+                with patch(
+                    "sys.argv", ["blinter.py", temp_file, "--output", report_path]
+                ):
                     with pytest.raises(SystemExit) as exc_info:
                         main()
                     assert exc_info.value.code in [0, 1]
