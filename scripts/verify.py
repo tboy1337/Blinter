@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import platform
 import subprocess
 import sys
 from typing import Sequence, cast
@@ -17,6 +18,10 @@ _CORPUS_DIR = Path("batch-script-examples")
 _PACKAGE_DIR = Path("src") / "blinter"
 _PYPROJECT = "pyproject.toml"
 _PYLINT_OUTPUT = "pylint-output.txt"
+_POWERSHELL_SCRIPT = Path("scripts") / "test_exe_smoke.ps1"
+_POWERSHELL_HELPERS = Path("scripts") / "TestExeSmoke.Helpers.ps1"
+_POWERSHELL_ANALYZER_SETTINGS = Path("scripts") / "PSScriptAnalyzerSettings.psd1"
+_PESTER_TEST = Path("scripts") / "TestExeSmoke.Tests.ps1"
 
 
 def _repo_root() -> Path:
@@ -71,6 +76,67 @@ def _isort_args(*, fix: bool) -> list[str]:
     if not fix:
         args.insert(3, "--check-only")
     return args
+
+
+def _is_windows() -> bool:
+    return platform.system() == "Windows"
+
+
+def _powershell_executable() -> str:
+    return "powershell"
+
+
+def _run_powershell_step(name: str, command: str, *, cwd: Path | None = None) -> None:
+    """Run a PowerShell command on Windows."""
+    print(f"==> {name}")
+    result = subprocess.run(
+        [
+            _powershell_executable(),
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            command,
+        ],
+        cwd=cwd if cwd is not None else _repo_root(),
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"Step failed: {name} (exit code {result.returncode})")
+
+
+def _run_windows_powershell_checks(root: Path) -> None:
+    """Run PSScriptAnalyzer and Pester checks for the exe smoke script."""
+    helpers = root / _POWERSHELL_HELPERS
+    runner = root / _POWERSHELL_SCRIPT
+    analyzer_settings = root / _POWERSHELL_ANALYZER_SETTINGS
+    pester_test = root / _PESTER_TEST
+
+    ensure_modules = (
+        "$ErrorActionPreference = 'Stop'; "
+        "foreach ($moduleName in @('PSScriptAnalyzer', 'Pester')) { "
+        "if (-not (Get-Module -ListAvailable -Name $moduleName)) { "
+        "Install-Module -Name $moduleName -Force -Scope CurrentUser -AllowClobber "
+        "-Repository PSGallery } }"
+    )
+    _run_powershell_step("PowerShell module prerequisites", ensure_modules, cwd=root)
+
+    analyzer_command = (
+        "$issues = @(); "
+        f"foreach ($path in @('{helpers}', '{runner}')) {{ "
+        f"$issues += Invoke-ScriptAnalyzer -Path $path -Settings '{analyzer_settings}' "
+        "-Severity Warning }; "
+        "if ($issues) { $issues | Format-Table -AutoSize; exit 1 }"
+    )
+    _run_powershell_step(
+        "PSScriptAnalyzer (exe smoke scripts)", analyzer_command, cwd=root
+    )
+
+    pester_command = (
+        "Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop; "
+        f"Invoke-Pester -Path '{pester_test}' -PassThru -EnableExit"
+    )
+    _run_powershell_step("Pester (exe smoke helpers)", pester_command, cwd=root)
 
 
 def main() -> None:
@@ -130,6 +196,11 @@ def main() -> None:
 
     for name, step_args in subprocess_steps_after_pylint:
         _run_step(name, step_args, cwd=root)
+
+    if _is_windows():
+        _run_windows_powershell_checks(root)
+    else:
+        print("Skipping PowerShell checks (Windows only).")
 
     corpus_dir = root / _CORPUS_DIR
     baseline_path = root / "tests" / "fixtures" / "corpus-baseline.json"
