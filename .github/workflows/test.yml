@@ -91,7 +91,7 @@ jobs:
           python -m pip install --upgrade setuptools
           python -m pip install --upgrade wheel
           python -m pip install --upgrade pyinstaller
-          python -m pip install --upgrade -r requirements.txt
+          python -m pip install --upgrade -r requirements-dev.txt
         shell: pwsh
 
       - name: Generate version info file
