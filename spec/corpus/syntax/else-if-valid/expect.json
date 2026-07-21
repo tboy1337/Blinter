@@ -1,0 +1,8 @@
+{
+  "description": "else if chains are valid cmd.exe syntax (parser negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W056"],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}

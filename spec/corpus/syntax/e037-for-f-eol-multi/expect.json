@@ -1,0 +1,10 @@
+{
+  "description": "FOR /F eol= with multiple characters is invalid cmd.exe syntax (E037)",
+  "rules": ["E037"],
+  "lines": {
+    "2": ["E037"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax"]
+}

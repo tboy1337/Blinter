@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "w044 set spacing",
+  "lines": {
+    "2": [
+      "W001",
+      "W044"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001",
+    "W044"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

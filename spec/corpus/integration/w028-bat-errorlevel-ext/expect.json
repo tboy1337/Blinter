@@ -1,0 +1,24 @@
+{
+  "config": {},
+  "description": "w028 bat errorlevel ext",
+  "lines": {
+    "1": [
+      "S007"
+    ],
+    "2": [
+      "W028"
+    ],
+    "3": [
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S007",
+    "W001",
+    "W028"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

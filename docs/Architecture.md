@@ -1,6 +1,6 @@
 # Blinter Architecture
 
-Blinter is a read-only static analyzer for Windows batch files (`.bat`, `.cmd`). It does not execute batch code; it parses source text and applies rule checkers.
+Blinter is a read-only static analyzer for Windows batch files (`.bat`, `.cmd`). It does not execute batch code; it parses source text through a unified ANTLR-first visitor pipeline.
 
 ## Module map
 
@@ -9,28 +9,30 @@ src/blinter/
   __init__.py          # Public API (library and CLI entry re-exports)
   models.py            # BlinterConfig, LintIssue, Rule, RuleSeverity
   constants.py         # Shared constants (BUILTIN_VARS, MAX_FILE_SIZE_BYTES, ...)
-  patterns.py          # Dangerous-command and syntax patterns
+  patterns.py          # Dangerous-command and syntax patterns (generated from SSOT)
   rules/
-    registry.py        # RULES dict (single source of rule metadata)
+    registry.py        # RULES dict (generated from spec/data/rules.yaml)
     helpers.py         # _create_rule, _add_issue, severity helpers
   parsing/
+    ast_pipeline.py    # lint_via_ast() — unified AST-first orchestration
+    grammar_rules.py   # Grammar-backed rule codes (generated from rules.yaml)
+    preprocessor.py    # Line continuations, line number mapping
+    antlr_bridge.py    # ANTLR lex/parse
     structure.py       # Labels, SET variables, script structure
-    context.py         # Comment/safe-context helpers
     embedded.py        # PowerShell/VBScript block detection
-  checkers/
-    orchestration.py   # _process_file_checks, _filter_issues_by_config
-    syntax.py          # Error-level syntax rules
-    warnings.py        # Warning-level rules
-    style.py           # Style rules
-    security.py        # Security rules
-    performance.py     # Performance rules
-    vars.py            # Variable rules
-    line_endings.py    # Line-ending rules (E018, etc.)
-    advanced/          # Split from former advanced.py (facade __init__.py)
-    globals/           # Split from former globals.py (facade __init__.py)
+    visitors/
+      syntax_visitor.py      # Grammar-backed syntax (E009, E011, E017, E019, E030-E033)
+      structure_visitor.py   # Structural syntax rules
+      encoding_visitor.py    # Encoding and line-ending rules
+      flow_visitor.py        # Control-flow and global analysis
+      symbol_visitor.py      # Variable/symbol analysis
+      setlocal_visitor.py    # SETLOCAL nesting rules
+      heuristic_visitors.py  # SEC/W/P/S heuristic visitors
+      rule_impl/             # Rule implementation helpers (invoked by visitors)
   engine/
-    linter.py          # lint_batch_file() orchestration
+    linter.py          # lint_batch_file() entry point
     dependencies.py    # CALL graph and cross-script variable collection
+  checkers/            # Backward-compatible module aliases (re-export rule_impl)
   io/
     encoding.py        # read_file_with_encoding, size limits
     discovery.py       # find_batch_files, is_path_under_root
@@ -38,7 +40,7 @@ src/blinter/
     loader.py          # blinter.ini loading
   output/
     formatters.py      # CLI output formatting
-    json_formatter.py    # JSON report serialization
+    json_formatter.py  # JSON report serialization
   cli/
     args.py            # Argument parsing
     main.py            # CLI orchestration and multi-file processing
@@ -52,8 +54,7 @@ flowchart BT
   constants --> patterns
   patterns --> rules
   rules --> parsing
-  parsing --> checkers
-  checkers --> engine
+  parsing --> engine
   engine --> cli
   config --> cli
   io --> engine
@@ -61,9 +62,9 @@ flowchart BT
 
 1. **Input** — `read_file_with_encoding` reads the batch file; encoding is detected via `charset_normalizer` with fallbacks.
 2. **Structure** — Labels, SET variables, delayed expansion, and embedded script blocks are analyzed.
-3. **Checkers** — Line and global rules run via `orchestration._process_file_checks`.
+3. **AST pipeline** — `lint_via_ast()` runs encoding, structure, heuristic, flow, symbol, and grammar-backed visitor passes.
 4. **Filter** — `BlinterConfig`, inline `REM LINT:IGNORE` comments, and severity filters apply.
-5. **Output** — `LintIssue` list returned to library callers, or formatted by the CLI as human-readable text (`output/formatters.py`) or structured JSON (`output/json_formatter.py` via `--format json` / `--output`).
+5. **Output** — `LintIssue` list returned to library callers, or formatted by the CLI.
 
 ## Public vs internal imports
 
@@ -72,39 +73,50 @@ flowchart BT
 - `lint_batch_file`, `read_file_with_encoding`, `find_batch_files`
 - `load_config`, `create_default_config_file`, `main`
 - `BlinterConfig`, `LintIssue`, `Rule`, `RuleSeverity`
-- `__version__`, `__author__`, `__license__` — `__version__` is read from `[project].version` in `pyproject.toml` when developing from a source checkout; otherwise it uses installed package metadata (`importlib.metadata`), with a final fallback to parsing `pyproject.toml` (see `_version.py`).
+- `__version__`, `__author__`, `__license__`
 
-**Internal / extension imports** (import from subpackages):
+**Internal / extension imports**:
 
 ```python
 from blinter.rules.registry import RULES
-from blinter.checkers.syntax import _check_syntax_errors
-from blinter.checkers.advanced import _check_advanced_escaping_rules
-from blinter.checkers.globals import _check_unreachable_code
+from blinter.parsing.ast_pipeline import lint_via_ast
+from blinter.parsing.visitors.syntax_visitor import check_ast_syntax_rules
 ```
 
-Only symbols listed in `blinter.__all__` are stable for external integrators. Checker facades (`blinter.checkers.advanced`, `blinter.checkers.globals`) re-export symbols for tests and advanced use; keep their `__all__` lists in sync when moving functions between submodules.
-
-## Checker refactor (advanced / globals)
-
-Former monolithic modules were split into subpackages with facade `__init__.py` files that re-export all symbols. `orchestration.py` imports from the facades, so call sites do not need deep paths like `blinter.checkers.globals.exit_flow`.
-
-When adding or moving a checker function:
-
-1. Place it in the appropriate submodule under `advanced/` or `globals/`.
-2. Add the symbol to that subpackage's `__init__.py` and `__all__`.
-3. If `orchestration.py` calls it, ensure the facade export exists.
+Only symbols listed in `blinter.__all__` are stable for external integrators. The `blinter.checkers` package remains as backward-compatible aliases to `parsing.visitors.rule_impl`.
 
 ## Thread safety
 
-`lint_batch_file` and `read_file_with_encoding` are designed for concurrent use: they use local state and immutable global rule metadata. The CLI runs single-threaded. `RULES` is read-only at runtime.
-
-Per-lint invocation-prefix data (subroutine reachability for rules such as SEC014) is stored in a `contextvars.ContextVar` cache that is reset at the start of each `lint_batch_file` call, so concurrent lints in different threads do not share or clear each other's prefix state. Shared `lines_cache` reads and writes are synchronized via a lock in `engine/lines_cache.py`.
-
-## `--follow-calls` and `scan_root`
-
-When `follow_calls` is enabled, Blinter resolves `CALL` targets to read variables and lint called scripts recursively. Variable context is position-aware (available only after each `CALL` line) and includes variables from transitively called scripts within `MAX_FOLLOW_CALL_DEPTH` and `MAX_FOLLOW_CALL_FILES`. The CLI sets `BlinterConfig.scan_root` to the target directory (or the parent of a single file) so paths outside the scan root are not read or processed. `lint_batch_file()` defaults `scan_root` to the batch file's parent directory when unset, matching CLI containment for library callers. Follow-call lint failures on callee scripts are best-effort (logged, no exit impact); skipped primary discovery targets exit with code 1.
+`lint_batch_file` and `read_file_with_encoding` are designed for concurrent use. Per-lint invocation-prefix data uses a `contextvars.ContextVar` cache reset at each `lint_batch_file` call.
 
 ## Configuration
 
 `BlinterConfig` controls recursion, rule enablement, `max_line_length`, `follow_calls`, `scan_root`, and severity filtering. Values can be loaded from `blinter.ini` and overridden by CLI flags.
+
+## SSOT grammar and spec (`spec/`)
+
+| Artifact | Role |
+|----------|------|
+| [`spec/data/rules.yaml`](../../spec/data/rules.yaml) | Rule catalog (all `checker: ast`; see `RULE_COUNT`) |
+| [`spec/data/commands.yaml`](../../spec/data/commands.yaml) | Builtin/deprecated commands (generates `patterns.py`) |
+| [`spec/data/expansion.yaml`](../../spec/data/expansion.yaml) | `%~` modifiers (generates `expansion_data.py`) |
+| [`spec/grammar/*.g4`](../../spec/grammar/) | ANTLR 4 lexer/parser (generates `src/blinter/generated/`) |
+| [`spec/corpus/`](../../spec/corpus/) | 202 committed fixtures + `expect.json` oracles |
+| [`spec/audit/`](../../spec/audit/) | Reference matrix, cmd.exe help captures, audit baselines |
+
+Generators live under [`scripts/spec/`](../scripts/spec/). `scripts/verify.py` runs schema validation, generator `--check`, strict SSOT audit, cmd.exe oracle (Windows), linting, and tests.
+
+**cmd.exe oracle:** [`scripts/spec/cmd_oracle.py`](../scripts/spec/cmd_oracle.py) runs safe corpus fixtures in isolated `cmd /c` subprocesses (currently **167 runnable**, **19 skipped** with default 3s timeout). Skips use an explicit denylist ([`oracle-skip.yaml`](../spec/corpus/meta/oracle-skip.yaml)) plus refined content heuristics (not a blanket security skip). Per-case overrides in `expect.json`: `"oracle": "skip"` / `"oracle": "run"` and `"oracle_timeout_s"`. Destructive, interactive, or long-running fixtures remain static-only; echo/set-only security fixtures run as smoke tests.
+
+Corpus policy: every rule in `rules.yaml` must have at least one corpus assertion (see `audit_ssot.py` coverage checks).
+
+### AST-first parsing pipeline
+
+All rules are implemented through AST-aware visitors (`checker: ast` in `rules.yaml`):
+
+1. [`parsing/preprocessor.py`](parsing/preprocessor.py) — join `^` continuations, map line numbers
+2. [`parsing/antlr_bridge.py`](parsing/antlr_bridge.py) — ANTLR lex/parse
+3. [`parsing/ast_pipeline.py`](parsing/ast_pipeline.py) — orchestrates visitor passes
+4. [`parsing/visitors/`](parsing/visitors/) — syntax, structure, encoding, flow, symbol, setlocal, and heuristic visitors
+
+Grammar-backed rules (those with `grammar_nodes` in `rules.yaml`) use `SyntaxLintVisitor` on the parse tree. Security, performance, and style rules use heuristic visitors that walk command nodes and apply pattern libraries.

@@ -1,4 +1,12 @@
-"""Regex patterns for dangerous commands and deprecated syntax."""
+"""Regex patterns for dangerous commands and deprecated syntax.
+
+SSOT tables (dangerous commands, builtins, typos) are generated from
+spec/data/commands.yaml. Embedded-language detection patterns are maintained
+in scripts/spec/patterns_static_fragment.py.
+
+THIS FILE IS PARTIALLY GENERATED — run:
+  py scripts/spec/generate_commands.py
+"""
 
 import re
 from typing import List, Set, Tuple
@@ -13,6 +21,267 @@ DANGEROUS_COMMAND_NAMES: List[str] = [
 ]
 
 _DANGEROUS_CMDS_REGEX: str = "|".join(DANGEROUS_COMMAND_NAMES)
+
+DANGEROUS_COMMAND_PATTERNS: List[Tuple[str, str]] = [
+    ("del\\s+(?:[/-]\\w+\\s+)*[\\\"']?\\*\\.\\*[\\\"']?(\\s|$)", "SEC003"),
+    ("del\\s+(?:[/-]\\w+\\s+)*[\\\"']?\\*/\\*[\\\"']?(\\s|$)", "SEC003"),
+    ("del\\s+(?:[/-]\\w+\\s+)*[\\\"']?[a-z]:\\\\\\*[\\\"']?(\\s|$)", "SEC003"),
+    ("format\\s+(?:[/-]\\w+\\s+)*[a-z]:", "SEC003"),
+    ("\\b(ps)?shutdown\\s+[/-]", "SEC003"),
+    ("rmdir\\s+/s\\s+/q\\s+", "SEC003"),
+    ("reg\\s+delete\\s+.*\\s+/f", "SEC004"),
+]
+
+COMMAND_CASING_KEYWORDS: Set[str] = {
+    "attrib",
+    "call",
+    "cd",
+    "choice",
+    "cls",
+    "copy",
+    "del",
+    "dir",
+    "echo",
+    "enabledelayedexpansion",
+    "endlocal",
+    "exit",
+    "find",
+    "findstr",
+    "for",
+    "goto",
+    "if",
+    "ipconfig",
+    "mkdir",
+    "more",
+    "move",
+    "net",
+    "netstat",
+    "pause",
+    "ping",
+    "popd",
+    "powershell",
+    "pushd",
+    "reg",
+    "rem",
+    "rmdir",
+    "robocopy",
+    "sc",
+    "set",
+    "setlocal",
+    "sort",
+    "taskkill",
+    "tasklist",
+    "timeout",
+    "type",
+    "wmic",
+    "xcopy",
+}
+
+OLDER_WINDOWS_COMMANDS: Set[str] = {
+    "choice",
+    "forfiles",
+    "icacls",
+    "where",
+}
+
+ARCHITECTURE_SPECIFIC_PATTERNS: List[str] = [
+    r"Wow6432Node",
+    r"Program Files \(x86\)",
+    r"SysWow64",
+]
+
+UNICODE_PROBLEMATIC_COMMANDS: Set[str] = {
+    "echo",
+    "find",
+    "findstr",
+    "type",
+}
+
+DEPRECATED_COMMANDS = {
+    "assign": "Deprecated Windows command",
+    "backup": "Deprecated Windows command",
+    "bitsadmin": "Deprecated Windows command",
+    "cacls": "Deprecated Windows command",
+    "comp": "Deprecated Windows command",
+    "dpath": "Deprecated Windows command",
+    "edlin": "Deprecated Windows command",
+    "join": "Deprecated Windows command",
+    "keys": "Deprecated Windows command",
+    "nbtstat": "Deprecated Windows command",
+    "subst": "Deprecated Windows command",
+    "winrm": "Deprecated Windows command",
+    "wmic": "Deprecated Windows command",
+}
+
+REMOVED_COMMANDS = {
+    "append": "Removed Windows command",
+    "browstat": "Removed Windows command",
+    "caspol": "Removed Windows command",
+    "diskcomp": "Removed Windows command",
+    "diskcopy": "Removed Windows command",
+    "inuse": "Removed Windows command",
+    "streams": "Removed Windows command",
+}
+
+COMMON_COMMAND_TYPOS = {
+    "caal": "call",
+    "ecko": "echo",
+    "ecoh": "echo",
+    "exitt": "exit",
+    "forx": "for",
+    "fro": "for",
+    "goot": "goto",
+    "iff": "if",
+    "sett": "set",
+}
+
+SENSITIVE_KEYWORDS: List[str] = [
+    "password",
+    "pwd",
+    "passwd",
+    "apikey",
+    "api_key",
+    "secret",
+    "token",
+]
+
+CREDENTIAL_PATTERNS = [
+    rf"{keyword}\s*=\s*[\"\']?[^\s\"']+[\"\']?" for keyword in SENSITIVE_KEYWORDS
+]
+
+SENSITIVE_ECHO_PATTERNS = [rf"echo.*{keyword}" for keyword in SENSITIVE_KEYWORDS]
+
+BUILTIN_COMMANDS: Set[str] = {
+    "7z",
+    "aria2c",
+    "attrib",
+    "aws",
+    "az",
+    "bundle",
+    "call",
+    "cargo",
+    "cd",
+    "chdir",
+    "choco",
+    "choice",
+    "cls",
+    "cmake",
+    "cmd",
+    "code",
+    "color",
+    "composer",
+    "copy",
+    "cscript",
+    "curl",
+    "date",
+    "del",
+    "dir",
+    "docker",
+    "docker-compose",
+    "dotnet",
+    "echo",
+    "endlocal",
+    "erase",
+    "exit",
+    "find",
+    "findstr",
+    "for",
+    "ftp",
+    "gcloud",
+    "gem",
+    "gh",
+    "git",
+    "go",
+    "gofmt",
+    "goto",
+    "gradle",
+    "gzip",
+    "helm",
+    "help",
+    "hg",
+    "if",
+    "ipconfig",
+    "java",
+    "javac",
+    "kubectl",
+    "make",
+    "maven",
+    "md",
+    "mkdir",
+    "more",
+    "move",
+    "msbuild",
+    "msiexec",
+    "mvn",
+    "nano",
+    "net",
+    "netstat",
+    "ninja",
+    "node",
+    "notepad",
+    "npm",
+    "npx",
+    "nslookup",
+    "nuget",
+    "path",
+    "pause",
+    "php",
+    "ping",
+    "pip",
+    "pip3",
+    "pipenv",
+    "pnpm",
+    "poetry",
+    "popd",
+    "powershell",
+    "prompt",
+    "pushd",
+    "py",
+    "python",
+    "python3",
+    "rd",
+    "reg",
+    "ren",
+    "rename",
+    "rmdir",
+    "robocopy",
+    "ruby",
+    "rustc",
+    "rustup",
+    "sc",
+    "scoop",
+    "scp",
+    "set",
+    "setlocal",
+    "shift",
+    "sort",
+    "ssh",
+    "start",
+    "svn",
+    "tar",
+    "taskkill",
+    "tasklist",
+    "telnet",
+    "terraform",
+    "time",
+    "timeout",
+    "title",
+    "tracert",
+    "type",
+    "unzip",
+    "ver",
+    "vim",
+    "vol",
+    "wget",
+    "winget",
+    "wmic",
+    "wscript",
+    "xcopy",
+    "yarn",
+    "zip",
+}
+
+# Compiled helpers and embedded-language detection (not in commands.yaml SSOT).
 
 _COMPILED_IF_PATTERN = re.compile(r"if\s+(.+)", re.IGNORECASE)
 
@@ -36,334 +305,66 @@ _COMPILED_NET_COMMAND = re.compile(r"\bnet\s+", re.IGNORECASE)
 
 _COMPILED_DELAYED_VAR = re.compile(r"![^!]+!")
 
-DANGEROUS_COMMAND_PATTERNS: List[Tuple[str, str]] = [
-    (
-        r"del\s+(?:[/-]\w+\s+)*[\"']?\*\.\*[\"']?(\s|$)",
-        "SEC003",
-    ),  # del *.* with optional flags
-    (
-        r"del\s+(?:[/-]\w+\s+)*[\"']?\*/\*[\"']?(\s|$)",
-        "SEC003",
-    ),  # del */* pattern with optional flags
-    (
-        r"del\s+(?:[/-]\w+\s+)*[\"']?[a-z]:\\\*[\"']?(\s|$)",
-        "SEC003",
-    ),  # del c:\* type commands with optional flags
-    (
-        r"format\s+(?:[/-]\w+\s+)*[a-z]:",
-        "SEC003",
-    ),  # format c: type commands with optional flags
-    (r"\b(ps)?shutdown\s+[/-]", "SEC003"),  # shutdown/psshutdown commands with flags
-    (r"rmdir\s+/s\s+/q\s+", "SEC003"),  # rmdir /s /q commands
-    (r"reg\s+delete\s+.*\s+/f", "SEC004"),  # forced registry deletions
-]
-
-COMMAND_CASING_KEYWORDS = {
-    "echo",
-    "set",
-    "if",
-    "for",
-    "goto",
-    "call",
-    "exit",
-    "rem",
-    "pause",
-    "copy",
-    "move",
-    "del",
-    "dir",
-    "type",
-    "find",
-    "findstr",
-    "sort",
-    "more",
-    "cls",
-    "cd",
-    "pushd",
-    "popd",
-    "mkdir",
-    "rmdir",
-    "attrib",
-    "xcopy",
-    "robocopy",
-    "ping",
-    "ipconfig",
-    "netstat",
-    "tasklist",
-    "taskkill",
-    "sc",
-    "net",
-    "reg",
-    "wmic",
-    "powershell",
-    "timeout",
-    "choice",
-    "setlocal",
-    "endlocal",
-    "enabledelayedexpansion",
-}
-
-OLDER_WINDOWS_COMMANDS = {"choice", "forfiles", "where", "icacls"}
-
-ARCHITECTURE_SPECIFIC_PATTERNS = [
-    r"Wow6432Node",  # 32-bit registry redirect
-    r"Program Files \(x86\)",  # 32-bit program files
-    r"SysWow64",  # 32-bit system directory
-]
-
-UNICODE_PROBLEMATIC_COMMANDS = {"type", "echo", "find", "findstr"}
-
-DEPRECATED_COMMANDS = {
-    "wmic",  # Use PowerShell WMI cmdlets instead
-    "cacls",  # Use icacls instead
-    "winrm",  # Use PowerShell Remoting instead
-    "bitsadmin",  # Use PowerShell BitsTransfer module instead
-    "nbtstat",  # Use PowerShell Get-NetAdapter cmdlets instead
-    "dpath",  # Modify PATH environment variable instead
-    "keys",  # Use CHOICE or SET /P instead
-    "assign",  # Legacy command
-    "backup",  # Legacy command
-    "comp",  # Use FC instead
-    "edlin",  # Legacy line editor
-    "join",  # Legacy command
-    "subst",  # Use persistent drive mappings or UNC paths instead
-}
-
-REMOVED_COMMANDS = {
-    "caspol",  # Removed - use Code Access Security Policy Tool from SDK
-    "diskcomp",  # Removed - use FC for file comparison
-    "append",  # Removed - modify PATH or use full paths
-    "browstat",  # Removed - use NET VIEW or PowerShell
-    "inuse",  # Removed - use HANDLE.EXE from Sysinternals
-    "diskcopy",  # Removed - use ROBOCOPY or XCOPY
-    "streams",  # Removed - use Get-Item -Stream in PowerShell
-}
-
-COMMON_COMMAND_TYPOS = {
-    "iff": "if",
-    "ecko": "echo",
-    "ecoh": "echo",
-    "forx": "for",
-    "fro": "for",
-    "goot": "goto",
-    "sett": "set",
-    "caal": "call",
-    "exitt": "exit",
-}
-
-SENSITIVE_KEYWORDS: List[str] = [
-    "password",
-    "pwd",
-    "passwd",
-    "apikey",
-    "api_key",
-    "secret",
-    "token",
-]
-
-CREDENTIAL_PATTERNS = [
-    rf"{keyword}\s*=\s*[\"']?[^\s\"']+[\"']?" for keyword in SENSITIVE_KEYWORDS
-]
-
-SENSITIVE_ECHO_PATTERNS = [rf"echo.*{keyword}" for keyword in SENSITIVE_KEYWORDS]
-
-BUILTIN_COMMANDS: Set[str] = {
-    # Core batch commands
-    "echo",
-    "set",
-    "if",
-    "for",
-    "goto",
-    "call",
-    "exit",
-    "pause",
-    "setlocal",
-    "endlocal",
-    "shift",
-    "pushd",
-    "popd",
-    # File operations
-    "dir",
-    "copy",
-    "move",
-    "del",
-    "erase",
-    "ren",
-    "rename",
-    "type",
-    "xcopy",
-    "robocopy",
-    "mkdir",
-    "md",
-    "rmdir",
-    "rd",
-    "cd",
-    "chdir",
-    "attrib",
-    # System commands
-    "cls",
-    "ver",
-    "vol",
-    "date",
-    "time",
-    "title",
-    "color",
-    "prompt",
-    "path",
-    "help",
-    "start",
-    "cmd",
-    "tasklist",
-    "taskkill",
-    # Network commands
-    "ping",
-    "ipconfig",
-    "netstat",
-    "net",
-    "nslookup",
-    "tracert",
-    # Other common commands
-    "find",
-    "findstr",
-    "sort",
-    "more",
-    "choice",
-    "timeout",
-    "sc",
-    "reg",
-    "wmic",
-    "powershell",
-    "cscript",
-    "wscript",
-    "msiexec",
-    # Common external programs
-    "npm",
-    "node",
-    "npx",
-    "yarn",
-    "pnpm",
-    "git",
-    "gh",
-    "svn",
-    "hg",
-    "python",
-    "python3",
-    "py",
-    "pip",
-    "pip3",
-    "pipenv",
-    "poetry",
-    "ruby",
-    "gem",
-    "bundle",
-    "php",
-    "composer",
-    "java",
-    "javac",
-    "maven",
-    "mvn",
-    "gradle",
-    "dotnet",
-    "nuget",
-    "msbuild",
-    "cargo",
-    "rustc",
-    "rustup",
-    "go",
-    "gofmt",
-    "docker",
-    "docker-compose",
-    "kubectl",
-    "helm",
-    "aws",
-    "az",
-    "gcloud",
-    "terraform",
-    "make",
-    "cmake",
-    "ninja",
-    "wget",
-    "curl",
-    "aria2c",
-    "7z",
-    "zip",
-    "unzip",
-    "tar",
-    "gzip",
-    "choco",
-    "scoop",
-    "winget",
-    "code",
-    "vim",
-    "nano",
-    "notepad",
-    "ssh",
-    "scp",
-    "ftp",
-    "telnet",
-}
-
 POWERSHELL_PATTERNS: List[str] = [
-    r"\$\w+\s*=",  # PowerShell variable assignment: $var =
-    r"\$\w+\.\w+",  # PowerShell member access: $var.property
-    r"\[.*::\w+\]",  # PowerShell static method/type: [Type::Method]
-    r"-match\s+",  # PowerShell -match operator
-    r"-eq\s+",  # PowerShell -eq operator
-    r"-ne\s+",  # PowerShell -ne operator
-    r"-ge\s+",  # PowerShell -ge operator
-    r"-le\s+",  # PowerShell -le operator
-    r"-gt\s+",  # PowerShell -gt operator
-    r"-lt\s+",  # PowerShell -lt operator
-    r"Get-\w+",  # PowerShell cmdlets (Get-*)
-    r"Set-\w+",  # PowerShell cmdlets (Set-*)
-    r"Write-\w+",  # PowerShell cmdlets (Write-*)
-    r"New-\w+",  # PowerShell cmdlets (New-*)
-    r"foreach\s*\(",  # PowerShell foreach loop (lowercase)
-    r"ForEach-Object",  # PowerShell ForEach-Object cmdlet
-    r"\|\s*%\s*{",  # PowerShell pipe to % (ForEach-Object alias)
-    r"\.Get\(\)",  # PowerShell method call pattern
-    r"\.OpenSubKey\(",  # Registry access pattern
-    r"\.GetSubKeyNames\(\)",  # Registry enumeration
-    r"\[Microsoft\.Win32\.",  # .NET type usage
-    r"\[System\.",  # .NET System namespace
-    r"\[Convert\]::\w+",  # .NET Convert class
-    r"\[Math\]::\w+",  # .NET Math class
+    r"\$\w+\s*=",
+    r"\$\w+\.\w+",
+    r"\[.*::\w+\]",
+    r"-match\s+",
+    r"-eq\s+",
+    r"-ne\s+",
+    r"-ge\s+",
+    r"-le\s+",
+    r"-gt\s+",
+    r"-lt\s+",
+    r"Get-\w+",
+    r"Set-\w+",
+    r"Write-\w+",
+    r"New-\w+",
+    r"foreach\s*\(",
+    r"ForEach-Object",
+    r"\|\s*%\s*{",
+    r"\.Get\(\)",
+    r"\.OpenSubKey\(",
+    r"\.GetSubKeyNames\(\)",
+    r"\[Microsoft\.Win32\.",
+    r"\[System\.",
+    r"\[Convert\]::\w+",
+    r"\[Math\]::\w+",
 ]
 
 VBSCRIPT_PATTERNS: List[str] = [
-    r"^\s*Dim\s+",  # VBScript Dim statement
-    r"^\s*Set\s+\w+\s*=\s*CreateObject",  # VBScript CreateObject
-    r"WScript\.",  # WScript object
-    r"^\s*On\s+Error\s+Resume\s+Next",  # VBScript error handling
-    r"^\s*Function\s+\w+\(",  # VBScript function definition
-    r"^\s*Sub\s+\w+\(",  # VBScript subroutine definition
-    r"^\s*End\s+Function",  # VBScript end function
-    r"^\s*End\s+Sub",  # VBScript end sub
-    r"^\s*'",  # VBScript comment (line starting with ')
+    r"^\s*Dim\s+",
+    r"^\s*Set\s+\w+\s*=\s*CreateObject",
+    r"WScript\.",
+    r"^\s*On\s+Error\s+Resume\s+Next",
+    r"^\s*Function\s+\w+\(",
+    r"^\s*Sub\s+\w+\(",
+    r"^\s*End\s+Function",
+    r"^\s*End\s+Sub",
+    r"^\s*'",
 ]
 
 CSHARP_PATTERNS: List[str] = [
-    r"^\s*using\s+System",  # C# using statement
-    # C# access modifiers
+    r"^\s*using\s+System",
     r"^\s*(public|private|protected|internal)\s+(class|static|void|string|int|bool)",
-    r"^\s*namespace\s+",  # C# namespace
-    r"\bforeach\s*\(\s*\w+\s+\w+\s+in\s+",  # C# foreach (type var in collection)
-    r"\bfor\s*\(\s*int\s+\w+\s*=",  # C# for loop with int declaration
-    r"\bfor\s*\(\s*uint\s+\w+\s*=",  # C# for loop with uint declaration
-    r"\bfor\s*\(\s*long\s+\w+\s*=",  # C# for loop with long declaration
-    r"byte\s+\w+\s+in\s+",  # C# byte iteration
-    r"^\s*{\s*$",  # C# opening brace on its own line (common in C#)
-    r"0x[0-9A-Fa-f]+",  # Hexadecimal literals (common in C#/C++)
-    r"\b(uint|byte|long|ushort|ulong)\s+",  # C# primitive types
+    r"^\s*namespace\s+",
+    r"\bforeach\s*\(\s*\w+\s+\w+\s+in\s+",
+    r"\bfor\s*\(\s*int\s+\w+\s*=",
+    r"\bfor\s*\(\s*uint\s+\w+\s*=",
+    r"\bfor\s*\(\s*long\s+\w+\s*=",
+    r"byte\s+\w+\s+in\s+",
+    r"^\s*{\s*$",
+    r"0x[0-9A-Fa-f]+",
+    r"\b(uint|byte|long|ushort|ulong)\s+",
 ]
 
 BATCH_INDICATORS: List[str] = [
     r"^@?echo\s+",
     r"^setlocal\b",
     r"^endlocal\b",
-    r"^set\s+[A-Z_]+=",  # Batch SET with uppercase var
+    r"^set\s+[A-Z_]+=",
     r"^if\s+",
-    r"^FOR\s+",  # FOR in uppercase is batch
+    r"^FOR\s+",
     r"^goto\s+",
     r"^call\s+",
     r"^exit\s+",

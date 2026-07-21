@@ -6,6 +6,7 @@ source = src/blinter
 omit =
     */tests/*
     */test_*
+    */generated/*
     */__pycache__/*
     */.*
     */venv/*

@@ -1,0 +1,8 @@
+{
+  "config": {},
+  "description": "Valid IF EXIST forms (E036 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E036"],
+  "tags": ["syntax", "control-flow"]
+}

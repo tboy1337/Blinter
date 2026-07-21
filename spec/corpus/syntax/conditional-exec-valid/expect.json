@@ -1,0 +1,8 @@
+{
+  "description": "Conditional execution with && and || is valid cmd.exe syntax (W056 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W056"],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}

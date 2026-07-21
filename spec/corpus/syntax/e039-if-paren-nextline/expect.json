@@ -1,0 +1,10 @@
+{
+  "description": "IF block open parenthesis on next line is invalid (E039)",
+  "rules": ["E039"],
+  "lines": {
+    "2": ["E039"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax"]
+}

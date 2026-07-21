@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "s003 command casing",
+  "lines": {
+    "3": [
+      "S003",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S003",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

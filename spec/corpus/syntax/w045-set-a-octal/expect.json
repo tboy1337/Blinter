@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "w045 set a octal",
+  "lines": {
+    "2": [
+      "W001",
+      "W045"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001",
+    "W045"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

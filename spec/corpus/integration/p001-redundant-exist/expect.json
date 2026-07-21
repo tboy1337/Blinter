@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "p001 redundant exist",
+  "lines": {
+    "3": [
+      "P001",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P001",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

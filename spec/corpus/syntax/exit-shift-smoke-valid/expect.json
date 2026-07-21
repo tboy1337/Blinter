@@ -1,0 +1,11 @@
+{
+  "config": {},
+  "description": "EXIT /B and SHIFT parse as valid batch control flow (grammar smoke)",
+  "lines": {},
+  "must_not": [],
+  "rules": [],
+  "tags": [
+    "syntax",
+    "control-flow"
+  ]
+}

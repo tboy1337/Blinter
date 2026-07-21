@@ -1,0 +1,22 @@
+{
+  "config": {},
+  "description": "w024 deprecated wmic",
+  "lines": {
+    "2": [
+      "W001",
+      "W002",
+      "W003",
+      "W024"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001",
+    "W002",
+    "W003",
+    "W024"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

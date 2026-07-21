@@ -1,0 +1,8 @@
+{
+  "description": "FOR /F variables within tokens= range (W063 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W063"],
+  "config": {},
+  "tags": ["syntax"]
+}

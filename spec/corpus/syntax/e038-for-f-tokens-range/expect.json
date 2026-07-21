@@ -1,0 +1,10 @@
+{
+  "description": "FOR /F tokens= with descending range is invalid (E038)",
+  "rules": ["E038"],
+  "lines": {
+    "2": ["E038"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax"]
+}

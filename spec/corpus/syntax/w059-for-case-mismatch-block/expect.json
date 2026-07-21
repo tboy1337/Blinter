@@ -1,0 +1,10 @@
+{
+  "description": "FOR loop case mismatch inside parenthesized block (W059)",
+  "rules": ["W059"],
+  "lines": {
+    "3": ["W059"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}

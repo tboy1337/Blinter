@@ -1,0 +1,22 @@
+{
+  "config": {},
+  "description": "w040 for var scope",
+  "lines": {
+    "3": [
+      "W001",
+      "W023",
+      "W039",
+      "W040"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001",
+    "W023",
+    "W039",
+    "W040"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

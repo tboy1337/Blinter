@@ -1,0 +1,26 @@
+{
+  "config": {},
+  "description": "p013 dir no b flag",
+  "lines": {
+    "2": [
+      "P010",
+      "P013",
+      "P014",
+      "SEC006",
+      "SEC007",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P010",
+    "P013",
+    "P014",
+    "SEC006",
+    "SEC007",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

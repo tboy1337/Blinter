@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "w034 for f usebackq",
+  "lines": {
+    "2": [
+      "W001",
+      "W034",
+      "W035"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001",
+    "W034",
+    "W035"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

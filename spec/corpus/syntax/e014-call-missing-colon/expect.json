@@ -1,0 +1,26 @@
+{
+  "config": {},
+  "description": "e014 call missing colon",
+  "lines": {
+    "2": [
+      "E014",
+      "W033"
+    ],
+    "3": [
+      "S010",
+      "S018",
+      "S027"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E014",
+    "S010",
+    "S018",
+    "S027",
+    "W033"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

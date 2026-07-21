@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blinter.dev/schema/commands.schema.json",
+  "title": "Blinter command definitions",
+  "type": "object",
+  "required": ["version"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "dangerous_command_names": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "dangerous_command_patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["pattern", "rule_code"],
+        "properties": {
+          "pattern": { "type": "string" },
+          "rule_code": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "command_casing_keywords": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "builtin_commands": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "deprecated_commands": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "removed_commands": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "older_windows_commands": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "common_command_typos": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "sensitive_keywords": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "architecture_specific_patterns": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "unicode_problematic_commands": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "builtin_overlap_deprecated_notes": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

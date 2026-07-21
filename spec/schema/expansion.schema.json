@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blinter.dev/schema/expansion.schema.json",
+  "title": "Blinter batch expansion rules",
+  "type": "object",
+  "required": ["version", "valid_modifiers", "valid_modifier_chars"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "valid_modifiers": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "valid_modifier_chars": {
+      "type": "string",
+      "pattern": "^[a-z]+$"
+    },
+    "valid_parameter_patterns": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "invalid_combinations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["reason"],
+        "properties": {
+          "pattern": { "type": "string" },
+          "modifiers": { "type": "string" },
+          "reason": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "valid_combined_examples": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "delayed_expansion": {
+      "type": "object",
+      "required": ["pattern", "requires_setlocal"],
+      "properties": {
+        "pattern": { "type": "string", "minLength": 1 },
+        "requires_setlocal": { "type": "boolean" },
+        "enable_keywords": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "for_loop_variables": {
+      "type": "object",
+      "required": ["batch_file_prefix", "command_line_prefix"],
+      "properties": {
+        "batch_file_prefix": { "type": "string", "const": "%%" },
+        "command_line_prefix": { "type": "string", "const": "%" }
+      },
+      "additionalProperties": false
+    },
+    "caret_escape": {
+      "type": "object",
+      "required": ["valid_caret_counts", "description"],
+      "properties": {
+        "valid_caret_counts": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1 },
+          "minItems": 1
+        },
+        "description": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "double_percent": {
+      "type": "object",
+      "properties": {
+        "for_body_rule": { "type": "string" },
+        "echo_literal_rule": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "string_operations": {
+      "type": "object",
+      "properties": {
+        "substring_pattern": { "type": "string" },
+        "replacement_pattern": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "path_search_modifier": {
+      "type": "object",
+      "properties": {
+        "pattern": { "type": "string" },
+        "description": { "type": "string" },
+        "example": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "legacy_id_notes": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

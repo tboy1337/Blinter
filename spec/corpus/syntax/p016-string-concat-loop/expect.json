@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "p016 string concat loop",
+  "lines": {
+    "4": [
+      "P016",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P016",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

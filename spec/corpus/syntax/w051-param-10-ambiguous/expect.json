@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "Double-digit batch parameters parse as %1 plus literal digits (W051)",
+  "lines": {
+    "2": ["W051"]
+  },
+  "must_not": [],
+  "rules": ["W051"],
+  "tags": [
+    "syntax"
+  ]
+}

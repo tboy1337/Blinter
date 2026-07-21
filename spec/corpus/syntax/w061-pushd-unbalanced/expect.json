@@ -1,0 +1,10 @@
+{
+  "description": "PUSHD without matching POPD leaves mapped drives (W061)",
+  "rules": ["W061"],
+  "lines": {
+    "2": ["W061"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax"]
+}

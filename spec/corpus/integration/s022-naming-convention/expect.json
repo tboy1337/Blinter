@@ -1,0 +1,22 @@
+{
+  "config": {},
+  "description": "s022 naming convention",
+  "lines": {
+    "1": [
+      "S022"
+    ],
+    "4": [
+      "S017",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S017",
+    "S022",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

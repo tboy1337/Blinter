@@ -1,0 +1,749 @@
+version: 2
+description: SSOT construct to authoritative source mapping for batch language audit
+  (AST-first visitor pipeline; full rule coverage enforced by audit_ssot.py)
+implementation: ast
+entries:
+- construct: Nested parentheses and block structure
+  sources:
+  - MS Learn batch syntax
+  ssot_artifacts:
+  - rules E001
+  rules:
+  - E001
+  corpus:
+  - syntax/e001-nested-parens
+- construct: GOTO label resolution and unreachable flow
+  sources:
+  - MS Learn goto
+  - spec/audit/cmd-help/goto-help.txt
+  - spec/audit/cmd-help/if-help.txt
+  ssot_artifacts:
+  - rules E002 W001 W019
+  rules:
+  - E002
+  - W001
+  - W019
+  corpus:
+  - syntax/e002-missing-label
+  - integration/special-filename-percent
+  - syntax/w019-goto-lf
+  - syntax/for-in-parens-valid
+  - syntax/percent-tilde-dp0-valid
+  - syntax/if-errorlevel-ge
+  - syntax/e021-string-substring-valid
+  - integration/w005-unquoted-var
+  - integration/w028-bat-errorlevel
+  - integration/w028-bat-errorlevel-ext
+- construct: IF command format and EXIST/NOT mixing
+  sources:
+  - MS Learn if
+  - spec/audit/cmd-help/if-help.txt
+  ssot_artifacts:
+  - rules E003 E004 E036 E039 W021 W056
+  rules:
+  - E003
+  - E004
+  - E036
+  - E039
+  - W021
+  - W056
+  corpus:
+  - syntax/e003-if-format
+  - syntax/e004-if-exist-mix
+  - syntax/e036-if-exists-typo
+  - syntax/e036-if-exist-valid
+  - syntax/e039-if-paren-nextline
+  - syntax/e039-if-paren-sameline-valid
+  - syntax/w021-if-unquoted
+  - syntax/e007-empty-var-check
+  - syntax/w056-if-pseudo-and
+  - syntax/w056-if-nested-valid
+  - syntax/w056-if-orange-valid
+  - syntax/w056-dash-concat-valid
+  - syntax/w056-else-if-pseudo-and
+  - syntax/else-if-valid
+  - syntax/conditional-exec-valid
+- construct: Path validation, UNC, and hardcoded absolute paths
+  sources:
+  - MS Learn cd/path
+  - spec/audit/cmd-help/cd-help.txt
+  - spec/audit/cmd-help/ren-help.txt
+  - spec/audit/cmd-help/pushd-help.txt
+  - spec/audit/cmd-help/popd-help.txt
+  - spec/audit/cmd-help/move-help.txt
+  ssot_artifacts:
+  - rules E005 E027 SEC006 W058 W061 W062
+  rules:
+  - E005
+  - E027
+  - SEC006
+  - W058
+  - W061
+  - W062
+  corpus:
+  - syntax/e005-invalid-path
+  - syntax/e027-unc-cd
+  - integration/sec024-self-copy-removable
+  - integration/w007-locked-path
+  - syntax/p013-dir-no-b-flag
+  - syntax/w008-path-modification
+  - syntax/w058-ren-path
+  - syntax/w058-ren-valid
+  - syntax/w061-pushd-unbalanced
+  - syntax/w061-pushd-popd-valid
+  - syntax/w062-cd-no-d-switch
+  - syntax/w062-cd-d-valid
+- construct: Undefined variable references
+  sources:
+  - MS Learn set
+  - SS64 variables
+  ssot_artifacts:
+  - rules E006 W054
+  rules:
+  - E006
+  - W054
+  corpus:
+  - syntax/e007-empty-var-check
+  - syntax/w054-digit-var-set
+  - syntax/w054-digit-var-delayed-valid
+  - integration/delayed-expansion-no-p026
+  - integration/follow-calls-e006
+  - integration/p002-code-duplication
+  - integration/p008-delayed-not-enabled
+  - integration/sec010-sensitive-echo
+  - integration/setlocal-delayed-expansion
+- construct: Empty variable check syntax
+  sources:
+  - MS Learn if
+  - SS64 IF
+  ssot_artifacts:
+  - rules E007
+  rules:
+  - E007
+  corpus:
+  - syntax/e007-empty-var-check
+- construct: Unreachable code after EXIT/GOTO
+  sources:
+  - MS Learn control flow
+  - spec/audit/cmd-help/exit-help.txt
+  ssot_artifacts:
+  - rules E008
+  rules:
+  - E008
+  corpus:
+  - integration/e008-unreachable-after-exit
+  - integration/s015-inconsistent-goto-colon
+- construct: EXIT and SHIFT batch parameters
+  sources:
+  - spec/audit/cmd-help/exit-help.txt
+  - spec/audit/cmd-help/shift-help.txt
+  - MS Learn shift
+  - SS64 shift
+  ssot_artifacts:
+  - rules W050 W052 W053
+  rules:
+  - W050
+  - W052
+  - W053
+  corpus:
+  - syntax/exit-shift-smoke-valid
+  - syntax/w050-shift-invalid-n
+  - syntax/w050-shift-valid-boundaries
+  - syntax/w052-shift-in-block
+  - syntax/w052-shift-outside-valid
+  - syntax/w053-shift-bare
+- construct: Quote and percent expansion syntax
+  sources:
+  - cmd.exe parsing
+  - SS64 escape
+  ssot_artifacts:
+  - rules E009 E011 E028
+  rules:
+  - E009
+  - E011
+  - E028
+  corpus:
+  - syntax/e009-mismatched-quotes
+  - syntax/e011-invalid-expansion
+  - syntax/e028-complex-quotes
+- construct: FOR loop syntax and variable forms
+  sources:
+  - spec/audit/cmd-help/for-help.txt
+  - MS Learn for
+  ssot_artifacts:
+  - rules E010 E020 E040 W036 W038 W059
+  rules:
+  - E010
+  - E020
+  - E040
+  - W036
+  - W038
+  - W059
+  corpus:
+  - syntax/e010-for-missing-do
+  - syntax/e020-for-var-single-percent
+  - syntax/e040-for-do-paren-nextline
+  - syntax/e040-for-do-paren-sameline-valid
+  - syntax/w038-for-r-no-wildcard
+  - syntax/for-case-distinct-valid
+  - syntax/w059-for-case-mismatch
+  - syntax/w059-for-case-mismatch-block
+  - syntax/w059-for-case-consistent-valid
+- construct: SET /A syntax errors in FOR context
+  sources:
+  - MS Learn set /A
+  ssot_artifacts:
+  - rules E022 E023
+  rules:
+  - E022
+  - E023
+  corpus:
+  - syntax/e022-set-a-invalid
+  - syntax/e023-set-a-unquoted
+  - syntax/e029-set-a-unbalanced
+- construct: CALL subroutine and GOTO EOF colon rules
+  sources:
+  - MS Learn goto/call
+  - spec/audit/cmd-help/call-help.txt
+  - spec/audit/cmd-help/goto-help.txt
+  ssot_artifacts:
+  - rules E012 E014 E015 S010 W057
+  rules:
+  - E012
+  - E014
+  - E015
+  - S010
+  - W057
+  corpus:
+  - syntax/e012-missing-call
+  - syntax/e014-call-missing-colon
+  - syntax/e015-goto-eof-missing-colon
+  - integration/sec016-restart-no-limit
+  - integration/w013-duplicate-label
+  - syntax/w057-bat-without-call
+  - syntax/w057-bat-with-call-valid
+- construct: Command typos and removed/deprecated commands
+  sources:
+  - spec/data/commands.yaml
+  ssot_artifacts:
+  - rules E013 E034 W024 W025 W029
+  rules:
+  - E013
+  - E034
+  - W024
+  - W025
+  - W029
+  corpus:
+  - syntax/e013-command-typo
+  - syntax/e034-removed-command
+  - syntax/w024-deprecated-wmic
+  - syntax/p025-wildcard-star
+  - syntax/w029-16bit-command
+  - syntax/w027-interpreter-diff
+  - integration/sec003-dangerous-del
+  - integration/sec007-hardcoded-temp
+  - integration/sec024-self-copy-removable
+  - integration/w007-locked-path
+  - syntax/e005-invalid-path
+  - syntax/w031-unicode-filename
+- construct: IF ERRORLEVEL and numeric comparison semantics
+  sources:
+  - spec/audit/cmd-help/if-help.txt
+  - SS64 errorlevel
+  ssot_artifacts:
+  - rules E016 W017 W046
+  rules:
+  - E016
+  - W017
+  - W046
+  corpus:
+  - syntax/e016-errorlevel-syntax
+  - syntax/w017-errorlevel-semantic
+  - syntax/w017-not-errorlevel-zero
+  - syntax/w017-not-errorlevel-one-valid
+  - syntax/w046-if-numeric-compare
+- construct: Percent-tilde (%~) parameter expansion
+  sources:
+  - spec/audit/cmd-help/call-help.txt
+  - spec/data/expansion.yaml
+  ssot_artifacts:
+  - rules E017 E019 E024 E025 W051
+  rules:
+  - E017
+  - E019
+  - E024
+  - E025
+  - W051
+  corpus:
+  - syntax/e017-invalid-modifier
+  - syntax/e019-tilde-wrong-param
+  - syntax/e019-percent-tilde-on-var
+  - syntax/e024-invalid-modifier-combo
+  - syntax/e025-tilde-wrong-context
+  - syntax/w051-param-10-ambiguous
+  - syntax/w051-param-9-valid
+  - syntax/w051-for-loop-valid
+- construct: Line endings, encoding, and multibyte risks
+  sources:
+  - cmd.exe CRLF behavior
+  ssot_artifacts:
+  - rules E018 S005 S016 W018
+  rules:
+  - E018
+  - S005
+  - S016
+  - W018
+  corpus:
+  - syntax/e018-unix-endings
+  - syntax/s005-mixed-endings
+  - syntax/s016-double-colon-lf
+  - syntax/w018-multibyte-lf
+  - integration/p027-setlocal-nesting
+  - syntax/w019-goto-lf
+- construct: String substring, replacement, and unset expansion
+  sources:
+  - SS64 variable substring
+  - spec/data/expansion.yaml
+  ssot_artifacts:
+  - rules E021 P012 W047
+  rules:
+  - E021
+  - P012
+  - W047
+  corpus:
+  - syntax/e021-string-substring-invalid
+  - syntax/w047-substring-unset
+  - syntax/w047-substring-empty
+  - syntax/p012-string-ops
+- construct: SET /A arithmetic syntax and octal literals
+  sources:
+  - MS Learn set /A
+  - cmd.exe SET /A behavior
+  ssot_artifacts:
+  - rules E029 W045
+  rules:
+  - E029
+  - W045
+  corpus:
+  - syntax/e029-set-a-unbalanced
+  - syntax/w045-set-a-octal
+  - syntax/e023-set-a-unquoted
+- construct: Caret escape, multilevel escaping, and continuation
+  sources:
+  - spec/data/expansion.yaml
+  - SS64 escape characters
+  ssot_artifacts:
+  - rules E030 E031 E032 E033
+  rules:
+  - E030
+  - E031
+  - E032
+  - E033
+  corpus:
+  - syntax/e030-improper-caret
+  - syntax/e031-multilevel-caret
+  - syntax/e032-continuation-trailing-space
+  - syntax/e033-double-percent
+- construct: Smart/curly quotes in source
+  sources:
+  - Unicode not valid as cmd.exe delimiters
+  ssot_artifacts:
+  - rules E035
+  rules:
+  - E035
+  corpus:
+  - syntax/e035-smart-quotes
+- construct: IF DEFINED and IF/ELSE block forms
+  sources:
+  - MS Learn if
+  - SS64 IF DEFINED
+  - spec/audit/cmd-help/if-help.txt
+  ssot_artifacts:
+  - rules W055
+  rules:
+  - W055
+  corpus:
+  - syntax/if-defined-var
+  - syntax/if-else-block
+  - syntax/w055-if-defined-percent
+  - syntax/w055-if-defined-dynamic-valid
+  - syntax/else-if-valid
+- construct: Delayed expansion enablement and redundancy
+  sources:
+  - MS Learn setlocal
+  - SS64 delayed expansion
+  ssot_artifacts:
+  - rules P003 P004 P008 P026 W022
+  rules:
+  - P003
+  - P004
+  - P008
+  - P026
+  - W022
+  corpus:
+  - syntax/p004-unnecessary-delayed
+  - integration/p008-delayed-not-enabled
+  - integration/setlocal-delayed-expansion
+  - integration/delayed-expansion-no-p026
+  - syntax/p026-redundant-disable-delayed
+  - integration/p006-missing-endlocal
+  - integration/p027-setlocal-nesting
+- construct: SETLOCAL/ENDLOCAL pairing and nesting limit
+  sources:
+  - MS Learn setlocal
+  - cmd.exe SETLOCAL nesting limit
+  ssot_artifacts:
+  - rules P005 P006 P027
+  rules:
+  - P005
+  - P006
+  - P027
+  corpus:
+  - syntax/p005-endlocal-without-setlocal
+  - integration/p006-missing-endlocal
+  - integration/p027-setlocal-nesting
+- construct: Temporary files, randomness, and predictable paths
+  sources:
+  - MS Learn environment variables
+  - Security best practice
+  ssot_artifacts:
+  - rules P007 SEC007 SEC012 SEC017
+  rules:
+  - P007
+  - SEC007
+  - SEC012
+  - SEC017
+  corpus:
+  - syntax/p007-temp-no-random
+  - integration/sec007-hardcoded-temp
+  - integration/sec012-unsafe-temp
+  - integration/sec017-predictable-temp
+  - integration/sec018-insecure-redirection
+  - syntax/p013-dir-no-b-flag
+- construct: FOR loop and I/O performance anti-patterns
+  sources:
+  - MS Learn for
+  - SS64 FOR
+  ssot_artifacts:
+  - rules P009 P010 P013 P014 P015 P016 P018 P019 P020 P021 P022 P023 P025
+  rules:
+  - P009
+  - P010
+  - P013
+  - P014
+  - P015
+  - P016
+  - P018
+  - P019
+  - P020
+  - P021
+  - P022
+  - P023
+  - P025
+  corpus:
+  - syntax/p013-dir-no-b-flag
+  - syntax/p015-inefficient-delay
+  - syntax/p016-string-concat-loop
+  - syntax/p018-for-r-wildcard
+  - syntax/p019-expansion-in-loop
+  - syntax/p021-tasklist-no-fi
+  - syntax/p022-redir-in-loop
+  - syntax/p023-seta-in-loop
+  - syntax/p025-wildcard-star
+  - syntax/w048-for-f-csv
+  - integration/sec018-insecure-redirection
+  - syntax/e030-improper-caret
+  - integration/p020-redundant-echo-off
+  - integration/sec003-dangerous-del
+- construct: Redundant existence checks and code duplication
+  sources:
+  - Community performance practice
+  ssot_artifacts:
+  - rules P001 P002 P017 P024
+  rules:
+  - P001
+  - P002
+  - P017
+  - P024
+  corpus:
+  - integration/p001-redundant-exist
+  - integration/p002-code-duplication
+  - integration/p017-repeated-exist
+  - integration/p027-setlocal-nesting
+- construct: Global style conventions and readability
+  sources:
+  - Community batch style
+  - SS64 tips
+  ssot_artifacts:
+  - rules S001 S002 S003 S004 S007 S008 S009 S011 S012 S013 S014 S015 S017 S018 S019
+    S020 S022 S023 S024 S026 S027 S028
+  rules:
+  - S001
+  - S002
+  - S003
+  - S004
+  - S007
+  - S008
+  - S009
+  - S011
+  - S012
+  - S013
+  - S014
+  - S015
+  - S017
+  - S018
+  - S019
+  - S020
+  - S022
+  - S023
+  - S024
+  - S026
+  - S027
+  - S028
+  corpus:
+  - syntax/s001-missing-echo-off
+  - syntax/s002-echo-off-no-at
+  - integration/s003-command-casing
+  - integration/s007-bat-extension
+  - integration/s008-missing-complex-comment
+  - syntax/s009-magic-number
+  - syntax/s011-line-too-long
+  - integration/s014-long-params
+  - integration/s015-inconsistent-goto-colon
+  - integration/s017-var-case
+  - integration/s022-naming-convention
+  - syntax/s023-magic-timeout
+  - syntax/s024-complex-oneliner
+  - syntax/s028-redundant-parens
+  - integration/p020-redundant-echo-off
+  - syntax/e032-continuation-trailing-space
+  - integration/w028-bat-errorlevel-ext
+  - integration/indentation-s012-bounded
+  - integration/p027-setlocal-nesting
+  - integration/call-subroutine-e012
+  - integration/sec016-restart-no-limit
+  - integration/sec021-fork-bomb
+  - integration/unreachable-goto-flow
+  - integration/w013-duplicate-label
+  - syntax/e012-missing-call
+  - syntax/e014-call-missing-colon
+  - syntax/w019-goto-lf
+  - syntax/w046-if-numeric-compare
+  - syntax/s020-long-line
+  - syntax/e023-set-a-unquoted
+- construct: Compatibility, portability, and environment warnings
+  sources:
+  - MS Learn compatibility
+  - SS64 batch tips
+  - spec/audit/cmd-help/setx-help.txt
+  - spec/audit/cmd-help/subst-help.txt
+  ssot_artifacts:
+  - rules W002 W003 W004 W005 W006 W007 W008 W009 W010 W011 W012 W014 W020 W026 W027
+    W028 W030 W031 W032 W033 W042 W043 W060
+  rules:
+  - W002
+  - W003
+  - W004
+  - W005
+  - W006
+  - W007
+  - W008
+  - W009
+  - W010
+  - W011
+  - W012
+  - W014
+  - W020
+  - W026
+  - W027
+  - W028
+  - W030
+  - W031
+  - W032
+  - W033
+  - W042
+  - W043
+  - W060
+  corpus:
+  - syntax/w006-ping-no-timeout
+  - integration/w007-locked-path
+  - syntax/w008-path-modification
+  - syntax/w009-older-windows-cmd
+  - syntax/w010-architecture-specific
+  - integration/w014-missing-pause
+  - syntax/w026-inefficient-modifiers
+  - syntax/w027-interpreter-diff
+  - integration/w028-bat-errorlevel-ext
+  - syntax/w031-unicode-filename
+  - syntax/w042-timeout-nobreak
+  - syntax/w048-for-f-csv
+  - integration/p002-code-duplication
+  - integration/sec003-dangerous-del
+  - integration/sec004-dangerous-reg
+  - integration/sec005-privilege-check
+  - integration/sec007-hardcoded-temp
+  - integration/sec024-self-copy-removable
+  - syntax/e005-invalid-path
+  - syntax/p025-wildcard-star
+  - syntax/w024-deprecated-wmic
+  - integration/s015-inconsistent-goto-colon
+  - integration/sec021-fork-bomb
+  - integration/unreachable-goto-flow
+  - syntax/w019-goto-lf
+  - syntax/e007-empty-var-check
+  - syntax/w021-if-unquoted
+  - syntax/e035-smart-quotes
+  - syntax/w018-multibyte-lf
+  - integration/sec001-command-injection
+  - syntax/e014-call-missing-colon
+  - syntax/s009-magic-number
+  - syntax/s023-magic-timeout
+  - integration/sec015-taskkill-unfiltered
+  - syntax/w043-taskkill-no-verify
+  - syntax/w060-setx-equals-sign
+  - syntax/w060-setx-valid
+- construct: Duplicate GOTO labels
+  sources:
+  - MS Learn goto
+  ssot_artifacts:
+  - rules W013
+  rules:
+  - W013
+  corpus:
+  - integration/w013-duplicate-label
+- construct: Nested FOR loops and variable scope
+  sources:
+  - MS Learn for
+  - SS64 FOR nested loops
+  ssot_artifacts:
+  - rules W023 W039 W040
+  rules:
+  - W023
+  - W039
+  - W040
+  corpus:
+  - syntax/w023-nested-for
+  - syntax/w039-nested-for-no-call
+  - syntax/w040-for-var-scope
+- construct: FOR /F tokenization, delimiters, and CSV
+  sources:
+  - spec/audit/cmd-help/for-help.txt
+  - cmd.exe FOR /F behavior
+  ssot_artifacts:
+  - rules E037 E038 W034 W035 W037 W048 W063
+  rules:
+  - E037
+  - E038
+  - W034
+  - W035
+  - W037
+  - W048
+  - W063
+  corpus:
+  - syntax/w034-for-f-usebackq
+  - syntax/w034-useback-synonym-valid
+  - syntax/w035-for-f-no-delims
+  - syntax/w037-for-f-no-eol
+  - syntax/e037-for-f-eol-multi
+  - syntax/e037-for-f-eol-valid
+  - syntax/e038-for-f-skip-zero
+  - syntax/e038-for-f-skip-invalid
+  - syntax/e038-for-f-tokens-range
+  - syntax/e038-for-f-valid
+  - syntax/w048-for-f-csv
+  - syntax/w063-for-f-token-overflow
+  - syntax/w063-for-f-token-valid
+  - syntax/w063-for-f-token-star-overflow
+  - syntax/w063-for-f-multiline-overflow
+  - syntax/w063-for-f-tokens-star-suffix-overflow
+  - syntax/w063-for-f-tokens-star-suffix-valid
+- construct: SET variable spacing
+  sources:
+  - MS Learn set
+  - SS64 SET
+  - spec/audit/cmd-help/set-help.txt
+  ssot_artifacts:
+  - rules W044 E041
+  rules:
+  - W044
+  - E041
+  corpus:
+  - syntax/w044-set-spacing
+  - syntax/w044-set-a-spacing-valid
+  - syntax/e041-set-p-missing-var
+  - syntax/e041-set-p-valid
+- construct: Pseudo-environment variable assignment
+  sources:
+  - MS Learn set
+  - cmd.exe dynamic variables
+  - spec/audit/cmd-help/set-help.txt
+  ssot_artifacts:
+  - rules W049
+  rules:
+  - W049
+  corpus:
+  - syntax/w049-pseudo-env-set
+  - syntax/w049-pseudo-env-clear-valid
+  - syntax/w049-set-a-pseudo-valid
+  - syntax/w049-set-a-pseudo-assign
+- construct: 'Security: injection, credentials, and dangerous commands'
+  sources:
+  - MS Learn security
+  - spec/data/commands.yaml
+  ssot_artifacts:
+  - rules SEC001 SEC002 SEC003 SEC004 SEC005 SEC008 SEC009 SEC010 SEC011 SEC013 SEC014
+    SEC015
+  rules:
+  - SEC001
+  - SEC002
+  - SEC003
+  - SEC004
+  - SEC005
+  - SEC008
+  - SEC009
+  - SEC010
+  - SEC011
+  - SEC013
+  - SEC014
+  - SEC015
+  corpus:
+  - integration/sec001-command-injection
+  - integration/w005-unquoted-var
+  - integration/sec003-dangerous-del
+  - integration/sec004-dangerous-reg
+  - integration/sec005-privilege-check
+  - integration/sec008-plaintext-creds
+  - integration/sec009-powershell-bypass
+  - integration/sec010-sensitive-echo
+  - integration/sec011-path-traversal
+  - integration/sec013-var-injection
+  - integration/sec014-unescaped-input
+  - integration/sec015-taskkill-unfiltered
+  - integration/w005-unquoted-var
+  - syntax/w021-if-unquoted
+  - syntax/p025-wildcard-star
+  - integration/sec016-restart-no-limit
+- construct: 'Security: system modification and malware patterns'
+  sources:
+  - Security best practice
+  - cmd.exe redirection behavior
+  ssot_artifacts:
+  - rules SEC016 SEC018 SEC019 SEC020 SEC021 SEC022 SEC023 SEC024
+  rules:
+  - SEC016
+  - SEC018
+  - SEC019
+  - SEC020
+  - SEC021
+  - SEC022
+  - SEC023
+  - SEC024
+  corpus:
+  - integration/sec016-restart-no-limit
+  - integration/sec018-insecure-redirection
+  - integration/sec019-self-modification
+  - integration/sec021-fork-bomb
+  - integration/sec022-hosts-modification
+  - integration/sec023-autorun-inf
+  - integration/sec024-self-copy-removable
+  - syntax/e027-unc-cd

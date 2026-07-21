@@ -1,0 +1,8 @@
+{
+  "description": "FOR /F tokens=2* remainder variable %%b is in range (W063 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W063"],
+  "config": {},
+  "tags": ["syntax"]
+}

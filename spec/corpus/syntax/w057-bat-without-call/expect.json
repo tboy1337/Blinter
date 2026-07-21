@@ -1,0 +1,11 @@
+{
+  "description": "Invoking .bat/.cmd without CALL does not return control (W057)",
+  "rules": ["W057"],
+  "lines": {
+    "2": ["W057"],
+    "3": ["W057"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}

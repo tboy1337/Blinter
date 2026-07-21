@@ -1,0 +1,13 @@
+@echo off
+echo line1
+echo line2
+echo line3
+echo line4
+echo line5
+echo line6
+echo line7
+echo line8
+echo line9
+echo line10
+echo line11
+setlocal disabledelayedexpansion

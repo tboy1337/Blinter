@@ -210,6 +210,22 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
     return set_vars
 
 
+def _collect_empty_assigned_variables(lines: List[str]) -> Set[str]:
+    """Collect variables explicitly assigned an empty value via SET."""
+    empty_vars: Set[str] = set()
+    vn = _SET_VAR_NAME
+    empty_patterns = [
+        rf'\bset\s+"?({vn})"?\s*=\s*(?:$|[&|])',
+        rf'\bset\s+"({vn})="\s*(?:$|[&|])',
+    ]
+    for line in lines:
+        stripped = line.strip()
+        for pattern in empty_patterns:
+            for match in re.finditer(pattern, stripped, re.IGNORECASE):
+                empty_vars.add(str(match.group(1)).upper())
+    return empty_vars
+
+
 def _parse_suppression_comments(lines: List[str]) -> Dict[int, Set[str]]:
     """
     Parse inline suppression comments from batch file lines.
@@ -268,6 +284,26 @@ def _parse_suppression_comments(lines: List[str]) -> Dict[int, Set[str]]:
                     suppressions[i + 1] = set()
 
     return suppressions
+
+
+def _delayed_expansion_active_at_line(lines: List[str], line_num: int) -> bool:
+    """Return whether delayed expansion is active at the given 1-based line number."""
+    stack: List[bool] = []
+    for index, line in enumerate(lines, start=1):
+        stripped = line.strip().lower()
+        if re.match(r"setlocal\b", stripped):
+            if "enabledelayedexpansion" in stripped:
+                stack.append(True)
+            elif "disabledelayedexpansion" in stripped:
+                stack.append(False)
+            else:
+                stack.append(stack[-1] if stack else False)
+        elif re.match(r"endlocal\b", stripped):
+            if stack:
+                stack.pop()
+        if index == line_num:
+            return stack[-1] if stack else False
+    return False
 
 
 def _analyze_script_structure(

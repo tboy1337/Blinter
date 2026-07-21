@@ -1,0 +1,22 @@
+{
+  "config": {},
+  "description": "sec005 privilege check",
+  "lines": {
+    "2": [
+      "SEC005",
+      "W001",
+      "W002",
+      "W003"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "SEC005",
+    "W001",
+    "W002",
+    "W003"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "w026 inefficient modifiers",
+  "lines": {
+    "2": [
+      "W001",
+      "W026"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001",
+    "W026"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

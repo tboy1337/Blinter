@@ -1,0 +1,30 @@
+{
+  "config": {},
+  "description": "w013 duplicate label",
+  "lines": {
+    "2": [
+      "S018",
+      "S027"
+    ],
+    "4": [
+      "S010",
+      "S018",
+      "S027",
+      "W013"
+    ],
+    "5": [
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S010",
+    "S018",
+    "S027",
+    "W001",
+    "W013"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

@@ -14,6 +14,12 @@ mypy
 autopep8
 bandit
 
+# SSOT spec tooling
+pyyaml
+jsonschema
+antlr4-tools
+antlr4-python3-runtime
+
 # Security Analysis
 pip-audit
 

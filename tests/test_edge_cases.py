@@ -439,12 +439,21 @@ class TestPerformanceIssueChecking:
     """Test performance issue detection edge cases."""
 
     def test_inefficient_dir_command(self) -> None:
-        """Test DIR command without /F flag."""
+        """Test DIR command without /B when output is piped."""
         issues = _check_performance_issues(
-            [""], 1, "dir /s", False, False, False, False, False, False, False
+            [""],
+            1,
+            "dir /s | findstr txt",
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
         )
         assert len(issues) == 1
-        assert "P010" in issues[0].rule.code
+        assert issues[0].rule.code == "P010"
 
     def test_for_loop_without_tokens(self) -> None:
         """Test FOR loop without tokens optimization."""
@@ -1023,6 +1032,292 @@ class TestWarningChecking:
         )
         warning_issues = [i for i in issues if i.rule.code == "W008"]
         assert len(warning_issues) == 1
+
+    def test_v4_warning_rules(self) -> None:
+        """W049 SET /A assign, W050 invalid SHIFT /n, W051 double-digit params."""
+        set_vars: set[str] = set()
+        read_issues = _check_warning_issues("set /a seed=%random%", 1, set_vars, False)
+        assert not [i for i in read_issues if i.rule.code == "W049"]
+
+        assign_issues = _check_warning_issues("set /a errorlevel=0", 1, set_vars, False)
+        assert [i.rule.code for i in assign_issues].count("W049") == 1
+
+        shift_issues = _check_warning_issues("shift /9", 1, set_vars, False)
+        assert [i.rule.code for i in shift_issues].count("W050") == 1
+
+        param_issues = _check_warning_issues("echo %10", 1, set_vars, False)
+        assert [i.rule.code for i in param_issues].count("W051") == 1
+
+        substring_issues = _check_warning_issues(
+            "echo %PATH:~10,5%", 1, set_vars, False
+        )
+        assert not [i for i in substring_issues if i.rule.code == "W051"]
+
+    def test_v5_shift_warning_rules(self) -> None:
+        """W052 SHIFT in block, W053 bare SHIFT, boundary and FOR negatives."""
+        set_vars: set[str] = set()
+        lines = ["@echo off", "(", "shift", "echo %1", ")"]
+
+        block_issues = _check_warning_issues("shift", 3, set_vars, False, lines=lines)
+        assert [i.rule.code for i in block_issues].count("W052") == 1
+
+        bare_issues = _check_warning_issues("shift", 1, set_vars, False)
+        assert [i.rule.code for i in bare_issues].count("W053") == 1
+
+        slash1_issues = _check_warning_issues("shift /1", 1, set_vars, False)
+        assert not [i for i in slash1_issues if i.rule.code in {"W052", "W053"}]
+
+        boundary_issues = _check_warning_issues("shift /8", 1, set_vars, False)
+        assert not [i for i in boundary_issues if i.rule.code == "W050"]
+
+        for_issues = _check_warning_issues(
+            "for %%i in (1 2) do echo %%i", 1, set_vars, False
+        )
+        assert not [i for i in for_issues if i.rule.code == "W051"]
+
+    def test_v6_digit_prefixed_variable_rules(self) -> None:
+        """W054 digit-prefixed SET names and %digitName% expansion."""
+        set_vars: set[str] = set()
+        set_issues = _check_warning_issues("set 1var=hello", 1, set_vars, False)
+        assert [i.rule.code for i in set_issues].count("W054") == 1
+
+        expand_issues = _check_warning_issues("echo %1var%", 1, set_vars, False)
+        assert [i.rule.code for i in expand_issues].count("W054") == 1
+
+        delayed_issues = _check_warning_issues("echo !1var!", 1, set_vars, True)
+        assert not [i for i in delayed_issues if i.rule.code == "W054"]
+
+        param_issues = _check_warning_issues("echo %10", 1, set_vars, False)
+        assert [i.rule.code for i in param_issues].count("W051") == 1
+        assert not [i for i in param_issues if i.rule.code == "W054"]
+
+    def test_v7_useback_synonym_and_if_defined_percent(self) -> None:
+        """W034 accepts useback synonym; W055 flags IF DEFINED %var%."""
+        from blinter.parsing.visitors.rule_impl.advanced.vars_syntax import (
+            _check_advanced_for_rules,
+        )
+
+        set_vars: set[str] = set()
+        useback_issues = _check_advanced_for_rules(
+            'FOR /F "useback tokens=*" %%i IN (`echo hi`) DO echo %%i',
+            1,
+        )
+        assert not [i for i in useback_issues if i.rule.code == "W034"]
+
+        defined_issues = _check_warning_issues(
+            "IF DEFINED %MYVAR% echo wrong", 1, set_vars, False
+        )
+        assert [i.rule.code for i in defined_issues].count("W055") == 1
+
+        dynamic_issues = _check_warning_issues(
+            "if defined stk%~1 echo ok", 1, set_vars, False
+        )
+        assert not [i for i in dynamic_issues if i.rule.code == "W055"]
+
+    def test_v8_if_pseudo_and_or_operator(self) -> None:
+        """W056 flags pseudo AND/OR in IF clauses; nested IF and ORANGE literals are exempt."""
+        set_vars: set[str] = set()
+        and_issues = _check_warning_issues(
+            "IF %A% EQU 1 AND %B% EQU 2 echo both", 1, set_vars, False
+        )
+        assert [i.rule.code for i in and_issues].count("W056") == 1
+
+        or_issues = _check_warning_issues(
+            "IF %X% EQU WA OR %X% EQU OR echo coast", 1, set_vars, False
+        )
+        assert [i.rule.code for i in or_issues].count("W056") == 1
+
+        nested_issues = _check_warning_issues(
+            "IF %A% EQU 1 IF %B% EQU 2 echo both", 1, set_vars, False
+        )
+        assert not [i for i in nested_issues if i.rule.code == "W056"]
+
+        orange_issues = _check_warning_issues(
+            'IF "%X%" EQU "ORANGE" echo ok', 1, set_vars, False
+        )
+        assert not [i for i in orange_issues if i.rule.code == "W056"]
+
+    def test_v9_if_else_if_and_dash_concat_controls(self) -> None:
+        """v9: else if chains and dash-concat AND pattern must not trigger W056."""
+        set_vars: set[str] = set()
+        else_if_issues = _check_warning_issues(
+            "if %x%==1 (echo one) else if %x%==2 (echo two)", 1, set_vars, False
+        )
+        assert not [i for i in else_if_issues if i.rule.code == "W056"]
+
+        dash_issues = _check_warning_issues(
+            'if "%a%-%b%" equ "A-B" echo ok', 1, set_vars, False
+        )
+        assert not [i for i in dash_issues if i.rule.code == "W056"]
+
+        pseudo_else_if = _check_warning_issues(
+            "if %a%==1 (echo ok) else if %a% equ 1 and %b% equ 2 (echo bad)",
+            1,
+            set_vars,
+            False,
+        )
+        assert [i.rule.code for i in pseudo_else_if].count("W056") == 1
+
+    def test_v10_conditional_exec_no_w056(self) -> None:
+        """v10: && and || conditional execution must not trigger W056."""
+        set_vars: set[str] = set()
+        and_issues = _check_warning_issues(
+            "echo ok >nul && echo and-ok", 1, set_vars, False
+        )
+        assert not [i for i in and_issues if i.rule.code == "W056"]
+
+        or_issues = _check_warning_issues(
+            "nonexistentcmd 2>nul || echo or-ok", 1, set_vars, False
+        )
+        assert not [i for i in or_issues if i.rule.code == "W056"]
+
+    def test_v11_bat_without_call_and_ren_path(self) -> None:
+        """v11: W057 flags .bat/.cmd without CALL; W058 flags REN path destinations."""
+        set_vars: set[str] = set()
+
+        bat_issues = _check_warning_issues("helper.bat", 1, set_vars, False)
+        w057 = [i for i in bat_issues if i.rule.code == "W057"]
+        assert len(w057) == 1
+        assert "without CALL" in w057[0].context
+
+        call_issues = _check_warning_issues("call helper.bat", 1, set_vars, False)
+        assert not [i for i in call_issues if i.rule.code == "W057"]
+
+        start_issues = _check_warning_issues("start helper.bat", 1, set_vars, False)
+        assert not [i for i in start_issues if i.rule.code == "W057"]
+
+        ren_issues = _check_warning_issues(
+            r"ren oldname.txt sub\newname.txt", 1, set_vars, False
+        )
+        w058 = [i for i in ren_issues if i.rule.code == "W058"]
+        assert len(w058) == 1
+
+        ren_valid = _check_warning_issues(
+            "ren oldname.txt newname.txt", 1, set_vars, False
+        )
+        assert not [i for i in ren_valid if i.rule.code == "W058"]
+
+    def test_w059_for_case_mismatch(self) -> None:
+        """W059 flags FOR body references that differ only in case from declaration."""
+        from blinter.parsing.visitors.rule_impl.globals.for_scope import (
+            _check_for_var_case_mismatch,
+        )
+
+        lines = ["@echo off", "FOR %%i IN (a b) DO echo %%I"]
+        issues = _check_for_var_case_mismatch(lines)
+        w059 = [issue for issue in issues if issue.rule.code == "W059"]
+        assert len(w059) == 1
+        assert "%%I" in w059[0].context
+        assert "%%i" in w059[0].context
+
+    def test_w059_nested_distinct_cases_allowed(self) -> None:
+        """Nested FOR loops with intentional distinct cases must not trigger W059."""
+        from blinter.parsing.visitors.rule_impl.globals.for_scope import (
+            _check_for_var_case_mismatch,
+        )
+
+        lines = [
+            "@echo off",
+            "for %%i in (lower) do (",
+            "  for %%I in (UPPER) do echo i=%%i I=%%I",
+            ")",
+        ]
+        issues = _check_for_var_case_mismatch(lines)
+        assert not [issue for issue in issues if issue.rule.code == "W059"]
+
+    def test_w060_setx_equals_sign(self) -> None:
+        """W060 flags SETX with SET-style equals sign."""
+        set_vars: set[str] = set()
+        bad = _check_warning_issues("setx MYVAR=hello", 1, set_vars, False)
+        w060 = [issue for issue in bad if issue.rule.code == "W060"]
+        assert len(w060) == 1
+
+        good = _check_warning_issues("setx MYVAR hello", 1, set_vars, False)
+        assert not [issue for issue in good if issue.rule.code == "W060"]
+
+        reg_form = _check_warning_issues(
+            "setx TZONE /K HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\"
+            "Control\\TimeZoneInformation\\StandardName",
+            1,
+            set_vars,
+            False,
+        )
+        assert not [issue for issue in reg_form if issue.rule.code == "W060"]
+
+    def test_w017_not_errorlevel_zero(self) -> None:
+        """W017 flags IF NOT ERRORLEVEL 0 as misleading failure check."""
+        set_vars: set[str] = set()
+        bad = _check_warning_issues("if not errorlevel 0 echo fail", 1, set_vars, False)
+        w017 = [issue for issue in bad if issue.rule.code == "W017"]
+        assert len(w017) == 1
+        assert "negative exit codes" in (w017[0].context or "")
+
+        good = _check_warning_issues("if not errorlevel 1 echo ok", 1, set_vars, False)
+        assert not [issue for issue in good if issue.rule.code == "W017"]
+
+    def test_w061_pushd_popd_balance(self) -> None:
+        """W061 flags unbalanced PUSHD/POPD directory stack usage."""
+        from blinter.parsing.visitors.rule_impl.globals.analysis import (
+            _check_pushd_popd_balance,
+        )
+
+        bad = _check_pushd_popd_balance(
+            ["@echo off", "pushd %TEMP%", "echo working", "exit /b 0"]
+        )
+        w061 = [issue for issue in bad if issue.rule.code == "W061"]
+        assert len(w061) == 1
+        assert w061[0].line_number == 2
+        assert "without matching POPD" in (w061[0].context or "")
+
+        good = _check_pushd_popd_balance(
+            ["@echo off", "pushd %TEMP%", "echo working", "popd", "exit /b 0"]
+        )
+        assert not [issue for issue in good if issue.rule.code == "W061"]
+
+        extra_popd = _check_pushd_popd_balance(["@echo off", "popd"])
+        extra = [issue for issue in extra_popd if issue.rule.code == "W061"]
+        assert len(extra) == 1
+        assert "POPD without matching PUSHD" in (extra[0].context or "")
+
+    def test_w062_cd_without_d_switch(self) -> None:
+        """W062 flags CD/CHDIR to another drive path without /D."""
+        from blinter.parsing.visitors.rule_impl.globals.analysis import (
+            _check_cd_without_d_switch,
+        )
+
+        bad = _check_cd_without_d_switch(
+            ["@echo off", "cd Z:\\System32", "echo working", "exit /b 0"]
+        )
+        w062 = [issue for issue in bad if issue.rule.code == "W062"]
+        assert len(w062) == 1
+        assert w062[0].line_number == 2
+        assert "does not switch the active drive" in (w062[0].context or "")
+
+        good = _check_cd_without_d_switch(
+            ["@echo off", "cd /d Z:\\System32", "echo working", "exit /b 0"]
+        )
+        assert not [issue for issue in good if issue.rule.code == "W062"]
+
+        query = _check_cd_without_d_switch(["@echo off", "cd Z:", "exit /b 0"])
+        assert not [issue for issue in query if issue.rule.code == "W062"]
+
+        parent = _check_cd_without_d_switch(["@echo off", "cd ..", "exit /b 0"])
+        assert not [issue for issue in parent if issue.rule.code == "W062"]
+
+    def test_w040_nested_case_distinct_not_reuse(self) -> None:
+        """W040 must not flag %%i and %%I as reuse — they are distinct variables."""
+        from blinter.parsing.visitors.rule_impl.globals.analysis import (
+            _find_nested_for_issues,
+        )
+
+        lines = [
+            "@echo off",
+            "FOR %%i IN (1 2 3) DO (",
+            "    FOR %%I IN (a b) DO echo %%i %%I",
+            ")",
+        ]
+        issues = _find_nested_for_issues(lines, 2)
+        assert not [issue for issue in issues if issue.rule.code == "W040"]
 
     def test_older_windows_commands(self) -> None:
         """Test detection of older Windows commands."""
@@ -2099,6 +2394,37 @@ IF EXIST myfile.txt == "yes" ECHO Found
             issues = lint_batch_file(temp_file)
             e004_issues = [i for i in issues if i.rule.code == "E004"]
             assert len(e004_issues) == 1
+        finally:
+            os.unlink(temp_file)
+
+    def test_if_exists_typo_e036(self) -> None:
+        """Test E036 rule for IF EXISTS typo."""
+
+        content = """@echo off
+IF EXISTS myfile.txt ECHO Found
+IF NOT EXISTS other.txt ECHO Missing
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e036_issues = [i for i in issues if i.rule.code == "E036"]
+            assert len(e036_issues) == 2
+        finally:
+            os.unlink(temp_file)
+
+    def test_substring_on_empty_assigned_var_w047(self) -> None:
+        """Test W047 flags substring expansion on empty-assigned variables."""
+
+        content = """@echo off
+set x=
+echo %x:~-1%
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            w047_issues = [i for i in issues if i.rule.code == "W047"]
+            assert len(w047_issues) == 1
+            assert "empty" in w047_issues[0].context.lower()
         finally:
             os.unlink(temp_file)
 

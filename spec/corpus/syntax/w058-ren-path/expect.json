@@ -1,0 +1,12 @@
+{
+  "description": "REN destination must be a filename only, not a path (W058)",
+  "rules": ["W058"],
+  "lines": {
+    "2": ["W058"],
+    "3": ["W058"],
+    "4": ["W058"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax"]
+}

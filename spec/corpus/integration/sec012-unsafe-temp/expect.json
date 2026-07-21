@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "sec012 unsafe temp",
+  "lines": {
+    "2": [
+      "SEC012",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "SEC012",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

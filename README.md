@@ -9,7 +9,7 @@
 ## Features ✨
 
 ### 🔍 **Rule Categories**
-- **Built-in Rules** -- the registry currently ships **147** rules across 5 severity levels (see `blinter.rules.registry.RULE_COUNT`; numbering gaps reflect retired or consolidated rule IDs)
+- **Built-in Rules** -- **175** rules across 5 severity levels (see `blinter.rules.registry.RULE_COUNT`; numbering gaps reflect retired or consolidated rule IDs)
 - **Error Level (E001-E999)**: Critical syntax errors that prevent execution
 - **Warning Level (W001-W999)**: Potential runtime issues and bad practices
 - **Style Level (S001-S999)**: Code formatting and readability improvements
@@ -356,8 +356,8 @@ Advanced integrators can import from submodules directly:
 
 ```python
 from blinter.rules.registry import RULES
-from blinter.patterns import DANGEROUS_COMMAND_PATTERNS
-from blinter.checkers.syntax import _check_syntax_errors
+from blinter.parsing.ast_pipeline import lint_via_ast
+from blinter.parsing.visitors.syntax_visitor import check_ast_syntax_rules
 ```
 
 See [docs/Architecture.md](docs/Architecture.md) for the full module map and extension points.
@@ -370,9 +370,9 @@ src/blinter/
   models.py            # BlinterConfig, LintIssue, Rule
   rules/               # RULES registry
   patterns.py          # Dangerous-command patterns
-  parsing/             # Structure and context analysis
-  checkers/            # Rule implementations by category
+  parsing/             # AST pipeline, ANTLR bridge, visitors
   engine/              # lint_batch_file orchestration
+  checkers/            # Backward-compatible aliases to parsing.visitors.rule_impl
   io/                  # Encoding and file discovery
   config/              # blinter.ini loading
   output/              # CLI formatters
@@ -385,8 +385,7 @@ flowchart BT
   constants --> patterns
   patterns --> rules
   rules --> parsing
-  parsing --> checkers
-  checkers --> engine
+  parsing --> engine
   engine --> cli
   config --> cli
   io --> engine
@@ -497,30 +496,26 @@ py -m black --check src tests
 py -m isort --check-only src tests
 ```
 
-### Optional corpus tests
+### SSOT corpus tests
 
-Some tests depend on a **local, large, varied collection** of `.bat` and `.cmd` files. Neither the scripts nor their lint baseline are included in the repository for privacy reasons. A fresh clone runs the full test suite without them — corpus-related tests skip automatically.
-
-Affected modules:
-
-- [`tests/test_batch_script_examples.py`](tests/test_batch_script_examples.py) — corpus regression and baseline snapshot tests (some marked `@pytest.mark.slow`)
-- [`tests/test_main_cli.py`](tests/test_main_cli.py) — `TestCorpusCli` directory-scan integration
-
-To run optional corpus testing locally:
+Conformance tests use committed fixtures under [`spec/corpus/`](spec/corpus/). Each case has `input.cmd` and `expect.json` (expected rule codes). These run in CI without any local-only folder.
 
 ```bash
-# 1. Create a private folder at repo root (gitignored)
-mkdir batch-script-examples
-# 2. Add your own .bat / .cmd files
-# 3. Generate a local baseline snapshot (also gitignored)
-py scripts/generate_corpus_baseline.py
-# 4. Run optional corpus tests and checks
-py -m pytest tests/test_batch_script_examples.py -v
-py scripts/corpus_lint.py
-py scripts/corpus_lint.py --check-baseline
+py scripts/spec/validate_corpus.py
+py -m pytest tests/test_spec_corpus.py tests/test_spec_parser.py -v
 ```
 
-Baseline snapshots are per-machine and only comparable against the same local corpus. Regenerate with `py scripts/generate_corpus_baseline.py` after rule changes or corpus updates.
+To add a case, create `spec/corpus/<category>/<case-id>/input.cmd` and `expect.json`, then run `py scripts/spec/validate_corpus.py`.
+
+Rule metadata lives in [`spec/data/rules.yaml`](spec/data/rules.yaml). Regenerate Python artifacts with:
+
+```bash
+py scripts/spec/generate_rules.py
+py scripts/spec/generate_parser.py   # requires Java + antlr4-tools
+py scripts/spec/generate_docs.py
+```
+
+See [`spec/README.md`](spec/README.md) for the full SSOT layout.
 
 The test suite enforces 90% branch coverage (`pytest.ini`, `.coveragerc`). CI runs pytest on Python 3.11–3.14, static analysis (black, isort, mypy, pylint, bandit), and Windows executable smoke tests on every push and pull request to `main`. Releases run automatically when `version` in `pyproject.toml` is bumped on `main`.
 

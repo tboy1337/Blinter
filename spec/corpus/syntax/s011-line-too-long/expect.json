@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "s011 line too long",
+  "lines": {
+    "2": [
+      "S011",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S011",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

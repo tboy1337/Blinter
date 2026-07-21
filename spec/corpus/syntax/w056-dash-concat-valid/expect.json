@@ -1,0 +1,8 @@
+{
+  "description": "Dash-concatenation AND pattern must not trigger W056 pseudo-operator false positive",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W056"],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}

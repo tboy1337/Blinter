@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "p019 expansion in loop",
+  "lines": {
+    "4": [
+      "P019",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P019",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

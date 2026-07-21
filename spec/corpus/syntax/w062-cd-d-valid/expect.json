@@ -1,0 +1,8 @@
+{
+  "description": "CD /D cross-drive path must not trigger W062",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W062"],
+  "config": {},
+  "tags": ["syntax"]
+}

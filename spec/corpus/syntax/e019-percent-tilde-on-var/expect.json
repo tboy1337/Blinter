@@ -1,0 +1,24 @@
+{
+  "config": {},
+  "description": "e019 percent tilde on var",
+  "lines": {
+    "2": [
+      "E017",
+      "E019",
+      "E024",
+      "E025",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E017",
+    "E019",
+    "E024",
+    "E025",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

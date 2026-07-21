@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blinter.dev/schema/rules.schema.json",
+  "title": "Blinter rules catalog",
+  "type": "object",
+  "required": ["version", "rules"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "rules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rule" },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "required": [
+        "code",
+        "name",
+        "severity",
+        "explanation",
+        "recommendation"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^(E|W|S|SEC|P)[0-9]{3}$"
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "severity": {
+          "type": "string",
+          "enum": ["ERROR", "WARNING", "STYLE", "SECURITY", "PERFORMANCE"]
+        },
+        "explanation": { "type": "string", "minLength": 1 },
+        "recommendation": { "type": "string", "minLength": 1 },
+        "checker": {
+          "type": "string",
+          "enum": ["ast"]
+        },
+        "grammar_nodes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "examples": {
+          "type": "object",
+          "properties": {
+            "good": { "type": "array", "items": { "type": "string" } },
+            "bad": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

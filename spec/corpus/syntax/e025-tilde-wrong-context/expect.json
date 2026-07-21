@@ -1,0 +1,22 @@
+{
+  "config": {},
+  "description": "e025 tilde wrong context",
+  "lines": {
+    "2": [
+      "E017",
+      "E024",
+      "E025",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E017",
+    "E024",
+    "E025",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

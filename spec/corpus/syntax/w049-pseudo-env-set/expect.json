@@ -1,0 +1,19 @@
+{
+  "config": {},
+  "description": "Assigning to pseudo-environment variables (W049)",
+  "lines": {
+    "2": ["W049"],
+    "3": ["W049"],
+    "4": ["W049"],
+    "5": ["W049"],
+    "6": ["W049"],
+    "7": ["W049"],
+    "8": ["W049"],
+    "9": ["W049"]
+  },
+  "must_not": [],
+  "rules": ["W049"],
+  "tags": [
+    "syntax"
+  ]
+}

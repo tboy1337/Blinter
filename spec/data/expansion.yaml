@@ -1,0 +1,68 @@
+version: 1
+
+# Percent-tilde (%~) expansion rules used by E017, E019, E024, E025
+# Authoritative syntax: spec/audit/cmd-help/call-help.txt (CALL /?)
+
+valid_modifiers:
+  n: name
+  x: extension
+  f: full path
+  d: drive
+  p: path
+  s: short names
+  t: timestamp
+  z: size
+  a: attributes
+  $: path search (e.g. %~$PATH:1)
+
+valid_modifier_chars: "nxfpdstaz"
+
+valid_parameter_patterns:
+  - digit_0_9
+  - single_alpha_for_var
+
+invalid_combinations:
+  - modifiers: "*"
+    reason: "%~ modifiers may not be used with %* (CALL /?)"
+  - pattern: "%~[^%]*%[^0-9a-zA-Z]%"
+    reason: "Percent-tilde requires parameter 0-9 or single FOR loop letter"
+
+valid_combined_examples:
+  - "%~dpnx1%"
+  - "%~f1%"
+  - "%~nx1%"
+  - "%~dp0%"
+  - "%~z0%"
+  - "%~ftza1%"
+
+path_search_modifier:
+  pattern: "%~$ENV:parameter%"
+  description: "Searches PATH or other env var for file; expands to first match"
+  example: "%~$PATH:1%"
+
+delayed_expansion:
+  pattern: "!VAR!"
+  requires_setlocal: true
+  enable_keywords:
+    - "setlocal enabledelayedexpansion"
+    - "setlocal enableextensions enabledelayedexpansion"
+
+for_loop_variables:
+  batch_file_prefix: "%%"
+  command_line_prefix: "%"
+
+caret_escape:
+  valid_caret_counts: [1, 3, 7, 15, 31]
+  description: "Valid multilevel escaping follows 2^n-1 caret pattern"
+
+double_percent:
+  for_body_rule: "FOR loop variables use %% in batch files"
+  echo_literal_rule: "Literal % in ECHO often requires %% escaping"
+
+string_operations:
+  substring_pattern: "%var:~start,length%"
+  replacement_pattern: "%var:old=new%"
+  description: "Batch substring and search-replace expansion (E021)"
+
+legacy_id_notes:
+  E006: "Historical E-prefix ID with WARNING severity; retained for compatibility"

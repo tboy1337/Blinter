@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "e010 for missing do",
+  "lines": {
+    "2": [
+      "E010",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E010",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

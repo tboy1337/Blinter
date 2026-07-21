@@ -1,0 +1,31 @@
+{
+  "config": {},
+  "description": "sec016 restart no limit",
+  "lines": {
+    "2": [
+      "S010",
+      "S018",
+      "S027",
+      "SEC016"
+    ],
+    "3": [
+      "SEC005"
+    ],
+    "4": [
+      "SEC016",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S010",
+    "S018",
+    "S027",
+    "SEC005",
+    "SEC016",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

@@ -108,7 +108,7 @@ class TestProcessFileChecks:
         lines = ["net user admin password /add\n"]
 
         with patch(
-            "blinter.checkers.orchestration._check_security_issues"
+            "blinter.parsing.visitors.heuristic_visitors._check_security_issues"
         ) as mock_security:
             _process_file_checks(
                 lines,

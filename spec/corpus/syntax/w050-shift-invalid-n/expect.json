@@ -1,0 +1,13 @@
+{
+  "config": {},
+  "description": "SHIFT /9 is invalid; n must be 0-8 (W050)",
+  "lines": {
+    "2": ["W050"]
+  },
+  "must_not": [],
+  "rules": ["W050"],
+  "tags": [
+    "syntax",
+    "control-flow"
+  ]
+}

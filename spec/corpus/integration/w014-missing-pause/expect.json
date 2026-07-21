@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "w014 missing pause",
+  "lines": {
+    "3": [
+      "W001",
+      "W014"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001",
+    "W014"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

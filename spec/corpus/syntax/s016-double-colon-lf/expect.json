@@ -1,0 +1,24 @@
+{
+  "config": {},
+  "description": "s016 double colon lf",
+  "lines": {
+    "1": [
+      "E018"
+    ],
+    "2": [
+      "S016"
+    ],
+    "3": [
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E018",
+    "S016",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

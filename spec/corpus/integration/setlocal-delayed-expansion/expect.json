@@ -1,0 +1,22 @@
+{
+  "config": {},
+  "description": "setlocal delayed expansion",
+  "lines": {
+    "2": [
+      "P003"
+    ],
+    "3": [
+      "E006",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E006",
+    "P003",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

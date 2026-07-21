@@ -1,0 +1,8 @@
+{
+  "description": "CALL and START batch invocations must not trigger W057",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W057"],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}

@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "w017 errorlevel semantic",
+  "lines": {
+    "2": [
+      "W001",
+      "W017"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001",
+    "W017"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

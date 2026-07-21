@@ -1,0 +1,10 @@
+{
+  "config": {},
+  "description": "SHIFT inside parenthesized block (W052)",
+  "lines": {
+    "3": ["W052"]
+  },
+  "must_not": [],
+  "rules": ["W052"],
+  "tags": ["syntax", "control-flow"]
+}

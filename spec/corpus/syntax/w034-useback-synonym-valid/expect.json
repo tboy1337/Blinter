@@ -1,0 +1,8 @@
+{
+  "description": "FOR /F useback synonym is valid (no W034)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W034"],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}
