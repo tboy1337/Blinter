@@ -23,6 +23,7 @@ from blinter.parsing.structure import (
     _collect_set_variables,
     _parse_suppression_comments,
 )
+from blinter.parsing.visitors.rule_impl.warnings import _begin_empty_assigned_vars_pass
 
 
 def lint_batch_file(  # pylint: disable=too-many-locals
@@ -55,6 +56,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
         return []
 
     _begin_invocation_prefix_pass()
+    _begin_empty_assigned_vars_pass()
 
     skip_lines = _detect_embedded_script_blocks(lines)
 

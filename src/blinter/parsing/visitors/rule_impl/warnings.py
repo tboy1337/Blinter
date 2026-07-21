@@ -1,7 +1,9 @@
 """Warning-level line checks (W-prefix rules)."""
 
+from contextvars import ContextVar
 import re
 from typing import (
+    Dict,
     List,
     Optional,
     Set,
@@ -647,16 +649,27 @@ def _check_unquoted_numeric_if_compare(stripped: str, line_num: int) -> List[Lin
     return []
 
 
-_EMPTY_ASSIGNED_VARS_CACHE: dict[int, frozenset[str]] = {}
+_empty_assigned_vars_cache_var: ContextVar[Optional[Dict[int, frozenset[str]]]] = (
+    ContextVar("empty_assigned_vars_cache", default=None)
+)
+
+
+def _begin_empty_assigned_vars_pass() -> None:
+    """Start a per-lint empty-assigned-vars cache for the current context."""
+    _empty_assigned_vars_cache_var.set({})
 
 
 def _empty_assigned_vars_for_lines(lines: list[str]) -> Set[str]:
-    """Return variables assigned empty values, cached per lines list object."""
+    """Return variables assigned empty values, cached per lint pass."""
+    cache = _empty_assigned_vars_cache_var.get()
+    if cache is None:
+        return _collect_empty_assigned_variables(lines)
+
     cache_key = id(lines)
-    cached = _EMPTY_ASSIGNED_VARS_CACHE.get(cache_key)
+    cached = cache.get(cache_key)
     if cached is None:
         cached = frozenset(_collect_empty_assigned_variables(lines))
-        _EMPTY_ASSIGNED_VARS_CACHE[cache_key] = cached
+        cache[cache_key] = cached
     return set(cached)
 
 

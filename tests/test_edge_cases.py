@@ -2428,6 +2428,42 @@ echo %x:~-1%
         finally:
             os.unlink(temp_file)
 
+    def test_empty_assigned_vars_cache_scoped_per_lint_pass(self) -> None:
+        """Empty-assigned var cache must not leak stale entries across lint passes."""
+        from blinter.parsing.visitors.rule_impl.warnings import (
+            _begin_empty_assigned_vars_pass,
+            _empty_assigned_vars_for_lines,
+        )
+
+        lines_with_empty = ["@echo off\n", "set x=\n", "echo ok\n"]
+        _begin_empty_assigned_vars_pass()
+        assert "X" in _empty_assigned_vars_for_lines(lines_with_empty)
+
+        lines_without_empty = ["@echo off\n", "echo %x:~-1%\n"]
+        assert "X" not in _empty_assigned_vars_for_lines(lines_without_empty)
+
+        _begin_empty_assigned_vars_pass()
+        assert "X" not in _empty_assigned_vars_for_lines(lines_without_empty)
+
+    def test_w047_stable_after_many_lint_passes(self) -> None:
+        """W047 must stay correct after many unrelated lint runs."""
+        filler = "@echo off\necho no empty assignments\n"
+        target = """@echo off
+set x=
+echo %x:~-1%
+"""
+        filler_file = self.create_temp_batch_file(filler)
+        target_file = self.create_temp_batch_file(target)
+        try:
+            for _ in range(50):
+                lint_batch_file(filler_file)
+            issues = lint_batch_file(target_file)
+            w047_issues = [issue for issue in issues if issue.rule.code == "W047"]
+            assert len(w047_issues) == 1
+        finally:
+            os.unlink(filler_file)
+            os.unlink(target_file)
+
     def test_path_invalid_characters_e005(self) -> None:
         """Test E005 rule for invalid path characters."""
 
