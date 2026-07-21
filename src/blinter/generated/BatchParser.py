@@ -142,26 +142,26 @@ class BatchParser ( Parser ):
 
     sharedContextCache = PredictionContextCache()
 
-    literalNames = [ "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>",
-                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>",
-                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>",
-                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>",
-                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>",
-                     "'EOF'", "'('", "')'", "'&'", "'|'", "'&&'", "'||'",
-                     "'>'", "'<'", "'>='", "'<='", "'=='", "':'", "'/'",
-                     "'='", "','", "'EQU'", "'NEQ'", "'LSS'", "'LEQ'", "'GTR'",
+    literalNames = [ "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
+                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
+                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
+                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
+                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
+                     "'EOF'", "'('", "')'", "'&'", "'|'", "'&&'", "'||'", 
+                     "'>'", "'<'", "'>='", "'<='", "'=='", "':'", "'/'", 
+                     "'='", "','", "'EQU'", "'NEQ'", "'LSS'", "'LEQ'", "'GTR'", 
                      "'GEQ'", "'/A'", "'^'", "'%'", "'*'" ]
 
-    symbolicNames = [ "<INVALID>", "LINE_COMMENT", "REM", "LABEL", "FOR",
-                      "IF", "CALL", "GOTO", "SET", "SETLOCAL", "ENDLOCAL",
-                      "DO", "IN", "EXIST", "DEFINED", "NOT", "ERRORLEVEL",
-                      "ELSE", "EXIT", "SHIFT", "EOF_KW", "LPAREN", "RPAREN",
-                      "AMP", "PIPE", "AMPAMP", "PIPEPIPE", "GT", "LT", "GE",
-                      "LE", "EQ", "COLON", "SLASH", "EQUALS", "COMMA", "EQU",
-                      "NEQ", "LSS", "LEQ", "GTR", "GEQ", "SET_A", "CARET",
-                      "PERCENT", "ASTERISK", "DQ_STRING", "SQ_STRING", "PERCENT_TILDE",
-                      "PERCENT_VAR_SUBSTRING", "PERCENT_VAR_REPLACE", "PERCENT_VAR",
-                      "PERCENT_NUM", "FOR_VAR", "FOR_VAR_TILDE", "BANG_VAR",
+    symbolicNames = [ "<INVALID>", "LINE_COMMENT", "REM", "LABEL", "FOR", 
+                      "IF", "CALL", "GOTO", "SET", "SETLOCAL", "ENDLOCAL", 
+                      "DO", "IN", "EXIST", "DEFINED", "NOT", "ERRORLEVEL", 
+                      "ELSE", "EXIT", "SHIFT", "EOF_KW", "LPAREN", "RPAREN", 
+                      "AMP", "PIPE", "AMPAMP", "PIPEPIPE", "GT", "LT", "GE", 
+                      "LE", "EQ", "COLON", "SLASH", "EQUALS", "COMMA", "EQU", 
+                      "NEQ", "LSS", "LEQ", "GTR", "GEQ", "SET_A", "CARET", 
+                      "PERCENT", "ASTERISK", "DQ_STRING", "SQ_STRING", "PERCENT_TILDE", 
+                      "PERCENT_VAR_SUBSTRING", "PERCENT_VAR_REPLACE", "PERCENT_VAR", 
+                      "PERCENT_NUM", "FOR_VAR", "FOR_VAR_TILDE", "BANG_VAR", 
                       "WORD", "NUMBER", "WS", "NEWLINE", "UNMATCHED_DQ" ]
 
     RULE_script = 0
@@ -200,13 +200,13 @@ class BatchParser ( Parser ):
     RULE_token = 33
     RULE_block = 34
 
-    ruleNames =  [ "script", "line", "label", "commandLine", "statement",
-                   "exitStmt", "exitTail", "shiftStmt", "ifStmt", "ifTail",
-                   "ifErrorlevelStmt", "ifExistOperand", "ifBlockStmt",
-                   "ifCondition", "comparison", "compareOp", "compareOperand",
-                   "forStmt", "forMod", "forList", "forItem", "callStmt",
-                   "callTarget", "gotoStmt", "setStmt", "setlocalStmt",
-                   "setlocalRest", "endlocalStmt", "setTarget", "setOp",
+    ruleNames =  [ "script", "line", "label", "commandLine", "statement", 
+                   "exitStmt", "exitTail", "shiftStmt", "ifStmt", "ifTail", 
+                   "ifErrorlevelStmt", "ifExistOperand", "ifBlockStmt", 
+                   "ifCondition", "comparison", "compareOp", "compareOperand", 
+                   "forStmt", "forMod", "forList", "forItem", "callStmt", 
+                   "callTarget", "gotoStmt", "setStmt", "setlocalStmt", 
+                   "setlocalRest", "endlocalStmt", "setTarget", "setOp", 
                    "setRest", "genericCmd", "commandTail", "token", "block" ]
 
     EOF = Token.EOF
@@ -541,7 +541,7 @@ class BatchParser ( Parser ):
                         pass
                     else:
                         raise NoViableAltException(self)
-
+             
                 self.state = 97
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,4,self._ctx)
@@ -802,7 +802,7 @@ class BatchParser ( Parser ):
 
             elif la_ == 3:
                 self.enterOuterAlt(localctx, 3)
-                self.state = 121
+                self.state = 121 
                 self._errHandler.sync(self)
                 _alt = 1
                 while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
@@ -812,7 +812,7 @@ class BatchParser ( Parser ):
 
                     else:
                         raise NoViableAltException(self)
-                    self.state = 123
+                    self.state = 123 
                     self._errHandler.sync(self)
                     _alt = self._interp.adaptivePredict(self._input,8,self._ctx)
 
@@ -871,7 +871,7 @@ class BatchParser ( Parser ):
             while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
                 if _alt==1:
                     self.state = 128
-                    self.token()
+                    self.token() 
                 self.state = 133
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,10,self._ctx)
@@ -2288,7 +2288,7 @@ class BatchParser ( Parser ):
         self.enterRule(localctx, 52, self.RULE_setlocalRest)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 289
+            self.state = 289 
             self._errHandler.sync(self)
             _alt = 1
             while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
@@ -2298,7 +2298,7 @@ class BatchParser ( Parser ):
 
                 else:
                     raise NoViableAltException(self)
-                self.state = 291
+                self.state = 291 
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,37,self._ctx)
 
@@ -2493,7 +2493,7 @@ class BatchParser ( Parser ):
         self.enterRule(localctx, 60, self.RULE_setRest)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 302
+            self.state = 302 
             self._errHandler.sync(self)
             _alt = 1
             while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
@@ -2503,7 +2503,7 @@ class BatchParser ( Parser ):
 
                 else:
                     raise NoViableAltException(self)
-                self.state = 304
+                self.state = 304 
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,39,self._ctx)
 
@@ -2588,7 +2588,7 @@ class BatchParser ( Parser ):
         self.enterRule(localctx, 64, self.RULE_commandTail)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 309
+            self.state = 309 
             self._errHandler.sync(self)
             _alt = 1
             while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
@@ -2598,7 +2598,7 @@ class BatchParser ( Parser ):
 
                 else:
                     raise NoViableAltException(self)
-                self.state = 311
+                self.state = 311 
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,40,self._ctx)
 
@@ -2751,7 +2751,7 @@ class BatchParser ( Parser ):
             while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
                 if _alt==1:
                     self.state = 315
-                    self.line()
+                    self.line() 
                 self.state = 320
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,41,self._ctx)

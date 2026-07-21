@@ -67,7 +67,7 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m pytest tests/test_spec_corpus.py tests/test_spec_parser.py
+          python -m pytest --no-cov tests/test_spec_corpus.py tests/test_spec_parser.py
           python -m pytest
 
   test-windows-exe:
