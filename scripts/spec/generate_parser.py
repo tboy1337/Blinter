@@ -23,7 +23,9 @@ _STAMP_NAME = ".grammar-stamp"
 def _grammar_fingerprint() -> str:
     digest = hashlib.sha256()
     for name in _GRAMMAR_FILES:
-        digest.update((GRAMMAR_DIR / name).read_bytes())
+        content = (GRAMMAR_DIR / name).read_bytes()
+        content = content.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        digest.update(content)
     return digest.hexdigest()
 
 
