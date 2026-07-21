@@ -63,9 +63,12 @@ function Invoke-BlinterProcess {
         throw "Failed to start process: $Binary"
     }
 
-    $stdout = $process.StandardOutput.ReadToEnd()
-    $stderr = $process.StandardError.ReadToEnd()
+    # Read stdout and stderr concurrently to avoid pipe-buffer deadlocks on verbose lint runs.
+    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+    $stderrTask = $process.StandardError.ReadToEndAsync()
     $process.WaitForExit()
+    $stdout = $stdoutTask.GetAwaiter().GetResult()
+    $stderr = $stderrTask.GetAwaiter().GetResult()
 
     return [PSCustomObject]@{
         ExitCode = $process.ExitCode
