@@ -17,13 +17,11 @@ from _paths import REPO_ROOT, RULES_YAML  # noqa: E402
 if str(REPO_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from blinter.models import RuleSeverity  # noqa: E402
+from blinter.models import Rule, RuleSeverity  # noqa: E402
 from blinter.rules.registry import RULES  # noqa: E402
 
 
 def _rule_to_dict(rule: object) -> dict[str, object]:
-    from blinter.models import Rule
-
     if not isinstance(rule, Rule):
         raise TypeError(f"Expected Rule, got {type(rule)}")
     return {
