@@ -27,6 +27,9 @@ jobs:
             exit 1
           }
 
+      - name: Fetch batch-spec tags
+        run: git -C vendor/batch-spec fetch --tags origin
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -41,6 +44,7 @@ jobs:
         run: |
           python -m black --check src tests scripts
           python -m isort --check-only src tests scripts
+          python -m autopep8 --select=W291,W293 --diff -r src tests scripts
           python scripts/spec/validate_spec.py
           python scripts/spec/validate_corpus.py
           python scripts/spec/generate_rules.py --check
@@ -53,6 +57,7 @@ jobs:
           python -m mypy src/blinter tests scripts/verify.py
           python -m pylint src/blinter
           python -m bandit -r src/blinter -c pyproject.toml -ll -q
+          python -m pip-audit -r requirements.txt -r requirements-dev.txt
 
   test-python:
     name: pytest (Python ${{ matrix.python-version }})

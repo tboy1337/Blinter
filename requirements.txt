@@ -1,2 +1,3 @@
-# Required runtime dependency for encoding detection
+# Required runtime dependencies
 charset_normalizer
+antlr4-python3-runtime

@@ -493,12 +493,13 @@ Optional manual steps (same checks as `verify.py`):
 
 ```bash
 py -m pytest
-py -m mypy src/blinter tests
+py -m mypy src/blinter tests scripts/verify.py
 py -m pylint src/blinter --output-format=text > pylint-output.txt
 py -m bandit -r src/blinter
 py -m pip-audit -r requirements.txt -r requirements-dev.txt
-py -m black --check src tests
-py -m isort --check-only src tests
+py -m autopep8 --select=W291,W293 --diff -r src tests scripts
+py -m black --check src tests scripts
+py -m isort --check-only src tests scripts
 ```
 
 ### SSOT corpus tests
@@ -522,7 +523,7 @@ py scripts/spec/generate_docs.py
 
 See [`spec/README.md`](spec/README.md) for the full SSOT layout.
 
-The test suite enforces 90% branch coverage (`pytest.ini`, `.coveragerc`). CI runs pytest on Python 3.11–3.14, static analysis (black, isort, mypy, pylint, bandit), and Windows executable smoke tests on every push and pull request to `main`. Releases run automatically when `version` in `pyproject.toml` is bumped on `main`.
+The test suite enforces 90% branch coverage (`pytest.ini`, `.coveragerc`). CI runs pytest on Python 3.11–3.14, static analysis (autopep8, black, isort, mypy, pylint, bandit, pip-audit), SSOT drift checks, and Windows executable smoke tests on every push and pull request to `main`. Releases run automatically when `version` in `pyproject.toml` is bumped on `main`.
 
 See [docs/Architecture.md](docs/Architecture.md) for module layout and extension points.
 

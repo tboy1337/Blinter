@@ -127,6 +127,7 @@ jobs:
           python -m pip install --upgrade wheel
           python -m pip install --upgrade pyinstaller
           python -m pip install --upgrade -r requirements.txt
+          python -m pip install -e .
         shell: pwsh
 
       - name: Generate version info file
@@ -146,6 +147,16 @@ jobs:
           if (-not (Test-Path -Path "dist\Blinter.exe" -PathType Leaf)) {
             throw "dist\Blinter.exe was not produced by PyInstaller"
           }
+        shell: pwsh
+
+      - name: Run cmd.exe corpus oracle
+        run: |
+          .\venv\Scripts\Activate.ps1
+          python scripts/spec/cmd_oracle.py
+        shell: pwsh
+
+      - name: Smoke test executable
+        run: .\scripts\test_exe_smoke.ps1 -ExePath .\dist\Blinter.exe
         shell: pwsh
 
       - name: Rename executable

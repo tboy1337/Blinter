@@ -32,7 +32,10 @@ classifiers = [
     "Environment :: Console",
 ]
 requires-python = ">=3.11"
-dependencies = ["charset_normalizer"]
+dependencies = [
+    "charset_normalizer",
+    "antlr4-python3-runtime",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -54,7 +57,6 @@ dev = [
     "types-PyYAML",
     "jsonschema",
     "antlr4-tools",
-    "antlr4-python3-runtime",
     # Code Formatting
     "black",
     "isort",

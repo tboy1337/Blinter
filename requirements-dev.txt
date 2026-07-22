@@ -19,7 +19,6 @@ pyyaml
 types-PyYAML
 jsonschema
 antlr4-tools
-antlr4-python3-runtime
 
 # Security Analysis
 pip-audit
