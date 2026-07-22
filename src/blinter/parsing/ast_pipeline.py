@@ -5,7 +5,6 @@ from typing import Dict, List, Optional, Set
 from blinter.constants import LARGE_FILE_LINE_THRESHOLD
 from blinter.io.encoding import LineEndingInfo
 from blinter.models import BlinterConfig, LintIssue
-from blinter.parsing.structure import _build_delayed_expansion_state
 from blinter.parsing.visitors import ast_handled_rule_codes, check_ast_syntax_rules
 from blinter.parsing.visitors.encoding_visitor import check_encoding_rules
 from blinter.parsing.visitors.flow_visitor import check_flow_rules
@@ -106,8 +105,6 @@ def lint_via_ast(  # pylint: disable=too-many-arguments,too-many-positional-argu
         )
     )
 
-    delayed_expansion_state = _build_delayed_expansion_state(lines)
-
     for index, line in enumerate(lines, start=1):
         if index in skip_lines:
             continue
@@ -120,7 +117,6 @@ def lint_via_ast(  # pylint: disable=too-many-arguments,too-many-positional-argu
                     index,
                     labels,
                     lines=lines,
-                    delayed_expansion_state=delayed_expansion_state,
                 )
             )
         line_issues = _filter_ast_handled(line_issues)

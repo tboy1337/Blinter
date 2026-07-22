@@ -8,7 +8,7 @@ from typing import List, Set
 from blinter.models import LintIssue
 from blinter.parsing.grammar_rules import GRAMMAR_BACKED_RULE_CODES
 from blinter.parsing.preprocessor import map_line_number, preprocess_lines
-from blinter.parsing.structure import _build_delayed_expansion_state
+from blinter.parsing.structure import _delayed_expansion_state_for_lines
 from blinter.parsing.visitors.rule_impl.advanced.escaping import (
     _check_continuation_spaces,
     _check_double_percent_escaping,
@@ -37,7 +37,6 @@ def _collect_grammar_issues_for_line(
     physical_line: str,
     logical_line: str,
     line_number: int,
-    lines: List[str],
     delayed_expansion_state: List[bool],
     seen: Set[tuple[int, str]],
 ) -> List[LintIssue]:
@@ -93,7 +92,7 @@ def check_grammar_backed_syntax_fast(
     E011 uses the per-line delayed-expansion stack from ``lines``.
     """
     del has_delayed_expansion
-    delayed_expansion_state = _build_delayed_expansion_state(lines)
+    delayed_expansion_state = _delayed_expansion_state_for_lines(lines)
     preprocessed = preprocess_lines(lines)
     issues: List[LintIssue] = []
     seen: Set[tuple[int, str]] = set()
@@ -123,7 +122,6 @@ def check_grammar_backed_syntax_fast(
                 physical_line=physical_line,
                 logical_line=logical_line,
                 line_number=original_line_number,
-                lines=lines,
                 delayed_expansion_state=delayed_expansion_state,
                 seen=seen,
             )

@@ -14,6 +14,7 @@ from antlr4.error.Errors import ParseCancellationException
 from blinter.generated.BatchLexer import BatchLexer
 from blinter.generated.BatchParser import BatchParser
 from blinter.parsing.preprocessor import PreprocessedScript, preprocess_lines
+from blinter.parsing.structure import _delayed_expansion_state_for_lines
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +50,8 @@ class ParseResult:
 
 
 def _detect_delayed_expansion(lines: List[str]) -> bool:
-    lowered = "\n".join(line.lower() for line in lines)
-    return "enabledelayedexpansion" in lowered
+    """Return True when delayed expansion is active on any line in the script."""
+    return any(_delayed_expansion_state_for_lines(lines))
 
 
 def _parse_with_antlr(

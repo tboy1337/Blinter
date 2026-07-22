@@ -100,7 +100,7 @@ Only symbols listed in `blinter.__all__` are stable for external integrators. Th
 | ANTLR grammar, expansion rules, command catalog, cmd-help | [`vendor/batch-spec`](../../vendor/batch-spec) ([`tboy1337/batch-spec`](https://github.com/tboy1337/batch-spec), pinned in [`spec/batch-spec.lock`](../../spec/batch-spec.lock)) |
 | [`spec/data/rules.yaml`](../../spec/data/rules.yaml) | Rule catalog (all `checker: ast`; see `RULE_COUNT`) |
 | [`spec/data/commands-linter.yaml`](../../spec/data/commands-linter.yaml) | Security/style command policy (merged with batch-spec `commands.yaml` for `patterns.py`) |
-| [`spec/corpus/`](../../spec/corpus/) | 202 committed fixtures + `expect.json` oracles |
+| [`spec/corpus/`](../../spec/corpus/) | 203 committed fixtures + `expect.json` oracles |
 | [`spec/audit/`](../../spec/audit/) | Reference matrix and audit baselines |
 
 Clone with `git clone --recurse-submodules` or run `git submodule update --init --recursive`

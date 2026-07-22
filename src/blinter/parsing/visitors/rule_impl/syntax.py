@@ -9,7 +9,7 @@ from typing import (
 )
 
 from blinter.models import LintIssue
-from blinter.parsing.structure import _build_delayed_expansion_state
+from blinter.parsing.structure import _delayed_expansion_state_for_lines
 from blinter.patterns import (
     _COMPILED_IF_PATTERN,
     BUILTIN_COMMANDS,
@@ -634,7 +634,7 @@ def _check_variable_expansion(
 
     de_state = delayed_expansion_state
     if de_state is None and lines is not None:
-        de_state = _build_delayed_expansion_state(lines)
+        de_state = _delayed_expansion_state_for_lines(lines)
     de_active = (
         de_state is not None
         and line_num >= 1
@@ -965,7 +965,6 @@ def _check_syntax_errors(
     labels: Dict[str, int],
     *,
     lines: List[str] | None = None,
-    delayed_expansion_state: List[bool] | None = None,
 ) -> List[LintIssue]:
     """Check for syntax error level issues."""
     issues: List[LintIssue] = []
@@ -985,7 +984,6 @@ def _check_syntax_errors(
             stripped,
             line_num,
             lines=lines,
-            delayed_expansion_state=delayed_expansion_state,
         )
     )
     issues.extend(_check_subroutine_call(stripped, line_num, labels))

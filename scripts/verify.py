@@ -7,8 +7,10 @@ import argparse
 import importlib.metadata
 from pathlib import Path
 import platform
+import re
 import subprocess
 import sys
+import tomllib
 from typing import Sequence, cast
 
 _SCRIPTS_SPEC_DIR = Path(__file__).resolve().parent / "spec"
@@ -130,7 +132,7 @@ def _is_windows() -> bool:
 def _check_antlr_runtime_version() -> None:
     """Fail when installed antlr4-python3-runtime drifts from the generator pin."""
     name = "antlr4-python3-runtime"
-    expected = _load_expected_antlr_runtime_version()
+    expected = _read_antlr_runtime_pin()
     print(f"==> {name} version (expected {expected})")
     try:
         installed = importlib.metadata.version(name)
@@ -147,7 +149,7 @@ def _check_antlr_runtime_version() -> None:
         )
 
 
-def _load_expected_antlr_runtime_version() -> str:
+def _read_antlr_runtime_pin() -> str:
     """Read the generator pin from scripts/spec/generate_parser.py."""
     parser_path = _SCRIPTS_SPEC_DIR / "generate_parser.py"
     for line in parser_path.read_text(encoding="utf-8").splitlines():
@@ -156,6 +158,89 @@ def _load_expected_antlr_runtime_version() -> str:
             _, _, value = stripped.partition("=")
             return value.strip().strip('"').strip("'")
     return _EXPECTED_ANTLR_RUNTIME_VERSION
+
+
+def _normalize_requirement_name(name: str) -> str:
+    """Normalize a distribution name for set comparison."""
+    return re.sub(r"[-_.]+", "-", name.strip().lower())
+
+
+def _read_requirements_packages(path: Path) -> set[str]:
+    """Return normalized package names from a requirements file."""
+    packages: set[str] = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("-r"):
+            continue
+        package = stripped.split()[0].split("[")[0]
+        packages.add(_normalize_requirement_name(package))
+    return packages
+
+
+def _dependency_names_from_list(raw: object) -> set[str]:
+    """Extract normalized package names from a TOML list value."""
+    if not isinstance(raw, list):
+        return set()
+    names: set[str] = set()
+    for item in raw:
+        if isinstance(item, str):
+            names.add(_normalize_requirement_name(item))
+    return names
+
+
+def _read_pyproject_dependency_sets(pyproject_path: Path) -> tuple[set[str], set[str]]:
+    """Return runtime and dev dependency name sets from pyproject.toml."""
+    with pyproject_path.open("rb") as pyproject_file:
+        data_object: object = tomllib.load(pyproject_file)
+    if not isinstance(data_object, dict):
+        raise SystemExit("Step failed: pyproject.toml missing root table")
+    project_object: object = data_object.get("project")
+    if not isinstance(project_object, dict):
+        raise SystemExit("Step failed: pyproject.toml missing [project] table")
+
+    runtime = _dependency_names_from_list(project_object.get("dependencies"))
+    optional_object: object = project_object.get("optional-dependencies")
+    dev: set[str] = set()
+    if isinstance(optional_object, dict):
+        dev = _dependency_names_from_list(optional_object.get("dev"))
+    return runtime, dev
+
+
+def _check_requirements_drift(root: Path) -> None:
+    """Fail when requirements files drift from pyproject.toml dependency lists."""
+    name = "requirements drift (pyproject.toml vs requirements*.txt)"
+    print(f"==> {name}")
+    pyproject_path = root / _PYPROJECT
+    requirements_path = root / "requirements.txt"
+    requirements_dev_path = root / "requirements-dev.txt"
+
+    runtime_expected, dev_expected = _read_pyproject_dependency_sets(pyproject_path)
+    runtime_actual = _read_requirements_packages(requirements_path)
+    dev_actual = _read_requirements_packages(requirements_dev_path) - runtime_actual
+
+    runtime_missing = runtime_expected - runtime_actual
+    runtime_extra = runtime_actual - runtime_expected
+    dev_missing = dev_expected - dev_actual
+    dev_extra = dev_actual - dev_expected
+
+    problems: list[str] = []
+    if runtime_missing:
+        problems.append(
+            f"requirements.txt missing: {', '.join(sorted(runtime_missing))}"
+        )
+    if runtime_extra:
+        problems.append(f"requirements.txt extra: {', '.join(sorted(runtime_extra))}")
+    if dev_missing:
+        problems.append(
+            f"requirements-dev.txt missing: {', '.join(sorted(dev_missing))}"
+        )
+    if dev_extra:
+        problems.append(f"requirements-dev.txt extra: {', '.join(sorted(dev_extra))}")
+
+    if problems:
+        raise SystemExit(f"Step failed: {name}\n" + "\n".join(problems))
 
 
 def _powershell_executable() -> str:
@@ -319,6 +404,7 @@ def main() -> None:
     for name, step_args in subprocess_steps_before_pylint:
         _run_step(name, step_args, cwd=root)
 
+    _check_requirements_drift(root)
     _check_antlr_runtime_version()
 
     _run_autopep8_step(cwd=root, fix=fix)

@@ -83,7 +83,7 @@ def main() -> int:
             encoding="utf-8",
             newline="\n",
         )
-    except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
+    except (OSError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 

@@ -21,7 +21,6 @@ def check_structure_rules(
     labels: Dict[str, int],
     *,
     lines: list[str],
-    delayed_expansion_state: list[bool] | None = None,
 ) -> List[LintIssue]:
     """Check structural syntax for one line (AST visitor delegates here)."""
     issues = _check_syntax_errors(
@@ -29,7 +28,6 @@ def check_structure_rules(
         line_number,
         labels,
         lines=lines,
-        delayed_expansion_state=delayed_expansion_state,
     )
     issues.extend(_check_if_block_paren_next_line(lines, line_number))
     issues.extend(_check_for_do_paren_next_line(lines, line_number))

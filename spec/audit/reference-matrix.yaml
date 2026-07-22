@@ -164,6 +164,7 @@ entries:
   - E028
   corpus:
   - syntax/e009-mismatched-quotes
+  - syntax/e011-bang-invalid-expansion
   - syntax/e011-invalid-expansion
   - syntax/e028-complex-quotes
 - construct: FOR loop syntax and variable forms

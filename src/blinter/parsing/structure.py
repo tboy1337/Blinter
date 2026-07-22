@@ -286,9 +286,9 @@ def _parse_suppression_comments(lines: List[str]) -> Dict[int, Set[str]]:
     return suppressions
 
 
-_delayed_expansion_cache_var: ContextVar[Optional[Dict[int, List[bool]]]] = ContextVar(
-    "delayed_expansion_cache", default=None
-)
+_delayed_expansion_cache_var: ContextVar[
+    Optional[Dict[tuple[str, ...], List[bool]]]
+] = ContextVar("delayed_expansion_cache", default=None)
 
 
 def _begin_delayed_expansion_pass() -> None:
@@ -321,11 +321,11 @@ def _delayed_expansion_state_for_lines(lines: List[str]) -> List[bool]:
     cache = _delayed_expansion_cache_var.get()
     if cache is None:
         return _build_delayed_expansion_state(lines)
-    lines_id = id(lines)
-    cached = cache.get(lines_id)
+    lines_key = tuple(lines)
+    cached = cache.get(lines_key)
     if cached is None:
         cached = _build_delayed_expansion_state(lines)
-        cache[lines_id] = cached
+        cache[lines_key] = cached
     return cached
 
 

@@ -49,7 +49,7 @@ Microsoft Learn requires parentheses around the `IN` set in batch files. The ANT
 
 ### Delayed expansion
 
-`!VAR!` is only active after `SETLOCAL EnableDelayedExpansion` (see MS Learn `setlocal` and SS64 delayed expansion). Blinter flags missing enablement via P008/W022.
+`!VAR!` is only active after `SETLOCAL EnableDelayedExpansion` (see MS Learn `setlocal` and SS64 delayed expansion). Blinter tracks delayed-expansion state with a per-line SETLOCAL stack in [`parsing/structure.py`](../src/blinter/parsing/structure.py). The same stack gates **P008** (bang variables used without enablement) and bang-delimited **E011** (mismatched `!` delimiters when delayed expansion is active on that line). Comment-only mentions of `enabledelayedexpansion` do not enable the stack.
 
 ### IF EXISTS typo (E036)
 

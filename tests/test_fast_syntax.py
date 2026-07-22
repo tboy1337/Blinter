@@ -102,3 +102,31 @@ def test_bang_e011_allows_special_char_vars_when_delayed_expansion_active() -> N
     ]
     keys = _issue_keys(check_grammar_backed_syntax_fast(lines))
     assert "E011" not in {code for _, code in keys}
+
+
+def test_bang_e011_after_endlocal() -> None:
+    """Incomplete bang variables after endlocal should not raise E011."""
+    lines = [
+        "setlocal enabledelayedexpansion",
+        "echo !ok!",
+        "endlocal",
+        "echo !literal_open",
+    ]
+    keys = _issue_keys(check_grammar_backed_syntax_fast(lines))
+    assert "E011" not in {code for _, code in keys}
+
+
+def test_bang_e011_nested_setlocal() -> None:
+    """Nested setlocal boundaries gate bang E011 per active scope."""
+    lines = [
+        "setlocal enabledelayedexpansion",
+        "echo !outer_open",
+        "setlocal disabledelayedexpansion",
+        "echo !inner_literal",
+        "endlocal",
+        "echo !outer_open_again",
+    ]
+    keys = _issue_keys(check_grammar_backed_syntax_fast(lines))
+    assert keys == {(2, "E011"), (6, "E011")}
+    antlr_keys = _issue_keys(check_ast_syntax_rules_antlr(lines))
+    assert keys == antlr_keys

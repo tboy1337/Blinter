@@ -97,7 +97,7 @@ jobs:
           python -m pip install --upgrade setuptools
           python -m pip install --upgrade wheel
           python -m pip install --upgrade pyinstaller
-          python -m pip install --upgrade -r requirements-dev.txt
+          python -m pip install -e ".[dev]"
         shell: pwsh
 
       - name: Generate version info file
@@ -117,12 +117,6 @@ jobs:
           if (-not (Test-Path -Path "dist\Blinter.exe" -PathType Leaf)) {
             throw "dist\Blinter.exe was not produced by PyInstaller"
           }
-        shell: pwsh
-
-      - name: Install Blinter for parity checks
-        run: |
-          .\venv\Scripts\Activate.ps1
-          python -m pip install -e .
         shell: pwsh
 
       - name: Run cmd.exe corpus oracle

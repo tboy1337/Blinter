@@ -16,7 +16,7 @@ from blinter.parsing.antlr_bridge import ParseResult, parse_batch_lines
 from blinter.parsing.fast_syntax import check_grammar_backed_syntax_fast
 from blinter.parsing.grammar_rules import GRAMMAR_BACKED_RULE_CODES
 from blinter.parsing.preprocessor import map_line_number
-from blinter.parsing.structure import _build_delayed_expansion_state
+from blinter.parsing.structure import _delayed_expansion_state_for_lines
 from blinter.parsing.visitors.rule_impl.advanced.escaping import (
     _check_continuation_spaces,
     _check_double_percent_escaping,
@@ -55,13 +55,13 @@ class SyntaxLintVisitor(BatchParserVisitor):
         *,
         parse_result: ParseResult,
         original_lines: List[str],
-        has_delayed_expansion: bool,
     ) -> None:
         super().__init__()
         self._parse_result: ParseResult = parse_result
         self.original_lines = original_lines
-        self.has_delayed_expansion = has_delayed_expansion
-        self._delayed_expansion_state = _build_delayed_expansion_state(original_lines)
+        self._delayed_expansion_state = _delayed_expansion_state_for_lines(
+            original_lines
+        )
         self.issues: List[LintIssue] = []
         self._seen: Set[tuple[int, str]] = set()
 
@@ -184,7 +184,6 @@ def check_ast_syntax_rules_antlr(
     visitor = SyntaxLintVisitor(
         parse_result=parse_result,
         original_lines=lines,
-        has_delayed_expansion=has_delayed_expansion,
     )
     visitor.visit(parse_result.tree)
 
