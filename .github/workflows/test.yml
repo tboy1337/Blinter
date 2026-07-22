@@ -66,6 +66,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Fetch batch-spec tags
+        run: git -C vendor/batch-spec fetch --tags origin
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
