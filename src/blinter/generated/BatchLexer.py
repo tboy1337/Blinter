@@ -274,34 +274,34 @@ class BatchLexer(Lexer):
     modeNames = [ "DEFAULT_MODE" ]
 
     literalNames = [ "<INVALID>",
-            "'EOF'", "'('", "')'", "'&'", "'|'", "'&&'", "'||'", "'>'", 
-            "'<'", "'>='", "'<='", "'=='", "':'", "'/A'", "'/'", "'='", 
-            "','", "'.'", "'\\'", "'+'", "'-'", "'EQU'", "'NEQ'", "'LSS'", 
+            "'EOF'", "'('", "')'", "'&'", "'|'", "'&&'", "'||'", "'>'",
+            "'<'", "'>='", "'<='", "'=='", "':'", "'/A'", "'/'", "'='",
+            "','", "'.'", "'\\'", "'+'", "'-'", "'EQU'", "'NEQ'", "'LSS'",
             "'LEQ'", "'GTR'", "'GEQ'", "'^'", "'%'", "'*'" ]
 
     symbolicNames = [ "<INVALID>",
-            "LINE_COMMENT", "REM", "LABEL", "FOR", "IF", "CALL", "GOTO", 
-            "SET", "SETLOCAL", "ENDLOCAL", "DO", "IN", "EXIST", "DEFINED", 
-            "NOT", "ERRORLEVEL", "ELSE", "EXIT", "SHIFT", "EOF_KW", "LPAREN", 
-            "RPAREN", "AMP", "PIPE", "AMPAMP", "PIPEPIPE", "GT", "LT", "GE", 
-            "LE", "EQ", "COLON", "SET_A", "SLASH", "EQUALS", "COMMA", "DOT", 
-            "BACKSLASH", "PLUS", "MINUS", "EQU", "NEQ", "LSS", "LEQ", "GTR", 
-            "GEQ", "CARET", "PERCENT", "ASTERISK", "DQ_STRING", "SQ_STRING", 
-            "PERCENT_TILDE", "PERCENT_VAR_SUBSTRING", "PERCENT_VAR_REPLACE", 
-            "PERCENT_VAR", "PERCENT_NUM", "FOR_VAR", "FOR_VAR_TILDE", "BANG_VAR", 
+            "LINE_COMMENT", "REM", "LABEL", "FOR", "IF", "CALL", "GOTO",
+            "SET", "SETLOCAL", "ENDLOCAL", "DO", "IN", "EXIST", "DEFINED",
+            "NOT", "ERRORLEVEL", "ELSE", "EXIT", "SHIFT", "EOF_KW", "LPAREN",
+            "RPAREN", "AMP", "PIPE", "AMPAMP", "PIPEPIPE", "GT", "LT", "GE",
+            "LE", "EQ", "COLON", "SET_A", "SLASH", "EQUALS", "COMMA", "DOT",
+            "BACKSLASH", "PLUS", "MINUS", "EQU", "NEQ", "LSS", "LEQ", "GTR",
+            "GEQ", "CARET", "PERCENT", "ASTERISK", "DQ_STRING", "SQ_STRING",
+            "PERCENT_TILDE", "PERCENT_VAR_SUBSTRING", "PERCENT_VAR_REPLACE",
+            "PERCENT_VAR", "PERCENT_NUM", "FOR_VAR", "FOR_VAR_TILDE", "BANG_VAR",
             "WORD", "NUMBER", "WS", "NEWLINE", "UNMATCHED_DQ" ]
 
-    ruleNames = [ "IDENT", "DIGIT", "LINE_COMMENT", "REM", "LABEL", "FOR", 
-                  "IF", "CALL", "GOTO", "SET", "SETLOCAL", "ENDLOCAL", "DO", 
-                  "IN", "EXIST", "DEFINED", "NOT", "ERRORLEVEL", "ELSE", 
-                  "EXIT", "SHIFT", "EOF_KW", "LPAREN", "RPAREN", "AMP", 
-                  "PIPE", "AMPAMP", "PIPEPIPE", "GT", "LT", "GE", "LE", 
-                  "EQ", "COLON", "SET_A", "SLASH", "EQUALS", "COMMA", "DOT", 
-                  "BACKSLASH", "PLUS", "MINUS", "EQU", "NEQ", "LSS", "LEQ", 
-                  "GTR", "GEQ", "CARET", "PERCENT", "ASTERISK", "DQ_STRING", 
-                  "SQ_STRING", "PERCENT_TILDE", "PERCENT_VAR_SUBSTRING", 
-                  "PERCENT_VAR_REPLACE", "PERCENT_VAR", "PERCENT_NUM", "FOR_VAR", 
-                  "FOR_VAR_TILDE", "BANG_VAR", "WORD", "NUMBER", "WS", "NEWLINE", 
+    ruleNames = [ "IDENT", "DIGIT", "LINE_COMMENT", "REM", "LABEL", "FOR",
+                  "IF", "CALL", "GOTO", "SET", "SETLOCAL", "ENDLOCAL", "DO",
+                  "IN", "EXIST", "DEFINED", "NOT", "ERRORLEVEL", "ELSE",
+                  "EXIT", "SHIFT", "EOF_KW", "LPAREN", "RPAREN", "AMP",
+                  "PIPE", "AMPAMP", "PIPEPIPE", "GT", "LT", "GE", "LE",
+                  "EQ", "COLON", "SET_A", "SLASH", "EQUALS", "COMMA", "DOT",
+                  "BACKSLASH", "PLUS", "MINUS", "EQU", "NEQ", "LSS", "LEQ",
+                  "GTR", "GEQ", "CARET", "PERCENT", "ASTERISK", "DQ_STRING",
+                  "SQ_STRING", "PERCENT_TILDE", "PERCENT_VAR_SUBSTRING",
+                  "PERCENT_VAR_REPLACE", "PERCENT_VAR", "PERCENT_NUM", "FOR_VAR",
+                  "FOR_VAR_TILDE", "BANG_VAR", "WORD", "NUMBER", "WS", "NEWLINE",
                   "UNMATCHED_DQ" ]
 
     grammarFileName = "BatchLexer.g4"
@@ -328,6 +328,6 @@ class BatchLexer(Lexer):
     def LABEL_sempred(self, localctx:RuleContext, predIndex:int):
             if predIndex == 0:
                 return self._tokenStartColumn == 0
-         
+
 
 

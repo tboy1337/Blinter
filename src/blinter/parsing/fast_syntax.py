@@ -7,7 +7,10 @@ import re
 from typing import List, Set
 
 from blinter.models import LintIssue
-from blinter.parsing.antlr_bridge import _detect_delayed_expansion
+from blinter.parsing.delayed_expansion_tokens import (
+    check_delayed_expansion_bang_var_tokens,
+    resolve_delayed_expansion,
+)
 from blinter.parsing.grammar_rules import GRAMMAR_BACKED_RULE_CODES
 from blinter.parsing.preprocessor import map_line_number, preprocess_lines
 from blinter.parsing.visitors.rule_impl.advanced.escaping import (
@@ -41,6 +44,7 @@ def _collect_grammar_issues_for_line(
     logical_line: str,
     line_number: int,
     seen: Set[tuple[int, str]],
+    effective_delayed_expansion: bool,
 ) -> List[LintIssue]:
     """Run grammar-backed checks for one command line."""
     issues: List[LintIssue] = []
@@ -70,6 +74,12 @@ def _collect_grammar_issues_for_line(
         add(issue.rule.code, issue.context or "")
     for issue in _check_percent_tilde_syntax(logical_stripped, line_number):
         add(issue.rule.code, issue.context or "")
+    for issue in check_delayed_expansion_bang_var_tokens(
+        logical_stripped,
+        line_number,
+        effective_delayed_expansion=effective_delayed_expansion,
+    ):
+        add(issue.rule.code, issue.context or "")
 
     return issues
 
@@ -86,7 +96,10 @@ def check_grammar_backed_syntax_fast(
     other rules run per preprocessed command line (first physical line for text
     checks, merged logical line for percent-tilde token scans).
     """
-    del has_delayed_expansion  # reserved for future delayed-expansion token rules
+    effective_delayed_expansion = resolve_delayed_expansion(
+        has_delayed_expansion,
+        lines,
+    )
     preprocessed = preprocess_lines(lines)
     issues: List[LintIssue] = []
     seen: Set[tuple[int, str]] = set()
@@ -117,6 +130,7 @@ def check_grammar_backed_syntax_fast(
                 logical_line=logical_line,
                 line_number=original_line_number,
                 seen=seen,
+                effective_delayed_expansion=effective_delayed_expansion,
             )
         )
 
@@ -130,7 +144,7 @@ def check_grammar_backed_syntax_fast(
         seen.add(key)
         issues.append(LintIssue(line_number, rule, context=""))
 
-    if _detect_delayed_expansion(lines):
+    if effective_delayed_expansion:
         logger.debug("Fast syntax path: delayed expansion enabled")
 
     return issues

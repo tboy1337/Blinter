@@ -46,3 +46,45 @@ def test_fast_syntax_matches_antlr_on_grammar_corpus_cases(case: object) -> None
         f"Mismatch for {case.id}: fast-only={fast_keys - antlr_keys}, "
         f"antlr-only={antlr_keys - fast_keys}"
     )
+
+
+@pytest.mark.parametrize("has_delayed_expansion", [False, True])
+def test_fast_syntax_matches_antlr_with_explicit_delayed_expansion_flag(
+    has_delayed_expansion: bool,
+) -> None:
+    """Explicit delayed-expansion flag should keep fast and ANTLR paths aligned."""
+    lines = [
+        "@echo off",
+        "setlocal enabledelayedexpansion",
+        "echo !notclosed",
+    ]
+    fast_keys = _issue_keys(
+        check_grammar_backed_syntax_fast(
+            lines,
+            has_delayed_expansion=has_delayed_expansion,
+        )
+    )
+    antlr_keys = _issue_keys(
+        check_ast_syntax_rules_antlr(
+            lines,
+            has_delayed_expansion=has_delayed_expansion,
+        )
+    )
+    assert fast_keys == antlr_keys
+
+
+def test_delayed_expansion_token_rule_flags_incomplete_bang_var() -> None:
+    """Incomplete delayed-expansion spans should raise E011 when DE is enabled."""
+    lines = ["setlocal enabledelayedexpansion", "echo !notclosed"]
+    keys = _issue_keys(check_grammar_backed_syntax_fast(lines))
+    assert keys == {(2, "E011")}
+
+
+def test_delayed_expansion_token_rule_allows_special_char_vars() -> None:
+    """Special-character delayed expansion variables must not raise grammar E011."""
+    lines = [
+        "setlocal enabledelayedexpansion",
+        "echo !@DEBUG_MODE!",
+    ]
+    keys = _issue_keys(check_grammar_backed_syntax_fast(lines))
+    assert "E011" not in {code for _, code in keys}

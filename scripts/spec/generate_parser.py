@@ -60,6 +60,22 @@ def _write_stamp() -> None:
     stamp_path.write_text(_grammar_fingerprint(), encoding="utf-8")
 
 
+def _strip_generated_trailing_whitespace() -> None:
+    """Remove trailing whitespace ANTLR may emit in generated Python sources."""
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "autopep8",
+            "--select=W291,W293",
+            "--in-place",
+            "-r",
+            str(GENERATED_DIR),
+        ],
+        check=True,
+    )
+
+
 def generate_parser() -> None:
     """Regenerate parser sources under src/blinter/generated/."""
     if GENERATED_DIR.exists():
@@ -67,6 +83,7 @@ def generate_parser() -> None:
     GENERATED_DIR.mkdir(parents=True, exist_ok=True)
     _run_antlr()
     _write_package_init()
+    _strip_generated_trailing_whitespace()
     _write_stamp()
 
 

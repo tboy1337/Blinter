@@ -127,28 +127,28 @@ class BatchParser ( Parser ):
 
     sharedContextCache = PredictionContextCache()
 
-    literalNames = [ "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
-                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
-                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
-                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
-                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>", 
-                     "'EOF'", "'('", "')'", "'&'", "'|'", "'&&'", "'||'", 
-                     "'>'", "'<'", "'>='", "'<='", "'=='", "':'", "'/A'", 
-                     "'/'", "'='", "','", "'.'", "'\\'", "'+'", "'-'", "'EQU'", 
-                     "'NEQ'", "'LSS'", "'LEQ'", "'GTR'", "'GEQ'", "'^'", 
+    literalNames = [ "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>",
+                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>",
+                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>",
+                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>",
+                     "<INVALID>", "<INVALID>", "<INVALID>", "<INVALID>",
+                     "'EOF'", "'('", "')'", "'&'", "'|'", "'&&'", "'||'",
+                     "'>'", "'<'", "'>='", "'<='", "'=='", "':'", "'/A'",
+                     "'/'", "'='", "','", "'.'", "'\\'", "'+'", "'-'", "'EQU'",
+                     "'NEQ'", "'LSS'", "'LEQ'", "'GTR'", "'GEQ'", "'^'",
                      "'%'", "'*'" ]
 
-    symbolicNames = [ "<INVALID>", "LINE_COMMENT", "REM", "LABEL", "FOR", 
-                      "IF", "CALL", "GOTO", "SET", "SETLOCAL", "ENDLOCAL", 
-                      "DO", "IN", "EXIST", "DEFINED", "NOT", "ERRORLEVEL", 
-                      "ELSE", "EXIT", "SHIFT", "EOF_KW", "LPAREN", "RPAREN", 
-                      "AMP", "PIPE", "AMPAMP", "PIPEPIPE", "GT", "LT", "GE", 
-                      "LE", "EQ", "COLON", "SET_A", "SLASH", "EQUALS", "COMMA", 
-                      "DOT", "BACKSLASH", "PLUS", "MINUS", "EQU", "NEQ", 
-                      "LSS", "LEQ", "GTR", "GEQ", "CARET", "PERCENT", "ASTERISK", 
-                      "DQ_STRING", "SQ_STRING", "PERCENT_TILDE", "PERCENT_VAR_SUBSTRING", 
-                      "PERCENT_VAR_REPLACE", "PERCENT_VAR", "PERCENT_NUM", 
-                      "FOR_VAR", "FOR_VAR_TILDE", "BANG_VAR", "WORD", "NUMBER", 
+    symbolicNames = [ "<INVALID>", "LINE_COMMENT", "REM", "LABEL", "FOR",
+                      "IF", "CALL", "GOTO", "SET", "SETLOCAL", "ENDLOCAL",
+                      "DO", "IN", "EXIST", "DEFINED", "NOT", "ERRORLEVEL",
+                      "ELSE", "EXIT", "SHIFT", "EOF_KW", "LPAREN", "RPAREN",
+                      "AMP", "PIPE", "AMPAMP", "PIPEPIPE", "GT", "LT", "GE",
+                      "LE", "EQ", "COLON", "SET_A", "SLASH", "EQUALS", "COMMA",
+                      "DOT", "BACKSLASH", "PLUS", "MINUS", "EQU", "NEQ",
+                      "LSS", "LEQ", "GTR", "GEQ", "CARET", "PERCENT", "ASTERISK",
+                      "DQ_STRING", "SQ_STRING", "PERCENT_TILDE", "PERCENT_VAR_SUBSTRING",
+                      "PERCENT_VAR_REPLACE", "PERCENT_VAR", "PERCENT_NUM",
+                      "FOR_VAR", "FOR_VAR_TILDE", "BANG_VAR", "WORD", "NUMBER",
                       "WS", "NEWLINE", "UNMATCHED_DQ" ]
 
     RULE_script = 0
@@ -187,13 +187,13 @@ class BatchParser ( Parser ):
     RULE_token = 33
     RULE_block = 34
 
-    ruleNames =  [ "script", "line", "label", "commandLine", "statement", 
-                   "exitStmt", "exitTail", "shiftStmt", "ifStmt", "ifTail", 
-                   "ifErrorlevelStmt", "ifExistOperand", "ifBlockStmt", 
-                   "ifPredicate", "comparison", "compareOp", "compareOperand", 
-                   "forStmt", "forMod", "forList", "forItem", "callStmt", 
-                   "callTarget", "gotoStmt", "setStmt", "setlocalStmt", 
-                   "setlocalRest", "endlocalStmt", "setTarget", "setOp", 
+    ruleNames =  [ "script", "line", "label", "commandLine", "statement",
+                   "exitStmt", "exitTail", "shiftStmt", "ifStmt", "ifTail",
+                   "ifErrorlevelStmt", "ifExistOperand", "ifBlockStmt",
+                   "ifPredicate", "comparison", "compareOp", "compareOperand",
+                   "forStmt", "forMod", "forList", "forItem", "callStmt",
+                   "callTarget", "gotoStmt", "setStmt", "setlocalStmt",
+                   "setlocalRest", "endlocalStmt", "setTarget", "setOp",
                    "setRest", "genericCmd", "commandTail", "token", "block" ]
 
     EOF = Token.EOF
@@ -518,7 +518,7 @@ class BatchParser ( Parser ):
                         self._errHandler.reportMatch(self)
                         self.consume()
                     self.state = 89
-                    self.statement() 
+                    self.statement()
                 self.state = 94
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,3,self._ctx)
@@ -779,7 +779,7 @@ class BatchParser ( Parser ):
 
             elif la_ == 3:
                 self.enterOuterAlt(localctx, 3)
-                self.state = 118 
+                self.state = 118
                 self._errHandler.sync(self)
                 _alt = 1
                 while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
@@ -789,7 +789,7 @@ class BatchParser ( Parser ):
 
                     else:
                         raise NoViableAltException(self)
-                    self.state = 120 
+                    self.state = 120
                     self._errHandler.sync(self)
                     _alt = self._interp.adaptivePredict(self._input,7,self._ctx)
 
@@ -848,7 +848,7 @@ class BatchParser ( Parser ):
             while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
                 if _alt==1:
                     self.state = 125
-                    self.token() 
+                    self.token()
                 self.state = 130
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,9,self._ctx)
@@ -2140,7 +2140,7 @@ class BatchParser ( Parser ):
         self.enterRule(localctx, 52, self.RULE_setlocalRest)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 255 
+            self.state = 255
             self._errHandler.sync(self)
             _alt = 1
             while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
@@ -2150,7 +2150,7 @@ class BatchParser ( Parser ):
 
                 else:
                     raise NoViableAltException(self)
-                self.state = 257 
+                self.state = 257
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,28,self._ctx)
 
@@ -2345,7 +2345,7 @@ class BatchParser ( Parser ):
         self.enterRule(localctx, 60, self.RULE_setRest)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 268 
+            self.state = 268
             self._errHandler.sync(self)
             _alt = 1
             while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
@@ -2355,7 +2355,7 @@ class BatchParser ( Parser ):
 
                 else:
                     raise NoViableAltException(self)
-                self.state = 270 
+                self.state = 270
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,30,self._ctx)
 
@@ -2440,7 +2440,7 @@ class BatchParser ( Parser ):
         self.enterRule(localctx, 64, self.RULE_commandTail)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 275 
+            self.state = 275
             self._errHandler.sync(self)
             _alt = 1
             while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
@@ -2450,7 +2450,7 @@ class BatchParser ( Parser ):
 
                 else:
                     raise NoViableAltException(self)
-                self.state = 277 
+                self.state = 277
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,31,self._ctx)
 
@@ -2621,7 +2621,7 @@ class BatchParser ( Parser ):
             while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
                 if _alt==1:
                     self.state = 281
-                    self.line() 
+                    self.line()
                 self.state = 286
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,32,self._ctx)

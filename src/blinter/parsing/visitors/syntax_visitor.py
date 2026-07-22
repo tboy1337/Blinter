@@ -13,6 +13,10 @@ from blinter.generated.BatchParser import BatchParser
 from blinter.generated.BatchParserVisitor import BatchParserVisitor
 from blinter.models import LintIssue
 from blinter.parsing.antlr_bridge import ParseResult, parse_batch_lines
+from blinter.parsing.delayed_expansion_tokens import (
+    check_delayed_expansion_bang_var_tokens,
+    resolve_delayed_expansion,
+)
 from blinter.parsing.fast_syntax import check_grammar_backed_syntax_fast
 from blinter.parsing.grammar_rules import GRAMMAR_BACKED_RULE_CODES
 from blinter.parsing.preprocessor import map_line_number
@@ -91,7 +95,7 @@ class SyntaxLintVisitor(BatchParserVisitor):
             elif token_type == BatchLexer.PERCENT_TILDE:
                 self._check_percent_tilde_token(text, line_no)
             elif token_type == BatchLexer.BANG_VAR and not self.has_delayed_expansion:
-                pass
+                return
             return
         for index in range(node.getChildCount()):
             self._walk_tokens(node.getChild(index), preprocessed_line)
@@ -134,6 +138,12 @@ class SyntaxLintVisitor(BatchParserVisitor):
             line = self.original_lines[line_no - 1]
             stripped = line.strip()
             self._check_line_text(line, stripped, line_no)
+            for issue in check_delayed_expansion_bang_var_tokens(
+                stripped,
+                line_no,
+                effective_delayed_expansion=self.has_delayed_expansion,
+            ):
+                self._add(line_no, issue.rule.code, context=issue.context or "")
         return None
 
     def _check_line_text(self, line: str, stripped: str, line_number: int) -> None:
@@ -161,8 +171,10 @@ def check_ast_syntax_rules(
     ANTLR remains available via ``check_ast_syntax_rules_antlr`` for corpus
     conformance tests and grammar validation.
     """
-    del has_delayed_expansion
-    return check_grammar_backed_syntax_fast(lines)
+    return check_grammar_backed_syntax_fast(
+        lines,
+        has_delayed_expansion=has_delayed_expansion,
+    )
 
 
 def check_ast_syntax_rules_antlr(
@@ -175,11 +187,14 @@ def check_ast_syntax_rules_antlr(
     if parse_result.errors:
         logger.debug("ANTLR parse messages: %s", parse_result.errors)
 
+    effective_delayed_expansion = resolve_delayed_expansion(
+        has_delayed_expansion,
+        lines,
+    )
     visitor = SyntaxLintVisitor(
         parse_result=parse_result,
         original_lines=lines,
-        has_delayed_expansion=has_delayed_expansion
-        or parse_result.delayed_expansion_enabled,
+        has_delayed_expansion=effective_delayed_expansion,
     )
     visitor.visit(parse_result.tree)
 

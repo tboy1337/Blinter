@@ -14,7 +14,9 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from _paths import REQUIREMENTS_MD, RULES_YAML  # noqa: E402
+from _paths import REPO_ROOT, REQUIREMENTS_MD, RULES_YAML  # noqa: E402
+
+_README_MD = REPO_ROOT / "README.md"
 
 _START = "<!-- GENERATED:rule-catalog:start -->"
 _END = "<!-- GENERATED:rule-catalog:end -->"
@@ -66,6 +68,31 @@ def _build_catalog(rules: list[dict[str, object]]) -> str:
     return "\n".join(sections)
 
 
+def _apply_rule_count_prose(text: str, rule_count: int) -> str:
+    updated = re.sub(
+        r"\(currently \*\*\d+\*\* rules; see `RULE_COUNT`[^)]*\)",
+        f"(currently **{rule_count}** rules; see `RULE_COUNT` in that module)",
+        text,
+        count=1,
+    )
+    updated = re.sub(
+        r"\(see `RULE_COUNT` in that module for the current count\)",
+        f"(currently **{rule_count}** rules; see `RULE_COUNT` in that module)",
+        updated,
+        count=1,
+    )
+    updated = re.sub(
+        r"\*\*\d+\*\* rules across 5 severity levels \(see `blinter\.rules\.registry\.RULE_COUNT`",
+        (
+            f"**{rule_count}** rules across 5 severity levels "
+            "(see `blinter.rules.registry.RULE_COUNT`"
+        ),
+        updated,
+        count=1,
+    )
+    return updated
+
+
 def generate_docs_text() -> str:
     data = yaml.safe_load(RULES_YAML.read_text(encoding="utf-8"))
     rules = data["rules"]
@@ -86,20 +113,15 @@ def generate_docs_text() -> str:
             updated = parts[0] + marker + "\n\n" + catalog + "\n\n" + parts[1].lstrip()
         else:
             updated = original + "\n\n" + catalog + "\n"
-    rule_count = len(rules)
-    updated = re.sub(
-        r"\(currently \*\*\d+\*\* rules; see `RULE_COUNT`[^)]*\)",
-        f"(currently **{rule_count}** rules; see `RULE_COUNT` in that module)",
-        updated,
-        count=1,
-    )
-    updated = re.sub(
-        r"\(see `RULE_COUNT` in that module for the current count\)",
-        f"(currently **{rule_count}** rules; see `RULE_COUNT` in that module)",
-        updated,
-        count=1,
-    )
-    return updated
+    return _apply_rule_count_prose(updated, len(rules))
+
+
+def generate_readme_text() -> str:
+    """Update README rule-count prose to match rules.yaml."""
+    data = yaml.safe_load(RULES_YAML.read_text(encoding="utf-8"))
+    rule_count = len(data["rules"])
+    original = _README_MD.read_text(encoding="utf-8")
+    return _apply_rule_count_prose(original, rule_count)
 
 
 def main() -> None:
@@ -108,16 +130,24 @@ def main() -> None:
     )
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    generated = generate_docs_text()
+    generated_docs = generate_docs_text()
+    generated_readme = generate_readme_text()
     if args.check:
-        existing = REQUIREMENTS_MD.read_text(encoding="utf-8")
-        if existing != generated:
+        existing_docs = REQUIREMENTS_MD.read_text(encoding="utf-8")
+        if existing_docs != generated_docs:
             print(f"{REQUIREMENTS_MD} is out of date", file=sys.stderr)
             raise SystemExit(1)
+        existing_readme = _README_MD.read_text(encoding="utf-8")
+        if existing_readme != generated_readme:
+            print(f"{_README_MD} is out of date", file=sys.stderr)
+            raise SystemExit(1)
         print("Requirements.md catalog is up to date")
+        print("README.md rule count is up to date")
         return
-    REQUIREMENTS_MD.write_text(generated, encoding="utf-8", newline="\n")
+    REQUIREMENTS_MD.write_text(generated_docs, encoding="utf-8", newline="\n")
+    _README_MD.write_text(generated_readme, encoding="utf-8", newline="\n")
     print(f"Updated {REQUIREMENTS_MD}")
+    print(f"Updated {_README_MD}")
 
 
 if __name__ == "__main__":

@@ -79,6 +79,39 @@ def _autopep8_args(*, fix: bool) -> list[str]:
     return args
 
 
+def _run_autopep8_step(*, cwd: Path, fix: bool) -> None:
+    """Run autopep8; in check mode fail when trailing whitespace would change."""
+    name = "autopep8 (trailing whitespace)"
+    print(f"==> {name}")
+    if fix:
+        fix_result = subprocess.run(
+            _autopep8_args(fix=True),
+            cwd=cwd,
+            check=False,
+        )
+        if fix_result.returncode != 0:
+            raise SystemExit(f"Step failed: {name} (exit code {fix_result.returncode})")
+        return
+
+    check_result = subprocess.run(
+        _autopep8_args(fix=False),
+        cwd=cwd,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if check_result.returncode != 0:
+        raise SystemExit(f"Step failed: {name} (exit code {check_result.returncode})")
+    diff_output = check_result.stdout + check_result.stderr
+    if diff_output.strip():
+        print(diff_output, end="" if diff_output.endswith("\n") else "\n")
+        raise SystemExit(
+            f"Step failed: {name} (trailing whitespace found; run py scripts/verify.py --fix)"
+        )
+
+
 def _isort_args(*, fix: bool) -> list[str]:
     args = _python_m("isort", *_CHECK_DIRS)
     if not fix:
@@ -142,7 +175,11 @@ def _run_windows_powershell_checks(root: Path) -> None:
 
     pester_command = (
         "Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop; "
-        f"Invoke-Pester -Path '{pester_test}' -PassThru -EnableExit"
+        f"$config = New-PesterConfiguration; "
+        f"$config.Run.Path = '{pester_test}'; "
+        "$config.Run.PassThru = $true; "
+        "$config.Run.Exit = $true; "
+        "Invoke-Pester -Configuration $config | Out-Null"
     )
     _run_powershell_step("Pester (exe smoke helpers)", pester_command, cwd=root)
 
@@ -206,20 +243,22 @@ def main() -> None:
                 "SSOT audit (strict)",
                 [sys.executable, str(_SPEC_AUDIT), "--strict"],
             ),
-            ("autopep8 (trailing whitespace)", _autopep8_args(fix=fix)),
-            ("isort", _isort_args(fix=fix)),
-            ("black", _python_m("black", "--check", *_CHECK_DIRS)),
-            (
-                "mypy",
-                _python_m(
-                    "mypy",
-                    package_dir,
-                    "tests",
-                    verify_script,
-                ),
-            ),
         ]
     )
+
+    formatting_steps: list[tuple[str, list[str]]] = [
+        ("isort", _isort_args(fix=fix)),
+        ("black", _python_m("black", "--check", *_CHECK_DIRS)),
+        (
+            "mypy",
+            _python_m(
+                "mypy",
+                package_dir,
+                "tests",
+                verify_script,
+            ),
+        ),
+    ]
 
     subprocess_steps_after_pylint: list[tuple[str, list[str]]] = [
         ("pylint (verify)", _python_m("pylint", verify_script)),
@@ -237,6 +276,11 @@ def main() -> None:
     ]
 
     for name, step_args in subprocess_steps_before_pylint:
+        _run_step(name, step_args, cwd=root)
+
+    _run_autopep8_step(cwd=root, fix=fix)
+
+    for name, step_args in formatting_steps:
         _run_step(name, step_args, cwd=root)
 
     _run_pylint_package(cwd=root, package_dir=package_dir, report_path=pylint_report)
