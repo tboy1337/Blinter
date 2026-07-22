@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://blinter.dev/schema/commands.schema.json",
-  "title": "Blinter command definitions",
+  "$id": "https://blinter.dev/schema/commands-linter.schema.json",
+  "title": "Blinter linter command policy",
   "type": "object",
   "required": ["version"],
   "properties": {
@@ -26,26 +26,6 @@
       "type": "array",
       "items": { "type": "string" }
     },
-    "builtin_commands": {
-      "type": "array",
-      "items": { "type": "string" }
-    },
-    "deprecated_commands": {
-      "type": "object",
-      "additionalProperties": { "type": "string" }
-    },
-    "removed_commands": {
-      "type": "object",
-      "additionalProperties": { "type": "string" }
-    },
-    "older_windows_commands": {
-      "type": "array",
-      "items": { "type": "string" }
-    },
-    "common_command_typos": {
-      "type": "object",
-      "additionalProperties": { "type": "string" }
-    },
     "sensitive_keywords": {
       "type": "array",
       "items": { "type": "string" }
@@ -57,10 +37,6 @@
     "unicode_problematic_commands": {
       "type": "array",
       "items": { "type": "string" }
-    },
-    "builtin_overlap_deprecated_notes": {
-      "type": "object",
-      "additionalProperties": { "type": "string" }
     }
   },
   "additionalProperties": false

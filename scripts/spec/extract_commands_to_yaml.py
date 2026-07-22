@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build spec/data/commands.yaml from src/blinter/patterns.py tables."""
+"""Build spec/data/commands-linter.yaml from src/blinter/patterns.py linter tables."""
 
 from __future__ import annotations
 

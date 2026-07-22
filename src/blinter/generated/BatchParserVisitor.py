@@ -1,4 +1,4 @@
-# Generated from C:/Users/Laptop/Documents/Git/Blinter/spec/grammar/BatchParser.g4 by ANTLR 4.13.2
+# Generated from C:/Users/Laptop/Documents/Git/Blinter/vendor/batch-spec/grammar/BatchParser.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .BatchParser import BatchParser

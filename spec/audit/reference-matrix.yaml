@@ -15,8 +15,8 @@ entries:
 - construct: GOTO label resolution and unreachable flow
   sources:
   - MS Learn goto
-  - spec/audit/cmd-help/goto-help.txt
-  - spec/audit/cmd-help/if-help.txt
+  - vendor/batch-spec/audit/cmd-help/goto-help.txt
+  - vendor/batch-spec/audit/cmd-help/if-help.txt
   ssot_artifacts:
   - rules E002 W001 W019
   rules:
@@ -37,7 +37,7 @@ entries:
 - construct: IF command format and EXIST/NOT mixing
   sources:
   - MS Learn if
-  - spec/audit/cmd-help/if-help.txt
+  - vendor/batch-spec/audit/cmd-help/if-help.txt
   ssot_artifacts:
   - rules E003 E004 E036 E039 W021 W056
   rules:
@@ -66,11 +66,11 @@ entries:
 - construct: Path validation, UNC, and hardcoded absolute paths
   sources:
   - MS Learn cd/path
-  - spec/audit/cmd-help/cd-help.txt
-  - spec/audit/cmd-help/ren-help.txt
-  - spec/audit/cmd-help/pushd-help.txt
-  - spec/audit/cmd-help/popd-help.txt
-  - spec/audit/cmd-help/move-help.txt
+  - vendor/batch-spec/audit/cmd-help/cd-help.txt
+  - vendor/batch-spec/audit/cmd-help/ren-help.txt
+  - vendor/batch-spec/audit/cmd-help/pushd-help.txt
+  - vendor/batch-spec/audit/cmd-help/popd-help.txt
+  - vendor/batch-spec/audit/cmd-help/move-help.txt
   ssot_artifacts:
   - rules E005 E027 SEC006 W058 W061 W062
   rules:
@@ -125,7 +125,7 @@ entries:
 - construct: Unreachable code after EXIT/GOTO
   sources:
   - MS Learn control flow
-  - spec/audit/cmd-help/exit-help.txt
+  - vendor/batch-spec/audit/cmd-help/exit-help.txt
   ssot_artifacts:
   - rules E008
   rules:
@@ -135,8 +135,8 @@ entries:
   - integration/s015-inconsistent-goto-colon
 - construct: EXIT and SHIFT batch parameters
   sources:
-  - spec/audit/cmd-help/exit-help.txt
-  - spec/audit/cmd-help/shift-help.txt
+  - vendor/batch-spec/audit/cmd-help/exit-help.txt
+  - vendor/batch-spec/audit/cmd-help/shift-help.txt
   - MS Learn shift
   - SS64 shift
   ssot_artifacts:
@@ -168,7 +168,7 @@ entries:
   - syntax/e028-complex-quotes
 - construct: FOR loop syntax and variable forms
   sources:
-  - spec/audit/cmd-help/for-help.txt
+  - vendor/batch-spec/audit/cmd-help/for-help.txt
   - MS Learn for
   ssot_artifacts:
   - rules E010 E020 E040 W036 W038 W059
@@ -204,8 +204,8 @@ entries:
 - construct: CALL subroutine and GOTO EOF colon rules
   sources:
   - MS Learn goto/call
-  - spec/audit/cmd-help/call-help.txt
-  - spec/audit/cmd-help/goto-help.txt
+  - vendor/batch-spec/audit/cmd-help/call-help.txt
+  - vendor/batch-spec/audit/cmd-help/goto-help.txt
   ssot_artifacts:
   - rules E012 E014 E015 S010 W057
   rules:
@@ -224,7 +224,7 @@ entries:
   - syntax/w057-bat-with-call-valid
 - construct: Command typos and removed/deprecated commands
   sources:
-  - spec/data/commands.yaml
+  - vendor/batch-spec/data/commands.yaml
   ssot_artifacts:
   - rules E013 E034 W024 W025 W029
   rules:
@@ -248,7 +248,7 @@ entries:
   - syntax/w031-unicode-filename
 - construct: IF ERRORLEVEL and numeric comparison semantics
   sources:
-  - spec/audit/cmd-help/if-help.txt
+  - vendor/batch-spec/audit/cmd-help/if-help.txt
   - SS64 errorlevel
   ssot_artifacts:
   - rules E016 W017 W046
@@ -264,8 +264,8 @@ entries:
   - syntax/w046-if-numeric-compare
 - construct: Percent-tilde (%~) parameter expansion
   sources:
-  - spec/audit/cmd-help/call-help.txt
-  - spec/data/expansion.yaml
+  - vendor/batch-spec/audit/cmd-help/call-help.txt
+  - vendor/batch-spec/data/expansion.yaml
   ssot_artifacts:
   - rules E017 E019 E024 E025 W051
   rules:
@@ -303,7 +303,7 @@ entries:
 - construct: String substring, replacement, and unset expansion
   sources:
   - SS64 variable substring
-  - spec/data/expansion.yaml
+  - vendor/batch-spec/data/expansion.yaml
   ssot_artifacts:
   - rules E021 P012 W047
   rules:
@@ -330,7 +330,7 @@ entries:
   - syntax/e023-set-a-unquoted
 - construct: Caret escape, multilevel escaping, and continuation
   sources:
-  - spec/data/expansion.yaml
+  - vendor/batch-spec/data/expansion.yaml
   - SS64 escape characters
   ssot_artifacts:
   - rules E030 E031 E032 E033
@@ -357,7 +357,7 @@ entries:
   sources:
   - MS Learn if
   - SS64 IF DEFINED
-  - spec/audit/cmd-help/if-help.txt
+  - vendor/batch-spec/audit/cmd-help/if-help.txt
   ssot_artifacts:
   - rules W055
   rules:
@@ -535,8 +535,8 @@ entries:
   sources:
   - MS Learn compatibility
   - SS64 batch tips
-  - spec/audit/cmd-help/setx-help.txt
-  - spec/audit/cmd-help/subst-help.txt
+  - vendor/batch-spec/audit/cmd-help/setx-help.txt
+  - vendor/batch-spec/audit/cmd-help/subst-help.txt
   ssot_artifacts:
   - rules W002 W003 W004 W005 W006 W007 W008 W009 W010 W011 W012 W014 W020 W026 W027
     W028 W030 W031 W032 W033 W042 W043 W060
@@ -627,7 +627,7 @@ entries:
   - syntax/w040-for-var-scope
 - construct: FOR /F tokenization, delimiters, and CSV
   sources:
-  - spec/audit/cmd-help/for-help.txt
+  - vendor/batch-spec/audit/cmd-help/for-help.txt
   - cmd.exe FOR /F behavior
   ssot_artifacts:
   - rules E037 E038 W034 W035 W037 W048 W063
@@ -661,7 +661,7 @@ entries:
   sources:
   - MS Learn set
   - SS64 SET
-  - spec/audit/cmd-help/set-help.txt
+  - vendor/batch-spec/audit/cmd-help/set-help.txt
   ssot_artifacts:
   - rules W044 E041
   rules:
@@ -676,7 +676,7 @@ entries:
   sources:
   - MS Learn set
   - cmd.exe dynamic variables
-  - spec/audit/cmd-help/set-help.txt
+  - vendor/batch-spec/audit/cmd-help/set-help.txt
   ssot_artifacts:
   - rules W049
   rules:
@@ -689,7 +689,7 @@ entries:
 - construct: 'Security: injection, credentials, and dangerous commands'
   sources:
   - MS Learn security
-  - spec/data/commands.yaml
+  - vendor/batch-spec/data/commands.yaml
   ssot_artifacts:
   - rules SEC001 SEC002 SEC003 SEC004 SEC005 SEC008 SEC009 SEC010 SEC011 SEC013 SEC014
     SEC015

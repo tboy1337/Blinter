@@ -1,27 +1,27 @@
 # Batch Language Reference (SSOT Companion)
 
-Authoritative references used to validate Blinter's `spec/` single source of truth.
+Authoritative references used to validate Blinter's batch language SSOT (`vendor/batch-spec`) and linter spec (`spec/`).
 
 ## Primary sources
 
 | Source | Location | Use |
 |--------|----------|-----|
-| cmd.exe `CALL /?` | [spec/audit/cmd-help/call-help.txt](../spec/audit/cmd-help/call-help.txt) | `%~` modifier syntax |
-| cmd.exe `FOR /?` | [spec/audit/cmd-help/for-help.txt](../spec/audit/cmd-help/for-help.txt) | `FOR %%i IN (set) DO` |
-| cmd.exe `IF /?` | [spec/audit/cmd-help/if-help.txt](../spec/audit/cmd-help/if-help.txt) | IF forms, ERRORLEVEL |
-| cmd.exe `SET /?` | [spec/audit/cmd-help/set-help.txt](../spec/audit/cmd-help/set-help.txt) | SET syntax, spacing |
-| cmd.exe `SETLOCAL /?` | [spec/audit/cmd-help/setlocal-help.txt](../spec/audit/cmd-help/setlocal-help.txt) | Scope, delayed expansion |
-| cmd.exe `GOTO /?` | [spec/audit/cmd-help/goto-help.txt](../spec/audit/cmd-help/goto-help.txt) | Labels, `:EOF` |
-| cmd.exe `SETX /?` | [spec/audit/cmd-help/setx-help.txt](../spec/audit/cmd-help/setx-help.txt) | SETX space-delimited syntax |
-| cmd.exe `REN /?` | [spec/audit/cmd-help/ren-help.txt](../spec/audit/cmd-help/ren-help.txt) | REN destination filename-only |
-| cmd.exe `CD /?` | [spec/audit/cmd-help/cd-help.txt](../spec/audit/cmd-help/cd-help.txt) | `/D` switch, drive vs directory |
-| cmd.exe `PUSHD /?` | [spec/audit/cmd-help/pushd-help.txt](../spec/audit/cmd-help/pushd-help.txt) | Directory stack, UNC mapping |
-| cmd.exe `POPD /?` | [spec/audit/cmd-help/popd-help.txt](../spec/audit/cmd-help/popd-help.txt) | Restore pushed directory |
-| cmd.exe `MOVE /?` | [spec/audit/cmd-help/move-help.txt](../spec/audit/cmd-help/move-help.txt) | MOVE vs REN semantics |
-| cmd.exe `SUBST /?` | [spec/audit/cmd-help/subst-help.txt](../spec/audit/cmd-help/subst-help.txt) | Virtual drive mapping |
-| cmd.exe `EXIT /?` | [spec/audit/cmd-help/exit-help.txt](../spec/audit/cmd-help/exit-help.txt) | `EXIT /B`, exit codes |
-| cmd.exe `SHIFT /?` | [spec/audit/cmd-help/shift-help.txt](../spec/audit/cmd-help/shift-help.txt) | Batch parameters |
-| cmd.exe `CHOICE /?` | [spec/audit/cmd-help/choice-help.txt](../spec/audit/cmd-help/choice-help.txt) | Interactive menu selections, ERRORLEVEL index |
+| cmd.exe `CALL /?` | [vendor/batch-spec/audit/cmd-help/call-help.txt](../vendor/batch-spec/audit/cmd-help/call-help.txt) | `%~` modifier syntax |
+| cmd.exe `FOR /?` | [vendor/batch-spec/audit/cmd-help/for-help.txt](../vendor/batch-spec/audit/cmd-help/for-help.txt) | `FOR %%i IN (set) DO` |
+| cmd.exe `IF /?` | [vendor/batch-spec/audit/cmd-help/if-help.txt](../vendor/batch-spec/audit/cmd-help/if-help.txt) | IF forms, ERRORLEVEL |
+| cmd.exe `SET /?` | [vendor/batch-spec/audit/cmd-help/set-help.txt](../vendor/batch-spec/audit/cmd-help/set-help.txt) | SET syntax, spacing |
+| cmd.exe `SETLOCAL /?` | [vendor/batch-spec/audit/cmd-help/setlocal-help.txt](../vendor/batch-spec/audit/cmd-help/setlocal-help.txt) | Scope, delayed expansion |
+| cmd.exe `GOTO /?` | [vendor/batch-spec/audit/cmd-help/goto-help.txt](../vendor/batch-spec/audit/cmd-help/goto-help.txt) | Labels, `:EOF` |
+| cmd.exe `SETX /?` | [vendor/batch-spec/audit/cmd-help/setx-help.txt](../vendor/batch-spec/audit/cmd-help/setx-help.txt) | SETX space-delimited syntax |
+| cmd.exe `REN /?` | [vendor/batch-spec/audit/cmd-help/ren-help.txt](../vendor/batch-spec/audit/cmd-help/ren-help.txt) | REN destination filename-only |
+| cmd.exe `CD /?` | [vendor/batch-spec/audit/cmd-help/cd-help.txt](../vendor/batch-spec/audit/cmd-help/cd-help.txt) | `/D` switch, drive vs directory |
+| cmd.exe `PUSHD /?` | [vendor/batch-spec/audit/cmd-help/pushd-help.txt](../vendor/batch-spec/audit/cmd-help/pushd-help.txt) | Directory stack, UNC mapping |
+| cmd.exe `POPD /?` | [vendor/batch-spec/audit/cmd-help/popd-help.txt](../vendor/batch-spec/audit/cmd-help/popd-help.txt) | Restore pushed directory |
+| cmd.exe `MOVE /?` | [vendor/batch-spec/audit/cmd-help/move-help.txt](../vendor/batch-spec/audit/cmd-help/move-help.txt) | MOVE vs REN semantics |
+| cmd.exe `SUBST /?` | [vendor/batch-spec/audit/cmd-help/subst-help.txt](../vendor/batch-spec/audit/cmd-help/subst-help.txt) | Virtual drive mapping |
+| cmd.exe `EXIT /?` | [vendor/batch-spec/audit/cmd-help/exit-help.txt](../vendor/batch-spec/audit/cmd-help/exit-help.txt) | `EXIT /B`, exit codes |
+| cmd.exe `SHIFT /?` | [vendor/batch-spec/audit/cmd-help/shift-help.txt](../vendor/batch-spec/audit/cmd-help/shift-help.txt) | Batch parameters |
+| cmd.exe `CHOICE /?` | [vendor/batch-spec/audit/cmd-help/choice-help.txt](../vendor/batch-spec/audit/cmd-help/choice-help.txt) | Interactive menu selections, ERRORLEVEL index |
 | Microsoft Learn | [if](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/if), [for](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/for), [setlocal](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/setlocal), [set](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/set) | Behavioral semantics |
 | SS64 | [IF](https://ss64.com/nt/if.html), [Errorlevel](https://ss64.com/nt/errorlevel.html), [Delayed expansion](https://ss64.com/nt/delayedexpansion.html) | ERRORLEVEL `>= n` vs `%ERRORLEVEL%`, delayed expansion |
 
@@ -129,15 +129,15 @@ Some commands use exit codes greater than zero to indicate partial success (for 
 
 ### PUSHD/POPD balance (W061)
 
-`PUSHD` stores the current directory on a stack and changes to a new path; `POPD` restores the most recent pushed directory per [PUSHD /?](../spec/audit/cmd-help/pushd-help.txt) and [POPD /?](../spec/audit/cmd-help/popd-help.txt). When `PUSHD` maps a network path, cmd.exe allocates a temporary drive letter that `POPD` removes. Unmatched `PUSHD` calls can leave mapped drives allocated after the script exits. **W061** flags unbalanced `PUSHD`/`POPD` usage at file scope.
+`PUSHD` stores the current directory on a stack and changes to a new path; `POPD` restores the most recent pushed directory per [PUSHD /?](../vendor/batch-spec/audit/cmd-help/pushd-help.txt) and [POPD /?](../vendor/batch-spec/audit/cmd-help/popd-help.txt). When `PUSHD` maps a network path, cmd.exe allocates a temporary drive letter that `POPD` removes. Unmatched `PUSHD` calls can leave mapped drives allocated after the script exits. **W061** flags unbalanced `PUSHD`/`POPD` usage at file scope.
 
 ### CD /D cross-drive navigation (W062)
 
-`CD` and `CHDIR` accept an optional `/D` switch per [CD /?](../spec/audit/cmd-help/cd-help.txt). Without `/D`, `cd Z:\folder` from another drive changes the stored directory on `Z:` but does not switch the active drive; the script remains on the current drive (SS64; oracle-confirmed). `cd Z:` alone displays the current directory on `Z:` and is not flagged. **W062** flags `CD`/`CHDIR` lines with a drive-letter path that omit `/D`.
+`CD` and `CHDIR` accept an optional `/D` switch per [CD /?](../vendor/batch-spec/audit/cmd-help/cd-help.txt). Without `/D`, `cd Z:\folder` from another drive changes the stored directory on `Z:` but does not switch the active drive; the script remains on the current drive (SS64; oracle-confirmed). `cd Z:` alone displays the current directory on `Z:` and is not flagged. **W062** flags `CD`/`CHDIR` lines with a drive-letter path that omit `/D`.
 
 ### SUBST virtual drives
 
-`SUBST` maps a drive letter to a path per [SUBST /?](../spec/audit/cmd-help/subst-help.txt). `SUBST drive: /D` removes a mapping. Static analysis cannot reliably pair `SUBST` with cleanup across all exit paths; document and review manually.
+`SUBST` maps a drive letter to a path per [SUBST /?](../vendor/batch-spec/audit/cmd-help/subst-help.txt). `SUBST drive: /D` removes a mapping. Static analysis cannot reliably pair `SUBST` with cleanup across all exit paths; document and review manually.
 
 ### FOR /F USEBACKQ (W034)
 
@@ -165,7 +165,7 @@ Unlike environment variables, FOR loop variables are **case-sensitive** per `FOR
 
 ### SETX space-delimited syntax (W060)
 
-`SETX` uses space-delimited syntax (`SETX var value`), not `SET`-style equals per [SETX /?](../spec/audit/cmd-help/setx-help.txt) (oracle-confirmed). `SETX MYVAR=value` fails at runtime with invalid syntax. **W060** flags an equals sign in the variable-name token. Valid forms include `SETX MYVAR hello`, `SETX MYVAR /K regpath`, and remote forms with `/S` `/U` switches. **W008** separately warns on `SETX PATH` modifications.
+`SETX` uses space-delimited syntax (`SETX var value`), not `SET`-style equals per [SETX /?](../vendor/batch-spec/audit/cmd-help/setx-help.txt) (oracle-confirmed). `SETX MYVAR=value` fails at runtime with invalid syntax. **W060** flags an equals sign in the variable-name token. Valid forms include `SETX MYVAR hello`, `SETX MYVAR /K regpath`, and remote forms with `/S` `/U` switches. **W008** separately warns on `SETX PATH` modifications.
 
 ### FOR /F delims= case sensitivity
 
@@ -223,7 +223,7 @@ When a label is not found, `GOTO :label` aborts the batch with an error message.
 
 ### REN destination path (W058)
 
-`REN` and `RENAME` rename files in place; the second argument must be a new filename only, not a path per [REN /?](../spec/audit/cmd-help/ren-help.txt) (cmd.exe reports a syntax error). Use `MOVE` to relocate files. **W058** flags path separators (including forward slashes), drive letters, or UNC-style paths in the destination argument.
+`REN` and `RENAME` rename files in place; the second argument must be a new filename only, not a path per [REN /?](../vendor/batch-spec/audit/cmd-help/ren-help.txt) (cmd.exe reports a syntax error). Use `MOVE` to relocate files. **W058** flags path separators (including forward slashes), drive letters, or UNC-style paths in the destination argument.
 
 ### FOR /F eol= single character (E037)
 
@@ -251,7 +251,7 @@ The open parenthesis of a `FOR` block must appear on the same line as the `DO` k
 
 ### CHOICE command semantics
 
-`CHOICE` maps selections to `ERRORLEVEL` indices (1-based) per [CHOICE /?](../spec/audit/cmd-help/choice-help.txt). Empty `/C` lists and missing valid choices return ERRORLEVEL 255 at runtime (`ERROR: List of choices cannot be empty` or `The file is either empty or does not contain the valid choices`); these are runtime errors, not parse-time syntax failures. Default choices require both `/T` and `/D`. Blinter flags CHOICE only when used as an inefficient delay substitute (**P007**); no E-rule is applied for CHOICE syntax.
+`CHOICE` maps selections to `ERRORLEVEL` indices (1-based) per [CHOICE /?](../vendor/batch-spec/audit/cmd-help/choice-help.txt). Empty `/C` lists and missing valid choices return ERRORLEVEL 255 at runtime (`ERROR: List of choices cannot be empty` or `The file is either empty or does not contain the valid choices`); these are runtime errors, not parse-time syntax failures. Default choices require both `/T` and `/D`. Blinter flags CHOICE only when used as an inefficient delay substitute (**P007**); no E-rule is applied for CHOICE syntax.
 
 ### ELSE / ELSE IF parenthesis placement
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate src/blinter/rules/expansion_data.py from spec/data/expansion.yaml."""
+"""Generate src/blinter/rules/expansion_data.py from vendor/batch-spec/data/expansion.yaml."""
 
 from __future__ import annotations
 
@@ -18,9 +18,9 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from _paths import EXPANSION_DATA_PY, EXPANSION_YAML  # noqa: E402
 
 _HEADER = '''\
-"""Batch expansion constants generated from spec/data/expansion.yaml.
+"""Batch expansion constants generated from vendor/batch-spec/data/expansion.yaml.
 
-THIS FILE IS GENERATED — edit spec/data/expansion.yaml and run:
+THIS FILE IS GENERATED — edit vendor/batch-spec/data/expansion.yaml and run:
   py scripts/spec/generate_expansion.py
 """
 

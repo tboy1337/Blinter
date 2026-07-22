@@ -19,8 +19,10 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from _paths import (  # noqa: E402
     AUDIT_DIR,
+    BATCH_SPEC_DIR,
     CHECKERS_DIR,
-    COMMANDS_YAML,
+    COMMANDS_LANGUAGE_YAML,
+    COMMANDS_LINTER_YAML,
     CORPUS_DIR,
     EXPANSION_DATA_PY,
     EXPANSION_YAML,
@@ -152,11 +154,34 @@ def _audit_rules(findings: list[AuditFinding]) -> set[str]:
     return set(codes)
 
 
+def _merged_commands_data() -> dict[str, Any]:
+    if not COMMANDS_LANGUAGE_YAML.is_file():
+        raise FileNotFoundError("batch-spec commands.yaml missing")
+    if not COMMANDS_LINTER_YAML.is_file():
+        raise FileNotFoundError("commands-linter.yaml missing")
+    language = _load_yaml(COMMANDS_LANGUAGE_YAML)
+    linter = _load_yaml(COMMANDS_LINTER_YAML)
+    if not isinstance(language, dict) or not isinstance(linter, dict):
+        raise ValueError("commands YAML must be mappings")
+    return {**language, **linter}
+
+
 def _audit_commands(findings: list[AuditFinding], valid_rules: set[str]) -> None:
-    if not COMMANDS_YAML.is_file():
-        findings.append(AuditFinding("error", "commands", "commands.yaml missing"))
+    if not BATCH_SPEC_DIR.is_dir():
+        findings.append(
+            AuditFinding("error", "commands", "vendor/batch-spec submodule missing")
+        )
         return
-    data = _load_yaml(COMMANDS_YAML)
+    if not COMMANDS_LINTER_YAML.is_file():
+        findings.append(
+            AuditFinding("error", "commands", "commands-linter.yaml missing")
+        )
+        return
+    try:
+        data = _merged_commands_data()
+    except (FileNotFoundError, ValueError) as error:
+        findings.append(AuditFinding("error", "commands", str(error)))
+        return
     for entry in data.get("dangerous_command_patterns", []):
         rule_code = str(entry.get("rule_code", ""))
         if rule_code and rule_code not in valid_rules:
@@ -198,9 +223,13 @@ def _read_patterns_constants() -> dict[str, Any]:
 
 
 def _audit_commands_patterns_drift(findings: list[AuditFinding]) -> None:
-    if not COMMANDS_YAML.is_file() or not PATTERNS_PY.is_file():
+    if not PATTERNS_PY.is_file():
         return
-    data = _load_yaml(COMMANDS_YAML)
+    try:
+        data = _merged_commands_data()
+    except (FileNotFoundError, ValueError) as error:
+        findings.append(AuditFinding("error", "drift", str(error)))
+        return
     patterns = _read_patterns_constants()
     checks: list[tuple[str, str, str]] = [
         ("dangerous_command_names", "DANGEROUS_COMMAND_NAMES", "list"),
@@ -221,7 +250,7 @@ def _audit_commands_patterns_drift(findings: list[AuditFinding]) -> None:
                 AuditFinding(
                     "error",
                     "drift",
-                    f"commands.yaml {yaml_key} != patterns.py {py_key}",
+                    f"commands YAML {yaml_key} != patterns.py {py_key}",
                 )
             )
 
@@ -243,7 +272,9 @@ def _read_expansion_data_constants() -> dict[str, str]:
 
 def _audit_expansion_drift(findings: list[AuditFinding]) -> None:
     if not EXPANSION_YAML.is_file():
-        findings.append(AuditFinding("error", "expansion", "expansion.yaml missing"))
+        findings.append(
+            AuditFinding("error", "expansion", "vendor/batch-spec expansion.yaml missing")
+        )
         return
     if not EXPANSION_DATA_PY.is_file():
         findings.append(

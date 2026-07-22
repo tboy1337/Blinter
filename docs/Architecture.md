@@ -93,16 +93,18 @@ Only symbols listed in `blinter.__all__` are stable for external integrators. Th
 
 `BlinterConfig` controls recursion, rule enablement, `max_line_length`, `follow_calls`, `scan_root`, and severity filtering. Values can be loaded from `blinter.ini` and overridden by CLI flags.
 
-## SSOT grammar and spec (`spec/`)
+## SSOT split: batch-spec vs Blinter
 
-| Artifact | Role |
-|----------|------|
+| Artifact | Repo / path |
+|----------|-------------|
+| ANTLR grammar, expansion rules, command catalog, cmd-help | [`vendor/batch-spec`](../../vendor/batch-spec) ([`tboy1337/batch-spec`](https://github.com/tboy1337/batch-spec), pinned in [`spec/batch-spec.lock`](../../spec/batch-spec.lock)) |
 | [`spec/data/rules.yaml`](../../spec/data/rules.yaml) | Rule catalog (all `checker: ast`; see `RULE_COUNT`) |
-| [`spec/data/commands.yaml`](../../spec/data/commands.yaml) | Builtin/deprecated commands (generates `patterns.py`) |
-| [`spec/data/expansion.yaml`](../../spec/data/expansion.yaml) | `%~` modifiers (generates `expansion_data.py`) |
-| [`spec/grammar/*.g4`](../../spec/grammar/) | ANTLR 4 lexer/parser (generates `src/blinter/generated/`) |
+| [`spec/data/commands-linter.yaml`](../../spec/data/commands-linter.yaml) | Security/style command policy (merged with batch-spec `commands.yaml` for `patterns.py`) |
 | [`spec/corpus/`](../../spec/corpus/) | 202 committed fixtures + `expect.json` oracles |
-| [`spec/audit/`](../../spec/audit/) | Reference matrix, cmd.exe help captures, audit baselines |
+| [`spec/audit/`](../../spec/audit/) | Reference matrix and audit baselines |
+
+Clone with `git clone --recurse-submodules` or run `git submodule update --init --recursive`
+after checkout.
 
 Generators live under [`scripts/spec/`](../scripts/spec/). `scripts/verify.py` runs schema validation, generator `--check`, strict SSOT audit, cmd.exe oracle (Windows), linting, and tests.
 

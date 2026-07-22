@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate src/blinter/patterns.py SSOT sections from spec/data/commands.yaml."""
+"""Generate src/blinter/patterns.py from batch-spec commands.yaml + commands-linter.yaml."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from _paths import COMMANDS_YAML, PATTERNS_PY  # noqa: E402
+from _paths import COMMANDS_LANGUAGE_YAML, COMMANDS_LINTER_YAML, PATTERNS_PY  # noqa: E402
 
 _STATIC_FRAGMENT = _SCRIPTS_DIR / "patterns_static_fragment.py"
 
@@ -23,7 +23,7 @@ _HEADER = '''\
 """Regex patterns for dangerous commands and deprecated syntax.
 
 SSOT tables (dangerous commands, builtins, typos) are generated from
-spec/data/commands.yaml. Embedded-language detection patterns are maintained
+vendor/batch-spec/data/commands.yaml and spec/data/commands-linter.yaml. Embedded-language detection patterns are maintained
 in scripts/spec/patterns_static_fragment.py.
 
 THIS FILE IS PARTIALLY GENERATED — run:
@@ -37,10 +37,11 @@ from typing import List, Set, Tuple
 
 
 def _load_commands() -> dict[str, Any]:
-    data = yaml.safe_load(COMMANDS_YAML.read_text(encoding="utf-8"))
-    if not isinstance(data, dict):
-        raise ValueError("commands.yaml must be a mapping")
-    return data
+    language = yaml.safe_load(COMMANDS_LANGUAGE_YAML.read_text(encoding="utf-8"))
+    linter = yaml.safe_load(COMMANDS_LINTER_YAML.read_text(encoding="utf-8"))
+    if not isinstance(language, dict) or not isinstance(linter, dict):
+        raise ValueError("commands YAML files must be mappings")
+    return {**language, **linter}
 
 
 def _format_list(name: str, values: list[str]) -> str:

@@ -1,19 +1,33 @@
-# Blinter Language Specification (SSOT)
+# Blinter Linter Specification
 
-This directory is the single source of truth for Blinter's batch language model,
-rule metadata, conformance corpus, and ANTLR grammar.
+Blinter owns **linter** artifacts: rule catalog, security/style command policy, and the
+202-case conformance corpus. The **batch language** SSOT lives in the pinned
+[`batch-spec`](https://github.com/tboy1337/batch-spec) submodule at `vendor/batch-spec`.
+
+## Submodule setup
+
+```bash
+git clone --recurse-submodules https://github.com/tboy1337/Blinter.git
+# or after a plain clone:
+git submodule update --init --recursive
+```
+
+The pinned release is recorded in [`batch-spec.lock`](batch-spec.lock) (currently `v0.1.0`).
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
-| `grammar/` | ANTLR 4 lexer/parser (`.g4`) |
 | `data/rules.yaml` | Rule catalog (codes, severity, messages) |
-| `data/commands.yaml` | Built-in commands, deprecations, security patterns |
-| `data/expansion.yaml` | `%` / `!` / `%~` expansion rules |
-| `schema/` | JSON Schema for YAML validation |
+| `data/commands-linter.yaml` | Linter policy: dangerous commands, casing, security patterns |
+| `schema/` | JSON Schema for linter YAML validation |
 | `corpus/` | Committed `.cmd` fixtures + `expect.json` oracles |
-| `audit/` | Reference matrix, cmd.exe help captures, audit baselines |
+| `audit/` | Reference matrix and audit baselines |
+| `batch-spec.lock` | Pinned batch-spec repo ref |
+
+Language artifacts (grammar, expansion rules, command catalog, cmd-help captures, parse
+conformance corpus) are in `vendor/batch-spec/`. See that repo's README for layout and
+versioning.
 
 ## Authoring a corpus case
 
@@ -51,13 +65,14 @@ Skip policy tiers (in order): `oracle=skip` → `oracle=run` (bypass heuristics)
 
 ```bash
 py scripts/spec/generate_rules.py      # rules.yaml -> src/blinter/rules/registry.py
-py scripts/spec/generate_parser.py     # grammar -> src/blinter/generated/
-py scripts/spec/generate_expansion.py  # expansion.yaml -> expansion_data.py
-py scripts/spec/generate_commands.py   # commands.yaml -> patterns.py (SSOT tables)
+py scripts/spec/generate_parser.py     # vendor/batch-spec/grammar -> src/blinter/generated/
+py scripts/spec/generate_expansion.py  # vendor/batch-spec/data/expansion.yaml -> expansion_data.py
+py scripts/spec/generate_commands.py   # merge language + linter YAML -> patterns.py
 py scripts/spec/generate_docs.py       # rules.yaml -> docs rule catalog sections
 py scripts/spec/generate_grammar_rules.py  # rules.yaml grammar_nodes -> grammar_rules.py
-py scripts/spec/validate_spec.py       # Validate all YAML against schemas
+py scripts/spec/validate_spec.py       # Validate linter YAML + batch-spec language YAML
 py scripts/spec/validate_corpus.py     # Validate corpus fixtures
+py scripts/conformance/lint_corpus.py  # Linter corpus conformance (wraps validate_corpus.py)
 py scripts/spec/audit_ssot.py          # SSOT drift and coverage audit
 py scripts/spec/seed_corpus_cases.py   # Seed additional corpus fixtures
 py scripts/spec/cmd_oracle.py          # Windows cmd.exe smoke oracle (safe subset only)
@@ -73,12 +88,16 @@ py scripts/spec/audit_ssot.py              # human-readable report
 py scripts/spec/audit_ssot.py --strict     # fail on error-level drift (CI)
 ```
 
-The audit enforces full rule corpus coverage, E-rule 100% coverage, `reference-matrix.yaml` integrity, grammar_nodes drift checks, and SSOT drift between YAML and generated Python artifacts.
+The audit enforces full rule corpus coverage, E-rule 100% coverage, `reference-matrix.yaml`
+integrity, grammar_nodes drift checks, and SSOT drift between YAML and generated Python
+artifacts.
 
-See `spec/audit/reference-matrix.yaml` and `spec/audit/cmd-help/` for batch language references. See `docs/Batch-Language-Reference.md` for the authoritative source list.
+See `spec/audit/reference-matrix.yaml` and `vendor/batch-spec/audit/cmd-help/` for batch
+language references. See `docs/Batch-Language-Reference.md` for the authoritative source list.
 
 ## Parser limitations
 
-The ANTLR grammar models **static structure** for linting (quotes, blocks, expansions).
-It does not execute batch or replicate full cmd.exe expansion phases. See `spec/grammar/`
-for supported constructs per phase.
+The ANTLR grammar in `vendor/batch-spec/grammar/` models **static structure** for linting
+(quotes, blocks, expansions). It does not execute batch or replicate full cmd.exe expansion
+phases. Runtime linting uses a fast syntax path; ANTLR remains available for tests and oracle
+parity.

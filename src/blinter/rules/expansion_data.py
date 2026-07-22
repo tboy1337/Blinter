@@ -1,6 +1,6 @@
-"""Batch expansion constants generated from spec/data/expansion.yaml.
+"""Batch expansion constants generated from vendor/batch-spec/data/expansion.yaml.
 
-THIS FILE IS GENERATED — edit spec/data/expansion.yaml and run:
+THIS FILE IS GENERATED — edit vendor/batch-spec/data/expansion.yaml and run:
   py scripts/spec/generate_expansion.py
 """
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate spec YAML files against JSON Schema."""
+"""Validate Blinter spec YAML and batch-spec language YAML against JSON Schema."""
 
 from __future__ import annotations
 
@@ -16,7 +16,10 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from _paths import (  # noqa: E402
-    COMMANDS_YAML,
+    BATCH_SPEC_DIR,
+    BATCH_SPEC_SCHEMA_DIR,
+    COMMANDS_LANGUAGE_YAML,
+    COMMANDS_LINTER_YAML,
     DATA_DIR,
     EXPANSION_YAML,
     RULES_YAML,
@@ -79,12 +82,24 @@ def _validate_commands_rule_refs(
             continue
         rule_code = str(entry.get("rule_code", ""))
         if rule_code and rule_code not in valid_rules:
-            raise ValueError(f"commands.yaml references unknown rule_code {rule_code}")
+            raise ValueError(
+                f"commands-linter.yaml references unknown rule_code {rule_code}"
+            )
+
+
+def _ensure_batch_spec_present() -> None:
+    if not BATCH_SPEC_DIR.is_dir():
+        raise SystemExit(
+            "vendor/batch-spec submodule is missing. "
+            "Run: git submodule update --init --recursive"
+        )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validate spec YAML against schemas")
     parser.parse_args()
+    _ensure_batch_spec_present()
+
     _validate(RULES_YAML, SCHEMA_DIR / "rules.schema.json")
     rules_data = _load_yaml(RULES_YAML)
     if not isinstance(rules_data, dict):
@@ -92,15 +107,13 @@ def main() -> None:
     _validate_rule_integrity(rules_data)
     valid_rules = {str(rule["code"]) for rule in rules_data["rules"]}
 
-    _validate(COMMANDS_YAML, SCHEMA_DIR / "commands.schema.json")
-    commands_data = _load_yaml(COMMANDS_YAML)
-    if isinstance(commands_data, dict):
-        _validate_commands_rule_refs(commands_data, valid_rules)
+    _validate(COMMANDS_LINTER_YAML, SCHEMA_DIR / "commands-linter.schema.json")
+    linter_commands = _load_yaml(COMMANDS_LINTER_YAML)
+    if isinstance(linter_commands, dict):
+        _validate_commands_rule_refs(linter_commands, valid_rules)
 
-    if EXPANSION_YAML.is_file():
-        _validate(EXPANSION_YAML, SCHEMA_DIR / "expansion.schema.json")
-    else:
-        raise SystemExit(f"Missing {EXPANSION_YAML}")
+    _validate(COMMANDS_LANGUAGE_YAML, BATCH_SPEC_SCHEMA_DIR / "commands.schema.json")
+    _validate(EXPANSION_YAML, BATCH_SPEC_SCHEMA_DIR / "expansion.schema.json")
 
     if not DATA_DIR.is_dir():
         raise SystemExit(f"Missing {DATA_DIR}")

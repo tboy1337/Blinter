@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate ANTLR Python parser from spec/grammar/*.g4."""
+"""Generate ANTLR Python parser from vendor/batch-spec/grammar/*.g4."""
 
 from __future__ import annotations
 

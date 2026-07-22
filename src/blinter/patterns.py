@@ -1,7 +1,7 @@
 """Regex patterns for dangerous commands and deprecated syntax.
 
 SSOT tables (dangerous commands, builtins, typos) are generated from
-spec/data/commands.yaml. Embedded-language detection patterns are maintained
+vendor/batch-spec/data/commands.yaml and spec/data/commands-linter.yaml. Embedded-language detection patterns are maintained
 in scripts/spec/patterns_static_fragment.py.
 
 THIS FILE IS PARTIALLY GENERATED — run:

@@ -78,10 +78,15 @@ pip uninstall Blinter
 
 ### 🔧 Manual Installation
 
-1. Clone the repository:
+1. Clone the repository (includes the `batch-spec` language submodule):
 ```cmd
-git clone https://github.com/tboy1337/Blinter.git
+git clone --recurse-submodules https://github.com/tboy1337/Blinter.git
 cd Blinter
+```
+
+If you already cloned without submodules:
+```cmd
+git submodule update --init --recursive
 ```
 
 2. (Optional) Create a virtual environment:
