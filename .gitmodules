@@ -1,0 +1,3 @@
+[submodule "vendor/batch-spec"]
+	path = vendor/batch-spec
+	url = https://github.com/tboy1337/batch-spec.git
