@@ -23,7 +23,7 @@ class TestLintPerformance:
     """Guard against major lint throughput regressions."""
 
     @pytest.mark.slow
-    @pytest.mark.timeout(30)
+    @pytest.mark.timeout(10)
     def test_thousand_line_file_lints_within_ceiling(self) -> None:
         """A ~1000-line script should lint within a generous time ceiling."""
         content = _build_thousand_line_batch()

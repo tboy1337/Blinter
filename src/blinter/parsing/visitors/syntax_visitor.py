@@ -13,6 +13,7 @@ from blinter.generated.BatchParser import BatchParser
 from blinter.generated.BatchParserVisitor import BatchParserVisitor
 from blinter.models import LintIssue
 from blinter.parsing.antlr_bridge import ParseResult, parse_batch_lines
+from blinter.parsing.fast_syntax import check_grammar_backed_syntax_fast
 from blinter.parsing.grammar_rules import GRAMMAR_BACKED_RULE_CODES
 from blinter.parsing.preprocessor import map_line_number
 from blinter.parsing.visitors.rule_impl.advanced.escaping import (
@@ -155,11 +156,21 @@ def check_ast_syntax_rules(
     has_delayed_expansion: bool = False,
 ) -> List[LintIssue]:
     """
-    Run grammar-backed syntax checks by walking the ANTLR parse tree.
+    Run grammar-backed syntax checks using the fast line scanner.
 
-    Falls back to preprocessor continuation issues and line-level expansion
-    helpers where tokenization alone is insufficient.
+    ANTLR remains available via ``check_ast_syntax_rules_antlr`` for corpus
+    conformance tests and grammar validation.
     """
+    del has_delayed_expansion
+    return check_grammar_backed_syntax_fast(lines)
+
+
+def check_ast_syntax_rules_antlr(
+    lines: List[str],
+    *,
+    has_delayed_expansion: bool = False,
+) -> List[LintIssue]:
+    """Run grammar-backed syntax checks by walking the ANTLR parse tree."""
     parse_result = parse_batch_lines(lines, delayed_expansion=has_delayed_expansion)
     if parse_result.errors:
         logger.debug("ANTLR parse messages: %s", parse_result.errors)
