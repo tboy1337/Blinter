@@ -206,6 +206,9 @@ logs/
 tmp/
 temp/
 
+# cmd.exe oracle side-effects inside corpus fixtures
+spec/corpus/**/temp.txt
+
 # Configuration files that might contain secrets
 config.ini
 .secrets
