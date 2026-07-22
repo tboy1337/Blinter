@@ -15,7 +15,11 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from _paths import COMMANDS_LANGUAGE_YAML, COMMANDS_LINTER_YAML, PATTERNS_PY  # noqa: E402
+from _paths import (  # noqa: E402
+    COMMANDS_LANGUAGE_YAML,
+    COMMANDS_LINTER_YAML,
+    PATTERNS_PY,
+)
 
 _STATIC_FRAGMENT = _SCRIPTS_DIR / "patterns_static_fragment.py"
 

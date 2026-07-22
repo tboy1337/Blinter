@@ -286,8 +286,8 @@ def _parse_suppression_comments(lines: List[str]) -> Dict[int, Set[str]]:
     return suppressions
 
 
-_delayed_expansion_cache_var: ContextVar[Optional[Dict[int, List[bool]]]] = (
-    ContextVar("delayed_expansion_cache", default=None)
+_delayed_expansion_cache_var: ContextVar[Optional[Dict[int, List[bool]]]] = ContextVar(
+    "delayed_expansion_cache", default=None
 )
 
 

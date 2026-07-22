@@ -5,12 +5,12 @@ from __future__ import annotations
 
 import argparse
 import cProfile
+from pathlib import Path
 import pstats
 import statistics
 import sys
 import tempfile
 import time
-from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT / "src") not in sys.path:

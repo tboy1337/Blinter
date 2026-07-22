@@ -273,7 +273,9 @@ def _read_expansion_data_constants() -> dict[str, str]:
 def _audit_expansion_drift(findings: list[AuditFinding]) -> None:
     if not EXPANSION_YAML.is_file():
         findings.append(
-            AuditFinding("error", "expansion", "vendor/batch-spec expansion.yaml missing")
+            AuditFinding(
+                "error", "expansion", "vendor/batch-spec expansion.yaml missing"
+            )
         )
         return
     if not EXPANSION_DATA_PY.is_file():

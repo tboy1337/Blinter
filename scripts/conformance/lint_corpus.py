@@ -8,9 +8,9 @@ Future alternate binaries can be selected via --impl.
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 import subprocess
 import sys
-from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _VALIDATE_CORPUS = _REPO_ROOT / "scripts" / "spec" / "validate_corpus.py"

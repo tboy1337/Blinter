@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
@@ -49,15 +49,15 @@ def test_generators_check(generator: str) -> None:
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 0, (
-        f"{generator} --check failed:\n{result.stdout}\n{result.stderr}"
-    )
+    assert (
+        result.returncode == 0
+    ), f"{generator} --check failed:\n{result.stdout}\n{result.stderr}"
 
 
 def test_batch_spec_submodule_present() -> None:
-    assert _BATCH_SPEC_DIR.is_dir(), (
-        "vendor/batch-spec is missing. Run: git submodule update --init --recursive"
-    )
+    assert (
+        _BATCH_SPEC_DIR.is_dir()
+    ), "vendor/batch-spec is missing. Run: git submodule update --init --recursive"
     assert (_BATCH_SPEC_DIR / "grammar" / "BatchLexer.g4").is_file()
     assert (_BATCH_SPEC_DIR / "data" / "expansion.yaml").is_file()
     assert (_BATCH_SPEC_DIR / "data" / "commands.yaml").is_file()
@@ -71,6 +71,6 @@ def test_batch_spec_lock_matches_checkout() -> None:
     assert lock["path"] == "vendor/batch-spec"
 
     describe = _git_describe_tags(_BATCH_SPEC_DIR)
-    assert describe == expected_ref or describe.startswith(f"{expected_ref}"), (
-        f"Checked-out batch-spec ({describe}) does not match lock ref ({expected_ref})"
-    )
+    assert describe == expected_ref or describe.startswith(
+        f"{expected_ref}"
+    ), f"Checked-out batch-spec ({describe}) does not match lock ref ({expected_ref})"

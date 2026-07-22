@@ -62,7 +62,7 @@ def _parse_with_antlr(
     parser.removeErrorListeners()
     parser.addErrorListener(error_listener)
 
-    parser._interp.predictionMode = PredictionMode.SLL  # type: ignore[attr-defined]
+    parser._interp.predictionMode = PredictionMode.SLL
     parser._errHandler = BailErrorStrategy()
     try:
         tree = parser.script()
@@ -71,7 +71,7 @@ def _parse_with_antlr(
         token_stream.seek(0)
         parser.reset()
         error_listener.messages.clear()
-        parser._interp.predictionMode = PredictionMode.LL  # type: ignore[attr-defined]
+        parser._interp.predictionMode = PredictionMode.LL
         parser._errHandler = DefaultErrorStrategy()
         tree = parser.script()
         return tree, list(error_listener.messages)
