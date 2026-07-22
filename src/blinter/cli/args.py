@@ -186,6 +186,48 @@ _ARG_HANDLERS: Dict[str, Callable[[], _ArgHandlerResult]] = {
     "--follow-calls": lambda: (None, None, None, None, True),
 }
 
+_ValueArgHandler = Callable[[int, "_ArgParseState"], int]
+
+
+def _handle_max_line_length_arg(index: int, state: _ArgParseState) -> int:
+    parsed_length = _parse_max_line_length_arg(index)
+    if parsed_length is None:
+        sys.exit(1)
+    next_index, state.cli_max_line_length = parsed_length
+    return next_index
+
+
+def _handle_config_arg(index: int, state: _ArgParseState) -> int:
+    parsed_config = _parse_config_arg(index)
+    if parsed_config is None:
+        sys.exit(1)
+    next_index, state.config_path = parsed_config
+    return next_index
+
+
+def _handle_output_arg(index: int, state: _ArgParseState) -> int:
+    parsed_output = _parse_output_arg(index)
+    if parsed_output is None:
+        sys.exit(1)
+    next_index, state.cli_output_path = parsed_output
+    return next_index
+
+
+def _handle_format_arg(index: int, state: _ArgParseState) -> int:
+    parsed_format = _parse_format_arg(index)
+    if parsed_format is None:
+        sys.exit(1)
+    next_index, state.cli_output_format = parsed_format
+    return next_index
+
+
+_VALUE_ARG_HANDLERS: Dict[str, _ValueArgHandler] = {
+    "--max-line-length": _handle_max_line_length_arg,
+    "--config": _handle_config_arg,
+    "--output": _handle_output_arg,
+    "--format": _handle_format_arg,
+}
+
 
 def _resolve_cli_log_level(verbose: bool, quiet: bool) -> Optional[int]:
     """Map verbose/quiet flags to a logging level."""
@@ -202,33 +244,9 @@ def _process_dash_argument(
     state: _ArgParseState,
 ) -> int:
     """Handle a single ``--`` argument and return the next argv index."""
-    if arg == "--max-line-length":
-        parsed_length = _parse_max_line_length_arg(index)
-        if parsed_length is None:
-            sys.exit(1)
-        next_index, state.cli_max_line_length = parsed_length
-        return next_index
-
-    if arg == "--config":
-        parsed_config = _parse_config_arg(index)
-        if parsed_config is None:
-            sys.exit(1)
-        next_index, state.config_path = parsed_config
-        return next_index
-
-    if arg == "--output":
-        parsed_output = _parse_output_arg(index)
-        if parsed_output is None:
-            sys.exit(1)
-        next_index, state.cli_output_path = parsed_output
-        return next_index
-
-    if arg == "--format":
-        parsed_format = _parse_format_arg(index)
-        if parsed_format is None:
-            sys.exit(1)
-        next_index, state.cli_output_format = parsed_format
-        return next_index
+    value_handler = _VALUE_ARG_HANDLERS.get(arg)
+    if value_handler is not None:
+        return value_handler(index, state)
 
     if arg == "--verbose":
         state.cli_verbose = True

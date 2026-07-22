@@ -496,7 +496,7 @@ py -m pytest
 py -m mypy src/blinter tests scripts/verify.py
 py -m pylint src/blinter --output-format=text > pylint-output.txt
 py -m bandit -r src/blinter
-py -m pip-audit -r requirements.txt -r requirements-dev.txt
+py -m pip_audit -r requirements.txt -r requirements-dev.txt
 py -m autopep8 --select=W291,W293 --diff -r src tests scripts
 py -m black --check src tests scripts
 py -m isort --check-only src tests scripts

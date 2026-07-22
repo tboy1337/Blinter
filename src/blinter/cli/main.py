@@ -22,7 +22,6 @@ from blinter.logging_config import logger
 from blinter.models import (
     BlinterConfig,
     CliArguments,
-    LintIssue,
     OutputFormat,
     ProcessingResults,
     ProcessingState,

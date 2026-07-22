@@ -57,7 +57,7 @@ jobs:
           python -m mypy src/blinter tests scripts/verify.py
           python -m pylint src/blinter
           python -m bandit -r src/blinter -c pyproject.toml -ll -q
-          python -m pip-audit -r requirements.txt -r requirements-dev.txt
+          python -m pip_audit -r requirements.txt -r requirements-dev.txt
 
   test-python:
     name: pytest (Python ${{ matrix.python-version }})
