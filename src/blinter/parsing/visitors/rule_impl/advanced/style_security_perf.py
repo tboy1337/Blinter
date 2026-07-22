@@ -1,5 +1,6 @@
 """Advanced style, security, and performance rules."""
 
+from contextvars import ContextVar
 import re
 from typing import (
     Dict,
@@ -273,21 +274,54 @@ def _check_advanced_performance(
     return issues
 
 
-def _line_is_inside_for_block(lines: List[str], line_number: int) -> bool:
-    """Return True when line_number appears inside a FOR loop block."""
+_for_block_cache_var: ContextVar[Optional[Dict[int, List[bool]]]] = ContextVar(
+    "for_block_cache", default=None
+)
+
+
+def _begin_for_block_pass() -> None:
+    """Start a per-lint FOR-block membership cache for the current context."""
+    _for_block_cache_var.set({})
+
+
+def _build_inside_for_block(lines: List[str]) -> List[bool]:
+    """Return whether each 1-based line is inside an active FOR loop block."""
+    result: List[bool] = []
     depth = 0
     in_for = False
-    for index in range(1, line_number + 1):
-        loop_line = lines[index - 1]
-        lowered = loop_line.strip().lower()
+    for line in lines:
+        lowered = line.strip().lower()
         if lowered.startswith("for "):
             in_for = True
         if not in_for:
+            result.append(False)
             continue
         depth += lowered.count("(") - lowered.count(")")
-        if index == line_number:
-            return depth >= 0
-    return False
+        result.append(depth >= 0)
+    return result
+
+
+def _inside_for_block_for_lines(lines: List[str]) -> List[bool]:
+    """Return cached FOR-block membership flags within a single lint pass."""
+    cache = _for_block_cache_var.get()
+    if cache is None:
+        return _build_inside_for_block(lines)
+    lines_id = id(lines)
+    cached = cache.get(lines_id)
+    if cached is None:
+        cached = _build_inside_for_block(lines)
+        cache[lines_id] = cached
+    return cached
+
+
+def _line_is_inside_for_block(lines: List[str], line_number: int) -> bool:
+    """Return True when line_number appears inside a FOR loop block."""
+    if line_number < 1:
+        return False
+    flags = _inside_for_block_for_lines(lines)
+    if line_number > len(flags):
+        return False
+    return flags[line_number - 1]
 
 
 def _timeout_lacks_explanation(

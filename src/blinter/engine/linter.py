@@ -18,7 +18,7 @@ from blinter.parsing.ast_pipeline import filter_issues_by_config, lint_via_ast
 from blinter.parsing.embedded import _detect_embedded_script_blocks
 from blinter.parsing.structure import (
     _analyze_script_structure,
-    _begin_invocation_prefix_pass,
+    _begin_structure_cache_pass,
     _collect_labels,
     _collect_set_variables,
     _parse_suppression_comments,
@@ -55,7 +55,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
     if not lines:
         return []
 
-    _begin_invocation_prefix_pass()
+    _begin_structure_cache_pass()
     _begin_empty_assigned_vars_pass()
 
     skip_lines = _detect_embedded_script_blocks(lines)

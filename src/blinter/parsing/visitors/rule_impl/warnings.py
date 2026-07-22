@@ -404,14 +404,49 @@ def _check_set_a_pseudo_env_assignment(stripped: str, line_num: int) -> List[Lin
     ]
 
 
-def _paren_depth_before_line(lines: list[str], line_num: int) -> int:
-    """Return parenthesis block depth before processing line_num (1-based)."""
+_paren_depth_cache_var: ContextVar[Optional[Dict[int, List[int]]]] = ContextVar(
+    "paren_depth_cache", default=None
+)
+
+
+def _begin_paren_depth_pass() -> None:
+    """Start a per-lint parenthesis-depth cache for the current context."""
+    _paren_depth_cache_var.set({})
+
+
+def _build_paren_depth_before(lines: list[str]) -> list[int]:
+    """Return parenthesis block depth before each 1-based line."""
     depth = 0
-    for line in lines[: max(line_num - 1, 0)]:
+    result: list[int] = []
+    for line in lines:
+        result.append(depth)
         depth = _update_paren_depth(line.strip(), depth)
         if depth < 0:
             depth = 0
-    return depth
+    return result
+
+
+def _paren_depth_before_for_lines(lines: list[str]) -> list[int]:
+    """Return cached parenthesis depth-before values within a single lint pass."""
+    cache = _paren_depth_cache_var.get()
+    if cache is None:
+        return _build_paren_depth_before(lines)
+    lines_id = id(lines)
+    cached = cache.get(lines_id)
+    if cached is None:
+        cached = _build_paren_depth_before(lines)
+        cache[lines_id] = cached
+    return cached
+
+
+def _paren_depth_before_line(lines: list[str], line_num: int) -> int:
+    """Return parenthesis block depth before processing line_num (1-based)."""
+    if line_num < 1:
+        return 0
+    depths = _paren_depth_before_for_lines(lines)
+    if line_num > len(depths):
+        return depths[-1] if depths else 0
+    return depths[line_num - 1]
 
 
 def _check_shift_inside_paren_block(

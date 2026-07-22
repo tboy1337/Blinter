@@ -17,7 +17,7 @@ label
     ;
 
 commandLine
-    : statement (AMP | PIPE | AMPAMP | PIPEPIPE statement)* NEWLINE?
+    : statement ( (AMP | PIPE | AMPAMP | PIPEPIPE) statement )* NEWLINE?
     ;
 
 statement
@@ -52,12 +52,7 @@ ifStmt
     ;
 
 ifTail
-    : NOT? ifErrorlevelStmt commandTail?
-    | NOT? DEFINED WORD commandTail?
-    | NOT? EXIST ifExistOperand commandTail?
-    | comparison commandTail?
-    | DQ_STRING commandTail?
-    | PERCENT_VAR commandTail?
+    : ifPredicate commandTail?
     | ifBlockStmt
     ;
 
@@ -72,10 +67,10 @@ ifExistOperand
     ;
 
 ifBlockStmt
-    : ifCondition LPAREN block RPAREN (ELSE LPAREN block RPAREN)?
+    : ifPredicate LPAREN block RPAREN (ELSE LPAREN block RPAREN)?
     ;
 
-ifCondition
+ifPredicate
     : NOT? ifErrorlevelStmt
     | NOT? DEFINED WORD
     | NOT? EXIST ifExistOperand
@@ -208,6 +203,12 @@ token
     | LT
     | AMP
     | PIPE
+    | DOT
+    | BACKSLASH
+    | PLUS
+    | MINUS
+    | COMMA
+    | SLASH
     | WORD
     | NUMBER
     | UNMATCHED_DQ

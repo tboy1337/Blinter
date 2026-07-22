@@ -6,8 +6,10 @@ from dataclasses import dataclass, field
 import logging
 from typing import List, Optional
 
-from antlr4 import CommonTokenStream, InputStream
+from antlr4 import CommonTokenStream, InputStream, PredictionMode
 from antlr4.error.ErrorListener import ErrorListener
+from antlr4.error.ErrorStrategy import BailErrorStrategy, DefaultErrorStrategy
+from antlr4.error.Errors import ParseCancellationException
 
 from blinter.generated.BatchLexer import BatchLexer
 from blinter.generated.BatchParser import BatchParser
@@ -51,6 +53,30 @@ def _detect_delayed_expansion(lines: List[str]) -> bool:
     return "enabledelayedexpansion" in lowered
 
 
+def _parse_with_antlr(
+    token_stream: CommonTokenStream,
+) -> tuple[object, list[str]]:
+    """Parse using SLL+bail first, then fall back to LL+recovery when needed."""
+    parser = BatchParser(token_stream)
+    error_listener = _CollectingErrorListener()
+    parser.removeErrorListeners()
+    parser.addErrorListener(error_listener)
+
+    parser._interp.predictionMode = PredictionMode.SLL  # type: ignore[attr-defined]
+    parser._errHandler = BailErrorStrategy()
+    try:
+        tree = parser.script()
+        return tree, list(error_listener.messages)
+    except ParseCancellationException:
+        token_stream.seek(0)
+        parser.reset()
+        error_listener.messages.clear()
+        parser._interp.predictionMode = PredictionMode.LL  # type: ignore[attr-defined]
+        parser._errHandler = DefaultErrorStrategy()
+        tree = parser.script()
+        return tree, list(error_listener.messages)
+
+
 def parse_batch_lines(
     lines: List[str],
     *,
@@ -64,19 +90,19 @@ def parse_batch_lines(
 
     input_stream = InputStream(source_text)
     lexer = BatchLexer(input_stream)
+    lexer_error_listener = _CollectingErrorListener()
+    lexer.removeErrorListeners()
+    lexer.addErrorListener(lexer_error_listener)
     token_stream = CommonTokenStream(lexer)
-    parser = BatchParser(token_stream)
-    error_listener = _CollectingErrorListener()
-    parser.removeErrorListeners()
-    parser.addErrorListener(error_listener)
 
-    tree = parser.script()
-    if error_listener.messages:
-        logger.debug("ANTLR parse messages: %s", error_listener.messages)
+    tree, parser_errors = _parse_with_antlr(token_stream)
+    errors = list(lexer_error_listener.messages) + parser_errors
+    if errors:
+        logger.debug("ANTLR parse messages: %s", errors)
 
     return ParseResult(
         preprocessed=preprocessed,
         tree=tree,
-        errors=list(error_listener.messages),
+        errors=errors,
         delayed_expansion_enabled=bool(delayed_expansion),
     )

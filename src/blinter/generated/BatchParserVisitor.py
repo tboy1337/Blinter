@@ -74,8 +74,8 @@ class BatchParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by BatchParser#ifCondition.
-    def visitIfCondition(self, ctx:BatchParser.IfConditionContext):
+    # Visit a parse tree produced by BatchParser#ifPredicate.
+    def visitIfPredicate(self, ctx:BatchParser.IfPredicateContext):
         return self.visitChildren(ctx)
 
 

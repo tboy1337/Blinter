@@ -7,7 +7,7 @@ fragment DIGIT : [0-9] ;
 LINE_COMMENT   : '::' ~[\r\n]* -> skip ;
 REM            : [rR][eE][mM] ~[\r\n]* -> skip ;
 
-LABEL          : ':' ~[ \t\r\n(][^\r\n]* ;
+LABEL          : {self._tokenStartColumn == 0}? ':' ~[ \t\r\n(][^\r\n]* ;
 
 FOR            : [fF][oO][rR] ;
 IF             : [iI][fF] ;
@@ -39,9 +39,14 @@ GE             : '>=' ;
 LE             : '<=' ;
 EQ             : '==' ;
 COLON          : ':' ;
+SET_A          : '/A' ;
 SLASH          : '/' ;
 EQUALS         : '=' ;
 COMMA          : ',' ;
+DOT            : '.' ;
+BACKSLASH      : '\\' ;
+PLUS           : '+' ;
+MINUS          : '-' ;
 
 EQU            : 'EQU' ;
 NEQ            : 'NEQ' ;
@@ -49,8 +54,6 @@ LSS            : 'LSS' ;
 LEQ            : 'LEQ' ;
 GTR            : 'GTR' ;
 GEQ            : 'GEQ' ;
-SET_A          : '/A' ;
-
 CARET          : '^' ;
 PERCENT        : '%' ;
 ASTERISK         : '*' ;
@@ -95,7 +98,7 @@ BANG_VAR
     : '!' [a-zA-Z_][a-zA-Z0-9_]* '!'
     ;
 
-WORD           : IDENT ;
+WORD           : [a-zA-Z_][a-zA-Z0-9_./\\:+\-]* ;
 NUMBER         : DIGIT+ ;
 
 WS             : [ \t]+ -> skip ;

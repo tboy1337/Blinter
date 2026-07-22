@@ -1,7 +1,9 @@
 """Security vulnerability line checks (SEC-prefix rules)."""
 
+from contextvars import ContextVar
 import re
 from typing import (
+    Dict,
     List,
     Optional,
 )
@@ -185,13 +187,49 @@ def _check_input_validation_sec(
     return issues
 
 
+_PRIV_CHECK_CACHE_VAR: ContextVar[Optional[Dict[int, List[bool]]]] = ContextVar(
+    "priv_check_cache", default=None
+)
+_NET_SESSION_PRIV_CHECK = re.compile(r"net\s+session\s*(>|$)", re.IGNORECASE)
+
+
+def _begin_priv_check_pass() -> None:
+    """Start a per-lint privilege-check prefix cache for the current context."""
+    _PRIV_CHECK_CACHE_VAR.set({})
+
+
+def _build_priv_check_before(lines: List[str]) -> List[bool]:
+    """Return whether a net session privilege check appears before each line."""
+    found = False
+    result: List[bool] = []
+    for line in lines:
+        result.append(found)
+        if _NET_SESSION_PRIV_CHECK.search(line.strip()):
+            found = True
+    return result
+
+
+def _priv_check_before_for_lines(lines: List[str]) -> List[bool]:
+    """Return cached privilege-check prefix flags within a single lint pass."""
+    cache = _PRIV_CHECK_CACHE_VAR.get()
+    if cache is None:
+        return _build_priv_check_before(lines)
+    lines_id = id(lines)
+    cached = cache.get(lines_id)
+    if cached is None:
+        cached = _build_priv_check_before(lines)
+        cache[lines_id] = cached
+    return cached
+
+
 def _has_priv_check_before(lines: List[str], target_line_num: int) -> bool:
     """Check if there's a privilege check (net session) before the target line."""
-    for _, line in enumerate(lines[: target_line_num - 1], start=1):
-        stripped = line.strip().lower()
-        if re.search(r"net\s+session\s*(>|$)", stripped):
-            return True
-    return False
+    if target_line_num < 1:
+        return False
+    flags = _priv_check_before_for_lines(lines)
+    if target_line_num > len(flags):
+        return flags[-1] if flags else False
+    return flags[target_line_num - 1]
 
 
 def _should_skip_sec005(lines: Optional[List[str]], line_num: int) -> bool:

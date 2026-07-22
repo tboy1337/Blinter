@@ -286,10 +286,21 @@ def _parse_suppression_comments(lines: List[str]) -> Dict[int, Set[str]]:
     return suppressions
 
 
-def _delayed_expansion_active_at_line(lines: List[str], line_num: int) -> bool:
-    """Return whether delayed expansion is active at the given 1-based line number."""
+_delayed_expansion_cache_var: ContextVar[Optional[Dict[int, List[bool]]]] = (
+    ContextVar("delayed_expansion_cache", default=None)
+)
+
+
+def _begin_delayed_expansion_pass() -> None:
+    """Start a per-lint delayed-expansion state cache for the current context."""
+    _delayed_expansion_cache_var.set({})
+
+
+def _build_delayed_expansion_state(lines: List[str]) -> List[bool]:
+    """Return delayed-expansion active state at each 1-based line (after that line)."""
     stack: List[bool] = []
-    for index, line in enumerate(lines, start=1):
+    state: List[bool] = []
+    for line in lines:
         stripped = line.strip().lower()
         if re.match(r"setlocal\b", stripped):
             if "enabledelayedexpansion" in stripped:
@@ -301,9 +312,43 @@ def _delayed_expansion_active_at_line(lines: List[str], line_num: int) -> bool:
         elif re.match(r"endlocal\b", stripped):
             if stack:
                 stack.pop()
-        if index == line_num:
-            return stack[-1] if stack else False
-    return False
+        state.append(stack[-1] if stack else False)
+    return state
+
+
+def _delayed_expansion_state_for_lines(lines: List[str]) -> List[bool]:
+    """Return cached delayed-expansion state per line within a single lint pass."""
+    cache = _delayed_expansion_cache_var.get()
+    if cache is None:
+        return _build_delayed_expansion_state(lines)
+    lines_id = id(lines)
+    cached = cache.get(lines_id)
+    if cached is None:
+        cached = _build_delayed_expansion_state(lines)
+        cache[lines_id] = cached
+    return cached
+
+
+def _delayed_expansion_active_at_line(lines: List[str], line_num: int) -> bool:
+    """Return whether delayed expansion is active at the given 1-based line number."""
+    if line_num < 1 or line_num > len(lines):
+        return False
+    return _delayed_expansion_state_for_lines(lines)[line_num - 1]
+
+
+def _begin_structure_cache_pass() -> None:
+    """Initialize all per-lint structure caches used by the visitor pipeline."""
+    from blinter.parsing.visitors.rule_impl.advanced.style_security_perf import (
+        _begin_for_block_pass,
+    )
+    from blinter.parsing.visitors.rule_impl.security import _begin_priv_check_pass
+    from blinter.parsing.visitors.rule_impl.warnings import _begin_paren_depth_pass
+
+    _begin_invocation_prefix_pass()
+    _begin_delayed_expansion_pass()
+    _begin_paren_depth_pass()
+    _begin_for_block_pass()
+    _begin_priv_check_pass()
 
 
 def _analyze_script_structure(
