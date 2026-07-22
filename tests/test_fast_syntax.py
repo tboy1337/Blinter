@@ -48,39 +48,53 @@ def test_fast_syntax_matches_antlr_on_grammar_corpus_cases(case: object) -> None
     )
 
 
-@pytest.mark.parametrize("has_delayed_expansion", [False, True])
-def test_fast_syntax_matches_antlr_with_explicit_delayed_expansion_flag(
-    has_delayed_expansion: bool,
-) -> None:
-    """Explicit delayed-expansion flag should keep fast and ANTLR paths aligned."""
+def test_fast_syntax_matches_antlr_with_delayed_expansion_enabled() -> None:
+    """Fast and ANTLR paths should agree when delayed expansion is active."""
     lines = [
         "@echo off",
         "setlocal enabledelayedexpansion",
         "echo !notclosed",
     ]
-    fast_keys = _issue_keys(
-        check_grammar_backed_syntax_fast(
-            lines,
-            has_delayed_expansion=has_delayed_expansion,
-        )
-    )
-    antlr_keys = _issue_keys(
-        check_ast_syntax_rules_antlr(
-            lines,
-            has_delayed_expansion=has_delayed_expansion,
-        )
-    )
+    fast_keys = _issue_keys(check_grammar_backed_syntax_fast(lines))
+    antlr_keys = _issue_keys(check_ast_syntax_rules_antlr(lines))
     assert fast_keys == antlr_keys
+    assert fast_keys == {(3, "E011")}
 
 
-def test_delayed_expansion_token_rule_flags_incomplete_bang_var() -> None:
-    """Incomplete delayed-expansion spans should raise E011 when DE is enabled."""
+def test_bang_e011_requires_active_delayed_expansion() -> None:
+    """Incomplete bang variables should not raise E011 when DE is inactive."""
+    lines = ["@echo off", "echo !notclosed"]
+    keys = _issue_keys(check_grammar_backed_syntax_fast(lines))
+    assert "E011" not in {code for _, code in keys}
+
+
+def test_bang_e011_after_disable_region() -> None:
+    """Incomplete bang variables after disable should not raise E011."""
+    lines = [
+        "setlocal enabledelayedexpansion",
+        "echo !ok!",
+        "setlocal disabledelayedexpansion",
+        "echo !literal_open",
+    ]
+    keys = _issue_keys(check_grammar_backed_syntax_fast(lines))
+    assert "E011" not in {code for _, code in keys}
+
+
+def test_bang_e011_ignores_rem_only_enable_hint() -> None:
+    """REM mentions of enabledelayedexpansion must not enable bang E011."""
+    lines = ["rem setlocal enabledelayedexpansion", "echo !notclosed"]
+    keys = _issue_keys(check_grammar_backed_syntax_fast(lines))
+    assert "E011" not in {code for _, code in keys}
+
+
+def test_bang_e011_flags_incomplete_var_when_delayed_expansion_active() -> None:
+    """Incomplete delayed-expansion spans should raise E011 when DE is active."""
     lines = ["setlocal enabledelayedexpansion", "echo !notclosed"]
     keys = _issue_keys(check_grammar_backed_syntax_fast(lines))
     assert keys == {(2, "E011")}
 
 
-def test_delayed_expansion_token_rule_allows_special_char_vars() -> None:
+def test_bang_e011_allows_special_char_vars_when_delayed_expansion_active() -> None:
     """Special-character delayed expansion variables must not raise grammar E011."""
     lines = [
         "setlocal enabledelayedexpansion",

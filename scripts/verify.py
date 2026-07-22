@@ -4,11 +4,15 @@
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 from pathlib import Path
 import platform
 import subprocess
 import sys
 from typing import Sequence, cast
+
+_SCRIPTS_SPEC_DIR = Path(__file__).resolve().parent / "spec"
+_EXPECTED_ANTLR_RUNTIME_VERSION = "4.13.2"
 
 # Portable directory names (no platform-specific separators).
 _CHECK_DIRS: tuple[str, ...] = ("src", "tests", "scripts")
@@ -123,6 +127,37 @@ def _is_windows() -> bool:
     return platform.system() == "Windows"
 
 
+def _check_antlr_runtime_version() -> None:
+    """Fail when installed antlr4-python3-runtime drifts from the generator pin."""
+    name = "antlr4-python3-runtime"
+    expected = _load_expected_antlr_runtime_version()
+    print(f"==> {name} version (expected {expected})")
+    try:
+        installed = importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError as exc:
+        raise SystemExit(f"Step failed: {name} is not installed") from exc
+
+    expected_prefix = ".".join(expected.split(".")[:2])
+    installed_prefix = ".".join(installed.split(".")[:2])
+    if installed_prefix != expected_prefix:
+        raise SystemExit(
+            "Step failed: "
+            f"{name} {installed} does not match generator pin "
+            f"{expected}"
+        )
+
+
+def _load_expected_antlr_runtime_version() -> str:
+    """Read the generator pin from scripts/spec/generate_parser.py."""
+    parser_path = _SCRIPTS_SPEC_DIR / "generate_parser.py"
+    for line in parser_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("EXPECTED_ANTLR_RUNTIME_VERSION"):
+            _, _, value = stripped.partition("=")
+            return value.strip().strip('"').strip("'")
+    return _EXPECTED_ANTLR_RUNTIME_VERSION
+
+
 def _powershell_executable() -> str:
     return "powershell"
 
@@ -192,8 +227,14 @@ def main() -> None:
         action="store_true",
         help="Apply autopep8 and isort fixes before running checks",
     )
+    parser.add_argument(
+        "--skip-tests",
+        action="store_true",
+        help="Skip pytest (for CI jobs that run tests separately)",
+    )
     args = parser.parse_args()
     fix = cast(bool, args.fix)
+    skip_tests = cast(bool, args.skip_tests)
 
     root = _repo_root()
     pylint_report = root / _PYLINT_OUTPUT
@@ -278,6 +319,8 @@ def main() -> None:
     for name, step_args in subprocess_steps_before_pylint:
         _run_step(name, step_args, cwd=root)
 
+    _check_antlr_runtime_version()
+
     _run_autopep8_step(cwd=root, fix=fix)
 
     for name, step_args in formatting_steps:
@@ -285,7 +328,13 @@ def main() -> None:
 
     _run_pylint_package(cwd=root, package_dir=package_dir, report_path=pylint_report)
 
-    for name, step_args in subprocess_steps_after_pylint:
+    steps_after_pylint = list(subprocess_steps_after_pylint)
+    if skip_tests:
+        steps_after_pylint = [
+            step for step in steps_after_pylint if step[0] != "pytest"
+        ]
+
+    for name, step_args in steps_after_pylint:
         _run_step(name, step_args, cwd=root)
 
     if _is_windows():

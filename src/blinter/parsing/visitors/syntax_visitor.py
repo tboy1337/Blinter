@@ -13,13 +13,10 @@ from blinter.generated.BatchParser import BatchParser
 from blinter.generated.BatchParserVisitor import BatchParserVisitor
 from blinter.models import LintIssue
 from blinter.parsing.antlr_bridge import ParseResult, parse_batch_lines
-from blinter.parsing.delayed_expansion_tokens import (
-    check_delayed_expansion_bang_var_tokens,
-    resolve_delayed_expansion,
-)
 from blinter.parsing.fast_syntax import check_grammar_backed_syntax_fast
 from blinter.parsing.grammar_rules import GRAMMAR_BACKED_RULE_CODES
 from blinter.parsing.preprocessor import map_line_number
+from blinter.parsing.structure import _build_delayed_expansion_state
 from blinter.parsing.visitors.rule_impl.advanced.escaping import (
     _check_continuation_spaces,
     _check_double_percent_escaping,
@@ -64,6 +61,7 @@ class SyntaxLintVisitor(BatchParserVisitor):
         self._parse_result: ParseResult = parse_result
         self.original_lines = original_lines
         self.has_delayed_expansion = has_delayed_expansion
+        self._delayed_expansion_state = _build_delayed_expansion_state(original_lines)
         self.issues: List[LintIssue] = []
         self._seen: Set[tuple[int, str]] = set()
 
@@ -92,10 +90,8 @@ class SyntaxLintVisitor(BatchParserVisitor):
             text = token.text or ""
             if token_type == BatchLexer.UNMATCHED_DQ:
                 return
-            elif token_type == BatchLexer.PERCENT_TILDE:
+            if token_type == BatchLexer.PERCENT_TILDE:
                 self._check_percent_tilde_token(text, line_no)
-            elif token_type == BatchLexer.BANG_VAR and not self.has_delayed_expansion:
-                return
             return
         for index in range(node.getChildCount()):
             self._walk_tokens(node.getChild(index), preprocessed_line)
@@ -138,16 +134,14 @@ class SyntaxLintVisitor(BatchParserVisitor):
             line = self.original_lines[line_no - 1]
             stripped = line.strip()
             self._check_line_text(line, stripped, line_no)
-            for issue in check_delayed_expansion_bang_var_tokens(
-                stripped,
-                line_no,
-                effective_delayed_expansion=self.has_delayed_expansion,
-            ):
-                self._add(line_no, issue.rule.code, context=issue.context or "")
         return None
 
     def _check_line_text(self, line: str, stripped: str, line_number: int) -> None:
-        for issue in _check_variable_expansion(stripped, line_number):
+        for issue in _check_variable_expansion(
+            stripped,
+            line_number,
+            delayed_expansion_state=self._delayed_expansion_state,
+        ):
             if issue.rule.code in _AST_RULE_CODES:
                 self._add(line_number, issue.rule.code, context=issue.context or "")
         for issue in _check_improper_caret_escape(stripped, line_number, line):
@@ -187,14 +181,10 @@ def check_ast_syntax_rules_antlr(
     if parse_result.errors:
         logger.debug("ANTLR parse messages: %s", parse_result.errors)
 
-    effective_delayed_expansion = resolve_delayed_expansion(
-        has_delayed_expansion,
-        lines,
-    )
     visitor = SyntaxLintVisitor(
         parse_result=parse_result,
         original_lines=lines,
-        has_delayed_expansion=effective_delayed_expansion,
+        has_delayed_expansion=has_delayed_expansion,
     )
     visitor.visit(parse_result.tree)
 

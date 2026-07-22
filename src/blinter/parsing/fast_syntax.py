@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-import logging
 import re
 from typing import List, Set
 
 from blinter.models import LintIssue
-from blinter.parsing.delayed_expansion_tokens import (
-    check_delayed_expansion_bang_var_tokens,
-    resolve_delayed_expansion,
-)
 from blinter.parsing.grammar_rules import GRAMMAR_BACKED_RULE_CODES
 from blinter.parsing.preprocessor import map_line_number, preprocess_lines
+from blinter.parsing.structure import _build_delayed_expansion_state
 from blinter.parsing.visitors.rule_impl.advanced.escaping import (
     _check_continuation_spaces,
     _check_double_percent_escaping,
@@ -28,8 +24,6 @@ from blinter.parsing.visitors.rule_impl.syntax import (
 )
 from blinter.rules.registry import RULES
 
-logger = logging.getLogger(__name__)
-
 _GRAMMAR_RULE_CODES: Set[str] = set(GRAMMAR_BACKED_RULE_CODES)
 
 
@@ -43,8 +37,9 @@ def _collect_grammar_issues_for_line(
     physical_line: str,
     logical_line: str,
     line_number: int,
+    lines: List[str],
+    delayed_expansion_state: List[bool],
     seen: Set[tuple[int, str]],
-    effective_delayed_expansion: bool,
 ) -> List[LintIssue]:
     """Run grammar-backed checks for one command line."""
     issues: List[LintIssue] = []
@@ -61,7 +56,11 @@ def _collect_grammar_issues_for_line(
         seen.add(key)
         issues.append(LintIssue(line_number, rule, context=context))
 
-    for issue in _check_variable_expansion(stripped, line_number):
+    for issue in _check_variable_expansion(
+        stripped,
+        line_number,
+        delayed_expansion_state=delayed_expansion_state,
+    ):
         if issue.rule.code in _GRAMMAR_RULE_CODES:
             add(issue.rule.code, issue.context or "")
     for issue in _check_improper_caret_escape(stripped, line_number, physical_line):
@@ -73,12 +72,6 @@ def _collect_grammar_issues_for_line(
     for issue in _check_double_percent_escaping(stripped, line_number):
         add(issue.rule.code, issue.context or "")
     for issue in _check_percent_tilde_syntax(logical_stripped, line_number):
-        add(issue.rule.code, issue.context or "")
-    for issue in check_delayed_expansion_bang_var_tokens(
-        logical_stripped,
-        line_number,
-        effective_delayed_expansion=effective_delayed_expansion,
-    ):
         add(issue.rule.code, issue.context or "")
 
     return issues
@@ -95,11 +88,12 @@ def check_grammar_backed_syntax_fast(
     Mirrors ``SyntaxLintVisitor`` behaviour: E009 is evaluated per physical line;
     other rules run per preprocessed command line (first physical line for text
     checks, merged logical line for percent-tilde token scans).
+
+    ``has_delayed_expansion`` is retained for API compatibility; bang-delimited
+    E011 uses the per-line delayed-expansion stack from ``lines``.
     """
-    effective_delayed_expansion = resolve_delayed_expansion(
-        has_delayed_expansion,
-        lines,
-    )
+    del has_delayed_expansion
+    delayed_expansion_state = _build_delayed_expansion_state(lines)
     preprocessed = preprocess_lines(lines)
     issues: List[LintIssue] = []
     seen: Set[tuple[int, str]] = set()
@@ -129,8 +123,9 @@ def check_grammar_backed_syntax_fast(
                 physical_line=physical_line,
                 logical_line=logical_line,
                 line_number=original_line_number,
+                lines=lines,
+                delayed_expansion_state=delayed_expansion_state,
                 seen=seen,
-                effective_delayed_expansion=effective_delayed_expansion,
             )
         )
 
@@ -143,8 +138,5 @@ def check_grammar_backed_syntax_fast(
             continue
         seen.add(key)
         issues.append(LintIssue(line_number, rule, context=""))
-
-    if effective_delayed_expansion:
-        logger.debug("Fast syntax path: delayed expansion enabled")
 
     return issues

@@ -90,8 +90,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
 
-      - name: Run full quality gate
-        run: python scripts/verify.py
+      - name: Run Linux quality gate (Windows oracle/Pester run in build-windows)
+        run: python scripts/verify.py --skip-tests
 
   build-windows:
     needs: [check-version, verify]

@@ -30,7 +30,7 @@ def main() -> None:
         "--corpus",
         type=Path,
         default=_REPO_ROOT / "spec" / "corpus",
-        help="Corpus root directory (default: spec/corpus)",
+        help="Corpus root directory (only spec/corpus is supported today)",
     )
     parser.add_argument(
         "--lint-only",

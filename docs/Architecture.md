@@ -1,6 +1,6 @@
 # Blinter Architecture
 
-Blinter is a read-only static analyzer for Windows batch files (`.bat`, `.cmd`). It does not execute batch code; it parses source text through a unified ANTLR-first visitor pipeline.
+Blinter is a read-only static analyzer for Windows batch files (`.bat`, `.cmd`). It does not execute batch code; production linting uses a structure-aware line pipeline with a fast grammar-backed syntax scanner. ANTLR remains available for corpus parity tests and grammar validation.
 
 ## Module map
 
@@ -62,7 +62,7 @@ flowchart BT
 
 1. **Input** — `read_file_with_encoding` reads the batch file; encoding is detected via `charset_normalizer` with fallbacks.
 2. **Structure** — Labels, SET variables, delayed expansion, and embedded script blocks are analyzed.
-3. **AST pipeline** — `lint_via_ast()` runs encoding, structure, heuristic, flow, symbol, and grammar-backed visitor passes.
+3. **AST pipeline** — `lint_via_ast()` runs encoding, structure, heuristic, flow, symbol, and grammar-backed checks. Grammar-backed syntax rules (E009, E011, E017, E019, E030–E033) use the fast line scanner in production; ANTLR is retained for parity tests.
 4. **Filter** — `BlinterConfig`, inline `REM LINT:IGNORE` comments, and severity filters apply.
 5. **Output** — `LintIssue` list returned to library callers, or formatted by the CLI.
 
@@ -108,17 +108,25 @@ after checkout.
 
 Generators live under [`scripts/spec/`](../scripts/spec/). `scripts/verify.py` runs schema validation, generator `--check`, strict SSOT audit, cmd.exe oracle (Windows), linting, and tests.
 
-**cmd.exe oracle:** [`scripts/spec/cmd_oracle.py`](../scripts/spec/cmd_oracle.py) runs safe corpus fixtures in isolated `cmd /c` subprocesses (currently **167 runnable**, **19 skipped** with default 3s timeout). Skips use an explicit denylist ([`oracle-skip.yaml`](../spec/corpus/meta/oracle-skip.yaml)) plus refined content heuristics (not a blanket security skip). Per-case overrides in `expect.json`: `"oracle": "skip"` / `"oracle": "run"` and `"oracle_timeout_s"`. Destructive, interactive, or long-running fixtures remain static-only; echo/set-only security fixtures run as smoke tests.
+**cmd.exe oracle:** [`scripts/spec/cmd_oracle.py`](../scripts/spec/cmd_oracle.py) runs safe corpus fixtures in isolated `cmd /c` subprocesses (currently **183 runnable**, **19 skipped** with default 3s timeout). Skips use an explicit denylist ([`oracle-skip.yaml`](../spec/corpus/meta/oracle-skip.yaml)) plus refined content heuristics (not a blanket security skip). Per-case overrides in `expect.json`: `"oracle": "skip"` / `"oracle": "run"` and `"oracle_timeout_s"`. Destructive, interactive, or long-running fixtures remain static-only; echo/set-only security fixtures run as smoke tests.
 
 Corpus policy: every rule in `rules.yaml` must have at least one corpus assertion (see `audit_ssot.py` coverage checks).
 
-### AST-first parsing pipeline
+### Grammar-backed syntax pipeline
+
+Production grammar-backed rules use the fast line scanner ([`parsing/fast_syntax.py`](parsing/fast_syntax.py)) backed by shared helpers in [`parsing/visitors/rule_impl/syntax.py`](parsing/visitors/rule_impl/syntax.py). Delayed-expansion bang syntax (E011) is gated by the per-line SETLOCAL stack in [`parsing/structure.py`](parsing/structure.py), consistent with P008.
+
+ANTLR parity path:
+
+1. [`parsing/preprocessor.py`](parsing/preprocessor.py) — join `^` continuations, map line numbers
+2. [`parsing/antlr_bridge.py`](parsing/antlr_bridge.py) — ANTLR lex/parse
+3. [`parsing/visitors/syntax_visitor.py`](parsing/visitors/syntax_visitor.py) — `check_ast_syntax_rules_antlr()` for corpus parity
 
 All rules are implemented through AST-aware visitors (`checker: ast` in `rules.yaml`):
 
 1. [`parsing/preprocessor.py`](parsing/preprocessor.py) — join `^` continuations, map line numbers
-2. [`parsing/antlr_bridge.py`](parsing/antlr_bridge.py) — ANTLR lex/parse
+2. [`parsing/structure.py`](parsing/structure.py) — labels, SET variables, delayed expansion state
 3. [`parsing/ast_pipeline.py`](parsing/ast_pipeline.py) — orchestrates visitor passes
 4. [`parsing/visitors/`](parsing/visitors/) — syntax, structure, encoding, flow, symbol, setlocal, and heuristic visitors
 
-Grammar-backed rules (those with `grammar_nodes` in `rules.yaml`) use `SyntaxLintVisitor` on the parse tree. Security, performance, and style rules use heuristic visitors that walk command nodes and apply pattern libraries.
+Security, performance, and style rules use heuristic visitors that walk command nodes and apply pattern libraries.

@@ -9,6 +9,7 @@ from typing import (
 )
 
 from blinter.models import LintIssue
+from blinter.parsing.structure import _build_delayed_expansion_state
 from blinter.patterns import (
     _COMPILED_IF_PATTERN,
     BUILTIN_COMMANDS,
@@ -593,7 +594,13 @@ def _has_special_variable_patterns(stripped: str) -> bool:
     )
 
 
-def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
+def _check_variable_expansion(
+    stripped: str,
+    line_num: int,
+    *,
+    lines: List[str] | None = None,
+    delayed_expansion_state: List[bool] | None = None,
+) -> List[LintIssue]:
     """Check for invalid variable expansion syntax (E011)."""
     issues: List[LintIssue] = []
 
@@ -610,15 +617,12 @@ def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
         r"%~?[fdpnxsatz]*[0-9*](?![0-9])", "", temp_stripped, flags=re.IGNORECASE
     )
 
-    # Remove all valid variable expansion patterns (including @ prefix)
+    # Remove all valid percent expansion patterns (including @ prefix)
     temp_no_percent = re.sub(
         r"%[A-Z0-9_~@]+[^%]*%", "", temp_stripped, flags=re.IGNORECASE
     )
-    temp_no_exclaim = re.sub(
-        r"![A-Z0-9_@]+[^!]*!", "", temp_stripped, flags=re.IGNORECASE
-    )
 
-    # Look for incomplete variable patterns that suggest mismatched delimiters
+    # Look for incomplete percent patterns that suggest mismatched delimiters
     if re.search(r"%[A-Z0-9_@]+(?:[^%]|$)", temp_no_percent, re.IGNORECASE):
         issues.append(
             LintIssue(
@@ -628,14 +632,27 @@ def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
             )
         )
 
-    if re.search(r"![A-Z0-9_@]+(?:[^!]|$)", temp_no_exclaim, re.IGNORECASE):
-        issues.append(
-            LintIssue(
-                line_number=line_num,
-                rule=RULES["E011"],
-                context="Delayed expansion variable may have mismatched ! delimiters",
+    de_state = delayed_expansion_state
+    if de_state is None and lines is not None:
+        de_state = _build_delayed_expansion_state(lines)
+    de_active = (
+        de_state is not None
+        and line_num >= 1
+        and line_num <= len(de_state)
+        and de_state[line_num - 1]
+    )
+    if de_active:
+        temp_no_exclaim = re.sub(r"![^!]+!", "", temp_stripped, flags=re.IGNORECASE)
+        if re.search(r"![A-Z0-9_@]+(?:[^!]|$)", temp_no_exclaim, re.IGNORECASE):
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["E011"],
+                    context=(
+                        "Delayed expansion variable may have mismatched ! delimiters"
+                    ),
+                )
             )
-        )
     return issues
 
 
@@ -943,7 +960,12 @@ def _check_smart_quotes(line: str, line_num: int) -> List[LintIssue]:
 
 
 def _check_syntax_errors(
-    line: str, line_num: int, labels: Dict[str, int]
+    line: str,
+    line_num: int,
+    labels: Dict[str, int],
+    *,
+    lines: List[str] | None = None,
+    delayed_expansion_state: List[bool] | None = None,
 ) -> List[LintIssue]:
     """Check for syntax error level issues."""
     issues: List[LintIssue] = []
@@ -958,7 +980,14 @@ def _check_syntax_errors(
     issues.extend(_check_path_syntax(stripped, line_num))
     issues.extend(_check_quotes(line, line_num))
     issues.extend(_check_for_loop_syntax(stripped, line_num))
-    issues.extend(_check_variable_expansion(stripped, line_num))
+    issues.extend(
+        _check_variable_expansion(
+            stripped,
+            line_num,
+            lines=lines,
+            delayed_expansion_state=delayed_expansion_state,
+        )
+    )
     issues.extend(_check_subroutine_call(stripped, line_num, labels))
     issues.extend(_check_command_typos(stripped, line_num))
     issues.extend(_check_parameter_modifiers(stripped, line_num))

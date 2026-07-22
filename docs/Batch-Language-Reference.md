@@ -263,7 +263,7 @@ The caret escape character does not escape `%` or `!` reliably. Double carets be
 
 ### AST-first pipeline (2026-07-21)
 
-All rules use the unified ANTLR-first visitor pipeline (`lint_via_ast`). Rules with `grammar_nodes` in `rules.yaml` walk the ANTLR parse tree via `SyntaxLintVisitor` (codes generated in `grammar_rules.py`). Security, performance, and style rules use AST-aware heuristic visitors on command nodes.
+All rules use the unified visitor pipeline (`lint_via_ast`). Grammar-backed rules (those with `grammar_nodes` in `rules.yaml`) are checked in production by the fast line scanner in `fast_syntax.py` (codes generated in `grammar_rules.py`); ANTLR parity is available via `check_ast_syntax_rules_antlr()`. Security, performance, and style rules use AST-aware heuristic visitors on command nodes.
 
 ### Opinion vs language rules
 

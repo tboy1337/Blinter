@@ -18,6 +18,7 @@ from _paths import GENERATED_DIR, GRAMMAR_DIR  # noqa: E402
 
 _GRAMMAR_FILES = ("BatchLexer.g4", "BatchParser.g4")
 _STAMP_NAME = ".grammar-stamp"
+EXPECTED_ANTLR_RUNTIME_VERSION = "4.13.2"
 
 
 def _grammar_fingerprint() -> str:
@@ -31,7 +32,7 @@ def _grammar_fingerprint() -> str:
 
 def _run_antlr() -> None:
     grammar_paths = [str(GRAMMAR_DIR / name) for name in _GRAMMAR_FILES]
-    env_version = "4.13.2"
+    env_version = EXPECTED_ANTLR_RUNTIME_VERSION
     cmd = [
         "antlr4",
         f"-Dlanguage=Python3",
