@@ -76,9 +76,7 @@ jobs:
           python -m pip install -e ".[dev]"
 
       - name: Run tests
-        run: |
-          python -m pytest --no-cov tests/test_spec_corpus.py tests/test_spec_parser.py
-          python -m pytest
+        run: python -m pytest
 
   test-windows-exe:
     name: Windows executable smoke tests
@@ -88,6 +86,18 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+
+      - name: Verify batch-spec submodule
+        shell: bash
+        run: |
+          test -f vendor/batch-spec/VERSION || {
+            echo "vendor/batch-spec is missing. Ensure checkout uses submodules: recursive."
+            exit 1
+          }
+
+      - name: Fetch batch-spec tags
+        shell: bash
+        run: git -C vendor/batch-spec fetch --tags origin
 
       - name: Set up Python
         uses: actions/setup-python@v6

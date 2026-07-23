@@ -128,9 +128,7 @@ jobs:
           python -m pip install -e ".[dev]"
 
       - name: Run tests
-        run: |
-          python -m pytest --no-cov tests/test_spec_corpus.py tests/test_spec_parser.py
-          python -m pytest
+        run: python -m pytest
 
   build-windows:
     needs: [check-version, verify, test]
@@ -140,6 +138,16 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
+
+      - name: Verify batch-spec submodule
+        run: |
+          test -f vendor/batch-spec/VERSION || {
+            echo "vendor/batch-spec is missing. Ensure checkout uses submodules: recursive."
+            exit 1
+          }
+
+      - name: Fetch batch-spec tags
+        run: git -C vendor/batch-spec fetch --tags origin
 
       - name: Read version from pyproject.toml
         id: version
@@ -227,6 +235,16 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Verify batch-spec submodule
+        run: |
+          test -f vendor/batch-spec/VERSION || {
+            echo "vendor/batch-spec is missing. Ensure checkout uses submodules: recursive."
+            exit 1
+          }
+
+      - name: Fetch batch-spec tags
+        run: git -C vendor/batch-spec fetch --tags origin
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -248,8 +266,17 @@ jobs:
           name: python-dist
           path: dist/
 
+  release-ready:
+    name: Release artifacts ready
+    needs: [check-version, build-windows, build-wheels]
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm Windows and Python artifacts built
+        run: echo "Windows executable and Python wheels built successfully."
+
   create-release:
-    needs: [check-version, verify, test, build-windows]
+    needs: [check-version, release-ready]
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -272,7 +299,7 @@ jobs:
 
   publish-pypi:
     name: Publish wheels to PyPI
-    needs: [check-version, verify, test, build-wheels]
+    needs: [check-version, release-ready]
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:

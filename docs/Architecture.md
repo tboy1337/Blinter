@@ -7,15 +7,21 @@ Blinter is a read-only static analyzer for Windows batch files (`.bat`, `.cmd`).
 ```
 src/blinter/
   __init__.py          # Public API (library and CLI entry re-exports)
+  _version.py          # Package version (generated from pyproject.toml)
   models.py            # BlinterConfig, LintIssue, Rule, RuleSeverity
   constants.py         # Shared constants (BUILTIN_VARS, MAX_FILE_SIZE_BYTES, ...)
+  paths.py             # Repo and resource path helpers
+  logging_config.py    # Logging setup for CLI and library use
   patterns.py          # Dangerous-command and syntax patterns (generated from SSOT)
   rules/
     registry.py        # RULES dict (generated from spec/data/rules.yaml)
     helpers.py         # _create_rule, _add_issue, severity helpers
+  generated/           # ANTLR lexer/parser output (committed SSOT artifact)
   parsing/
     ast_pipeline.py    # lint_via_ast() — unified AST-first orchestration
     grammar_rules.py   # Grammar-backed rule codes (generated from rules.yaml)
+    fast_syntax.py     # Production fast line scanner for grammar-backed rules
+    context.py         # Per-lint context and contextvars cache
     preprocessor.py    # Line continuations, line number mapping
     antlr_bridge.py    # ANTLR lex/parse
     structure.py       # Labels, SET variables, script structure
@@ -97,11 +103,11 @@ Only symbols listed in `blinter.__all__` are stable for external integrators. Th
 
 | Artifact | Repo / path |
 |----------|-------------|
-| ANTLR grammar, expansion rules, command catalog, cmd-help | [`vendor/batch-spec`](../../vendor/batch-spec) ([`tboy1337/batch-spec`](https://github.com/tboy1337/batch-spec), pinned in [`spec/batch-spec.lock`](../../spec/batch-spec.lock)) |
-| [`spec/data/rules.yaml`](../../spec/data/rules.yaml) | Rule catalog (all `checker: ast`; see `RULE_COUNT`) |
-| [`spec/data/commands-linter.yaml`](../../spec/data/commands-linter.yaml) | Security/style command policy (merged with batch-spec `commands.yaml` for `patterns.py`) |
-| [`spec/corpus/`](../../spec/corpus/) | 203 committed fixtures + `expect.json` oracles |
-| [`spec/audit/`](../../spec/audit/) | Reference matrix and audit baselines |
+| ANTLR grammar, expansion rules, command catalog, cmd-help | [`vendor/batch-spec`](../vendor/batch-spec) ([`tboy1337/batch-spec`](https://github.com/tboy1337/batch-spec), pinned in [`spec/batch-spec.lock`](../spec/batch-spec.lock)) |
+| [`spec/data/rules.yaml`](../spec/data/rules.yaml) | Rule catalog (all `checker: ast`; see `RULE_COUNT`) |
+| [`spec/data/commands-linter.yaml`](../spec/data/commands-linter.yaml) | Security/style command policy (merged with batch-spec `commands.yaml` for `patterns.py`) |
+| [`spec/corpus/`](../spec/corpus/) | 203 committed fixtures + `expect.json` oracles |
+| [`spec/audit/`](../spec/audit/) | Reference matrix and audit baselines |
 
 Clone with `git clone --recurse-submodules` or run `git submodule update --init --recursive`
 after checkout.
@@ -114,19 +120,19 @@ Corpus policy: every rule in `rules.yaml` must have at least one corpus assertio
 
 ### Grammar-backed syntax pipeline
 
-Production grammar-backed rules use the fast line scanner ([`parsing/fast_syntax.py`](parsing/fast_syntax.py)) backed by shared helpers in [`parsing/visitors/rule_impl/syntax.py`](parsing/visitors/rule_impl/syntax.py). Delayed-expansion bang syntax (E011) is gated by the per-line SETLOCAL stack in [`parsing/structure.py`](parsing/structure.py), consistent with P008.
+Production grammar-backed rules use the fast line scanner ([`parsing/fast_syntax.py`](../src/blinter/parsing/fast_syntax.py)) backed by shared helpers in [`parsing/visitors/rule_impl/syntax.py`](../src/blinter/parsing/visitors/rule_impl/syntax.py). Delayed-expansion bang syntax (E011) is gated by the per-line SETLOCAL stack in [`parsing/structure.py`](../src/blinter/parsing/structure.py), consistent with P008.
 
 ANTLR parity path:
 
-1. [`parsing/preprocessor.py`](parsing/preprocessor.py) — join `^` continuations, map line numbers
-2. [`parsing/antlr_bridge.py`](parsing/antlr_bridge.py) — ANTLR lex/parse
-3. [`parsing/visitors/syntax_visitor.py`](parsing/visitors/syntax_visitor.py) — `check_ast_syntax_rules_antlr()` for corpus parity
+1. [`parsing/preprocessor.py`](../src/blinter/parsing/preprocessor.py) — join `^` continuations, map line numbers
+2. [`parsing/antlr_bridge.py`](../src/blinter/parsing/antlr_bridge.py) — ANTLR lex/parse
+3. [`parsing/visitors/syntax_visitor.py`](../src/blinter/parsing/visitors/syntax_visitor.py) — `check_ast_syntax_rules_antlr()` for corpus parity
 
 All rules are implemented through AST-aware visitors (`checker: ast` in `rules.yaml`):
 
-1. [`parsing/preprocessor.py`](parsing/preprocessor.py) — join `^` continuations, map line numbers
-2. [`parsing/structure.py`](parsing/structure.py) — labels, SET variables, delayed expansion state
-3. [`parsing/ast_pipeline.py`](parsing/ast_pipeline.py) — orchestrates visitor passes
-4. [`parsing/visitors/`](parsing/visitors/) — syntax, structure, encoding, flow, symbol, setlocal, and heuristic visitors
+1. [`parsing/preprocessor.py`](../src/blinter/parsing/preprocessor.py) — join `^` continuations, map line numbers
+2. [`parsing/structure.py`](../src/blinter/parsing/structure.py) — labels, SET variables, delayed expansion state
+3. [`parsing/ast_pipeline.py`](../src/blinter/parsing/ast_pipeline.py) — orchestrates visitor passes
+4. [`parsing/visitors/`](../src/blinter/parsing/visitors/) — syntax, structure, encoding, flow, symbol, setlocal, and heuristic visitors
 
 Security, performance, and style rules use heuristic visitors that walk command nodes and apply pattern libraries.

@@ -5,6 +5,10 @@
 
 .DESCRIPTION
     Shared by scripts/verify.py and GitHub Actions Windows jobs.
+
+    Pinned module minimums (tested locally):
+      PSScriptAnalyzer 1.21.0
+      Pester             5.7.0
 #>
 [CmdletBinding()]
 param(
@@ -13,14 +17,20 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$modulePins = @{
+    PSScriptAnalyzer = '1.21.0'
+    Pester           = '5.7.0'
+}
+
 $helpers = Join-Path $RepoRoot 'scripts\TestExeSmoke.Helpers.ps1'
 $runner = Join-Path $RepoRoot 'scripts\test_exe_smoke.ps1'
 $analyzerSettings = Join-Path $RepoRoot 'scripts\PSScriptAnalyzerSettings.psd1'
 $pesterTest = Join-Path $RepoRoot 'scripts\TestExeSmoke.Tests.ps1'
 
-foreach ($moduleName in @('PSScriptAnalyzer', 'Pester')) {
-    if (-not (Get-Module -ListAvailable -Name $moduleName)) {
-        Install-Module -Name $moduleName -Force -Scope CurrentUser -AllowClobber -Repository PSGallery
+foreach ($moduleName in $modulePins.Keys) {
+    $minimumVersion = $modulePins[$moduleName]
+    if (-not (Get-Module -ListAvailable -Name $moduleName | Where-Object { $_.Version -ge [version]$minimumVersion })) {
+        Install-Module -Name $moduleName -MinimumVersion $minimumVersion -Force -Scope CurrentUser -AllowClobber -Repository PSGallery
     }
 }
 
@@ -33,7 +43,7 @@ if ($issues) {
     exit 1
 }
 
-Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
+Import-Module Pester -MinimumVersion $modulePins.Pester -ErrorAction Stop
 $config = New-PesterConfiguration
 $config.Run.Path = $pesterTest
 $config.Run.PassThru = $true

@@ -484,7 +484,6 @@ Install development dependencies and run the quality gate locally before releasi
 
 ```bash
 pip install -e ".[dev]"
-pre-commit install
 # Or: pip install -e . && pip install -r requirements-dev.txt
 py scripts/verify.py        # full gate (format, mypy, pylint, bandit, pip-audit, pytest)
 py scripts/verify.py --fix  # auto-fix whitespace, imports, and formatting first
