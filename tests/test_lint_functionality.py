@@ -385,10 +385,11 @@ for /l %%j in (1,1,5) do echo %%j
 
     def test_trailing_whitespace(self) -> None:
         """Test detection of trailing whitespace."""
-        content = """@echo off
-echo This line has trailing spaces   
-echo This line is clean
-"""
+        content = (
+            "@echo off\n"
+            "echo This line has trailing spaces   \n"
+            "echo This line is clean\n"
+        )
         temp_file = self.create_temp_batch_file(content)
         try:
             issues = lint_batch_file(temp_file)

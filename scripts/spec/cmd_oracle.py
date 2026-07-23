@@ -251,6 +251,21 @@ def _run_case(input_path: Path, timeout_s: float) -> int | Literal["TIMEOUT"]:
         return "TIMEOUT"
 
 
+def classify_corpus_cases() -> tuple[list[Path], list[tuple[str, str]]]:
+    """Return runnable inputs and skipped (case_id, reason) pairs without cmd.exe."""
+    skip_ids = _load_skip_ids()
+    runnable: list[Path] = []
+    skipped: list[tuple[str, str]] = []
+    for input_path in _corpus_inputs():
+        case_id = "/".join(input_path.parent.relative_to(_CORPUS).parts)
+        reason = _skip_reason(input_path, case_id, skip_ids)
+        if reason:
+            skipped.append((case_id, reason))
+            continue
+        runnable.append(input_path)
+    return runnable, skipped
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="cmd.exe oracle for corpus fixtures")
     parser.add_argument(
@@ -275,16 +290,7 @@ def main() -> None:
         print("cmd.exe oracle is Windows-only; skipping")
         return
 
-    skip_ids = _load_skip_ids()
-    runnable: list[Path] = []
-    skipped: list[tuple[str, str]] = []
-    for input_path in _corpus_inputs():
-        case_id = "/".join(input_path.parent.relative_to(_CORPUS).parts)
-        reason = _skip_reason(input_path, case_id, skip_ids)
-        if reason:
-            skipped.append((case_id, reason))
-            continue
-        runnable.append(input_path)
+    runnable, skipped = classify_corpus_cases()
 
     if args.limit:
         runnable = runnable[: args.limit]

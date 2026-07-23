@@ -2273,7 +2273,7 @@ class TestRuleEdgeCases:
 ::::::::::::::::::::::::
 ECHO Hello
 ::::::::::::::::::::::::
-:: Another comment  
+:: Another comment
 ::::::::::::::::::::::::
 """
         temp_file = self.create_temp_batch_file(content)

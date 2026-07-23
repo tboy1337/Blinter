@@ -52,6 +52,7 @@ coverage.xml
 *.cover
 *.py,cover
 .pytest_cache/
+.benchmarks/
 cover/
 
 # Translations
@@ -128,6 +129,7 @@ celerybeat.pid
 .audit-venv
 env/
 venv/
+venv-ci/
 ENV/
 env.bak/
 venv.bak/

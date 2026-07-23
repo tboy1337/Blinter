@@ -484,9 +484,10 @@ Install development dependencies and run the quality gate locally before releasi
 
 ```bash
 pip install -e ".[dev]"
+pre-commit install
 # Or: pip install -e . && pip install -r requirements-dev.txt
 py scripts/verify.py        # full gate (format, mypy, pylint, bandit, pip-audit, pytest)
-py scripts/verify.py --fix  # auto-fix whitespace and imports first
+py scripts/verify.py --fix  # auto-fix whitespace, imports, and formatting first
 ```
 
 Optional manual steps (same checks as `verify.py`):
@@ -540,7 +541,7 @@ To re-run a failed release for the current `pyproject.toml` version without bump
 
 ## Contributing 🤝
 
-**Contributions are welcome!** 
+**Contributions are welcome!**
 
 ### Ways to Contribute
 - 🐛 Report bugs or issues

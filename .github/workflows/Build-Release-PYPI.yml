@@ -107,6 +107,13 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Verify batch-spec submodule
+        run: |
+          test -f vendor/batch-spec/VERSION || {
+            echo "vendor/batch-spec is missing. Ensure checkout uses submodules: recursive."
+            exit 1
+          }
+
       - name: Fetch batch-spec tags
         run: git -C vendor/batch-spec fetch --tags origin
 
@@ -178,6 +185,10 @@ jobs:
           if (-not (Test-Path -Path "dist\Blinter.exe" -PathType Leaf)) {
             throw "dist\Blinter.exe was not produced by PyInstaller"
           }
+        shell: pwsh
+
+      - name: Run PowerShell quality checks
+        run: .\scripts\run_powershell_checks.ps1
         shell: pwsh
 
       - name: Run cmd.exe corpus oracle

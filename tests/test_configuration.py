@@ -336,8 +336,8 @@ disabled_rules = S001,S002,S003
         """Test loading configuration with empty rule lists."""
         config_content = """
 [rules]
-enabled_rules = 
-disabled_rules = 
+enabled_rules =
+disabled_rules =
 """
 
         with tempfile.NamedTemporaryFile(
@@ -362,8 +362,8 @@ disabled_rules =
         """Test loading configuration with whitespace in rule lists."""
         config_content = """
 [rules]
-enabled_rules = E001, E002 , W001 
-disabled_rules = S001 ,S002,  S003  
+enabled_rules = E001, E002 , W001
+disabled_rules = S001 ,S002,  S003
 """
 
         with tempfile.NamedTemporaryFile(

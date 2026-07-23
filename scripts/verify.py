@@ -32,10 +32,7 @@ _SPEC_CMD_ORACLE = Path("scripts") / "spec" / "cmd_oracle.py"
 _PACKAGE_DIR = Path("src") / "blinter"
 _PYPROJECT = "pyproject.toml"
 _PYLINT_OUTPUT = "pylint-output.txt"
-_POWERSHELL_SCRIPT = Path("scripts") / "test_exe_smoke.ps1"
-_POWERSHELL_HELPERS = Path("scripts") / "TestExeSmoke.Helpers.ps1"
-_POWERSHELL_ANALYZER_SETTINGS = Path("scripts") / "PSScriptAnalyzerSettings.psd1"
-_PESTER_TEST = Path("scripts") / "TestExeSmoke.Tests.ps1"
+_POWERSHELL_CHECKS = Path("scripts") / "run_powershell_checks.ps1"
 
 
 def _repo_root() -> Path:
@@ -122,6 +119,13 @@ def _isort_args(*, fix: bool) -> list[str]:
     args = _python_m("isort", *_CHECK_DIRS)
     if not fix:
         args.insert(3, "--check-only")
+    return args
+
+
+def _black_args(*, fix: bool) -> list[str]:
+    args = _python_m("black", *_CHECK_DIRS)
+    if not fix:
+        args.insert(3, "--check")
     return args
 
 
@@ -268,40 +272,12 @@ def _run_powershell_step(name: str, command: str, *, cwd: Path | None = None) ->
 
 def _run_windows_powershell_checks(root: Path) -> None:
     """Run PSScriptAnalyzer and Pester checks for the exe smoke script."""
-    helpers = root / _POWERSHELL_HELPERS
-    runner = root / _POWERSHELL_SCRIPT
-    analyzer_settings = root / _POWERSHELL_ANALYZER_SETTINGS
-    pester_test = root / _PESTER_TEST
-
-    ensure_modules = (
-        "$ErrorActionPreference = 'Stop'; "
-        "foreach ($moduleName in @('PSScriptAnalyzer', 'Pester')) { "
-        "if (-not (Get-Module -ListAvailable -Name $moduleName)) { "
-        "Install-Module -Name $moduleName -Force -Scope CurrentUser -AllowClobber "
-        "-Repository PSGallery } }"
-    )
-    _run_powershell_step("PowerShell module prerequisites", ensure_modules, cwd=root)
-
-    analyzer_command = (
-        "$issues = @(); "
-        f"foreach ($path in @('{helpers}', '{runner}')) {{ "
-        f"$issues += Invoke-ScriptAnalyzer -Path $path -Settings '{analyzer_settings}' "
-        "-Severity Warning }; "
-        "if ($issues) { $issues | Format-Table -AutoSize; exit 1 }"
-    )
+    checks_script = root / _POWERSHELL_CHECKS
     _run_powershell_step(
-        "PSScriptAnalyzer (exe smoke scripts)", analyzer_command, cwd=root
+        "PowerShell quality checks",
+        f"& '{checks_script}' -RepoRoot '{root}'",
+        cwd=root,
     )
-
-    pester_command = (
-        "Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop; "
-        f"$config = New-PesterConfiguration; "
-        f"$config.Run.Path = '{pester_test}'; "
-        "$config.Run.PassThru = $true; "
-        "$config.Run.Exit = $true; "
-        "Invoke-Pester -Configuration $config | Out-Null"
-    )
-    _run_powershell_step("Pester (exe smoke helpers)", pester_command, cwd=root)
 
 
 def main() -> None:
@@ -310,7 +286,7 @@ def main() -> None:
     parser.add_argument(
         "--fix",
         action="store_true",
-        help="Apply autopep8 and isort fixes before running checks",
+        help="Apply autopep8, isort, and black fixes before running checks",
     )
     parser.add_argument(
         "--skip-tests",
@@ -374,7 +350,7 @@ def main() -> None:
 
     formatting_steps: list[tuple[str, list[str]]] = [
         ("isort", _isort_args(fix=fix)),
-        ("black", _python_m("black", "--check", *_CHECK_DIRS)),
+        ("black", _black_args(fix=fix)),
         (
             "mypy",
             _python_m(

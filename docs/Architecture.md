@@ -108,7 +108,7 @@ after checkout.
 
 Generators live under [`scripts/spec/`](../scripts/spec/). `scripts/verify.py` runs schema validation, generator `--check`, strict SSOT audit, cmd.exe oracle (Windows), linting, and tests.
 
-**cmd.exe oracle:** [`scripts/spec/cmd_oracle.py`](../scripts/spec/cmd_oracle.py) runs safe corpus fixtures in isolated `cmd /c` subprocesses (currently **183 runnable**, **19 skipped** with default 3s timeout). Skips use an explicit denylist ([`oracle-skip.yaml`](../spec/corpus/meta/oracle-skip.yaml)) plus refined content heuristics (not a blanket security skip). Per-case overrides in `expect.json`: `"oracle": "skip"` / `"oracle": "run"` and `"oracle_timeout_s"`. Destructive, interactive, or long-running fixtures remain static-only; echo/set-only security fixtures run as smoke tests.
+**cmd.exe oracle:** [`scripts/spec/cmd_oracle.py`](../scripts/spec/cmd_oracle.py) runs safe corpus fixtures in isolated `cmd /c` subprocesses (currently **184 runnable**, **19 skipped** with default 3s timeout). Skips use an explicit denylist ([`oracle-skip.yaml`](../spec/corpus/meta/oracle-skip.yaml)) plus refined content heuristics (not a blanket security skip). Per-case overrides in `expect.json`: `"oracle": "skip"` / `"oracle": "run"` and `"oracle_timeout_s"`. Destructive, interactive, or long-running fixtures remain static-only; echo/set-only security fixtures run as smoke tests.
 
 Corpus policy: every rule in `rules.yaml` must have at least one corpus assertion (see `audit_ssot.py` coverage checks).
 
