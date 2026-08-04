@@ -289,7 +289,7 @@ def _check_advanced_for_rules(
             )
         )
 
-    # W038: FOR /R with literal filename (style â€” wildcards broaden matching)
+    # W038: FOR /R with literal filename (style — wildcards broaden matching)
     if "/r" in stripped and not ("*" in stripped or "?" in stripped):
         filename_match = re.search(r"\bin\s*\(\s*([^\s*)]+\.\w+)\s*\)", stripped)
         if filename_match:
