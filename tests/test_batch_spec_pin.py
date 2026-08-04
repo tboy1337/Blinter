@@ -19,7 +19,7 @@ _GENERATORS = (
 )
 
 
-def _git_describe_tags(repo_dir: Path) -> str:
+def _git_fetch_tags(repo_dir: Path) -> None:
     fetch = subprocess.run(
         ["git", "-C", str(repo_dir), "fetch", "--tags", "--quiet"],
         check=False,
@@ -31,31 +31,18 @@ def _git_describe_tags(repo_dir: Path) -> str:
             "Could not fetch batch-spec tags: "
             + (fetch.stderr.strip() or fetch.stdout.strip())
         )
+
+
+def _git_rev_parse(repo_dir: Path, ref: str) -> str:
     result = subprocess.run(
-        ["git", "-C", str(repo_dir), "describe", "--tags", "--exact-match"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode == 0:
-        return result.stdout.strip()
-    result = subprocess.run(
-        ["git", "-C", str(repo_dir), "describe", "--tags"],
+        ["git", "-C", str(repo_dir), "rev-parse", ref],
         check=False,
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
-        head = subprocess.run(
-            ["git", "-C", str(repo_dir), "rev-parse", "HEAD"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if head.returncode == 0:
-            return head.stdout.strip()
         pytest.fail(
-            "Could not describe batch-spec checkout: "
+            f"Could not resolve batch-spec ref {ref!r}: "
             + (result.stderr.strip() or result.stdout.strip())
         )
     return result.stdout.strip()
@@ -90,7 +77,10 @@ def test_batch_spec_lock_matches_checkout() -> None:
     expected_ref = lock["ref"]
     assert lock["path"] == "vendor/batch-spec"
 
-    describe = _git_describe_tags(_BATCH_SPEC_DIR)
-    assert describe == expected_ref or describe.startswith(
-        f"{expected_ref}"
-    ), f"Checked-out batch-spec ({describe}) does not match lock ref ({expected_ref})"
+    _git_fetch_tags(_BATCH_SPEC_DIR)
+    checkout = _git_rev_parse(_BATCH_SPEC_DIR, "HEAD")
+    expected = _git_rev_parse(_BATCH_SPEC_DIR, expected_ref)
+    assert checkout == expected, (
+        f"Checked-out batch-spec ({checkout}) does not match lock ref "
+        f"{expected_ref} ({expected})"
+    )
