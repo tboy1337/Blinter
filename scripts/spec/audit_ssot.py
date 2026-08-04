@@ -289,7 +289,7 @@ def _audit_expansion_drift(findings: list[AuditFinding]) -> None:
             AuditFinding(
                 "error",
                 "expansion",
-                "expansion_data.py missing â€” run generate_expansion.py",
+                "expansion_data.py missing — run generate_expansion.py",
             )
         )
         return
@@ -597,7 +597,7 @@ def _audit_grammar_nodes_drift(findings: list[AuditFinding]) -> None:
             AuditFinding(
                 "error",
                 "grammar",
-                "grammar_rules.py missing â€” run generate_grammar_rules.py",
+                "grammar_rules.py missing — run generate_grammar_rules.py",
             )
         )
         return
@@ -628,7 +628,7 @@ def _audit_requirements_duplicate_catalog(findings: list[AuditFinding]) -> None:
                 "error",
                 "docs",
                 "Requirements.md has duplicate hand-written rule catalog after "
-                "generated block â€” remove stale duplicate lists",
+                "generated block — remove stale duplicate lists",
             )
         )
 
@@ -693,7 +693,7 @@ def _audit_corpus(findings: list[AuditFinding], valid_rules: set[str]) -> None:
             AuditFinding(
                 "error",
                 "corpus",
-                f"E001â€“E041 corpus coverage incomplete: missing {', '.join(missing_target)}",
+                f"E001–E041 corpus coverage incomplete: missing {', '.join(missing_target)}",
             )
         )
     error_rules = {c for c in valid_rules if c.startswith("E") and c[1:].isdigit()}
@@ -707,7 +707,7 @@ def _audit_corpus(findings: list[AuditFinding], valid_rules: set[str]) -> None:
             AuditFinding(
                 "warning",
                 "corpus",
-                f"E001â€“E041 coverage {target_pct:.1f}% ({len(covered_target)}/{len(target_rules)})",
+                f"E001–E041 coverage {target_pct:.1f}% ({len(covered_target)}/{len(target_rules)})",
             )
         )
     if pct < 100.0:
