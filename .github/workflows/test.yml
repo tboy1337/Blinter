@@ -46,11 +46,12 @@ jobs:
           python scripts/benchmark_lint.py --runs 3 --check-baseline
 
   test-python:
-    name: pytest (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: pytest (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ['3.11', '3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@v7
