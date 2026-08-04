@@ -7,9 +7,9 @@ pipeline**. It does not embed the ANTLR parser at runtime.
 
 | Topic | Location |
 |-------|----------|
-| Batch grammar, expansion modifiers, builtin commands | [`vendor/batch-spec`](../vendor/batch-spec) submodule |
+| Batch grammar, expansion modifiers, builtin commands | [`vendor/batch-spec`](../vendor/batch-spec) submodule (`builtin_commands`, `common_external_tools`, deprecated/removed tables) |
 | Linter rules and messages | [`spec/data/rules.yaml`](../spec/data/rules.yaml) |
-| Security/style command policy | [`spec/data/commands-linter.yaml`](../spec/data/commands-linter.yaml) + batch-spec `commands.yaml` |
+| Security/style command policy | [`spec/data/commands-linter.yaml`](../spec/data/commands-linter.yaml) + batch-spec `commands.yaml` (merged; linter YAML pins W009 `older_windows_commands`) |
 | Construct-to-rule mapping | [`spec/audit/reference-matrix.yaml`](../spec/audit/reference-matrix.yaml) |
 | Behavioral fixtures | [`spec/corpus/`](../spec/corpus/) |
 

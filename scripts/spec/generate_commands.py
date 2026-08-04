@@ -15,11 +15,8 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from _paths import (  # noqa: E402
-    COMMANDS_LANGUAGE_YAML,
-    COMMANDS_LINTER_YAML,
-    PATTERNS_PY,
-)
+from _commands_data import builtin_commands_union, merged_commands_data  # noqa: E402
+from _paths import PATTERNS_PY  # noqa: E402
 
 _STATIC_FRAGMENT = _SCRIPTS_DIR / "patterns_static_fragment.py"
 
@@ -38,14 +35,6 @@ import re
 from typing import List, Set, Tuple
 
 '''
-
-
-def _load_commands() -> dict[str, Any]:
-    language = yaml.safe_load(COMMANDS_LANGUAGE_YAML.read_text(encoding="utf-8"))
-    linter = yaml.safe_load(COMMANDS_LINTER_YAML.read_text(encoding="utf-8"))
-    if not isinstance(language, dict) or not isinstance(linter, dict):
-        raise ValueError("commands YAML files must be mappings")
-    return {**language, **linter}
 
 
 def _format_list(name: str, values: list[str]) -> str:
@@ -84,7 +73,7 @@ def _format_dangerous_patterns(patterns: list[dict[str, str]]) -> str:
 
 
 def generate_patterns_text() -> str:
-    data = _load_commands()
+    data = merged_commands_data()
     sections = [_HEADER]
     sections.append(
         _format_list("DANGEROUS_COMMAND_NAMES", data["dangerous_command_names"])
@@ -138,7 +127,7 @@ def generate_patterns_text() -> str:
         'SENSITIVE_ECHO_PATTERNS = [rf"echo.*{keyword}" for keyword in SENSITIVE_KEYWORDS]'
     )
     sections.append("")
-    sections.append(_format_set("BUILTIN_COMMANDS", data["builtin_commands"]))
+    sections.append(_format_set("BUILTIN_COMMANDS", builtin_commands_union(data)))
     sections.append("")
     if _STATIC_FRAGMENT.is_file():
         sections.append(_STATIC_FRAGMENT.read_text(encoding="utf-8").strip())

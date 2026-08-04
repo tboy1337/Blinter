@@ -59,11 +59,15 @@ def _check_deprecated_commands(stripped: str, line_number: int) -> List[LintIssu
     first_word = stripped.split()[0].lower() if stripped.split() else ""
     if first_word in REMOVED_COMMANDS:
         replacement_map = {
-            "caspol": "Code Access Security Policy Tool from SDK",
+            "assign": "drive mounting with modern tools",
+            "backup": "modern backup tools (wbadmin)",
             "diskcomp": "FC (file comparison)",
             "append": "modify PATH or use full paths",
             "browstat": "NET VIEW or PowerShell",
+            "edlin": "modern text editors",
+            "graftabl": "modern code-page handling",
             "inuse": "HANDLE.EXE from Sysinternals",
+            "join": "drive mounting with modern tools",
             "diskcopy": "ROBOCOPY or XCOPY",
             "streams": "PowerShell Get-Item -Stream",
         }
@@ -101,22 +105,16 @@ def _check_deprecated_commands(stripped: str, line_number: int) -> List[LintIssu
             )
         )
 
-    # Check single-word deprecated commands
-    if first_word in DEPRECATED_COMMANDS:
+    # Check single-word deprecated commands (skip AT; regex branch handles scheduling)
+    if first_word in DEPRECATED_COMMANDS and first_word != "at":
         replacement_map = {
             "wmic": "PowerShell WMI cmdlets (Get-WmiObject/Get-CimInstance)",
             "cacls": "ICACLS command",
+            "caspol": "Code Access Security Policy Tool from SDK",
             "winrm": "PowerShell Remoting (Enter-PSSession/Invoke-Command)",
             "bitsadmin": "PowerShell BitsTransfer module",
-            "nbtstat": "PowerShell Get-NetAdapter cmdlets",
             "dpath": "PATH environment variable modification",
             "keys": "CHOICE or SET /P commands",
-            "assign": "drive mounting with modern tools",
-            "backup": "modern backup tools",
-            "comp": "FC command",
-            "edlin": "modern text editors",
-            "join": "drive mounting with modern tools",
-            "subst": "persistent drive mappings or UNC paths",
         }
         replacement = replacement_map.get(first_word, "a modern alternative")
         issues.append(

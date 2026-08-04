@@ -37,6 +37,10 @@
     "unicode_problematic_commands": {
       "type": "array",
       "items": { "type": "string" }
+    },
+    "older_windows_commands": {
+      "type": "array",
+      "items": { "type": "string" }
     }
   },
   "additionalProperties": false

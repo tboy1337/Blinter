@@ -12,7 +12,7 @@ git clone --recurse-submodules https://github.com/tboy1337/Blinter.git
 git submodule update --init --recursive
 ```
 
-The pinned release is recorded in [`batch-spec.lock`](batch-spec.lock) (currently `v0.2.1`).
+The pinned release is recorded in [`batch-spec.lock`](batch-spec.lock) (currently `v0.68.0`).
 
 ## Layout
 
@@ -29,6 +29,12 @@ The pinned release is recorded in [`batch-spec.lock`](batch-spec.lock) (currentl
 Language artifacts (grammar, expansion rules, command catalog, cmd-help captures) are in
 `vendor/batch-spec/`. Grammar conformance is validated in that repository; Blinter uses the
 regex checker pipeline only.
+
+`generate_commands.py` merges batch-spec `commands.yaml` with `commands-linter.yaml` into
+`patterns.py`. `BUILTIN_COMMANDS` is the union of upstream `builtin_commands` and
+`common_external_tools` (dev-tool names that suppress E012/E014 false positives). W009's
+`older_windows_commands` list is pinned in `commands-linter.yaml` so it does not follow
+upstream's inverted list.
 
 ## Authoring a corpus case
 

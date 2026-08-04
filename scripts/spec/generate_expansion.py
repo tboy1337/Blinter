@@ -42,7 +42,6 @@ def generate_expansion_text() -> str:
     data = _load_expansion()
     modifier_chars = str(data["valid_modifier_chars"])
     valid_modifiers = data.get("valid_modifiers", {})
-    caret_counts = data["caret_escape"]["valid_caret_counts"]
     invalid = data.get("invalid_combinations", [])
     examples = data.get("valid_combined_examples", [])
     delayed = data.get("delayed_expansion", {})
@@ -56,8 +55,6 @@ def generate_expansion_text() -> str:
     for key in sorted(valid_modifiers.keys()):
         lines.append(f'    "{key}",')
     lines.append("})")
-    lines.append("")
-    lines.append(f"VALID_CARET_COUNTS: Tuple[int, ...] = {tuple(caret_counts)}")
     lines.append("")
     lines.append(
         f'DELAYED_EXPANSION_PATTERN: str = "{delayed.get("pattern", "!VAR!")}"'

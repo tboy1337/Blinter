@@ -149,16 +149,11 @@ def _audit_rules(findings: list[AuditFinding]) -> set[str]:
     return set(codes)
 
 
+from _commands_data import builtin_commands_union, merged_commands_data  # noqa: E402
+
+
 def _merged_commands_data() -> dict[str, Any]:
-    if not COMMANDS_LANGUAGE_YAML.is_file():
-        raise FileNotFoundError("batch-spec commands.yaml missing")
-    if not COMMANDS_LINTER_YAML.is_file():
-        raise FileNotFoundError("commands-linter.yaml missing")
-    language = _load_yaml(COMMANDS_LANGUAGE_YAML)
-    linter = _load_yaml(COMMANDS_LINTER_YAML)
-    if not isinstance(language, dict) or not isinstance(linter, dict):
-        raise ValueError("commands YAML must be mappings")
-    return {**language, **linter}
+    return merged_commands_data()
 
 
 def _audit_commands(findings: list[AuditFinding], valid_rules: set[str]) -> None:
@@ -206,14 +201,22 @@ def _read_patterns_constants() -> dict[str, Any]:
     module = ast.parse(PATTERNS_PY.read_text(encoding="utf-8"))
     constants: dict[str, Any] = {}
     for node in module.body:
+        name: str | None = None
+        value_node = None
         if isinstance(node, ast.Assign) and len(node.targets) == 1:
             target = node.targets[0]
             if isinstance(target, ast.Name):
                 name = target.id
-                try:
-                    constants[name] = ast.literal_eval(node.value)
-                except (ValueError, TypeError):
-                    pass
+                value_node = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            name = node.target.id
+            value_node = node.value
+        if name is None or value_node is None:
+            continue
+        try:
+            constants[name] = ast.literal_eval(value_node)
+        except (ValueError, TypeError):
+            pass
     return constants
 
 
@@ -229,7 +232,6 @@ def _audit_commands_patterns_drift(findings: list[AuditFinding]) -> None:
     checks: list[tuple[str, str, str]] = [
         ("dangerous_command_names", "DANGEROUS_COMMAND_NAMES", "list"),
         ("command_casing_keywords", "COMMAND_CASING_KEYWORDS", "set"),
-        ("builtin_commands", "BUILTIN_COMMANDS", "set"),
         ("older_windows_commands", "OLDER_WINDOWS_COMMANDS", "set"),
         ("sensitive_keywords", "SENSITIVE_KEYWORDS", "list"),
     ]
@@ -248,6 +250,17 @@ def _audit_commands_patterns_drift(findings: list[AuditFinding]) -> None:
                     f"commands YAML {yaml_key} != patterns.py {py_key}",
                 )
             )
+    builtin_yaml = sorted(builtin_commands_union(data))
+    builtin_py = sorted(patterns.get("BUILTIN_COMMANDS", []))
+    if builtin_yaml != builtin_py:
+        findings.append(
+            AuditFinding(
+                "error",
+                "drift",
+                "commands YAML builtin_commands union common_external_tools "
+                "!= patterns.py BUILTIN_COMMANDS",
+            )
+        )
 
 
 def _read_expansion_data_constants() -> dict[str, str]:

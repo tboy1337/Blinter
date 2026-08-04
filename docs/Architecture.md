@@ -116,13 +116,17 @@ When `follow_calls` is enabled, Blinter resolves `CALL` targets to read variable
 |----------|-------------|
 | ANTLR grammar, expansion rules, command catalog, cmd-help | [`vendor/batch-spec`](../vendor/batch-spec) ([`tboy1337/batch-spec`](https://github.com/tboy1337/batch-spec), pinned in [`spec/batch-spec.lock`](../spec/batch-spec.lock)) |
 | [`spec/data/rules.yaml`](../spec/data/rules.yaml) | Rule catalog (`checker: regex`; see `RULE_COUNT`) |
-| [`spec/data/commands-linter.yaml`](../spec/data/commands-linter.yaml) | Security/style command policy (merged with batch-spec `commands.yaml` for `patterns.py`) |
+| [`spec/data/commands-linter.yaml`](../spec/data/commands-linter.yaml) | Security/style command policy (merged with batch-spec `commands.yaml` for `patterns.py`; pins W009 `older_windows_commands`) |
 | [`spec/corpus/`](../spec/corpus/) | 203 committed fixtures + `expect.json` oracles |
 | [`spec/audit/`](../spec/audit/) | Reference matrix and audit baselines |
 
 Clone with `git clone --recurse-submodules` or run `git submodule update --init --recursive` after checkout.
 
 Generators live under [`scripts/spec/`](../scripts/spec/). `scripts/verify.py` runs schema validation, generator `--check`, strict SSOT audit, cmd.exe oracle (Windows), linting, and tests.
+
+`patterns.py` `BUILTIN_COMMANDS` is generated as the union of batch-spec `builtin_commands` and
+`common_external_tools` so stock Windows utilities and common dev tools both suppress E012/E014.
+Deprecated/removed command tables come from batch-spec `commands.yaml` unchanged.
 
 **cmd.exe oracle:** [`scripts/spec/cmd_oracle.py`](../scripts/spec/cmd_oracle.py) runs safe corpus fixtures in isolated `cmd /c` subprocesses. Destructive, interactive, or long-running fixtures remain static-only; skips are listed in [`oracle-skip.yaml`](../spec/corpus/meta/oracle-skip.yaml).
 

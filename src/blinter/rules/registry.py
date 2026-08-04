@@ -240,7 +240,7 @@ RULES: Dict[str, Rule] = {
         name="Removed Windows command detected",
         severity=RuleSeverity.ERROR,
         explanation="Command has been completely removed from Windows and will not execute. These commands are no longer available in modern Windows versions and will cause script failures",
-        recommendation="Replace removed commands with modern alternatives: CASPOL (removed - use Code Access Security Policy Tool from SDK), DISKCOMP (removed - use FC for file comparison), APPEND (removed - modify PATH or use full paths), BROWSTAT (removed - use NET VIEW or PowerShell), INUSE (removed - use HANDLE.EXE from Sysinternals), NET PRINT (removed - use PowerShell Print cmdlets), DISKCOPY (removed - use ROBOCOPY or XCOPY), STREAMS (removed - use Get-Item -Stream in PowerShell)",
+        recommendation="Replace removed commands with modern alternatives: ASSIGN (removed - use drive mounting with modern tools), BACKUP (removed - use wbadmin or modern backup tools), DISKCOMP (removed - use FC for file comparison), APPEND (removed - modify PATH or use full paths), BROWSTAT (removed - use NET VIEW or PowerShell), EDLIN (removed - use modern text editors), GRAFTABL (removed - use modern code-page handling), INUSE (removed - use HANDLE.EXE from Sysinternals), JOIN (removed - use drive mounting with modern tools), NET PRINT (removed - use PowerShell Print cmdlets), DISKCOPY (removed - use ROBOCOPY or XCOPY), STREAMS (removed - use Get-Item -Stream in PowerShell)",
     ),
     "E035": Rule(
         code="E035",
@@ -972,7 +972,7 @@ RULES: Dict[str, Rule] = {
         name="Deprecated command detected",
         severity=RuleSeverity.WARNING,
         explanation="Command is deprecated in modern Windows versions and may not be available in future releases or may have reduced functionality",
-        recommendation="Replace with modern equivalent: WMIC->PowerShell WMI cmdlets (Get-WmiObject/Get-CimInstance), CACLS->ICACLS, WINRM->PowerShell Remoting (Enter-PSSession/Invoke-Command), BITSADMIN->PowerShell BitsTransfer module, NBTSTAT->Get-NetAdapter PowerShell cmdlets, DPATH->modify PATH environment variable, KEYS->use CHOICE or SET /P, NET SEND->MSG, AT->SCHTASKS. Note: XCOPY itself is NOT deprecated, but ROBOCOPY is recommended for advanced scenarios with better features",
+        recommendation="Replace with modern equivalent: WMIC->PowerShell WMI cmdlets (Get-WmiObject/Get-CimInstance), CACLS->ICACLS, CASPOL->Code Access Security Policy Tool from SDK, WINRM->PowerShell Remoting (Enter-PSSession/Invoke-Command), BITSADMIN->PowerShell BitsTransfer module, DPATH->modify PATH environment variable, KEYS->use CHOICE or SET /P, NET SEND->MSG, AT->SCHTASKS. Note: XCOPY itself is NOT deprecated, but ROBOCOPY is recommended for advanced scenarios with better features",
     ),
     "W025": Rule(
         code="W025",

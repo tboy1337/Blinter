@@ -8,6 +8,8 @@ _None_
 
 _None_
 
-## INFO (1)
+## INFO (3)
 
+- **[commands]** dpath is both builtin and deprecated (intentional for W024 recognition)
+- **[commands]** keys is both builtin and deprecated (intentional for W024 recognition)
 - **[commands]** wmic is both builtin and deprecated (intentional for W024 recognition)

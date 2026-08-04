@@ -80,4 +80,9 @@ sensitive_keywords:
 - api_key
 - secret
 - token
+older_windows_commands:
+- choice
+- forfiles
+- icacls
+- where
 version: 1

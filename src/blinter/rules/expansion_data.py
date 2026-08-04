@@ -24,27 +24,28 @@ VALID_MODIFIERS: FrozenSet[str] = frozenset(
     }
 )
 
-VALID_CARET_COUNTS: Tuple[int, ...] = (1, 3, 7, 15, 31)
-
 DELAYED_EXPANSION_PATTERN: str = "!VAR!"
-DELAYED_EXPANSION_REQUIRES_SETLOCAL: bool = True
+DELAYED_EXPANSION_REQUIRES_SETLOCAL: bool = False
 DELAYED_EXPANSION_ENABLE_KEYWORDS: Tuple[str, ...] = (
     "setlocal enabledelayedexpansion",
     "setlocal enableextensions enabledelayedexpansion",
 )
 
 VALID_COMBINED_TILDE_EXAMPLES: Tuple[str, ...] = (
-    "%~dpnx1%",
-    "%~f1%",
-    "%~nx1%",
-    "%~dp0%",
-    "%~z0%",
-    "%~ftza1%",
+    "%~1",
+    "%~dpnx1",
+    "%~f1",
+    "%~nx1",
+    "%~fs1",
+    "%~dp0",
+    "%~z0",
+    "%~ftza1",
+    "%~dp$PATH:1",
 )
 
 INVALID_TILDE_COMBINATION_REASONS: Tuple[str, ...] = (
     "%~ modifiers may not be used with %* (CALL /?)",
-    "Percent-tilde requires parameter 0-9 or single FOR loop letter",
+    "Percent-tilde letter modifiers must be from nxfpdstaz (case-insensitive; CALL /?, FOR /?); the parameter must be 0-9, *, or a path-search $ENV: form",
 )
 
 STRING_SUBSTRING_PATTERN: str = "%var:~start,length%"
