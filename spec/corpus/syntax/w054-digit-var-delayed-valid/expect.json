@@ -1,0 +1,8 @@
+{
+  "description": "Digit-prefixed variable with delayed expansion is valid (W054 must not fire)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W054"],
+  "config": {},
+  "tags": ["syntax", "expansion"]
+}

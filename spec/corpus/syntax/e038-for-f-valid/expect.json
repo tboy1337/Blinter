@@ -1,0 +1,8 @@
+{
+  "description": "Valid FOR /F skip= and tokens= (E038 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E038"],
+  "config": {},
+  "tags": ["syntax"]
+}

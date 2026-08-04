@@ -1,0 +1,10 @@
+{
+  "config": {},
+  "description": "SET /A reading pseudo-env names is valid (W049 must not fire)",
+  "lines": {},
+  "must_not": ["W049"],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

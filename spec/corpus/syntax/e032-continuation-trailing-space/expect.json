@@ -1,0 +1,22 @@
+{
+  "config": {},
+  "description": "e032 continuation trailing space",
+  "lines": {
+    "2": [
+      "E032",
+      "S004"
+    ],
+    "3": [
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E032",
+    "S004",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

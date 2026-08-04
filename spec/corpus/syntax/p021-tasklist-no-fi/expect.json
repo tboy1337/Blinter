@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "p021 tasklist no fi",
+  "lines": {
+    "2": [
+      "P021",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P021",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

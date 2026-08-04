@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "sec001 command injection",
+  "lines": {
+    "2": [
+      "SEC001",
+      "W001",
+      "W014"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "SEC001",
+    "W001",
+    "W014"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

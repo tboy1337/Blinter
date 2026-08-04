@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "e024 invalid modifier combo",
+  "lines": {
+    "2": [
+      "E017",
+      "E024",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E017",
+    "E024",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

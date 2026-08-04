@@ -1,0 +1,1170 @@
+version: 1
+rules:
+- code: E001
+  name: Nested parentheses mismatch
+  severity: ERROR
+  explanation: Batch scripts have improper nesting or mismatched parentheses which will cause syntax errors
+  recommendation: Ensure all opening parentheses have matching closing parentheses and are properly nested
+  checker: regex
+- code: E002
+  name: Missing label for GOTO statement
+  severity: ERROR
+  explanation: GOTO statement points to a label that does not exist, which will cause runtime errors
+  recommendation: Create the missing label or correct the GOTO statement to point to an existing label
+  checker: regex
+- code: E003
+  name: IF statement improper formatting
+  severity: ERROR
+  explanation: IF statement has improper spacing or syntax that will prevent correct execution
+  recommendation: 'Use proper spacing: IF "condition" operator "value" command'
+  checker: regex
+- code: E004
+  name: IF EXIST syntax mixing
+  severity: ERROR
+  explanation: Mixing IF EXIST syntax with comparison operators creates invalid syntax
+  recommendation: Use either 'IF EXIST filename' or 'IF "variable"=="value"' but not both together
+  checker: regex
+- code: E005
+  name: Invalid path syntax
+  severity: ERROR
+  explanation: Path contains invalid characters or exceeds system length limits
+  recommendation: Remove invalid characters (<>|"*?) and ensure path length is under 260 characters
+  checker: regex
+- code: E006
+  name: Potentially undefined variable reference
+  severity: WARNING
+  explanation: Script references variables that were never set in this script. This may be intentional
+    if using environment variables, but could cause runtime errors if the variable is not set by parent
+    process or system
+  recommendation: If this is an environment variable, this warning can be ignored. Otherwise, define the
+    variable using SET before referencing it, or add IF DEFINED checks to handle undefined cases
+  checker: regex
+- code: E007
+  name: Empty variable check syntax error
+  severity: ERROR
+  explanation: Incorrect syntax for checking if variables are empty will cause comparison errors
+  recommendation: 'Use proper syntax: IF "%%VAR%%"=="" for empty variable checks'
+  checker: regex
+- code: E008
+  name: Unreachable code after EXIT or GOTO
+  severity: ERROR
+  explanation: Code after EXIT or GOTO statements will never execute
+  recommendation: Remove unreachable code or restructure script logic
+  checker: regex
+- code: E009
+  name: Mismatched quotes
+  severity: ERROR
+  explanation: Lines with unmatched quotes will cause syntax errors or unexpected behavior
+  recommendation: Ensure all quotes are properly paired and closed
+  checker: regex
+  grammar_nodes:
+  - commandLine
+  - token
+- code: E010
+  name: Malformed FOR loop missing DO
+  severity: ERROR
+  explanation: FOR loops must contain the DO keyword for proper execution
+  recommendation: 'Add DO keyword: FOR %%i IN (items) DO command'
+  checker: regex
+- code: E011
+  name: Invalid variable expansion syntax
+  severity: ERROR
+  explanation: Variable references must use proper %VAR% or !VAR! syntax with matching delimiters
+  recommendation: 'Ensure variables use matching % or ! delimiters: %VAR% for standard, !VAR! for delayed
+    expansion'
+  checker: regex
+  grammar_nodes:
+  - commandLine
+  - token
+- code: E012
+  name: Missing CALL for subroutine invocation
+  severity: ERROR
+  explanation: Subroutines should be invoked using CALL :label_name to ensure proper return handling
+  recommendation: Use CALL :subroutine_name instead of direct label jumps for subroutines
+  checker: regex
+- code: E013
+  name: Invalid command syntax detected
+  severity: ERROR
+  explanation: Command appears to have typos or invalid syntax that will cause execution errors
+  recommendation: 'Check command spelling and syntax: IF not IFF, ECHO not ECKO, FOR not FORx'
+  checker: regex
+- code: E014
+  name: Missing colon in CALL statement
+  severity: ERROR
+  explanation: CALL statements to labels require a colon (unlike GOTO where colon is optional)
+  recommendation: Use CALL :label_name with colon when calling internal subroutines
+  checker: regex
+- code: E015
+  name: Missing colon in GOTO :EOF statement
+  severity: ERROR
+  explanation: GOTO :EOF requires a colon as it's a special built-in construct, not a user-defined label
+  recommendation: Use GOTO :EOF (with colon) to jump to end of file
+  checker: regex
+- code: E016
+  name: Invalid errorlevel comparison syntax
+  severity: ERROR
+  explanation: Invalid syntax in errorlevel comparison will cause script failure
+  recommendation: 'Use proper errorlevel syntax: ''IF ERRORLEVEL n'', ''IF NOT ERRORLEVEL n'', or ''IF
+    %ERRORLEVEL% operator value'''
+  checker: regex
+- code: E017
+  name: Invalid percent-tilde syntax
+  severity: ERROR
+  explanation: Percent-tilde expansion syntax is malformed and will cause errors
+  recommendation: 'Use correct syntax: %~n1 (name), %~f1 (full path), %~d1 (drive), %~p1 (path), %~x1
+    (extension)'
+  checker: regex
+  grammar_nodes:
+  - commandLine
+  - token
+- code: E018
+  name: Unix line endings detected
+  severity: ERROR
+  explanation: Batch file uses Unix line endings (LF-only) which can cause GOTO/CALL label parsing failures
+    and script malfunction due to Windows batch parser 512-byte boundary bugs
+  recommendation: Convert file to Windows line endings (CRLF). Use tools like dos2unix, notepad++, or
+    configure git with 'git config core.autocrlf true'
+  checker: regex
+- code: E019
+  name: Percent-tilde on non-parameter variable
+  severity: ERROR
+  explanation: Percent-tilde syntax only works with command-line parameters (%1-%9) and FOR loop variables
+  recommendation: Use percent-tilde only with %1-%9 parameters or FOR loop variables like %%i
+  checker: regex
+  grammar_nodes:
+  - commandLine
+  - token
+- code: E020
+  name: Invalid FOR loop variable syntax
+  severity: ERROR
+  explanation: FOR loop variables must use %% in batch files and % on command line
+  recommendation: Use %%i in batch files, %i on command line for FOR loop variables
+  checker: regex
+- code: E021
+  name: Invalid string operation syntax
+  severity: ERROR
+  explanation: String operations have incorrect syntax and will fail
+  recommendation: 'Use correct syntax: %var:~start,length% for substring, %var:old=new% for replacement'
+  checker: regex
+- code: E022
+  name: Invalid arithmetic expression in SET /A
+  severity: ERROR
+  explanation: Arithmetic expression contains invalid syntax or operators
+  recommendation: 'Use valid operators: + - * / % & | ^ << >> and proper parentheses'
+  checker: regex
+- code: E023
+  name: Missing quotes in SET /A with special characters
+  severity: ERROR
+  explanation: Special characters in SET /A expressions need quoting to prevent parsing errors
+  recommendation: 'Quote expressions with special chars: SET /A "result=5^2" not SET /A result=5^2'
+  checker: regex
+- code: E024
+  name: Invalid parameter modifier combination
+  severity: ERROR
+  explanation: Parameter modifier contains invalid or non-existent modifiers
+  recommendation: 'Use valid modifiers: %~n1% (name), %~f1% (full path), %~d1% (drive), %~p1% (path),
+    %~x1% (extension), %~s1% (short names), %~a1% (attributes), %~t1% (time), %~z1% (size)'
+  checker: regex
+- code: E025
+  name: Parameter modifier on wrong context
+  severity: ERROR
+  explanation: Parameter modifier used in inappropriate context or with wrong variable type
+  recommendation: Use parameter modifiers only with batch parameters (%1, %2, etc.) or FOR variables (%%i)
+  checker: regex
+- code: E027
+  name: UNC path used as working directory
+  severity: ERROR
+  explanation: UNC paths cannot be used as working directories with CD command
+  recommendation: Use PUSHD \server\share\ ... POPD pattern instead of CD for UNC paths
+  checker: regex
+- code: E028
+  name: Complex quote escaping error
+  severity: ERROR
+  explanation: Complex quote patterns may not be handled correctly by the command interpreter
+  recommendation: Use triple-quote pattern """text""" for quotes within quoted strings, or escape properly
+    with variables
+  checker: regex
+- code: E029
+  name: Complex SET /A expression errors
+  severity: ERROR
+  explanation: Arithmetic expression contains syntax errors or unbalanced operators
+  recommendation: 'Check operator precedence, balance parentheses, and quote complex expressions: SET
+    /A "result=(value1+value2)*3"'
+  checker: regex
+- code: E030
+  name: Improper caret escape sequence
+  severity: ERROR
+  explanation: Caret character requires proper escaping when used as literal text
+  recommendation: 'Use ^^ to display a single caret, or ^^^ to escape special chars: ^^^&'
+  checker: regex
+  grammar_nodes:
+  - commandLine
+  - token
+- code: E031
+  name: Invalid multilevel escaping
+  severity: ERROR
+  explanation: Complex multilevel escaping follows formula 2^n-1 carets for n levels
+  recommendation: 'Use correct caret count: ^ (1 level), ^^^ (2 levels), ^^^^^^^ (3 levels)'
+  checker: regex
+  grammar_nodes:
+  - commandLine
+  - token
+- code: E032
+  name: Continuation character with trailing spaces
+  severity: ERROR
+  explanation: Spaces after caret continuation character prevent line wrapping
+  recommendation: Ensure caret is last character on line with no trailing spaces
+  checker: regex
+  grammar_nodes:
+  - commandLine
+  - token
+- code: E033
+  name: Double percent escaping error
+  severity: ERROR
+  explanation: 'Percent signs in output require double escaping: %% instead of %'
+  recommendation: Use %% in ECHO statements to display single % character
+  checker: regex
+  grammar_nodes:
+  - commandLine
+  - token
+- code: E034
+  name: Removed Windows command detected
+  severity: ERROR
+  explanation: Command has been completely removed from Windows and will not execute. These commands are
+    no longer available in modern Windows versions and will cause script failures
+  recommendation: 'Replace removed commands with modern alternatives: CASPOL (removed - use Code Access
+    Security Policy Tool from SDK), DISKCOMP (removed - use FC for file comparison), APPEND (removed -
+    modify PATH or use full paths), BROWSTAT (removed - use NET VIEW or PowerShell), INUSE (removed -
+    use HANDLE.EXE from Sysinternals), NET PRINT (removed - use PowerShell Print cmdlets), DISKCOPY (removed
+    - use ROBOCOPY or XCOPY), STREAMS (removed - use Get-Item -Stream in PowerShell)'
+  checker: regex
+- code: E035
+  name: Smart quote characters in batch source
+  severity: ERROR
+  explanation: Curly/smart quotation marks from word processors are not valid batch string delimiters
+  recommendation: Replace Unicode curly quotes (U+201C/U+201D) with straight ASCII double quotes
+  checker: regex
+  examples:
+    bad:
+      - 'echo “hello”'
+    good:
+      - 'echo "hello"'
+- code: E036
+  name: IF EXISTS typo
+  severity: ERROR
+  explanation: cmd.exe accepts IF EXIST, not IF EXISTS; the trailing S causes a syntax error at runtime
+  recommendation: Use IF EXIST filename or IF NOT EXIST filename per IF /?
+  checker: regex
+  examples:
+    bad:
+      - IF EXISTS file.txt echo found
+      - IF NOT EXISTS file.txt echo missing
+    good:
+      - IF EXIST file.txt echo found
+      - IF NOT EXIST file.txt echo missing
+- code: E037
+  name: FOR /F eol option has multiple characters
+  severity: ERROR
+  explanation: The FOR /F eol= option accepts only a single end-of-line comment character per FOR /?; additional characters cause a cmd.exe syntax error
+  recommendation: Use eol= with exactly one character (for example eol=; or eol=#)
+  checker: regex
+  examples:
+    bad:
+      - for /f "eol=XY tokens=1" %%a in (data.txt) do echo %%a
+    good:
+      - for /f "eol=; tokens=1" %%a in (data.txt) do echo %%a
+- code: E038
+  name: FOR /F invalid skip or tokens suboption
+  severity: ERROR
+  explanation: FOR /F skip= must be a positive integer (1 or greater) and tokens= ranges must be ascending per FOR /?; invalid values cause cmd.exe syntax errors at parse time
+  recommendation: Use skip=1 or higher for header lines; use ascending token ranges such as tokens=1-5 or tokens=2,4
+  checker: regex
+  examples:
+    bad:
+      - for /f "skip=0 tokens=1" %%a in (data.txt) do echo %%a
+      - for /f "skip=abc tokens=1" %%a in (data.txt) do echo %%a
+      - for /f "tokens=5-2" %%a in ("a b") do echo %%a
+    good:
+      - for /f "skip=1 tokens=1" %%a in (data.txt) do echo %%a
+      - for /f "tokens=1-5" %%a in (data.txt) do echo %%a
+- code: E039
+  name: IF block parenthesis must be on same line
+  severity: ERROR
+  explanation: In cmd.exe the open parenthesis of an IF block must appear on the same line as the IF condition; placing it on the next line causes a syntax error
+  recommendation: Put the opening parenthesis on the IF line, for example IF 1==1 (echo ok)
+  checker: regex
+  examples:
+    bad:
+      - |-
+        if 1==1
+        (echo bad)
+    good:
+      - if 1==1 (echo ok)
+- code: E040
+  name: FOR block parenthesis must be on same line as DO
+  severity: ERROR
+  explanation: In cmd.exe the open parenthesis of a FOR block must appear on the same line as the DO keyword; placing it on the next line causes a syntax error
+  recommendation: Put the opening parenthesis on the FOR line after DO, for example FOR %%a IN (1) DO (echo ok)
+  checker: regex
+  examples:
+    bad:
+      - |-
+        for %%a in (1) do
+        (echo bad)
+    good:
+      - for %%a in (1) do (echo ok)
+- code: E041
+  name: SET /P missing variable assignment
+  severity: ERROR
+  explanation: SET /P requires variable=[promptString] per SET /?; a prompt-only quoted string without a variable name causes a cmd.exe syntax error
+  recommendation: Use SET /P var=Prompt or SET /P "var=Prompt text" before reading user input
+  checker: regex
+  examples:
+    bad:
+      - 'set /p "Enter your name: "'
+    good:
+      - set /p name=Enter your name
+      - 'set /p "name=Enter your name: "'
+- code: P001
+  name: Redundant file existence check
+  severity: PERFORMANCE
+  explanation: Unnecessary repeated file existence checks reduce script performance
+  recommendation: Combine existence checks or store result in variable for reuse
+  checker: regex
+- code: P002
+  name: Code duplication detected
+  severity: PERFORMANCE
+  explanation: Repeated code blocks should be refactored into subroutines for better maintainability
+  recommendation: Create subroutines using CALL :function_name for repeated code
+  checker: regex
+- code: P003
+  name: Unnecessary SETLOCAL
+  severity: PERFORMANCE
+  explanation: SETLOCAL is not needed if there are no SET commands in the script
+  recommendation: Remove SETLOCAL if no local variables are set
+  checker: regex
+- code: P004
+  name: Unnecessary ENABLEDELAYEDEXPANSION
+  severity: PERFORMANCE
+  explanation: ENABLEDELAYEDEXPANSION is not needed if no !VARIABLES! are used
+  recommendation: Remove ENABLEDELAYEDEXPANSION if delayed expansion is not used
+  checker: regex
+- code: P005
+  name: ENDLOCAL without SETLOCAL
+  severity: PERFORMANCE
+  explanation: ENDLOCAL is not needed without a corresponding SETLOCAL
+  recommendation: Remove unnecessary ENDLOCAL commands
+  checker: regex
+- code: P006
+  name: Missing ENDLOCAL before exit
+  severity: PERFORMANCE
+  explanation: SETLOCAL should be paired with ENDLOCAL before every exit point
+  recommendation: Add ENDLOCAL before all EXIT statements when SETLOCAL is used
+  checker: regex
+- code: P007
+  name: Temporary file without random name
+  severity: PERFORMANCE
+  explanation: Temporary files should use %%RANDOM%% to prevent file collisions
+  recommendation: 'Use %%RANDOM%% in temporary filenames: temp_%%RANDOM%%.txt'
+  checker: regex
+- code: P008
+  name: Delayed expansion without enablement
+  severity: PERFORMANCE
+  explanation: Using !VARIABLES! requires SETLOCAL ENABLEDELAYEDEXPANSION for proper functionality
+  recommendation: Add SETLOCAL ENABLEDELAYEDEXPANSION before using !variable! syntax
+  checker: regex
+- code: P009
+  name: Inefficient FOR loop pattern
+  severity: PERFORMANCE
+  explanation: FOR /F defaults to tokens=1; when the entire line is needed, omitting tokens=* parses only the first token
+  recommendation: 'Use ''tokens=*'' when the whole line is required: FOR /F "tokens=*" %%i'
+  checker: regex
+- code: P010
+  name: DIR without /B when output is processed
+  severity: PERFORMANCE
+  explanation: DIR without /B produces verbose multi-column output that is inefficient to parse when redirected or piped
+  recommendation: 'Use DIR /B for bare filename output when piping or redirecting: DIR /B | findstr txt'
+  checker: regex
+- code: P012
+  name: Inefficient string operations
+  severity: PERFORMANCE
+  explanation: Multiple string operations on same variable can be combined
+  recommendation: 'Combine operations: %var:~0,5:old=new% instead of multiple assignments'
+  checker: regex
+- code: P013
+  name: Missing /B flag for large DIR operations
+  severity: PERFORMANCE
+  explanation: DIR without /B produces verbose output that may be inefficient
+  recommendation: Use DIR /B for bare format when only filenames are needed
+  checker: regex
+- code: P014
+  name: Unnecessary command output
+  severity: PERFORMANCE
+  explanation: Commands producing unwanted output should be redirected to improve performance
+  recommendation: 'Redirect unwanted output: command >nul 2>&1'
+  checker: regex
+- code: P015
+  name: Inefficient delay implementation
+  severity: PERFORMANCE
+  explanation: Using ping localhost or choice for delays is inefficient on modern Windows
+  recommendation: Use TIMEOUT command for Vista+ or implement proper delay alternatives for older systems
+  checker: regex
+- code: P016
+  name: Inefficient string concatenation in loops
+  severity: PERFORMANCE
+  explanation: String concatenation inside loops creates performance bottlenecks
+  recommendation: Use arrays or temporary files for large string operations in loops
+  checker: regex
+- code: P017
+  name: Repeated file existence checks
+  severity: PERFORMANCE
+  explanation: Multiple IF EXIST checks on the same file waste I/O operations
+  recommendation: Store file existence result in variable for reuse
+  checker: regex
+- code: P018
+  name: Inefficient directory traversal
+  severity: PERFORMANCE
+  explanation: FOR /R without specific file masks processes unnecessary files
+  recommendation: Use specific file masks in FOR /R to reduce processing overhead
+  checker: regex
+- code: P019
+  name: Excessive variable expansion in loops
+  severity: PERFORMANCE
+  explanation: Complex variable expansion inside tight loops impacts performance
+  recommendation: Pre-calculate complex variables before loop entry
+  checker: regex
+- code: P020
+  name: Redundant command echoing suppression
+  severity: PERFORMANCE
+  explanation: Multiple @ECHO OFF commands or redundant @ prefixes waste processing
+  recommendation: Use single @ECHO OFF at script start, avoid @ on subsequent commands
+  checker: regex
+- code: P021
+  name: Inefficient process checking pattern
+  severity: PERFORMANCE
+  explanation: Repeated TASKLIST calls without filters are resource-intensive
+  recommendation: Use TASKLIST /FI filters to reduce output and processing time
+  checker: regex
+- code: P022
+  name: Unnecessary output redirection in loops
+  severity: PERFORMANCE
+  explanation: Redirecting output inside loops creates I/O overhead
+  recommendation: Collect output in variable and redirect once after loop completion
+  checker: regex
+- code: P023
+  name: Inefficient arithmetic operations
+  severity: PERFORMANCE
+  explanation: Complex arithmetic in SET /A can be optimized with intermediate variables
+  recommendation: Break complex expressions into steps with intermediate variables
+  checker: regex
+- code: P024
+  name: Redundant SETLOCAL/ENDLOCAL pairs
+  severity: PERFORMANCE
+  explanation: Multiple SETLOCAL/ENDLOCAL pairs create unnecessary scope overhead
+  recommendation: Use single SETLOCAL at script start with ENDLOCAL at end
+  checker: regex
+- code: P025
+  name: Inefficient wildcard usage in file operations
+  severity: PERFORMANCE
+  explanation: Overly broad wildcards (*.*) process unnecessary files
+  recommendation: 'Use specific file extensions: *.txt instead of *.*'
+  checker: regex
+- code: P026
+  name: Redundant DISABLEDELAYEDEXPANSION
+  severity: PERFORMANCE
+  explanation: Delayed expansion is disabled by default in batch scripts, so explicit disablement is usually
+    redundant unless ensuring a known state from parent scripts or protecting literal ! characters
+  recommendation: 'Remove unless: 1) After ENDLOCAL (toggling pattern), 2) Protecting literal ! in strings,
+    or 3) Defensive programming at script start'
+  checker: regex
+- code: P027
+  name: SETLOCAL nesting exceeds recommended depth
+  severity: PERFORMANCE
+  explanation: cmd.exe supports at most 32 nested SETLOCAL scopes; deep nesting risks runtime failure
+  recommendation: Flatten scope with fewer SETLOCAL/ENDLOCAL pairs or refactor into subroutines
+  checker: regex
+- code: S001
+  name: Missing @ECHO OFF at file start
+  severity: STYLE
+  explanation: Batch scripts usually start with @ECHO OFF to prevent command echoing during execution
+  recommendation: Add '@ECHO OFF' as the first line of your script
+  checker: regex
+- code: S002
+  name: ECHO OFF without @ prefix
+  severity: STYLE
+  explanation: ECHO OFF should use @ prefix to prevent the command itself from being displayed
+  recommendation: Use '@ECHO OFF' instead of 'ECHO OFF'
+  checker: regex
+- code: S003
+  name: Inconsistent command capitalization
+  severity: STYLE
+  explanation: Batch commands should follow consistent casing conventions within the same file for readability
+  recommendation: Use consistent casing for batch commands throughout the file (either uppercase or lowercase)
+  checker: regex
+- code: S004
+  name: Trailing whitespace
+  severity: STYLE
+  explanation: Trailing spaces at line end can cause subtle errors and should be removed
+  recommendation: Remove trailing spaces and tabs from line endings
+  checker: regex
+- code: S005
+  name: Mixed line endings
+  severity: STYLE
+  explanation: File contains mixed line ending types (CRLF and LF) which can cause parsing inconsistencies
+  recommendation: Use consistent CRLF line endings throughout the file for Windows batch files
+  checker: regex
+- code: S007
+  name: BAT extension used instead of CMD for newer Windows
+  severity: STYLE
+  explanation: The .cmd file extension is recommended over .bat for Windows NT and newer versions (Windows
+    2000+). CMD files support additional features and have better error handling in newer Windows environments
+  recommendation: Consider renaming .bat files to .cmd for scripts intended for Windows 2000 and newer
+    versions. CMD files provide better compatibility with modern Windows features and improved error reporting
+  checker: regex
+- code: S008
+  name: Missing comments for complex code
+  severity: STYLE
+  explanation: Complex sections should have comments explaining their purpose
+  recommendation: Add REM comments to explain complex logic and operations
+  checker: regex
+- code: S009
+  name: Magic numbers used
+  severity: STYLE
+  explanation: Hardcoded numeric values should be defined as named variables
+  recommendation: Define constants using SET before using numeric values
+  checker: regex
+- code: S010
+  name: Dead code detected
+  severity: STYLE
+  explanation: Unused labels or unreferenced subroutines make code harder to maintain
+  recommendation: Remove unused labels and unreferenced code sections
+  checker: regex
+- code: S011
+  name: Line exceeds maximum length
+  severity: STYLE
+  explanation: Lines longer than 100 characters are hard to read and maintain
+  recommendation: Break long lines into multiple shorter lines for better readability
+  checker: regex
+- code: S012
+  name: Inconsistent indentation
+  severity: STYLE
+  explanation: Inconsistent indentation makes code harder to read and maintain
+  recommendation: Use consistent indentation (4 spaces or 1 tab) for nested blocks
+  checker: regex
+- code: S013
+  name: Missing file header documentation
+  severity: STYLE
+  explanation: Scripts should include header documentation for maintainability
+  recommendation: Add REM comments at the top describing script purpose, author and date
+  checker: regex
+- code: S014
+  name: Long parameter list affects readability
+  severity: STYLE
+  explanation: Functions with many parameters are hard to read and maintain
+  recommendation: Group related parameters into variables or reduce parameter count
+  checker: regex
+- code: S015
+  name: Inconsistent colon usage in GOTO statements
+  severity: STYLE
+  explanation: GOTO statements should use consistent colon style throughout the script for better readability
+  recommendation: Choose either 'GOTO label' or 'GOTO :label' style and use consistently throughout the
+    script
+  checker: regex
+- code: S016
+  name: Potentially unsafe double-colon comment
+  severity: STYLE
+  explanation: Double-colon comments (::) may be misinterpreted as labels when using non-CRLF line endings
+    due to batch parser buffer alignment issues
+  recommendation: Use 'REM' for comments instead of '::' for maximum compatibility, or ensure CRLF line
+    endings are used throughout the file
+  checker: regex
+- code: S017
+  name: Inconsistent variable naming convention
+  severity: STYLE
+  explanation: Variable names should follow consistent naming conventions
+  recommendation: 'Use consistent case and naming: UPPERCASE for globals, lowercase for locals'
+  checker: regex
+- code: S018
+  name: Missing subroutine documentation
+  severity: STYLE
+  explanation: Subroutines (callable labels) should have documentation comments explaining their purpose,
+    parameters, and return behavior
+  recommendation: Add REM comments before subroutines describing what they do, parameters, and return
+    values
+  checker: regex
+- code: S019
+  name: Magic numbers in code
+  severity: STYLE
+  explanation: Numeric literals should be replaced with named constants for clarity
+  recommendation: 'Define constants: SET MAX_RETRIES=3 instead of using raw numbers'
+  checker: regex
+- code: S020
+  name: Long line without continuation
+  severity: STYLE
+  explanation: Very long lines reduce readability and should be split
+  recommendation: 'Use ^ for line continuation: command parameter1 ^ parameter2 ^ parameter3'
+  checker: regex
+- code: S022
+  name: Inconsistent variable naming convention
+  severity: STYLE
+  explanation: Variables should follow consistent naming conventions
+  recommendation: Choose one naming convention and apply it consistently throughout script
+  checker: regex
+- code: S023
+  name: Magic timeout values without explanation
+  severity: STYLE
+  explanation: Hard-coded timeout values should be documented or made configurable
+  recommendation: 'Use variables for timeout values: SET waitTime=30'
+  checker: regex
+- code: S024
+  name: Complex one-liner should be split
+  severity: STYLE
+  explanation: Complex commands spanning multiple operations should be split for readability
+  recommendation: Use continuation character ^ or separate commands for complex operations
+  checker: regex
+- code: S026
+  name: Inconsistent continuation character usage
+  severity: STYLE
+  explanation: Continuation characters should be used consistently for line wrapping
+  recommendation: Use ^ consistently for line continuation and align parameters vertically
+  checker: regex
+- code: S027
+  name: Missing blank lines around code blocks
+  severity: STYLE
+  explanation: Code blocks should be separated by blank lines for better readability
+  recommendation: Add blank lines before and after major code sections and subroutines
+  checker: regex
+- code: S028
+  name: Redundant parentheses in simple commands
+  severity: STYLE
+  explanation: Simple single commands don't need parentheses for code blocks
+  recommendation: 'Remove parentheses for single commands: IF condition command'
+  checker: regex
+- code: SEC001
+  name: Potential command injection vulnerability
+  severity: SECURITY
+  explanation: User input used in commands without validation could allow malicious code execution
+  recommendation: Validate and sanitize all user input before using in commands
+  checker: regex
+- code: SEC002
+  name: Unsafe SET command usage
+  severity: SECURITY
+  explanation: SET commands without proper validation or quoting can cause security issues
+  recommendation: 'Always quote SET values and validate input: SET "var=safe value"'
+  checker: regex
+- code: SEC003
+  name: Dangerous command without confirmation
+  severity: SECURITY
+  explanation: Destructive commands should require user confirmation to prevent accidental execution
+  recommendation: Add confirmation prompts before destructive operations
+  checker: regex
+- code: SEC004
+  name: Dangerous registry operation
+  severity: SECURITY
+  explanation: Registry modifications can damage system functionality and should be carefully reviewed
+  recommendation: Backup registry before modifications and use specific keys rather than broad deletions
+  checker: regex
+- code: SEC005
+  name: Missing privilege check
+  severity: SECURITY
+  explanation: Operations requiring admin rights should check for proper privileges
+  recommendation: Use NET SESSION >nul 2>&1 to check for administrator privileges
+  checker: regex
+- code: SEC006
+  name: Hardcoded absolute path
+  severity: STYLE
+  explanation: Hardcoded absolute paths may not exist on other systems, reducing script portability. This
+    is a portability concern, not a security issue
+  recommendation: Use environment variables like %USERPROFILE%, %PROGRAMFILES%, etc. instead of hardcoded
+    paths for better portability across different systems
+  checker: regex
+- code: SEC007
+  name: Hardcoded temporary directory
+  severity: SECURITY
+  explanation: Hardcoded temp paths may not exist and could create security vulnerabilities
+  recommendation: Use %%TEMP%% environment variable instead of hardcoded temporary paths
+  checker: regex
+- code: SEC008
+  name: Plain text credentials detected
+  severity: SECURITY
+  explanation: Hardcoded passwords and credentials in scripts pose serious security risks
+  recommendation: Use secure credential storage or prompt for credentials at runtime
+  checker: regex
+- code: SEC009
+  name: PowerShell execution policy bypass
+  severity: SECURITY
+  explanation: Bypassing PowerShell execution policy can allow malicious scripts to run
+  recommendation: Avoid using -ExecutionPolicy Bypass unless absolutely necessary
+  checker: regex
+- code: SEC010
+  name: Sensitive information in ECHO output
+  severity: SECURITY
+  explanation: ECHO statements may display sensitive information in console or log files
+  recommendation: Avoid echoing passwords, API keys, or other sensitive data
+  checker: regex
+- code: SEC011
+  name: Unvalidated path traversal
+  severity: SECURITY
+  explanation: Path operations may allow directory traversal attacks with .. sequences
+  recommendation: Validate paths and remove .. sequences before file operations
+  checker: regex
+- code: SEC012
+  name: Unsafe temporary file creation
+  severity: SECURITY
+  explanation: Temporary files created predictably may be security vulnerabilities
+  recommendation: Use %RANDOM% in temp file names or check file existence before creation
+  checker: regex
+- code: SEC013
+  name: Command injection via variable substitution
+  severity: SECURITY
+  explanation: Variables containing user input used in commands may allow code injection
+  recommendation: Validate and sanitize variables before use in command execution
+  checker: regex
+- code: SEC014
+  name: Unescaped user input in command execution
+  severity: SECURITY
+  explanation: User input containing special characters can break command execution
+  recommendation: 'Escape special characters in user input: ^&, ^|, ^>, ^<, ^^'
+  checker: regex
+- code: SEC015
+  name: Process killing without authentication
+  severity: SECURITY
+  explanation: TASKKILL commands can terminate system processes without proper checks
+  recommendation: Add process ownership and permission checks before killing processes
+  checker: regex
+- code: SEC016
+  name: Automatic restart without failure limits
+  severity: SECURITY
+  explanation: Unlimited restart attempts can mask security issues or resource exhaustion
+  recommendation: Implement maximum restart attempts (3-5) with exponential backoff
+  checker: regex
+- code: SEC017
+  name: Temporary file creation in predictable location
+  severity: SECURITY
+  explanation: Predictable temp file names are vulnerable to race conditions and hijacking
+  recommendation: 'Use %RANDOM% or timestamp in temp file names: temp_%RANDOM%.tmp'
+  checker: regex
+- code: SEC018
+  name: Command output redirection to insecure location
+  severity: SECURITY
+  explanation: Redirecting sensitive output to world-readable locations exposes information
+  recommendation: Redirect to secure user directories or use appropriate file permissions
+  checker: regex
+- code: SEC019
+  name: Batch self-modification vulnerability
+  severity: SECURITY
+  explanation: Scripts that modify themselves can be exploited to execute malicious code
+  recommendation: Avoid self-modifying scripts or validate all modifications carefully
+  checker: regex
+- code: SEC020
+  name: UNC path without UAC elevation check
+  severity: SECURITY
+  explanation: UNC path operations may fail under UAC without proper elevation checks
+  recommendation: Check for administrator privileges before UNC operations using NET SESSION
+  checker: regex
+- code: SEC021
+  name: Fork bomb pattern detected
+  severity: SECURITY
+  explanation: Recursive self-execution patterns can crash the system
+  recommendation: Remove fork bomb patterns that recursively start copies of the script
+  checker: regex
+- code: SEC022
+  name: Potential hosts file modification
+  severity: SECURITY
+  explanation: Modifying the hosts file can redirect DNS for malicious purposes
+  recommendation: Avoid hosts file modification or require explicit administrator confirmation
+  checker: regex
+- code: SEC023
+  name: Autorun.inf creation detected
+  severity: SECURITY
+  explanation: Creating autorun.inf files is a common malware vector
+  recommendation: Remove autorun.inf creation - this is blocked on modern Windows
+  checker: regex
+- code: SEC024
+  name: Batch file copying itself to removable media
+  severity: SECURITY
+  explanation: Self-replicating batch files exhibit virus-like behavior
+  recommendation: Remove self-copying logic or limit to specific controlled directories
+  checker: regex
+- code: W001
+  name: Missing exit code
+  severity: WARNING
+  explanation: Script doesn't set appropriate exit codes to indicate success or failure
+  recommendation: Add EXIT /b 0 for success or EXIT /b 1 for errors at script end
+  checker: regex
+- code: W002
+  name: Missing ERRORLEVEL check
+  severity: WARNING
+  explanation: Critical operations should check %%ERRORLEVEL%% to handle failures properly
+  recommendation: Add IF ERRORLEVEL 1 checks after operations that might fail
+  checker: regex
+- code: W003
+  name: Operation without error handling
+  severity: WARNING
+  explanation: Operations that commonly fail lack proper error checking
+  recommendation: Add error checking and appropriate responses for failed operations
+  checker: regex
+- code: W004
+  name: Potential infinite loop
+  severity: WARNING
+  explanation: Loop construct may run infinitely without proper exit conditions
+  recommendation: Add counter variables or proper exit conditions to prevent infinite loops
+  checker: regex
+- code: W005
+  name: Unquoted variable with spaces
+  severity: WARNING
+  explanation: Variables that may contain spaces should be quoted to prevent parsing errors
+  recommendation: 'Use quotes around variables: IF "%%VARIABLE%%"=="value"'
+  checker: regex
+- code: W006
+  name: Network operation without timeout
+  severity: WARNING
+  explanation: Network operations may hang indefinitely without proper timeout settings
+  recommendation: Add timeout parameters to network commands like PING -n 4
+  checker: regex
+- code: W007
+  name: File operation on potentially locked file
+  severity: WARNING
+  explanation: Operations on files that may be in use by other programs can fail
+  recommendation: Check if applications are using the file before attempting operations
+  checker: regex
+- code: W008
+  name: Permanent PATH modification
+  severity: WARNING
+  explanation: SETX modifies PATH permanently, which may not be desired
+  recommendation: Use SET for temporary changes or confirm permanent changes are intended
+  checker: regex
+- code: W009
+  name: Windows version compatibility
+  severity: WARNING
+  explanation: Command may not be available in older Windows versions
+  recommendation: Use version checks or provide alternative commands for older Windows
+  checker: regex
+- code: W010
+  name: Architecture-specific operation
+  severity: WARNING
+  explanation: Operation is specific to 32-bit or 64-bit architecture
+  recommendation: Add architecture detection and appropriate handling for both architectures
+  checker: regex
+- code: W011
+  name: Unicode handling issue
+  severity: WARNING
+  explanation: 'Command contains non-ASCII characters or complex operations that may not handle Unicode
+    properly. Note: Only flags lines with actual Unicode content or unsafe operations, not all echo/type/find
+    commands'
+  recommendation: Consider using commands with better Unicode support, or ensure proper code page (chcp
+    65001 for UTF-8)
+  checker: regex
+- code: W012
+  name: Non-ASCII characters detected
+  severity: WARNING
+  explanation: Non-ASCII characters may cause issues in some environments
+  recommendation: Use ASCII-only characters or ensure proper encoding handling
+  checker: regex
+- code: W013
+  name: Duplicate label
+  severity: WARNING
+  explanation: Multiple labels with the same name can cause unpredictable GOTO behavior
+  recommendation: Rename duplicate labels to have unique names
+  checker: regex
+- code: W014
+  name: Missing PAUSE for user interaction
+  severity: WARNING
+  explanation: Interactive scripts should include PAUSE to prevent window from closing immediately
+  recommendation: Add PAUSE before EXIT to allow user to see script output
+  checker: regex
+- code: W017
+  name: Errorlevel comparison semantic difference
+  severity: WARNING
+  explanation: IF %ERRORLEVEL% NEQ 1 has different behavior than IF NOT ERRORLEVEL 1 - NEQ 1 matches any
+    value except 1 (0,2,3...), while NOT ERRORLEVEL 1 only matches values less than 1 (i.e., 0).
+    IF NOT ERRORLEVEL 0 matches only negative exit codes (NOT >= 0), not general failure.
+  recommendation: Use 'IF NOT ERRORLEVEL 1' for traditional success checks, 'IF %ERRORLEVEL% NEQ 0'
+    or 'IF %ERRORLEVEL% EQU 0' for explicit comparisons, and avoid 'IF NOT ERRORLEVEL 0' unless
+    negative exit codes are intended
+  checker: regex
+- code: W018
+  name: Multi-byte characters with potential line ending risks
+  severity: WARNING
+  explanation: Multi-byte UTF-8 characters combined with non-CRLF line endings can cause buffer parsing
+    errors in batch files due to parser boundary misalignment
+  recommendation: Either remove non-ASCII characters OR ensure file uses CRLF line endings. Consider using
+    ASCII alternatives or environment variables for special characters
+  checker: regex
+- code: W019
+  name: GOTO/CALL with potential line ending risks
+  severity: WARNING
+  explanation: GOTO and CALL statements may fail to find labels when file uses Unix line endings, especially
+    near 512-byte boundaries due to Windows batch parser bugs
+  recommendation: Ensure file uses CRLF line endings, or duplicate critical labels as a workaround
+  checker: regex
+- code: W020
+  name: FOR loop missing /F options for complex parsing
+  severity: WARNING
+  explanation: FOR /F should specify tokens and delims options for reliable parsing
+  recommendation: 'Use explicit options: FOR /F "tokens=1,2 delims=," instead of default behavior'
+  checker: regex
+- code: W021
+  name: IF comparison without quotes
+  severity: WARNING
+  explanation: IF comparisons should be quoted to handle spaces and special characters
+  recommendation: 'Use quotes: IF "%var%"=="value" instead of IF %var%==value'
+  checker: regex
+- code: W022
+  name: Missing SETLOCAL EnableDelayedExpansion
+  severity: WARNING
+  explanation: Scripts using !var! syntax should enable delayed expansion
+  recommendation: Add SETLOCAL EnableDelayedExpansion at script start when using !var! expansion
+  checker: regex
+- code: W023
+  name: Inefficient nested FOR loops
+  severity: WARNING
+  explanation: Nested FOR loops can be performance bottlenecks with large data sets
+  recommendation: Consider alternative approaches or add progress indicators for large loops
+  checker: regex
+- code: W024
+  name: Deprecated command detected
+  severity: WARNING
+  explanation: Command is deprecated in modern Windows versions and may not be available in future releases
+    or may have reduced functionality
+  recommendation: 'Replace with modern equivalent: WMIC->PowerShell WMI cmdlets (Get-WmiObject/Get-CimInstance),
+    CACLS->ICACLS, WINRM->PowerShell Remoting (Enter-PSSession/Invoke-Command), BITSADMIN->PowerShell
+    BitsTransfer module, NBTSTAT->Get-NetAdapter PowerShell cmdlets, DPATH->modify PATH environment variable,
+    KEYS->use CHOICE or SET /P, NET SEND->MSG, AT->SCHTASKS. Note: XCOPY itself is NOT deprecated, but
+    ROBOCOPY is recommended for advanced scenarios with better features'
+  checker: regex
+- code: W025
+  name: Missing error handling
+  severity: WARNING
+  explanation: Command may produce errors that should be checked
+  recommendation: 'Add error checking: IF ERRORLEVEL 1 to handle failures. Only use 2>nul if you genuinely
+    want to ignore expected errors'
+  checker: regex
+- code: W026
+  name: Inefficient parameter modifier usage
+  severity: WARNING
+  explanation: Multiple separate parameter modifiers can be combined for efficiency
+  recommendation: 'Use combined modifiers: %~dpnx1% instead of %~d1%%~p1%%~n1%%~x1%'
+  checker: regex
+- code: W027
+  name: Command behavior differs between interpreters
+  severity: WARNING
+  explanation: Command behaves differently in COMMAND.COM vs cmd.exe environments
+  recommendation: Test behavior in target environment or use interpreter-specific alternatives
+  checker: regex
+- code: W028
+  name: Errorlevel handling difference between .bat/.cmd
+  severity: WARNING
+  explanation: Commands like APPEND, DPATH, FTYPE, SET, PATH, ASSOC handle errorlevel differently in .bat
+    vs .cmd files
+  recommendation: Use .cmd extension for consistent errorlevel behavior with these commands
+  checker: regex
+- code: W029
+  name: 16-bit command in 64-bit context
+  severity: WARNING
+  explanation: 16-bit .COM files may not work in 64-bit Windows environments
+  recommendation: Use 32-bit or 64-bit alternatives, or ensure 32-bit compatibility layer is available
+  checker: regex
+- code: W030
+  name: Non-ASCII characters may cause encoding issues
+  severity: WARNING
+  explanation: Characters outside Code Page 437 range may cause display or processing issues
+  recommendation: Use ASCII characters only, or use @CHCP command to set appropriate code page
+  checker: regex
+- code: W031
+  name: Unicode filename in batch operation
+  severity: WARNING
+  explanation: Files with Unicode names may not work correctly in batch operations
+  recommendation: Use cmd /U for Unicode support or rename files to use ASCII characters
+  checker: regex
+- code: W032
+  name: Missing character set declaration
+  severity: WARNING
+  explanation: Batch file uses non-ASCII characters without explicit character set declaration
+  recommendation: Add @CHCP 65001 for UTF-8 or appropriate code page at start of script
+  checker: regex
+- code: W033
+  name: Command execution may be ambiguous
+  severity: WARNING
+  explanation: Multiple files with same name but different extensions may cause ambiguous execution
+  recommendation: Use explicit file extensions in CALL statements and verify PATHEXT order
+  checker: regex
+- code: W034
+  name: FOR /F missing usebackq option
+  severity: WARNING
+  explanation: usebackq option allows quoted filenames and command execution with backticks
+  recommendation: Use FOR /F "usebackq" when file names contain spaces or executing commands
+  checker: regex
+- code: W035
+  name: FOR /F tokenizing without proper delimiters
+  severity: WARNING
+  explanation: Default space/tab delimiters may not match your data format
+  recommendation: 'Specify explicit delims= option: FOR /F "delims=," for CSV data'
+  checker: regex
+- code: W036
+  name: FOR /F missing skip option for headers
+  severity: WARNING
+  explanation: Files with header rows should use skip= option to avoid processing headers
+  recommendation: Add skip=1 or appropriate number to skip header rows
+  checker: regex
+- code: W037
+  name: FOR /F missing eol option for comments
+  severity: WARNING
+  explanation: Files with comment lines should specify end-of-line comment character
+  recommendation: Use eol=# or appropriate character to ignore comment lines
+  checker: regex
+- code: W038
+  name: FOR /R with literal filename
+  severity: WARNING
+  explanation: FOR /R with a literal filename (no wildcards) matches only that exact name during recursion
+  recommendation: 'Consider wildcards to broaden matching: FOR /R %%f IN (readme*.txt)'
+  checker: regex
+- code: W039
+  name: Nested FOR loops without call optimization
+  severity: WARNING
+  explanation: Complex nested FOR loops should use CALL :subroutine for maintainability
+  recommendation: Move inner loop logic to separate subroutine using CALL :label
+  checker: regex
+- code: W040
+  name: Nested FOR loop variable reuse
+  severity: WARNING
+  explanation: Reusing the same FOR loop variable name in nested FOR loops can cause confusing scope behavior
+  recommendation: Use distinct variable names in nested FOR loops (e.g. %%i and %%j)
+  checker: regex
+- code: W042
+  name: Timeout command without /NOBREAK option
+  severity: WARNING
+  explanation: TIMEOUT allows user interruption unless /NOBREAK is specified
+  recommendation: Use TIMEOUT /T seconds /NOBREAK >NUL for uninterruptible delays
+  checker: regex
+- code: W043
+  name: Process management without proper verification
+  severity: WARNING
+  explanation: TASKKILL and TASKLIST commands should verify process existence first
+  recommendation: Use TASKLIST /FI to check process before TASKKILL operations
+  checker: regex
+- code: W044
+  name: SET command spacing around equals
+  severity: WARNING
+  explanation: Spaces around the equals sign in SET create a variable name that includes trailing or leading spaces
+  recommendation: 'Use SET var=value with no spaces around ='
+  checker: regex
+  examples:
+    bad:
+      - 'set X = Hello'
+    good:
+      - 'set X=Hello'
+- code: W045
+  name: SET /A leading zero octal literal
+  severity: WARNING
+  explanation: Numeric literals with leading zeros are interpreted as octal in SET /A
+  recommendation: Remove leading zeros or use explicit base notation for clarity
+  checker: regex
+- code: W046
+  name: Unquoted IF numeric comparison ambiguity
+  severity: WARNING
+  explanation: Unquoted numeric IF comparisons use numeric semantics where 000 equals 0, unlike quoted string compares
+  recommendation: 'Quote both sides for string semantics: IF "%var%"=="000"'
+  checker: regex
+- code: W047
+  name: Substring expansion on empty variable
+  severity: WARNING
+  explanation: Substring syntax on an empty or unset variable expands literally (e.g. %var:~0,1% becomes ~0,1)
+  recommendation: Use IF DEFINED or quote checks before substring operations
+  checker: regex
+- code: W048
+  name: FOR /F may skip empty delimited fields
+  severity: WARNING
+  explanation: Consecutive delimiters in FOR /F produce empty tokens that are skipped by default (CSV middle-field loss)
+  recommendation: Use honoring-nulls technique or explicit token parsing when empty fields matter
+  checker: regex
+- code: W049
+  name: Assignment to pseudo-environment variable
+  severity: WARNING
+  explanation: Dynamic pseudo-environment variables such as ERRORLEVEL and RANDOM are maintained by cmd.exe; assigning with SET or SET /A shadows the dynamic value and breaks expected runtime semantics
+  recommendation: Use a normal variable name instead of ERRORLEVEL, RANDOM, CD, DATE, TIME, CMDCMDLINE, CMDEXTVERSION, or HIGHESTNUMANODENUMBER; use SET "errorlevel=" only to clear a shadow variable; reading pseudo-env names in SET /A expressions is fine
+  checker: regex
+- code: W050
+  name: Invalid SHIFT /n switch value
+  severity: WARNING
+  explanation: SHIFT /n accepts n between 0 and 8 per cmd.exe; values above 8 fail at runtime with ERRORLEVEL 1
+  recommendation: Use SHIFT /n with n between 0 and 8, or omit the switch for the default shift behavior
+  checker: regex
+- code: W051
+  name: Ambiguous double-digit batch parameter
+  severity: WARNING
+  explanation: cmd.exe only supports parameters %0 through %9; %10 and higher parse as %1 followed by literal digits, not the nth argument
+  recommendation: Use SHIFT in a loop to access arguments beyond %9, or use %~1 through %~9 with SHIFT /1 to preserve %0
+  checker: regex
+- code: W052
+  name: SHIFT inside parenthesized block
+  severity: WARNING
+  explanation: SHIFT inside a parenthesized command block does not affect %1-%9 expansion within that block; parameters shift only after the block completes
+  recommendation: Move SHIFT outside the block or use CALL to invoke a subroutine that shifts parameters
+  checker: regex
+- code: W053
+  name: Bare SHIFT changes script name parameter
+  severity: WARNING
+  explanation: SHIFT without /n copies %1 into %0, replacing the script name; SHIFT /1 preserves %0 per cmd.exe
+  recommendation: Use SHIFT /1 when %0 must remain the script path, or SHIFT /n with n between 0 and 8
+  checker: regex
+- code: W054
+  name: Digit-prefixed variable name
+  severity: WARNING
+  explanation: cmd.exe parses %digitName% as a batch parameter plus literal text, not a variable; digit-prefixed names require delayed expansion (!name!) or should be renamed
+  recommendation: Avoid variable names starting with a digit, or use delayed expansion with exclamation marks instead of percent signs
+  checker: regex
+- code: W055
+  name: IF DEFINED with percent-wrapped variable
+  severity: WARNING
+  explanation: IF DEFINED expects a bare environment variable name; IF DEFINED %var% checks a different (usually undefined) name because percent expansion is not applied in the DEFINED operand
+  recommendation: Use IF DEFINED varname without percent signs around the variable name
+  checker: regex
+- code: W056
+  name: IF clause with pseudo AND/OR operator
+  severity: WARNING
+  explanation: cmd.exe has no AND or OR operator in IF conditional clauses; AND/OR are treated as command separators, causing runtime errors or unintended command execution
+  recommendation: Use nested IF statements to combine conditions (for example IF %A% EQU 1 IF %B% EQU 2 ...)
+  checker: regex
+- code: W057
+  name: Batch file invoked without CALL
+  severity: WARNING
+  explanation: Invoking a .bat or .cmd file without CALL transfers control to the child script; lines after the invocation never run when the child exits
+  recommendation: Use CALL helper.bat (or CALL "path\\helper.cmd") so control returns to the caller
+  checker: regex
+- code: W058
+  name: REN destination includes a path
+  severity: WARNING
+  explanation: REN and RENAME rename files in place; the second argument must be a new filename only, not a path (cmd.exe reports a syntax error)
+  recommendation: Use MOVE to relocate a file, or REN with a filename only in the second argument
+  checker: regex
+- code: W059
+  name: FOR loop variable case mismatch
+  severity: WARNING
+  explanation: FOR loop variables are case-sensitive; %%i and %%I are distinct variables
+  recommendation: Use the same letter case as declared in the FOR statement (e.g. %%i if declared as %%i)
+  checker: regex
+- code: W060
+  name: SETX uses equals sign instead of space
+  severity: WARNING
+  explanation: SETX uses space-delimited syntax (var value), not SET-style equals; SETX MYVAR=value is invalid cmd.exe syntax
+  recommendation: Use SETX MYVAR value with a space between the variable name and value
+  checker: regex
+- code: W061
+  name: Unbalanced PUSHD and POPD commands
+  severity: WARNING
+  explanation: PUSHD and POPD maintain a directory stack; unmatched PUSHD calls can leave temporary network drive letters mapped after the script exits
+  recommendation: Pair each PUSHD with a matching POPD, including on error paths, before the script ends
+  checker: regex
+- code: W062
+  name: CD without /D for cross-drive path
+  severity: WARNING
+  explanation: CD and CHDIR without /D change the stored directory on the target drive but do not switch the active drive; scripts remain on the current drive
+  recommendation: Use CD /D path or CHDIR /D path to change both drive and directory in one step
+  checker: regex
+- code: W063
+  name: FOR /F loop variable beyond tokens range
+  severity: WARNING
+  explanation: FOR /F assigns implicit loop variables in alphabetical order from the declared variable; references beyond the tokens= count resolve as literal percent text (for example %%d becomes %d when only tokens=1-3 is declared, %%b becomes %b with tokens=*, or %%c with tokens=2* when only %%a and %%b are assigned)
+  recommendation: Declare enough tokens in the tokens= clause or reference only variables within the assigned range; for multiline DO blocks, check every line in the block body
+  checker: regex

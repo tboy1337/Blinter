@@ -1,0 +1,10 @@
+{
+  "description": "IF NOT ERRORLEVEL 0 is not a general failure check (W017)",
+  "rules": ["W017"],
+  "lines": {
+    "2": ["W017"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax"]
+}

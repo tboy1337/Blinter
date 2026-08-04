@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "s001 missing echo off",
+  "lines": {
+    "1": [
+      "S001",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S001",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

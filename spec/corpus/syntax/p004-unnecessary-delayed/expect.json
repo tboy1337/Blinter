@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "p004 unnecessary delayed",
+  "lines": {
+    "2": [
+      "P003",
+      "P004",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P003",
+    "P004",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

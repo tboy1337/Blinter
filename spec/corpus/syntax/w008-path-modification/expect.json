@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "w008 path modification",
+  "lines": {
+    "2": [
+      "SEC006",
+      "W001",
+      "W008"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "SEC006",
+    "W001",
+    "W008"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

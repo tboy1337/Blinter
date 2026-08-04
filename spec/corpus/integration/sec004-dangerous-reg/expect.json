@@ -1,0 +1,24 @@
+{
+  "config": {},
+  "description": "sec004 dangerous reg",
+  "lines": {
+    "2": [
+      "SEC004",
+      "SEC005",
+      "W001",
+      "W002",
+      "W003"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "SEC004",
+    "SEC005",
+    "W001",
+    "W002",
+    "W003"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

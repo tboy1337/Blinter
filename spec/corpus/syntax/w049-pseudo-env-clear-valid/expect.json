@@ -1,0 +1,10 @@
+{
+  "config": {},
+  "description": "Clearing shadow pseudo-env vars with SET \"name=\" is valid (W049 must not fire)",
+  "lines": {},
+  "must_not": ["W049"],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "description": "FOR /F tokens=2* assigns two variables; %%c is out of range (W063)",
+  "rules": ["W063"],
+  "lines": {
+    "2": ["W063"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax"]
+}

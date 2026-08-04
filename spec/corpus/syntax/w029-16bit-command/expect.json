@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "w029 16bit command",
+  "lines": {
+    "2": [
+      "W001",
+      "W029"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001",
+    "W029"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

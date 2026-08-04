@@ -1,0 +1,22 @@
+{
+  "config": {},
+  "description": "p022 redir in loop",
+  "lines": {
+    "3": [
+      "P010",
+      "P013",
+      "P022",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P010",
+    "P013",
+    "P022",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

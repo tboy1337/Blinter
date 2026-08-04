@@ -1,0 +1,22 @@
+{
+  "config": {},
+  "description": "s002 echo off no at",
+  "lines": {
+    "1": [
+      "S001",
+      "S002"
+    ],
+    "2": [
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S001",
+    "S002",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

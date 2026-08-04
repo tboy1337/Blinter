@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "p015 inefficient delay",
+  "lines": {
+    "2": [
+      "P015",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P015",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

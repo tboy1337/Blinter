@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "indentation s012 bounded",
+  "lines": {
+    "4": [
+      "S012",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S012",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

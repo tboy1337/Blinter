@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "percent tilde dp0 valid",
+  "lines": {
+    "2": [
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

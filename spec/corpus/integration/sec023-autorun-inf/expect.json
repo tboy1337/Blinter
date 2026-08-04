@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "sec023 autorun inf",
+  "lines": {
+    "2": [
+      "SEC023",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "SEC023",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

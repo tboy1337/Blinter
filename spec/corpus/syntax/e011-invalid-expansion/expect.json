@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "e011 invalid expansion",
+  "lines": {
+    "2": [
+      "E011",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E011",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

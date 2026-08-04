@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "w043 taskkill no verify",
+  "lines": {
+    "2": [
+      "W001",
+      "W043"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001",
+    "W043"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

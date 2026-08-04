@@ -1,14 +1,20 @@
 """Warning-level line checks (W-prefix rules)."""
 
+from contextvars import ContextVar
 import re
 from typing import (
+    Dict,
+    FrozenSet,
     List,
     Optional,
     Set,
     Tuple,
 )
 
+from blinter.checkers.globals.exit_flow import _update_paren_depth
+from blinter.constants import PSEUDO_ENV_VARS
 from blinter.models import LintIssue
+from blinter.parsing.structure import _collect_empty_assigned_variables
 from blinter.patterns import (
     _COMPILED_IF_PATTERN,
     ARCHITECTURE_SPECIFIC_PATTERNS,
@@ -202,6 +208,8 @@ def _check_command_warnings(  # pylint: disable=unused-argument
             )
         )
 
+    issues.extend(_check_setx_equals_syntax(stripped, line_num))
+
     return issues
 
 
@@ -263,20 +271,30 @@ def _check_errorlevel_comparison(stripped: str, line_num: int) -> List[LintIssue
         return issues
 
     w017_if_content: str = w017_group_result.strip()
-    # Only warn about the specific problematic pattern: %ERRORLEVEL% NEQ 1
+    if re.search(r"&&|\|\|", w017_if_content):
+        return issues
     if re.search(r"%errorlevel%\s+neq\s+1\b", w017_if_content, re.IGNORECASE):
-        # Don't warn if it's in a complex condition with && or ||
-        if not re.search(r"&&|\|\|", w017_if_content):
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["W017"],
-                    context=(
-                        "IF %ERRORLEVEL% NEQ 1 behaves differently than "
-                        "IF NOT ERRORLEVEL 1"
-                    ),
-                )
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W017"],
+                context=(
+                    "IF %ERRORLEVEL% NEQ 1 behaves differently than "
+                    "IF NOT ERRORLEVEL 1"
+                ),
             )
+        )
+    elif re.search(r"not\s+errorlevel\s+0\b", w017_if_content, re.IGNORECASE):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W017"],
+                context=(
+                    "IF NOT ERRORLEVEL 0 matches only negative exit codes "
+                    "(NOT >= 0), not a general failure check"
+                ),
+            )
+        )
     return issues
 
 
@@ -345,6 +363,676 @@ def _check_unicode_filenames(stripped: str, line_num: int) -> List[LintIssue]:
     return issues
 
 
+def _check_set_spacing(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check SET command spacing around equals (W044)."""
+    if re.match(r"set\s+(?!/)([^\s=]+)\s+=\s+\S", stripped, re.IGNORECASE):
+        return [
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W044"],
+                context="Spaces around = in SET create a variable name with trailing spaces",
+            )
+        ]
+    return []
+
+
+def _is_pseudo_env_clear_assignment(var_name: str, value_part: str) -> bool:
+    """True when SET clears a shadow pseudo-env var (SET \"errorlevel=\")."""
+    return var_name in PSEUDO_ENV_VARS and value_part.strip() == ""
+
+
+def _check_set_a_pseudo_env_assignment(stripped: str, line_num: int) -> List[LintIssue]:
+    """Warn when SET /A assigns to a pseudo-environment variable (W049)."""
+    match = re.match(
+        r"set\s+/a\s+([^=]+)=(.*)$",
+        stripped,
+        re.IGNORECASE,
+    )
+    if not match:
+        return []
+    lhs = str(match.group(1)).strip()
+    if not lhs:
+        return []
+    var_name = re.sub(r"\s+", "", lhs).upper()
+    if var_name not in PSEUDO_ENV_VARS:
+        return []
+    return [
+        LintIssue(
+            line_number=line_num,
+            rule=RULES["W049"],
+            context=(f"SET /A assigns to pseudo-environment variable {var_name}"),
+        )
+    ]
+
+
+_paren_depth_cache_var: ContextVar[Optional[Dict[int, List[int]]]] = ContextVar(
+    "paren_depth_cache", default=None
+)
+_defined_vars_cache_var: ContextVar[Optional[Dict[int, frozenset[str]]]] = ContextVar(
+    "defined_vars_cache", default=None
+)
+
+
+def _begin_paren_depth_pass() -> None:
+    """Start a per-lint parenthesis-depth cache for the current context."""
+    _paren_depth_cache_var.set({})
+
+
+def _build_paren_depth_before(lines: list[str]) -> list[int]:
+    """Return parenthesis block depth before each 1-based line."""
+    depth = 0
+    result: list[int] = []
+    for line in lines:
+        result.append(depth)
+        depth = _update_paren_depth(line.strip(), depth)
+        if depth < 0:
+            depth = 0
+    return result
+
+
+def _paren_depth_before_for_lines(lines: list[str]) -> list[int]:
+    """Return cached parenthesis depth-before values within a single lint pass."""
+    cache = _paren_depth_cache_var.get()
+    if cache is None:
+        return _build_paren_depth_before(lines)
+    lines_id = id(lines)
+    cached = cache.get(lines_id)
+    if cached is None:
+        cached = _build_paren_depth_before(lines)
+        cache[lines_id] = cached
+    return cached
+
+
+def _paren_depth_before_line(lines: list[str], line_num: int) -> int:
+    """Return parenthesis block depth before processing line_num (1-based)."""
+    if line_num < 1:
+        return 0
+    depths = _paren_depth_before_for_lines(lines)
+    if line_num > len(depths):
+        return depths[-1] if depths else 0
+    return depths[line_num - 1]
+
+
+def _check_shift_inside_paren_block(
+    stripped: str,
+    line_num: int,
+    lines: list[str],
+) -> List[LintIssue]:
+    """Warn when SHIFT runs inside a parenthesized block (W052)."""
+    if not re.match(r"^\s*shift\b", stripped, re.IGNORECASE):
+        return []
+    if _paren_depth_before_line(lines, line_num) <= 0:
+        return []
+    return [
+        LintIssue(
+            line_number=line_num,
+            rule=RULES["W052"],
+            context=(
+                "SHIFT inside a parenthesized block does not affect %1-%9 "
+                "expansion until after the block completes"
+            ),
+        )
+    ]
+
+
+def _check_bare_shift_mutates_pct0(stripped: str, line_num: int) -> List[LintIssue]:
+    """Warn when bare SHIFT may replace %0 with the former %1 (W053)."""
+    if not re.match(r"^\s*shift\s*$", stripped, re.IGNORECASE):
+        return []
+    return [
+        LintIssue(
+            line_number=line_num,
+            rule=RULES["W053"],
+            context="Bare SHIFT copies %1 into %0; use SHIFT /1 to preserve the script name",
+        )
+    ]
+
+
+def _check_invalid_shift_switch(stripped: str, line_num: int) -> List[LintIssue]:
+    """Warn when SHIFT /n uses n outside the valid 0-8 range (W050)."""
+    match = re.search(r"^\s*shift\s+/(\d+)\b", stripped, re.IGNORECASE)
+    if not match:
+        return []
+    switch_value = int(match.group(1))
+    if switch_value <= 8:
+        return []
+    return [
+        LintIssue(
+            line_number=line_num,
+            rule=RULES["W050"],
+            context=(f"SHIFT /{switch_value} is invalid; /n must be between 0 and 8"),
+        )
+    ]
+
+
+def _check_digit_prefixed_variable(stripped: str, line_num: int) -> List[LintIssue]:
+    """Warn on digit-prefixed SET names or ambiguous %digitName% expansion (W054)."""
+    issues: List[LintIssue] = []
+
+    def _append(var_name: str) -> None:
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W054"],
+                context=(
+                    f"Variable name {var_name!r} starts with a digit; "
+                    "% expansion resolves as a batch parameter plus literal text"
+                ),
+            )
+        )
+
+    quoted = re.match(r'set\s+"([^"]+)"', stripped, re.IGNORECASE)
+    if quoted:
+        assignment = str(quoted.group(1))
+        if "=" in assignment:
+            var_name = assignment.partition("=")[0].strip()
+            if var_name and var_name[0].isdigit():
+                _append(var_name)
+                return issues
+
+    unquoted = re.match(r"set\s+(?!/)([^\s=]+)\s*=", stripped, re.IGNORECASE)
+    if unquoted:
+        var_name = str(unquoted.group(1)).strip()
+        if var_name and var_name[0].isdigit():
+            _append(var_name)
+            return issues
+
+    set_a = re.match(r"set\s+/a\s+([^=]+)=", stripped, re.IGNORECASE)
+    if set_a:
+        lhs = str(set_a.group(1)).strip()
+        var_match = re.match(r"([A-Za-z_]\w*|\d\w*)", lhs)
+        if var_match:
+            var_name = str(var_match.group(1))
+            if var_name and var_name[0].isdigit():
+                _append(var_name)
+                return issues
+
+    for match in re.finditer(
+        r"%(~[fdpnxsatz]*)?(\d)([a-zA-Z_]\w*)%",
+        stripped,
+        re.IGNORECASE,
+    ):
+        suffix = str(match.group(3))
+        if not suffix:
+            continue
+        start = match.start()
+        if start > 0 and stripped[start - 1] == "%":
+            continue
+        prefix = stripped[:start]
+        if re.search(r"%\w+:\s*$", prefix, re.IGNORECASE):
+            continue
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W054"],
+                context=(
+                    f"%{match.group(2)}{suffix}% is parsed as %{match.group(2)} "
+                    f"plus literal {suffix!r}, not a variable name"
+                ),
+            )
+        )
+        return issues
+
+    return issues
+
+
+def _check_double_digit_batch_param(stripped: str, line_num: int) -> List[LintIssue]:
+    """Warn when a batch parameter uses two or more digits (W051)."""
+    for match in re.finditer(r"%(~[fdpnxsatz]*)?(\d+)", stripped, re.IGNORECASE):
+        digits = str(match.group(2))
+        if len(digits) < 2:
+            continue
+        start = match.start()
+        if start > 0 and stripped[start - 1] == "%":
+            continue
+        prefix = stripped[:start]
+        if re.search(r"%\w+:\s*$", prefix, re.IGNORECASE):
+            continue
+        if re.match(r"%\w+:", stripped[start:], re.IGNORECASE):
+            continue
+        return [
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W051"],
+                context=(
+                    f"%{digits} is not a valid parameter; cmd.exe parses it as "
+                    f"%{digits[0]} plus literal '{digits[1:]}'"
+                ),
+            )
+        ]
+    return []
+
+
+def _check_pseudo_env_assignment(stripped: str, line_num: int) -> List[LintIssue]:
+    """Warn when assigning to cmd.exe pseudo-environment variables (W049)."""
+    quoted = re.match(
+        r'set\s+"([^"]+)"',
+        stripped,
+        re.IGNORECASE,
+    )
+    if quoted:
+        assignment = str(quoted.group(1))
+        if "=" not in assignment:
+            return []
+        var_name, _, value_part = assignment.partition("=")
+        var_name = var_name.strip().upper()
+        if _is_pseudo_env_clear_assignment(var_name, value_part):
+            return []
+        if var_name in PSEUDO_ENV_VARS:
+            return [
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["W049"],
+                    context=(f"SET assigns to pseudo-environment variable {var_name}"),
+                )
+            ]
+        return []
+
+    unquoted = re.match(
+        r"set\s+(?!/)([^\s=]+)\s*=(.*)$",
+        stripped,
+        re.IGNORECASE,
+    )
+    if not unquoted:
+        return []
+    var_name = str(unquoted.group(1)).strip().upper()
+    value_part = str(unquoted.group(2))
+    if _is_pseudo_env_clear_assignment(var_name, value_part):
+        return []
+    if var_name not in PSEUDO_ENV_VARS:
+        return []
+    return [
+        LintIssue(
+            line_number=line_num,
+            rule=RULES["W049"],
+            context=f"SET assigns to pseudo-environment variable {var_name}",
+        )
+    ]
+
+
+def _check_set_a_octal_literal(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check SET /A leading-zero octal literals (W045)."""
+    if re.search(
+        r"set\s+/a\s+[^=]*=\s*0[0-7]+\b",
+        stripped,
+        re.IGNORECASE,
+    ):
+        return [
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W045"],
+                context="SET /A interprets leading-zero values as octal",
+            )
+        ]
+    return []
+
+
+def _check_unquoted_numeric_if_compare(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check unquoted IF numeric comparisons with leading zeros (W046)."""
+    lhs_pattern = (
+        r"if\s+(?!\"|')[^\"']*?\b0+\d+\b\s+" r"(equ|neq|==|!=|lss|leq|gtr|geq)\s+"
+    )
+    rhs_pattern = (
+        r"if\s+(?!\"|')[^\"']*?\b(?:equ|neq|==|!=|lss|leq|gtr|geq)\s+" r"\b0+\d+\b"
+    )
+    if re.search(lhs_pattern, stripped, re.IGNORECASE) or re.search(
+        rhs_pattern, stripped, re.IGNORECASE
+    ):
+        return [
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W046"],
+                context="Unquoted numeric IF comparisons use numeric equality semantics",
+            )
+        ]
+    return []
+
+
+_empty_assigned_vars_cache_var: ContextVar[Optional[Dict[int, frozenset[str]]]] = (
+    ContextVar("empty_assigned_vars_cache", default=None)
+)
+
+
+def _begin_empty_assigned_vars_pass() -> None:
+    """Start a per-lint empty-assigned-vars cache for the current context."""
+    _empty_assigned_vars_cache_var.set({})
+    _defined_vars_cache_var.set({})
+
+
+def _uppercased_defined_vars(set_vars: Set[str]) -> frozenset[str]:
+    """Return uppercased defined variable names, cached per lint pass."""
+    cache = _defined_vars_cache_var.get()
+    if cache is None:
+        return frozenset(name.upper() for name in set_vars)
+    cache_key = id(set_vars)
+    cached = cache.get(cache_key)
+    if cached is None:
+        cached = frozenset(name.upper() for name in set_vars)
+        cache[cache_key] = cached
+    return cached
+
+
+def _empty_assigned_vars_for_lines(lines: list[str]) -> FrozenSet[str]:
+    """Return variables assigned empty values, cached per lint pass."""
+    cache = _empty_assigned_vars_cache_var.get()
+    if cache is None:
+        return frozenset(_collect_empty_assigned_variables(lines))
+
+    cache_key = id(lines)
+    cached = cache.get(cache_key)
+    if cached is None:
+        cached = frozenset(_collect_empty_assigned_variables(lines))
+        cache[cache_key] = cached
+    return cached
+
+
+_SUBSTRING_EXPANSION_RE = re.compile(r"%([A-Za-z_][A-Za-z0-9_]*):~[^%]+%")
+
+
+def _check_substring_on_unset_var(
+    stripped: str,
+    line_num: int,
+    set_vars: Set[str],
+    *,
+    lines: list[str] | None = None,
+    empty_assigned_vars: FrozenSet[str] | None = None,
+) -> List[LintIssue]:
+    """Warn when substring expansion references undefined or empty variables (W047)."""
+    if ":~" not in stripped:
+        return []
+    defined = _uppercased_defined_vars(set_vars)
+    if empty_assigned_vars is None and lines is not None:
+        empty_assigned_vars = _empty_assigned_vars_for_lines(lines)
+    empty_vars = empty_assigned_vars or frozenset()
+    for match in _SUBSTRING_EXPANSION_RE.finditer(stripped):
+        var_name = str(match.group(1)).upper()
+        if var_name in empty_vars:
+            return [
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["W047"],
+                    context=(
+                        f"Substring expansion on empty variable %{var_name}% "
+                        "expands literally (e.g. ~0,1)"
+                    ),
+                )
+            ]
+        if var_name in defined:
+            continue
+        # FOR loop variables (%%i in source) appear as %i% in parsed lines
+        if len(var_name) == 1 and var_name.isalpha():
+            continue
+        return [
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W047"],
+                context=(
+                    f"Substring expansion on undefined variable %{var_name}% "
+                    "may expand literally"
+                ),
+            )
+        ]
+    return []
+
+
+def _check_for_f_null_fields(stripped: str, line_num: int) -> List[LintIssue]:
+    """Check FOR /F CSV parsing without honoring empty fields (W048)."""
+    lowered = stripped.lower()
+    if (
+        lowered.startswith("for")
+        and "/f" in lowered
+        and "delims=," in lowered.replace(" ", "")
+        and "tokens=*" not in lowered
+        and "honoring" not in lowered
+    ):
+        return [
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W048"],
+                context="FOR /F with comma delimiters skips consecutive empty tokens by default",
+            )
+        ]
+    return []
+
+
+_PSEUDO_IF_LOGICAL_RE = re.compile(
+    r"(?:"
+    r"(?:EQU|NEQ|LSS|LEQ|GTR|GEQ|==|>=|<=|>|<)\s+\S+|"
+    r"(?:exist|defined|errorlevel)\s+\S+"
+    r")\s+(AND|OR)\s+"
+    r"(?:%|!|defined|exist|not|errorlevel|/i|[\w(])",
+    re.IGNORECASE,
+)
+
+
+def _strip_double_quoted_strings(text: str) -> str:
+    """Remove double-quoted spans so pseudo-operator detection ignores string literals."""
+    return re.sub(r'"[^"]*"', '""', text)
+
+
+def _check_if_pseudo_logical_operator(stripped: str, line_num: int) -> List[LintIssue]:
+    """Warn when IF uses pseudo AND/OR operators (W056)."""
+    if not re.match(r"\bif\b", stripped, re.IGNORECASE):
+        return []
+    unquoted = _strip_double_quoted_strings(stripped)
+    match = _PSEUDO_IF_LOGICAL_RE.search(unquoted)
+    if not match:
+        return []
+    operator = str(match.group(1)).upper()
+    return [
+        LintIssue(
+            line_number=line_num,
+            rule=RULES["W056"],
+            context=(
+                f"Batch has no {operator} operator in IF clauses; "
+                "use nested IF statements instead"
+            ),
+        )
+    ]
+
+
+def _check_if_defined_percent_wrapped(stripped: str, line_num: int) -> List[LintIssue]:
+    """Warn when IF DEFINED uses %var% instead of a bare name (W055)."""
+    match = re.search(
+        r"\bif\s+(?:/i\s+)?(?:not\s+)?defined\s+%([A-Za-z_@][\w@]*)%",
+        stripped,
+        re.IGNORECASE,
+    )
+    if not match:
+        return []
+    var_name = str(match.group(1))
+    return [
+        LintIssue(
+            line_number=line_num,
+            rule=RULES["W055"],
+            context=(
+                f"IF DEFINED %{var_name}% checks the wrong name; "
+                f"use IF DEFINED {var_name} without percent signs"
+            ),
+        )
+    ]
+
+
+_NON_BAT_COMMAND_PREFIXES: frozenset[str] = frozenset(
+    {
+        "call",
+        "start",
+        "echo",
+        "rem",
+        "goto",
+        "if",
+        "for",
+        "set",
+        "cd",
+        "chdir",
+        "pushd",
+        "popd",
+        "del",
+        "erase",
+        "copy",
+        "move",
+        "ren",
+        "rename",
+        "type",
+        "find",
+        "findstr",
+        "pause",
+        "exit",
+        "shift",
+        "endlocal",
+        "setlocal",
+        "title",
+        "color",
+        "cls",
+        "break",
+        "choice",
+        "timeout",
+        "ping",
+        "dir",
+        "md",
+        "mkdir",
+        "rd",
+        "rmdir",
+        "assoc",
+        "ftype",
+        "chcp",
+        "doskey",
+        "more",
+        "sort",
+        "fc",
+        "ver",
+        "vol",
+        "tree",
+        "xcopy",
+        "robocopy",
+        "wmic",
+        "powershell",
+        "pwsh",
+        "cmd",
+        "where",
+        "sc",
+        "net",
+        "taskkill",
+        "tasklist",
+        "reg",
+        "attrib",
+        "cacls",
+        "icacls",
+    }
+)
+
+
+def _tokenize_setx_arguments(rest: str) -> list[str]:
+    """Split SETX arguments into tokens (quoted strings or bare words)."""
+    tokens: list[str] = []
+    index = 0
+    length = len(rest)
+    while index < length:
+        while index < length and rest[index].isspace():
+            index += 1
+        if index >= length:
+            break
+        if rest[index] == '"':
+            end = rest.find('"', index + 1)
+            if end == -1:
+                tokens.append(rest[index:])
+                break
+            tokens.append(rest[index : end + 1])
+            index = end + 1
+            continue
+        end = index
+        while end < length and not rest[end].isspace():
+            end += 1
+        tokens.append(rest[index:end])
+        index = end
+    return tokens
+
+
+def _check_setx_equals_syntax(stripped: str, line_num: int) -> List[LintIssue]:
+    """Warn when SETX uses SET-style equals sign instead of space-delimited syntax (W060)."""
+    if not re.match(r"setx\s+", stripped, re.IGNORECASE):
+        return []
+    rest = re.sub(r"^setx\s+", "", stripped, count=1, flags=re.IGNORECASE)
+    for token in _tokenize_setx_arguments(rest):
+        bare = token.strip('"')
+        if bare.startswith("/"):
+            continue
+        if "=" in bare:
+            return [
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["W060"],
+                    context=(
+                        "SETX uses space-delimited syntax (SETX var value), "
+                        "not SET-style equals; cmd.exe reports invalid syntax"
+                    ),
+                )
+            ]
+        break
+    return []
+
+
+def _check_bat_invocation_without_call(stripped: str, line_num: int) -> List[LintIssue]:
+    """Warn when a .bat/.cmd file is invoked without CALL (W057)."""
+    if stripped.startswith("::"):
+        return []
+    normalized = stripped.lstrip("@").strip()
+    if not normalized or normalized.lower().startswith("rem "):
+        return []
+    first_word_match = re.match(r"^(\S+)", normalized)
+    if not first_word_match:
+        return []
+    first_word = str(first_word_match.group(1)).lower().rstrip(":")
+    if first_word in _NON_BAT_COMMAND_PREFIXES:
+        return []
+    invoke_match = re.match(
+        r'^(?:"([^"]+\.(?:bat|cmd))"|([^\s&|<>^]+\.(?:bat|cmd)))\b',
+        normalized,
+        re.IGNORECASE,
+    )
+    if not invoke_match:
+        return []
+    target = str(invoke_match.group(1) or invoke_match.group(2))
+    return [
+        LintIssue(
+            line_number=line_num,
+            rule=RULES["W057"],
+            context=(
+                f"Invoking {target!r} without CALL does not return control "
+                "to the caller"
+            ),
+        )
+    ]
+
+
+def _check_ren_destination_path(stripped: str, line_num: int) -> List[LintIssue]:
+    """Warn when REN/RENAME uses a path in the destination argument (W058)."""
+    match = re.match(r"^(?:ren|rename)\s+(\S+)\s+(.+)$", stripped, re.IGNORECASE)
+    if not match:
+        return []
+    destination = str(match.group(2)).strip()
+    if destination.startswith('"'):
+        quote_end = destination.find('"', 1)
+        if quote_end == -1:
+            new_name = destination[1:]
+        else:
+            new_name = destination[1:quote_end]
+    else:
+        new_name = destination.split()[0]
+    if re.search(r"[:\\/]", new_name):
+        return [
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W058"],
+                context=(
+                    "REN destination must be a filename only; "
+                    "use MOVE to relocate files to another directory"
+                ),
+            )
+        ]
+    return []
+
+
 def _check_call_ambiguity(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for command execution ambiguity (W033)."""
     issues: List[LintIssue] = []
@@ -370,10 +1058,13 @@ def _check_warning_issues(
     line_num: int,
     _set_vars: Set[str],
     _delayed_expansion_enabled: bool,
+    *,
+    lines: list[str] | None = None,
 ) -> List[LintIssue]:
     """Check for warning level issues."""
     issues: List[LintIssue] = []
     stripped = line.strip()
+    line_context = lines if lines is not None else []
 
     # Use helper functions to check for various warning issues
     issues.extend(_check_unquoted_variables(stripped, line_num))
@@ -383,6 +1074,29 @@ def _check_warning_issues(
     issues.extend(_check_extended_non_ascii(stripped, line_num))
     issues.extend(_check_unicode_filenames(stripped, line_num))
     issues.extend(_check_call_ambiguity(stripped, line_num))
+    issues.extend(_check_set_spacing(stripped, line_num))
+    issues.extend(_check_pseudo_env_assignment(stripped, line_num))
+    issues.extend(_check_set_a_pseudo_env_assignment(stripped, line_num))
+    issues.extend(_check_invalid_shift_switch(stripped, line_num))
+    issues.extend(_check_shift_inside_paren_block(stripped, line_num, line_context))
+    issues.extend(_check_bare_shift_mutates_pct0(stripped, line_num))
+    issues.extend(_check_digit_prefixed_variable(stripped, line_num))
+    issues.extend(_check_double_digit_batch_param(stripped, line_num))
+    issues.extend(_check_set_a_octal_literal(stripped, line_num))
+    issues.extend(_check_unquoted_numeric_if_compare(stripped, line_num))
+    issues.extend(
+        _check_substring_on_unset_var(
+            stripped,
+            line_num,
+            _set_vars,
+            lines=line_context or None,
+        )
+    )
+    issues.extend(_check_for_f_null_fields(stripped, line_num))
+    issues.extend(_check_if_defined_percent_wrapped(stripped, line_num))
+    issues.extend(_check_if_pseudo_logical_operator(stripped, line_num))
+    issues.extend(_check_bat_invocation_without_call(stripped, line_num))
+    issues.extend(_check_ren_destination_path(stripped, line_num))
     issues.extend(_check_compatibility_warnings(line, line_num, stripped))
     issues.extend(_check_command_warnings(line, line_num, stripped))
 

@@ -1,0 +1,8 @@
+{
+  "description": "Balanced PUSHD/POPD must not trigger W061",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W061"],
+  "config": {},
+  "tags": ["syntax"]
+}

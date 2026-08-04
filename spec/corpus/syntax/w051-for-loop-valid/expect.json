@@ -1,0 +1,8 @@
+{
+  "config": {},
+  "description": "FOR loop %% variables must not trigger W051",
+  "lines": {},
+  "must_not": ["W051"],
+  "rules": [],
+  "tags": ["syntax"]
+}

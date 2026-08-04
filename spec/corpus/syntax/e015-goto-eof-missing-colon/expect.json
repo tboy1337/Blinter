@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "e015 goto eof missing colon",
+  "lines": {
+    "2": [
+      "E015"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E015"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

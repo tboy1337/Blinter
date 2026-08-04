@@ -1,0 +1,24 @@
+{
+  "config": {},
+  "description": "p020 redundant echo off",
+  "lines": {
+    "1": [
+      "S001"
+    ],
+    "2": [
+      "P020"
+    ],
+    "3": [
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P020",
+    "S001",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

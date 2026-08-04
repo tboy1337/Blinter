@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "w005 unquoted var",
+  "lines": {
+    "2": [
+      "SEC002"
+    ],
+    "3": [
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "SEC002",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "p005 endlocal without setlocal",
+  "lines": {
+    "2": [
+      "P005"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P005"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "config": {},
+  "description": "e005 invalid path",
+  "lines": {
+    "2": [
+      "E005",
+      "SEC006",
+      "W001",
+      "W002",
+      "W025"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E005",
+    "SEC006",
+    "W001",
+    "W002",
+    "W025"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

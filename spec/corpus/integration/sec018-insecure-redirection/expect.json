@@ -1,0 +1,24 @@
+{
+  "config": {},
+  "description": "sec018 insecure redirection",
+  "lines": {
+    "2": [
+      "P010",
+      "P013",
+      "SEC007",
+      "SEC018",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P010",
+    "P013",
+    "SEC007",
+    "SEC018",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

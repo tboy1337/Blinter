@@ -1,0 +1,10 @@
+{
+  "description": "FOR /F multiline DO body references variable beyond tokens= range (W063)",
+  "rules": ["W063"],
+  "lines": {
+    "2": ["W063"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax"]
+}

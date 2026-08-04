@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "e008 unreachable after exit",
+  "lines": {
+    "3": [
+      "E008"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E008"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

@@ -1,0 +1,44 @@
+version: 1
+description: >
+  Authoritative denylist for cmd_oracle.py. Fixtures listed here are valid
+  static-analysis oracles but must not be executed (interactive, unbounded,
+  destructive, or intentionally long-running). Safe integration/sec* fixtures
+  are not listed and run in isolated subprocesses when heuristics pass.
+
+cases:
+  - id: integration/sec001-command-injection
+    reason: "set /p blocks for interactive input"
+  - id: integration/sec003-dangerous-del
+    reason: "del /q *.* is destructive"
+  - id: integration/sec004-dangerous-reg
+    reason: "reg delete HKLM is destructive"
+  - id: integration/sec005-privilege-check
+    reason: "net user /add modifies accounts"
+  - id: integration/sec009-powershell-bypass
+    reason: "spawns PowerShell via cmd /c"
+  - id: integration/sec015-taskkill-unfiltered
+    reason: "taskkill /f terminates processes"
+  - id: integration/sec016-restart-no-limit
+    reason: "Infinite GOTO retry loop"
+  - id: integration/sec019-self-modification
+    reason: "overwrites script via %~f0"
+  - id: integration/sec021-fork-bomb
+    reason: "Spawns recursive cmd via start %0"
+  - id: integration/sec022-hosts-modification
+    reason: "appends to hosts file"
+  - id: integration/sec023-autorun-inf
+    reason: "writes autorun.inf"
+  - id: integration/sec024-self-copy-removable
+    reason: "copy %0 to removable media"
+  - id: syntax/p025-wildcard-star
+    reason: "del *.* in fixture cwd"
+  - id: syntax/s009-magic-number
+    reason: "timeout /t 300 waits five minutes"
+  - id: syntax/s023-magic-timeout
+    reason: "timeout /t 3600 waits one hour"
+  - id: syntax/w006-ping-no-timeout
+    reason: "Unbounded ping to external host"
+  - id: syntax/w009-older-windows-cmd
+    reason: "Interactive choice prompt blocks for input"
+  - id: syntax/w043-taskkill-no-verify
+    reason: "taskkill without verification"

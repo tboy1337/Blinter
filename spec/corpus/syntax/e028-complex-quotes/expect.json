@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "e028 complex quotes",
+  "lines": {
+    "2": [
+      "E009",
+      "E028",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E009",
+    "E028",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

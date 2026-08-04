@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "s024 complex oneliner",
+  "lines": {
+    "2": [
+      "S024",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S024",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

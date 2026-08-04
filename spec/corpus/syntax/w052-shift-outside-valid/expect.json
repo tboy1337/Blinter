@@ -1,0 +1,8 @@
+{
+  "config": {},
+  "description": "SHIFT /1 outside blocks is valid (W052 negative)",
+  "lines": {},
+  "must_not": ["W052", "W053"],
+  "rules": [],
+  "tags": ["syntax", "control-flow"]
+}

@@ -10,6 +10,9 @@ from typing import (
     Tuple,
 )
 
+from blinter.checkers.globals.for_scope import (
+    _check_for_var_case_mismatch,
+)
 from blinter.constants import LARGE_FILE_LINE_THRESHOLD
 from blinter.models import LintIssue
 from blinter.parsing.context import _is_comment_line
@@ -170,6 +173,94 @@ def _check_new_global_rules(lines: List[str], file_path: str) -> List[LintIssue]
     issues.extend(_check_infinite_loop_warnings(lines))
     issues.extend(_check_locked_file_operations(lines))
     issues.extend(_check_endlocal_before_exit(lines))
+    issues.extend(_check_pushd_popd_balance(lines))
+    issues.extend(_check_cd_without_d_switch(lines))
+
+    return issues
+
+
+def _line_starts_with_command(stripped: str, command: str) -> bool:
+    """Return True when a line begins with the given cmd.exe command."""
+    normalized = stripped.lstrip("@").strip()
+    return bool(re.match(rf"{command}\b", normalized, re.IGNORECASE))
+
+
+def _check_pushd_popd_balance(lines: List[str]) -> List[LintIssue]:
+    """Warn when PUSHD/POPD calls are unbalanced (W061)."""
+    issues: List[LintIssue] = []
+    depth = 0
+    unmatched_pushd: list[int] = []
+
+    for i, line in enumerate(lines, start=1):
+        if _is_comment_line(line):
+            continue
+        stripped = line.strip()
+        if _line_starts_with_command(stripped, "pushd"):
+            depth += 1
+            unmatched_pushd.append(i)
+            continue
+        if _line_starts_with_command(stripped, "popd"):
+            if depth > 0:
+                depth -= 1
+                unmatched_pushd.pop()
+            else:
+                issues.append(
+                    LintIssue(
+                        line_number=i,
+                        rule=RULES["W061"],
+                        context="POPD without matching PUSHD",
+                    )
+                )
+
+    for line_num in unmatched_pushd:
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W061"],
+                context=(
+                    "PUSHD without matching POPD; temporary network drive "
+                    "letters may remain mapped"
+                ),
+            )
+        )
+
+    return issues
+
+
+_CD_DRIVE_PATH_RE = re.compile(r"[A-Za-z]:(?:\\|[^:\s])")
+_CD_HAS_D_SWITCH_RE = re.compile(r"/d\b", re.IGNORECASE)
+
+
+def _check_cd_without_d_switch(lines: List[str]) -> List[LintIssue]:
+    """Warn when CD/CHDIR targets another drive without /D (W062)."""
+    issues: List[LintIssue] = []
+
+    for i, line in enumerate(lines, start=1):
+        if _is_comment_line(line):
+            continue
+        stripped = line.strip().lstrip("@").strip()
+        if not re.match(r"(?:cd|chdir)\b", stripped, re.IGNORECASE):
+            continue
+        args = re.sub(
+            r"^(?:cd|chdir)\b", "", stripped, count=1, flags=re.IGNORECASE
+        ).strip()
+        if not args or re.match(r"^\.\.+$", args):
+            continue
+        if _CD_HAS_D_SWITCH_RE.search(args):
+            continue
+        if re.match(r"^[A-Za-z]:\s*$", args):
+            continue
+        if _CD_DRIVE_PATH_RE.search(args):
+            issues.append(
+                LintIssue(
+                    line_number=i,
+                    rule=RULES["W062"],
+                    context=(
+                        "CD without /D changes the target drive directory but "
+                        "does not switch the active drive"
+                    ),
+                )
+            )
 
     return issues
 
@@ -232,6 +323,9 @@ def _check_advanced_global_patterns(
     # W039: Nested FOR loops without call optimization
     issues.extend(_check_nested_for_loops(lines))
 
+    # W059: FOR loop variable case mismatch
+    issues.extend(_check_for_var_case_mismatch(lines))
+
     # SEC016: Automatic restart without failure limits
     issues.extend(_check_restart_limits(lines))
 
@@ -263,7 +357,7 @@ def _find_nested_for_issues(lines: List[str], start_line: int) -> List[LintIssue
     brace_count = 0
     in_for_block = False
 
-    for j in range(start_line, min(start_line + 20, len(lines))):
+    for j in range(start_line - 1, min(start_line - 1 + 20, len(lines))):
         check_line = lines[j].strip()
         brace_count += check_line.count("(") - check_line.count(")")
 
@@ -275,12 +369,12 @@ def _find_nested_for_issues(lines: List[str], start_line: int) -> List[LintIssue
             if j != start_line - 1:  # Not the same line
                 outer_line = lines[start_line - 1]
                 outer_var = re.search(
-                    r"for\s+/[lfdr]\s+.*?%%(\w)",
+                    r"for\s+(?:/[lfdr]\s+.*?)?%%(\w)",
                     outer_line,
                     re.IGNORECASE,
                 )
                 inner_var = re.search(
-                    r"for\s+/[lfdr]\s+.*?%%(\w)",
+                    r"for\s+(?:/[lfdr]\s+.*?)?%%(\w)",
                     check_line,
                     re.IGNORECASE,
                 )
@@ -291,8 +385,8 @@ def _find_nested_for_issues(lines: List[str], start_line: int) -> List[LintIssue
                         context="Nested FOR loops can be inefficient with large data sets",
                     )
                 ]
-                outer_var_name = str(outer_var.group(1)).lower() if outer_var else ""
-                inner_var_name = str(inner_var.group(1)).lower() if inner_var else ""
+                outer_var_name = str(outer_var.group(1)) if outer_var else ""
+                inner_var_name = str(inner_var.group(1)) if inner_var else ""
                 if outer_var_name and outer_var_name == inner_var_name:
                     nested_issues.append(
                         LintIssue(
@@ -312,7 +406,7 @@ def _find_nested_for_issues(lines: List[str], start_line: int) -> List[LintIssue
                         )
                     )
                 return nested_issues
-            break
+            continue
 
         if brace_count <= 0 and in_for_block:
             break
@@ -354,25 +448,26 @@ def _check_restart_limits(lines: List[str]) -> List[LintIssue]:
 def _check_self_modification(lines: List[str], file_path: str) -> List[LintIssue]:
     """Check for batch self-modification vulnerabilities."""
     issues: List[LintIssue] = []
+    script_name = Path(file_path).name.lower()
 
     for i, line in enumerate(lines, start=1):
         stripped = line.strip().lower()
-        if (
-            "echo" in stripped
-            and (".bat" in stripped or ".cmd" in stripped)
-            and (">" in stripped or ">>" in stripped)
-        ):
-            # Check if writing to same file or generating batch files
-            if any(
-                keyword in stripped for keyword in ["%~f0", "%0", file_path.lower()]
-            ):
-                issues.append(
-                    LintIssue(
-                        line_number=i,
-                        rule=RULES["SEC019"],
-                        context="Script appears to modify itself - potential security risk",
-                    )
+        if "echo" not in stripped or (">" not in stripped and ">>" not in stripped):
+            continue
+
+        writes_batch = ".bat" in stripped or ".cmd" in stripped
+        writes_self = any(
+            keyword in stripped
+            for keyword in ("%~f0", "%0", file_path.lower(), script_name)
+        )
+        if writes_self and (writes_batch or "%~f0" in stripped or "%0" in stripped):
+            issues.append(
+                LintIssue(
+                    line_number=i,
+                    rule=RULES["SEC019"],
+                    context="Script appears to modify itself - potential security risk",
                 )
+            )
 
     return issues
 

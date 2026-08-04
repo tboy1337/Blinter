@@ -2,14 +2,10 @@
 
 ## Rule Categories Summary
 
-**Blinter** provides comprehensive static analysis with **built-in rules** registered in `blinter.rules.registry` (currently **147** rules; see `RULE_COUNT` in that module). Rule IDs may have gaps where rules were retired or consolidated (for example W041, S025, P011).
-
-Across 5 severity levels:
-
-> **Security rules:** SEC-prefixed findings are static heuristics over source text. They help spot risky patterns but do not prove exploitability or guarantee runtime safety.
+<!-- GENERATED:rule-catalog:start -->
 
 ### Error Level Rules (E001-E999)
-**Critical issues that will cause script failure**
+**Auto-generated from spec/data/rules.yaml**
 
 - **E001**: Nested parentheses mismatch
 - **E002**: Missing label for GOTO statement
@@ -28,7 +24,7 @@ Across 5 severity levels:
 - **E015**: Missing colon in GOTO :EOF statement
 - **E016**: Invalid errorlevel comparison syntax
 - **E017**: Invalid percent-tilde syntax
-- **E018**: Unix line endings detected  
+- **E018**: Unix line endings detected
 - **E019**: Percent-tilde on non-parameter variable
 - **E020**: Invalid FOR loop variable syntax
 - **E021**: Invalid string operation syntax
@@ -44,9 +40,15 @@ Across 5 severity levels:
 - **E032**: Continuation character with trailing spaces
 - **E033**: Double percent escaping error
 - **E034**: Removed Windows command detected
-
+- **E035**: Smart quote characters in batch source
+- **E036**: IF EXISTS typo
+- **E037**: FOR /F eol option has multiple characters
+- **E038**: FOR /F invalid skip or tokens suboption
+- **E039**: IF block parenthesis must be on same line
+- **E040**: FOR block parenthesis must be on same line as DO
+- **E041**: SET /P missing variable assignment
 ### Warning Level Rules (W001-W999)
-**Issues that may cause problems**
+**Auto-generated from spec/data/rules.yaml**
 
 - **W001**: Missing exit code
 - **W002**: Missing ERRORLEVEL check
@@ -70,7 +72,7 @@ Across 5 severity levels:
 - **W022**: Missing SETLOCAL EnableDelayedExpansion
 - **W023**: Inefficient nested FOR loops
 - **W024**: Deprecated command detected
-- **W025**: Missing error redirection
+- **W025**: Missing error handling
 - **W026**: Inefficient parameter modifier usage
 - **W027**: Command behavior differs between interpreters
 - **W028**: Errorlevel handling difference between .bat/.cmd
@@ -83,14 +85,33 @@ Across 5 severity levels:
 - **W035**: FOR /F tokenizing without proper delimiters
 - **W036**: FOR /F missing skip option for headers
 - **W037**: FOR /F missing eol option for comments
-- **W038**: FOR /R with explicit filename needs wildcard
+- **W038**: FOR /R with literal filename
 - **W039**: Nested FOR loops without call optimization
-- **W040**: FOR loop variable scope issue
+- **W040**: Nested FOR loop variable reuse
 - **W042**: Timeout command without /NOBREAK option
 - **W043**: Process management without proper verification
-
+- **W044**: SET command spacing around equals
+- **W045**: SET /A leading zero octal literal
+- **W046**: Unquoted IF numeric comparison ambiguity
+- **W047**: Substring expansion on empty variable
+- **W048**: FOR /F may skip empty delimited fields
+- **W049**: Assignment to pseudo-environment variable
+- **W050**: Invalid SHIFT /n switch value
+- **W051**: Ambiguous double-digit batch parameter
+- **W052**: SHIFT inside parenthesized block
+- **W053**: Bare SHIFT changes script name parameter
+- **W054**: Digit-prefixed variable name
+- **W055**: IF DEFINED with percent-wrapped variable
+- **W056**: IF clause with pseudo AND/OR operator
+- **W057**: Batch file invoked without CALL
+- **W058**: REN destination includes a path
+- **W059**: FOR loop variable case mismatch
+- **W060**: SETX uses equals sign instead of space
+- **W061**: Unbalanced PUSHD and POPD commands
+- **W062**: CD without /D for cross-drive path
+- **W063**: FOR /F loop variable beyond tokens range
 ### Style Level Rules (S001-S999)
-**Code style and formatting issues**
+**Auto-generated from spec/data/rules.yaml**
 
 - **S001**: Missing @ECHO OFF at file start
 - **S002**: ECHO OFF without @ prefix
@@ -117,16 +138,15 @@ Across 5 severity levels:
 - **S026**: Inconsistent continuation character usage
 - **S027**: Missing blank lines around code blocks
 - **S028**: Redundant parentheses in simple commands
-
 ### Security Level Rules (SEC001+)
-**Security vulnerabilities and risks**
+**Auto-generated from spec/data/rules.yaml**
 
 - **SEC001**: Potential command injection vulnerability
 - **SEC002**: Unsafe SET command usage
 - **SEC003**: Dangerous command without confirmation
 - **SEC004**: Dangerous registry operation
 - **SEC005**: Missing privilege check
-- **SEC006**: Hardcoded absolute path
+- **SEC006**: Hardcoded absolute path (Style severity despite SEC-prefix)
 - **SEC007**: Hardcoded temporary directory
 - **SEC008**: Plain text credentials detected
 - **SEC009**: PowerShell execution policy bypass
@@ -145,9 +165,8 @@ Across 5 severity levels:
 - **SEC022**: Potential hosts file modification
 - **SEC023**: Autorun.inf creation detected
 - **SEC024**: Batch file copying itself to removable media
-
 ### Performance Level Rules (P001-P999)
-**Performance and efficiency improvements**
+**Auto-generated from spec/data/rules.yaml**
 
 - **P001**: Redundant file existence check
 - **P002**: Code duplication detected
@@ -158,7 +177,7 @@ Across 5 severity levels:
 - **P007**: Temporary file without random name
 - **P008**: Delayed expansion without enablement
 - **P009**: Inefficient FOR loop pattern
-- **P010**: Missing optimization flags for directory operations
+- **P010**: DIR without /B when output is processed
 - **P012**: Inefficient string operations
 - **P013**: Missing /B flag for large DIR operations
 - **P014**: Unnecessary command output
@@ -174,6 +193,16 @@ Across 5 severity levels:
 - **P024**: Redundant SETLOCAL/ENDLOCAL pairs
 - **P025**: Inefficient wildcard usage in file operations
 - **P026**: Redundant DISABLEDELAYEDEXPANSION
+- **P027**: SETLOCAL nesting exceeds recommended depth
+
+<!-- GENERATED:rule-catalog:end -->
+
+**Blinter** provides comprehensive static analysis with **built-in rules** registered in `blinter.rules.registry` (currently **175** rules; see `RULE_COUNT` in that module). Rule IDs may have gaps where rules were retired or consolidated (for example W041, S025, P011).
+
+Across 5 severity levels:
+
+> **Security rules:** SEC-prefixed findings are static heuristics over source text. They help spot risky patterns but do not prove exploitability or guarantee runtime safety.
+
 
 ## Implementation Guidelines
 *Each rule should provide clear explanations and actionable recommendations*

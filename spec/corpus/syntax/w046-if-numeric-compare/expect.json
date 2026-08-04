@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "w046 if numeric compare",
+  "lines": {
+    "2": [
+      "S019",
+      "W001",
+      "W046"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S019",
+    "W001",
+    "W046"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

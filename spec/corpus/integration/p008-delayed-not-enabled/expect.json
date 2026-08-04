@@ -1,0 +1,24 @@
+{
+  "config": {},
+  "description": "p008 delayed not enabled",
+  "lines": {
+    "1": [
+      "W022"
+    ],
+    "2": [
+      "E006",
+      "P008",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E006",
+    "P008",
+    "W001",
+    "W022"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

@@ -804,7 +804,7 @@ def _check_enhanced_performance(lines: List[str]) -> List[LintIssue]:
         # P012: Inefficient string operations (multiple substring ops on one line)
         subst_ops = cast(
             List[str],
-            re.findall(r"%[^%]+%:[^=]+%", stripped, re.IGNORECASE),
+            re.findall(r"%[^%]*:[^%]*%", stripped, re.IGNORECASE),
         )
         if len(subst_ops) >= 2:
             issues.append(

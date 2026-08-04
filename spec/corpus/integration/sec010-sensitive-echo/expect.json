@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "sec010 sensitive echo",
+  "lines": {
+    "2": [
+      "E006",
+      "SEC010",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E006",
+    "SEC010",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

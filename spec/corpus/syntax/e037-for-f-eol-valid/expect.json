@@ -1,0 +1,8 @@
+{
+  "description": "Valid single-character FOR /F eol= must not trigger E037",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E037"],
+  "config": {},
+  "tags": ["syntax"]
+}

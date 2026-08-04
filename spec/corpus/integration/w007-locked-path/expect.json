@@ -1,0 +1,24 @@
+{
+  "config": {},
+  "description": "w007 locked path",
+  "lines": {
+    "2": [
+      "SEC006",
+      "W001",
+      "W002",
+      "W007",
+      "W025"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "SEC006",
+    "W001",
+    "W002",
+    "W007",
+    "W025"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

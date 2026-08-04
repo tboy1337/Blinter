@@ -58,7 +58,7 @@ def _assert_noise_limits(rule_counts: Counter[str], overlap_lines: int) -> None:
     assert rule_counts.get("E009", 0) <= 3
     assert rule_counts.get("E022", 0) == 0
     assert rule_counts.get("E006", 0) < 10
-    assert sum(rule_counts.values()) < 14_000
+    assert sum(rule_counts.values()) < 18_000
 
 
 @pytest.fixture(scope="module")

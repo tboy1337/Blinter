@@ -31,10 +31,17 @@ from blinter.checkers.globals import (
     _check_redundant_operations,
     _check_unreachable_code,
 )
-from blinter.checkers.performance import _check_performance_issues
+from blinter.checkers.performance import (
+    _check_performance_issues,
+    _check_setlocal_nesting_depth,
+)
 from blinter.checkers.security import _check_security_issues
 from blinter.checkers.style import _check_style_issues
-from blinter.checkers.syntax import _check_syntax_errors
+from blinter.checkers.syntax import (
+    _check_for_do_paren_next_line,
+    _check_if_block_paren_next_line,
+    _check_syntax_errors,
+)
 from blinter.checkers.vars import _check_undefined_variables
 from blinter.checkers.warnings import _check_warning_issues
 from blinter.constants import LARGE_FILE_LINE_THRESHOLD
@@ -105,14 +112,25 @@ def _append_line_checks(  # pylint: disable=too-many-arguments,too-many-position
 ) -> None:
     """Run enabled per-line checker groups for a single script line."""
     if run_errors:
-        issues.extend(_check_syntax_errors(line, line_number, labels))
+        issues.extend(_check_syntax_errors(line, line_number, labels, lines=lines))
+        stripped_lower = line.strip().lower()
+        if stripped_lower.startswith("if"):
+            issues.extend(_check_if_block_paren_next_line(lines, line_number))
+        if stripped_lower.startswith("for"):
+            issues.extend(_check_for_do_paren_next_line(lines, line_number))
         issues.extend(_check_advanced_escaping_rules(line, line_number))
 
     if run_warnings:
         issues.extend(
-            _check_warning_issues(line, line_number, set_vars, has_delayed_expansion)
+            _check_warning_issues(
+                line,
+                line_number,
+                set_vars,
+                has_delayed_expansion,
+                lines=lines,
+            )
         )
-        issues.extend(_check_advanced_for_rules(line, line_number))
+        issues.extend(_check_advanced_for_rules(line, line_number, lines=lines))
         issues.extend(_check_advanced_process_mgmt(line, line_number))
 
     if run_style:
@@ -175,6 +193,7 @@ def _append_global_checks(  # pylint: disable=too-many-arguments,too-many-positi
     if run_performance:
         issues.extend(_check_redundant_operations(lines))
         issues.extend(_check_enhanced_performance(lines))
+        issues.extend(_check_setlocal_nesting_depth(lines))
 
     if run_style:
         issues.extend(_check_inconsistent_indentation(lines))

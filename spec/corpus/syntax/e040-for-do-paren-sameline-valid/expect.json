@@ -1,0 +1,8 @@
+{
+  "description": "FOR block parenthesis on same line as DO (E040 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E040"],
+  "config": {},
+  "tags": ["syntax"]
+}

@@ -1,0 +1,8 @@
+{
+  "description": "Nested IF is the correct way to combine conditions (W056 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W056"],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}

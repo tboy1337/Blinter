@@ -6,6 +6,7 @@ from typing import (
 )
 
 from blinter.models import LintIssue
+from blinter.parsing.structure import _delayed_expansion_active_at_line
 from blinter.patterns import (
     _COMPILED_SETLOCAL_DISABLE,
 )
@@ -36,16 +37,21 @@ def _check_for_loop_optimization(stripped: str, line_num: int) -> List[LintIssue
     """Check for P009: Inefficient FOR loop pattern."""
     issues: List[LintIssue] = []
     for_match = re.match(
-        r"for\s+/f\s+[\"']([^\"']*)[\"']\s+%%\w+\s+in", stripped, re.IGNORECASE
+        r"for\s+/f\s+(?:[\"']([^\"']*)[\"']|(\S+))\s+%%\w+\s+in",
+        stripped,
+        re.IGNORECASE,
     )
     if for_match:
-        for_options: str = for_match.group(1).lower()
-        if "tokens=*" not in for_options:
+        for_options = str(for_match.group(1) or for_match.group(2) or "").lower()
+        if "tokens=" not in for_options:
             issues.append(
                 LintIssue(
                     line_number=line_num,
                     rule=RULES["P009"],
-                    context="FOR /F loop could be optimized with 'tokens=*' parameter",
+                    context=(
+                        "FOR /F defaults to tokens=1; use tokens=* when the "
+                        "entire line is needed"
+                    ),
                 )
             )
     return issues
@@ -184,7 +190,9 @@ def _check_performance_issues(  # pylint: disable=too-many-arguments,too-many-po
 
     # P008: Delayed expansion without enablement
     # Match any content between exclamation marks, including special chars like @, -, #, $, etc.
-    if not has_delayed_expansion and re.search(r"![^!]+!", stripped):
+    if not _delayed_expansion_active_at_line(_lines, line_num) and re.search(
+        r"![^!]+!", stripped
+    ):
         issues.append(
             LintIssue(
                 line_number=line_num,
@@ -197,7 +205,7 @@ def _check_performance_issues(  # pylint: disable=too-many-arguments,too-many-po
     issues.extend(_check_for_loop_optimization(stripped, line_num))
 
     # P010: Missing optimization flags for directory operations
-    if re.match(r"dir\s+(?!.*\/f)", stripped, re.IGNORECASE):
+    if re.match(r"dir\s+(?!.*/f)", stripped, re.IGNORECASE):
         issues.append(
             LintIssue(
                 line_number=line_num,
@@ -217,3 +225,30 @@ def _check_performance_issues(  # pylint: disable=too-many-arguments,too-many-po
     )
 
     return issues
+
+
+def _check_setlocal_nesting_depth(lines: List[str]) -> List[LintIssue]:
+    """Check SETLOCAL nesting depth against cmd.exe limit (P027)."""
+    depth = 0
+    max_depth = 0
+    max_line = 0
+    for index, line in enumerate(lines, start=1):
+        stripped = line.strip().lower()
+        if stripped.startswith("setlocal"):
+            depth += 1
+            if depth > max_depth:
+                max_depth = depth
+                max_line = index
+        elif stripped.startswith("endlocal"):
+            depth = max(depth - 1, 0)
+    if max_depth > 32:
+        return [
+            LintIssue(
+                line_number=max_line,
+                rule=RULES["P027"],
+                context=(
+                    f"SETLOCAL nesting depth {max_depth} exceeds cmd.exe limit of 32"
+                ),
+            )
+        ]
+    return []

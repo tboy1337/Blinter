@@ -9,9 +9,10 @@ src/blinter/
   __init__.py          # Public API (library and CLI entry re-exports)
   models.py            # BlinterConfig, LintIssue, Rule, RuleSeverity
   constants.py         # Shared constants (BUILTIN_VARS, MAX_FILE_SIZE_BYTES, ...)
-  patterns.py          # Dangerous-command and syntax patterns
+  patterns.py          # Dangerous-command patterns (generated from SSOT)
   rules/
-    registry.py        # RULES dict (single source of rule metadata)
+    registry.py        # RULES dict (generated from spec/data/rules.yaml)
+    expansion_data.py  # Variable expansion modifiers (generated from batch-spec)
     helpers.py         # _create_rule, _add_issue, severity helpers
   parsing/
     structure.py       # Labels, SET variables, script structure
@@ -108,3 +109,23 @@ When `follow_calls` is enabled, Blinter resolves `CALL` targets to read variable
 ## Configuration
 
 `BlinterConfig` controls recursion, rule enablement, `max_line_length`, `follow_calls`, `scan_root`, and severity filtering. Values can be loaded from `blinter.ini` and overridden by CLI flags.
+
+## SSOT split: batch-spec vs Blinter
+
+| Artifact | Repo / path |
+|----------|-------------|
+| ANTLR grammar, expansion rules, command catalog, cmd-help | [`vendor/batch-spec`](../vendor/batch-spec) ([`tboy1337/batch-spec`](https://github.com/tboy1337/batch-spec), pinned in [`spec/batch-spec.lock`](../spec/batch-spec.lock)) |
+| [`spec/data/rules.yaml`](../spec/data/rules.yaml) | Rule catalog (`checker: regex`; see `RULE_COUNT`) |
+| [`spec/data/commands-linter.yaml`](../spec/data/commands-linter.yaml) | Security/style command policy (merged with batch-spec `commands.yaml` for `patterns.py`) |
+| [`spec/corpus/`](../spec/corpus/) | 203 committed fixtures + `expect.json` oracles |
+| [`spec/audit/`](../spec/audit/) | Reference matrix and audit baselines |
+
+Clone with `git clone --recurse-submodules` or run `git submodule update --init --recursive` after checkout.
+
+Generators live under [`scripts/spec/`](../scripts/spec/). `scripts/verify.py` runs schema validation, generator `--check`, strict SSOT audit, cmd.exe oracle (Windows), linting, and tests.
+
+**cmd.exe oracle:** [`scripts/spec/cmd_oracle.py`](../scripts/spec/cmd_oracle.py) runs safe corpus fixtures in isolated `cmd /c` subprocesses. Destructive, interactive, or long-running fixtures remain static-only; skips are listed in [`oracle-skip.yaml`](../spec/corpus/meta/oracle-skip.yaml).
+
+Corpus policy: every rule in `rules.yaml` must have at least one corpus assertion (see `audit_ssot.py` coverage checks).
+
+**Performance gate:** [`scripts/benchmark_lint.py`](../scripts/benchmark_lint.py) with `--check-baseline` compares the synthetic-file median against [`spec/benchmark/synthetic-baseline.json`](../spec/benchmark/synthetic-baseline.json). Local A/B timing uses [`scripts/experiment_benchmark.py`](../scripts/experiment_benchmark.py).

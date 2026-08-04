@@ -1,0 +1,8 @@
+{
+  "description": "Consistent FOR loop variable case must not trigger W059",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W059"],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}

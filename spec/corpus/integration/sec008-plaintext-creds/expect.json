@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "sec008 plaintext creds",
+  "lines": {
+    "2": [
+      "SEC008",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "SEC008",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

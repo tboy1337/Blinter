@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "e013 command typo",
+  "lines": {
+    "2": [
+      "E013",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E013",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "config": {},
+  "description": "s014 long params",
+  "lines": {
+    "2": [
+      "S014"
+    ],
+    "3": [
+      "S018",
+      "S027"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S014",
+    "S018",
+    "S027"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

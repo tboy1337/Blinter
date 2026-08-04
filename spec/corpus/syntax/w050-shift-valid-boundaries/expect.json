@@ -1,0 +1,8 @@
+{
+  "config": {},
+  "description": "SHIFT /0 and /8 are valid per shift-help.txt (W050 boundary)",
+  "lines": {},
+  "must_not": ["W050"],
+  "rules": [],
+  "tags": ["syntax", "control-flow"]
+}

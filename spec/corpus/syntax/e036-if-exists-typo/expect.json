@@ -1,0 +1,11 @@
+{
+  "config": {},
+  "description": "IF EXISTS typo (E036)",
+  "lines": {
+    "2": ["E036"],
+    "3": ["E036", "W001"]
+  },
+  "must_not": [],
+  "rules": ["E036", "W001"],
+  "tags": ["syntax", "control-flow"]
+}

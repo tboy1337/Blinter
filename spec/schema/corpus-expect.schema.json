@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blinter.dev/schema/corpus-expect.schema.json",
+  "title": "Blinter corpus expect.json",
+  "type": "object",
+  "required": ["description"],
+  "properties": {
+    "description": { "type": "string", "minLength": 1 },
+    "rules": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^(E|W|S|SEC|P)[0-9]{3}$" }
+    },
+    "lines": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string", "pattern": "^(E|W|S|SEC|P)[0-9]{3}$" }
+      }
+    },
+    "must_not": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^(E|W|S|SEC|P)[0-9]{3}$" }
+    },
+    "total": { "type": "integer", "minimum": 0 },
+    "config": {
+      "type": "object",
+      "properties": {
+        "follow_calls": { "type": "boolean" },
+        "disabled_rules": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "enabled_rules": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "scan_root": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "parse": {
+      "type": "object",
+      "properties": {
+        "should_parse": { "type": "boolean" },
+        "expect_syntax_errors": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "oracle": {
+      "type": "string",
+      "enum": ["run", "skip"],
+      "description": "Override cmd_oracle.py execution for this fixture (run bypasses heuristics)"
+    },
+    "oracle_timeout_s": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Per-case cmd_oracle timeout override in seconds"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,13 @@
+{
+  "config": {
+    "follow_calls": true,
+    "scan_root": "C:\\Users\\Laptop\\Documents\\Git\\Blinter\\spec\\corpus\\integration\\follow-calls-e006"
+  },
+  "description": "follow_calls suppresses false E006 for vars defined in called scripts",
+  "lines": {},
+  "must_not": ["E006"],
+  "rules": [],
+  "tags": [
+    "integration"
+  ]
+}

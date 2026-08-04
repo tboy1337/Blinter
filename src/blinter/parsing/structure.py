@@ -210,6 +210,22 @@ def _collect_set_variables(lines: List[str]) -> Set[str]:
     return set_vars
 
 
+def _collect_empty_assigned_variables(lines: List[str]) -> Set[str]:
+    """Collect variables explicitly assigned an empty value via SET."""
+    empty_vars: Set[str] = set()
+    vn = _SET_VAR_NAME
+    empty_patterns = [
+        rf'\bset\s+"?({vn})"?\s*=\s*(?:$|[&|])',
+        rf'\bset\s+"({vn})="\s*(?:$|[&|])',
+    ]
+    for line in lines:
+        stripped = line.strip()
+        for pattern in empty_patterns:
+            for match in re.finditer(pattern, stripped, re.IGNORECASE):
+                empty_vars.add(str(match.group(1)).upper())
+    return empty_vars
+
+
 def _parse_suppression_comments(lines: List[str]) -> Dict[int, Set[str]]:
     """
     Parse inline suppression comments from batch file lines.
@@ -268,6 +284,69 @@ def _parse_suppression_comments(lines: List[str]) -> Dict[int, Set[str]]:
                     suppressions[i + 1] = set()
 
     return suppressions
+
+
+def _begin_structure_cache_pass() -> None:
+    """Initialize per-lint caches used by checker modules."""
+    from blinter.checkers.warnings import (
+        _begin_empty_assigned_vars_pass,
+        _begin_paren_depth_pass,
+    )
+
+    _begin_invocation_prefix_pass()
+    _begin_delayed_expansion_pass()
+    _begin_paren_depth_pass()
+    _begin_empty_assigned_vars_pass()
+
+
+_delayed_expansion_cache_var: ContextVar[
+    Optional[Dict[tuple[str, ...], List[bool]]]
+] = ContextVar("delayed_expansion_cache", default=None)
+
+
+def _begin_delayed_expansion_pass() -> None:
+    """Start a per-lint delayed-expansion state cache for the current context."""
+    _delayed_expansion_cache_var.set({})
+
+
+def _build_delayed_expansion_state(lines: List[str]) -> List[bool]:
+    """Return delayed-expansion active state at each 1-based line (after that line)."""
+    stack: List[bool] = []
+    state: List[bool] = []
+    for line in lines:
+        stripped = line.strip().lower()
+        if re.match(r"setlocal\b", stripped):
+            if "enabledelayedexpansion" in stripped:
+                stack.append(True)
+            elif "disabledelayedexpansion" in stripped:
+                stack.append(False)
+            else:
+                stack.append(stack[-1] if stack else False)
+        elif re.match(r"endlocal\b", stripped):
+            if stack:
+                stack.pop()
+        state.append(stack[-1] if stack else False)
+    return state
+
+
+def _delayed_expansion_state_for_lines(lines: List[str]) -> List[bool]:
+    """Return cached delayed-expansion state per line within a single lint pass."""
+    cache = _delayed_expansion_cache_var.get()
+    if cache is None:
+        return _build_delayed_expansion_state(lines)
+    lines_key = tuple(lines)
+    cached = cache.get(lines_key)
+    if cached is None:
+        cached = _build_delayed_expansion_state(lines)
+        cache[lines_key] = cached
+    return cached
+
+
+def _delayed_expansion_active_at_line(lines: List[str], line_num: int) -> bool:
+    """Return whether delayed expansion is active at the given 1-based line number."""
+    if line_num < 1 or line_num > len(lines):
+        return False
+    return _delayed_expansion_state_for_lines(lines)[line_num - 1]
 
 
 def _analyze_script_structure(

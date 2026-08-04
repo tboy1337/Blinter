@@ -1,0 +1,8 @@
+{
+  "description": "CD to another drive path without /D triggers W062",
+  "rules": ["W062"],
+  "lines": { "2": ["W062"] },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax"]
+}

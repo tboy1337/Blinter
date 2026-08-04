@@ -1,0 +1,13 @@
+{
+  "config": {},
+  "description": "SET /A assignment to pseudo-environment variables (W049)",
+  "lines": {
+    "2": ["W049"],
+    "3": ["W049"]
+  },
+  "must_not": [],
+  "rules": ["W049"],
+  "tags": [
+    "syntax"
+  ]
+}

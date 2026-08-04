@@ -1,0 +1,10 @@
+{
+  "config": {},
+  "description": "SET /A allows spaces around equals (W044 must not fire)",
+  "lines": {},
+  "must_not": ["W044"],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "config": {},
+  "description": "Bare SHIFT replaces %0 with former %1 (W053)",
+  "lines": {
+    "2": ["W053"]
+  },
+  "must_not": [],
+  "rules": ["W053"],
+  "tags": ["syntax", "control-flow"]
+}
