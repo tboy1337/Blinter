@@ -48,6 +48,17 @@ def _git_rev_parse(repo_dir: Path, ref: str) -> str:
     return result.stdout.strip()
 
 
+def _expected_lock_commit(lock: dict[str, object]) -> str:
+    commit = lock.get("commit")
+    if isinstance(commit, str) and commit:
+        return commit
+    ref = lock.get("ref")
+    if not isinstance(ref, str) or not ref:
+        pytest.fail("batch-spec.lock must include commit or ref")
+    _git_fetch_tags(_BATCH_SPEC_DIR)
+    return _git_rev_parse(_BATCH_SPEC_DIR, ref)
+
+
 @pytest.mark.parametrize("generator", _GENERATORS)
 def test_generators_check(generator: str) -> None:
     result = subprocess.run(
@@ -74,13 +85,11 @@ def test_batch_spec_submodule_present() -> None:
 def test_batch_spec_lock_matches_checkout() -> None:
     assert _LOCK_PATH.is_file(), "spec/batch-spec.lock is missing"
     lock = json.loads(_LOCK_PATH.read_text(encoding="utf-8"))
-    expected_ref = lock["ref"]
     assert lock["path"] == "vendor/batch-spec"
 
-    _git_fetch_tags(_BATCH_SPEC_DIR)
     checkout = _git_rev_parse(_BATCH_SPEC_DIR, "HEAD")
-    expected = _git_rev_parse(_BATCH_SPEC_DIR, expected_ref)
+    expected = _expected_lock_commit(lock)
     assert checkout == expected, (
-        f"Checked-out batch-spec ({checkout}) does not match lock ref "
-        f"{expected_ref} ({expected})"
+        f"Checked-out batch-spec ({checkout}) does not match lock "
+        f"({lock.get('ref', expected)})"
     )
