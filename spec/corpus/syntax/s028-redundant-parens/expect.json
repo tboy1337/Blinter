@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "s028 redundant parens",
+  "lines": {
+    "2": [
+      "S028",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S028",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

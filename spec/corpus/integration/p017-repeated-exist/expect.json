@@ -1,0 +1,27 @@
+{
+  "config": {},
+  "description": "p017 repeated exist",
+  "lines": {
+    "2": [
+      "P017"
+    ],
+    "3": [
+      "P001",
+      "P017"
+    ],
+    "4": [
+      "P001",
+      "P017",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P001",
+    "P017",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

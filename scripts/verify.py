@@ -13,6 +13,14 @@ from typing import Sequence, cast
 # Portable directory names (no platform-specific separators).
 _CHECK_DIRS: tuple[str, ...] = ("src", "tests", "scripts")
 _VERIFY_SCRIPT = Path("scripts") / "verify.py"
+_SPEC_VALIDATE = Path("scripts") / "spec" / "validate_spec.py"
+_SPEC_VALIDATE_CORPUS = Path("scripts") / "spec" / "validate_corpus.py"
+_SPEC_GENERATE_RULES = Path("scripts") / "spec" / "generate_rules.py"
+_SPEC_GENERATE_DOCS = Path("scripts") / "spec" / "generate_docs.py"
+_SPEC_GENERATE_EXPANSION = Path("scripts") / "spec" / "generate_expansion.py"
+_SPEC_GENERATE_COMMANDS = Path("scripts") / "spec" / "generate_commands.py"
+_SPEC_AUDIT = Path("scripts") / "spec" / "audit_ssot.py"
+_SPEC_CMD_ORACLE = Path("scripts") / "spec" / "cmd_oracle.py"
 _CORPUS_LINT_SCRIPT = Path("scripts") / "corpus_lint.py"
 _CORPUS_DIR = Path("batch-script-examples")
 _PACKAGE_DIR = Path("src") / "blinter"
@@ -157,22 +165,63 @@ def main() -> None:
     package_dir = str(_PACKAGE_DIR)
 
     subprocess_steps_before_pylint: list[tuple[str, list[str]]] = [
-        ("autopep8 (trailing whitespace)", _autopep8_args(fix=fix)),
-        ("isort", _isort_args(fix=fix)),
-        ("black", _python_m("black", "--check", *_CHECK_DIRS)),
-        (
-            "mypy",
-            _python_m(
-                "mypy",
-                package_dir,
-                "tests",
-                verify_script,
-                corpus_lint_script,
-                str(Path("scripts") / "corpus_baseline.py"),
-                str(Path("scripts") / "generate_corpus_baseline.py"),
-            ),
-        ),
+        ("validate spec schemas", [sys.executable, str(_SPEC_VALIDATE)]),
+        ("validate SSOT corpus", [sys.executable, str(_SPEC_VALIDATE_CORPUS)]),
     ]
+
+    if _is_windows():
+        subprocess_steps_before_pylint.append(
+            (
+                "cmd.exe corpus oracle",
+                [sys.executable, str(_SPEC_CMD_ORACLE)],
+            )
+        )
+
+    subprocess_steps_before_pylint.extend(
+        [
+            (
+                "check generated registry.py",
+                [sys.executable, str(_SPEC_GENERATE_RULES), "--check"],
+            ),
+            (
+                "check generated expansion_data.py",
+                [sys.executable, str(_SPEC_GENERATE_EXPANSION), "--check"],
+            ),
+            (
+                "check generated patterns.py",
+                [sys.executable, str(_SPEC_GENERATE_COMMANDS), "--check"],
+            ),
+            (
+                "check generated docs catalog",
+                [sys.executable, str(_SPEC_GENERATE_DOCS), "--check"],
+            ),
+            (
+                "SSOT audit (strict)",
+                [sys.executable, str(_SPEC_AUDIT), "--strict"],
+            ),
+        ]
+    )
+
+    subprocess_steps_before_pylint.extend(
+        [
+            ("autopep8 (trailing whitespace)", _autopep8_args(fix=fix)),
+            ("isort", _isort_args(fix=fix)),
+            ("black", _python_m("black", "--check", *_CHECK_DIRS)),
+            (
+                "mypy",
+                _python_m(
+                    "mypy",
+                    package_dir,
+                    "tests",
+                    verify_script,
+                    corpus_lint_script,
+                    str(Path("scripts") / "corpus_baseline.py"),
+                    str(Path("scripts") / "generate_corpus_baseline.py"),
+                    str(Path("scripts") / "benchmark_lint.py"),
+                ),
+            ),
+        ]
+    )
 
     subprocess_steps_after_pylint: list[tuple[str, list[str]]] = [
         ("pylint (verify)", _python_m("pylint", verify_script)),

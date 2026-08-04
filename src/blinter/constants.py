@@ -67,6 +67,19 @@ BUILTIN_VARS: Set[str] = {
     "SAFEBOOT_OPTION",  # Set when Windows is in Safe Mode
 }
 
+# cmd.exe dynamic pseudo-environment variables (W049). Assigning to these breaks
+# expected dynamic semantics; see MS Learn and cmd SET /? behavior.
+PSEUDO_ENV_VARS: Set[str] = {
+    "CD",
+    "CMDCMDLINE",
+    "CMDEXTVERSION",
+    "DATE",
+    "ERRORLEVEL",
+    "HIGHESTNUMANODENUMBER",
+    "RANDOM",
+    "TIME",
+}
+
 MAGIC_NUMBER_EXCEPTIONS: Set[str] = {
     # Basic numbers
     "0",

@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "sec019 self modification",
+  "lines": {
+    "2": [
+      "SEC019",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "SEC019",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

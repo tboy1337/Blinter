@@ -2217,8 +2217,8 @@ winrm get winrm/config
         finally:
             os.unlink(temp_file)
 
-    def test_w024_deprecated_commands_nbtstat(self) -> None:
-        """Test W024: NBTSTAT command should be flagged as deprecated."""
+    def test_w024_deprecated_commands_nbtstat_not_flagged(self) -> None:
+        """Test NBTSTAT is not flagged as deprecated (upstream v0.68.0 correction)."""
         content = """@ECHO OFF
 NBTSTAT -n
 nbtstat -c
@@ -2227,11 +2227,22 @@ nbtstat -c
         try:
             issues = lint_batch_file(temp_file)
             rule_codes = [issue.rule.code for issue in issues]
+            assert "W024" not in rule_codes, "NBTSTAT should not trigger W024"
+        finally:
+            os.unlink(temp_file)
+
+    def test_w024_deprecated_commands_caspol(self) -> None:
+        """Test W024: CASPOL command should be flagged as deprecated."""
+        content = """@ECHO OFF
+CASPOL -m -ag 1 -url file://c:\\temp\\* FullTrust
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            rule_codes = [issue.rule.code for issue in issues]
             w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
-            assert "W024" in rule_codes, "W024 should be triggered for NBTSTAT command"
-            assert (
-                len(w024_issues) == 2
-            ), f"Expected 2 W024 issues, got {len(w024_issues)}"
+            assert "W024" in rule_codes, "W024 should be triggered for CASPOL command"
+            assert "CASPOL" in w024_issues[0].context.upper()
         finally:
             os.unlink(temp_file)
 
@@ -2271,8 +2282,8 @@ at \\\\computer 10:00 backup.bat
         finally:
             os.unlink(temp_file)
 
-    def test_e034_removed_commands_caspol(self) -> None:
-        """Test E034: CASPOL command should be flagged as removed."""
+    def test_e034_removed_commands_caspol_not_flagged(self) -> None:
+        """Test CASPOL is deprecated (W024), not removed (E034), per upstream v0.68.0."""
         content = """@ECHO OFF
 CASPOL -m -ag 1 -url file://c:\\temp\\* FullTrust
 """
@@ -2280,9 +2291,8 @@ CASPOL -m -ag 1 -url file://c:\\temp\\* FullTrust
         try:
             issues = lint_batch_file(temp_file)
             rule_codes = [issue.rule.code for issue in issues]
-            assert "E034" in rule_codes, "E034 should be triggered for CASPOL command"
-            e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
-            assert "CASPOL" in e034_issues[0].context.upper()
+            assert "E034" not in rule_codes, "CASPOL should not trigger E034"
+            assert "W024" in rule_codes, "CASPOL should trigger W024"
         finally:
             os.unlink(temp_file)
 
@@ -2802,14 +2812,12 @@ WMIC os get caption
 CACLS file.txt /E
 BITSADMIN /transfer test http://test.com/file.zip c:\\file.zip
 WINRM quickconfig
-NBTSTAT -n
 NET SEND computer "message"
 AT 14:00 task.bat
 DPATH C:\\DATA
 KEYS
 
 REM Removed commands (should trigger E034)
-CASPOL -m -ag 1
 DISKCOMP A: B:
 APPEND C:\\DATA
 BROWSTAT status
@@ -2829,15 +2837,15 @@ ROBOCOPY source dest /E
             w024_issues = [issue for issue in issues if issue.rule.code == "W024"]
             e034_issues = [issue for issue in issues if issue.rule.code == "E034"]
 
-            # Should have 9 deprecated command warnings
-            assert len(w024_issues) == 9, (
-                f"Expected 9 W024 issues (deprecated commands), got {len(w024_issues)}. "
+            # Should have 8 deprecated command warnings (CASPOL moved from E034)
+            assert len(w024_issues) == 8, (
+                f"Expected 8 W024 issues (deprecated commands), got {len(w024_issues)}. "
                 f"Issues: {[(i.line_number, i.context) for i in w024_issues]}"
             )
 
-            # Should have 8 removed command errors
-            assert len(e034_issues) == 8, (
-                f"Expected 8 E034 issues (removed commands), got {len(e034_issues)}. "
+            # Should have 7 removed command errors (CASPOL no longer E034)
+            assert len(e034_issues) == 7, (
+                f"Expected 7 E034 issues (removed commands), got {len(e034_issues)}. "
                 f"Issues: {[(i.line_number, i.context) for i in e034_issues]}"
             )
         finally:

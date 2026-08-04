@@ -1,0 +1,30 @@
+{
+  "config": {},
+  "description": "delayed expansion no p026",
+  "lines": {
+    "1": [
+      "W022"
+    ],
+    "2": [
+      "P003"
+    ],
+    "3": [
+      "E006",
+      "P008",
+      "W001"
+    ]
+  },
+  "must_not": [
+    "P026"
+  ],
+  "rules": [
+    "E006",
+    "P003",
+    "P008",
+    "W001",
+    "W022"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

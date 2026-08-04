@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -30,21 +32,31 @@ jobs:
 
       - name: Run quality checks
         run: |
+          python scripts/spec/validate_spec.py
+          python scripts/spec/generate_rules.py --check
+          python scripts/spec/generate_expansion.py --check
+          python scripts/spec/generate_commands.py --check
+          python scripts/spec/generate_docs.py --check
+          python scripts/spec/audit_ssot.py --strict
           python -m black --check src tests scripts
           python -m isort --check-only src tests scripts
-          python -m mypy src/blinter tests scripts/verify.py scripts/corpus_lint.py scripts/corpus_baseline.py scripts/generate_corpus_baseline.py
+          python -m mypy src/blinter tests scripts/verify.py scripts/corpus_lint.py scripts/corpus_baseline.py scripts/generate_corpus_baseline.py scripts/benchmark_lint.py
           python -m pylint src/blinter
           python -m bandit -r src/blinter -c pyproject.toml -ll -q
+          python scripts/benchmark_lint.py --runs 3 --check-baseline
 
   test-python:
-    name: pytest (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: pytest (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ['3.11', '3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -66,6 +78,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
 
       - name: Set up Python
         uses: actions/setup-python@v6

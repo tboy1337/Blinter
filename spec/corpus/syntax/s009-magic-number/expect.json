@@ -1,0 +1,24 @@
+{
+  "config": {},
+  "description": "s009 magic number",
+  "lines": {
+    "2": [
+      "S009",
+      "S019",
+      "S023",
+      "W001",
+      "W042"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S009",
+    "S019",
+    "S023",
+    "W001",
+    "W042"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "p023 seta in loop",
+  "lines": {
+    "3": [
+      "P023",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P023",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

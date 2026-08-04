@@ -1,0 +1,8 @@
+{
+  "description": "IF NOT ERRORLEVEL 1 is valid traditional success syntax (W017 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W017"],
+  "config": {},
+  "tags": ["syntax"]
+}

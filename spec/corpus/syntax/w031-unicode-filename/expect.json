@@ -1,0 +1,28 @@
+{
+  "config": {},
+  "description": "w031 unicode filename",
+  "lines": {
+    "1": [
+      "W032"
+    ],
+    "2": [
+      "W001",
+      "W002",
+      "W012",
+      "W025",
+      "W031"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001",
+    "W002",
+    "W012",
+    "W025",
+    "W031",
+    "W032"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

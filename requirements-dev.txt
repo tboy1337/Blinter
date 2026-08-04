@@ -17,6 +17,11 @@ bandit
 # Security Analysis
 pip-audit
 
+# SSOT spec tooling
+pyyaml
+types-PyYAML
+jsonschema
+
 # Code Formatting
 black
 isort

@@ -1,0 +1,10 @@
+{
+  "description": "SET /P prompt-only quoted string without variable= is invalid (E041)",
+  "rules": ["E041"],
+  "lines": {
+    "2": ["E041"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax"]
+}

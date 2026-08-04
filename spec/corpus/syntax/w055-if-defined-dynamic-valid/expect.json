@@ -1,0 +1,8 @@
+{
+  "description": "Dynamic IF DEFINED stk%~1 is valid (no W055)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W055"],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}

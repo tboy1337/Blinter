@@ -1,0 +1,10 @@
+{
+  "description": "SETX with equals sign is invalid cmd.exe syntax (W060)",
+  "rules": ["W060"],
+  "lines": {
+    "2": ["W060"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax"]
+}

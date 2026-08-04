@@ -1,0 +1,8 @@
+{
+  "description": "Valid SETX space-delimited syntax must not trigger W060",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W060"],
+  "config": {},
+  "tags": ["syntax"]
+}

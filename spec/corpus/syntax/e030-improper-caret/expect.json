@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "e030 improper caret",
+  "lines": {
+    "2": [
+      "E030",
+      "P014",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E030",
+    "P014",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

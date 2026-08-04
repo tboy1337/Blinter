@@ -1,0 +1,8 @@
+{
+  "description": "SET /P with variable= prompt is valid (E041 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E041"],
+  "config": {},
+  "tags": ["syntax"]
+}

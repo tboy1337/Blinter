@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "p018 for r wildcard",
+  "lines": {
+    "2": [
+      "P018",
+      "P025",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P018",
+    "P025",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

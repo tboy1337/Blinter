@@ -1,0 +1,8 @@
+{
+  "description": "IF block with parenthesis on same line is valid (E039 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E039"],
+  "config": {},
+  "tags": ["syntax"]
+}

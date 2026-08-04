@@ -1,0 +1,24 @@
+{
+  "config": {},
+  "description": "sec003 dangerous del",
+  "lines": {
+    "2": [
+      "P025",
+      "SEC003",
+      "W001",
+      "W002",
+      "W025"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P025",
+    "SEC003",
+    "W001",
+    "W002",
+    "W025"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

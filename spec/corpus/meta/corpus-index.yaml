@@ -1,0 +1,15 @@
+version: 1
+description: SSOT corpus index and aggregate guardrails
+tags:
+  syntax:
+    - quotes
+    - expansion
+    - escaping
+    - control-flow
+  integration:
+    - follow_calls
+    - control-flow
+    - performance
+    - style
+aggregate_limits:
+  max_total_issues_per_case: 50

@@ -9,11 +9,13 @@ from typing import (
 )
 
 from blinter.models import LintIssue
+from blinter.parsing.structure import _delayed_expansion_state_for_lines
 from blinter.patterns import (
     _COMPILED_IF_PATTERN,
     BUILTIN_COMMANDS,
     COMMON_COMMAND_TYPOS,
 )
+from blinter.rules.expansion_data import VALID_MODIFIERS
 from blinter.rules.registry import RULES
 
 
@@ -95,9 +97,66 @@ def _check_call_labels(stripped: str, line_num: int) -> List[LintIssue]:
     return issues
 
 
+_SET_P_VALID_RE = re.compile(
+    r'^set\s+/p\s+(?:"[A-Za-z_#][\w#]*=|[A-Za-z_#][\w#]*=)',
+    re.IGNORECASE,
+)
+
+
+def _check_set_p_syntax(stripped: str, line_num: int) -> List[LintIssue]:
+    """Flag SET /P lines missing variable=[promptString] (E041)."""
+    if not re.match(r"set\s+/p\b", stripped, re.IGNORECASE):
+        return []
+    if _SET_P_VALID_RE.match(stripped):
+        return []
+    return [
+        LintIssue(
+            line_number=line_num,
+            rule=RULES["E041"],
+            context="SET /P requires variable=[promptString] per SET /?",
+        )
+    ]
+
+
+def _check_if_exists_typo(stripped: str, line_num: int) -> List[LintIssue]:
+    """Flag IF EXISTS / IF NOT EXISTS typo (E036). cmd.exe requires IF EXIST."""
+    if re.search(r"\bif\s+(?:/i\s+)?not\s+exists\b", stripped, re.IGNORECASE):
+        return [
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E036"],
+                context="IF NOT EXISTS is invalid; use IF NOT EXIST",
+            )
+        ]
+    if re.search(r"\bif\s+(?:/i\s+)?exists\b", stripped, re.IGNORECASE):
+        return [
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E036"],
+                context="IF EXISTS is invalid; use IF EXIST",
+            )
+        ]
+    return []
+
+
 def _check_if_statement_formatting(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for IF statement formatting issues (E003)."""
     issues: List[LintIssue] = []
+    issues.extend(_check_if_exists_typo(stripped, line_num))
+    if issues:
+        return issues
+    if re.match(r'if(?=["\'%!])', stripped, re.IGNORECASE) or re.match(
+        r"if\(", stripped, re.IGNORECASE
+    ):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E003"],
+                context="IF keyword must be followed by a space before the condition",
+            )
+        )
+        return issues
+
     if_match = _COMPILED_IF_PATTERN.match(stripped)
     if not if_match:
         return issues
@@ -142,6 +201,66 @@ def _check_if_statement_formatting(stripped: str, line_num: int) -> List[LintIss
     return issues
 
 
+def _check_if_block_paren_next_line(lines: list[str], line_num: int) -> List[LintIssue]:
+    """IF block open parenthesis must be on the same line as IF (E039)."""
+    if line_num < 1 or line_num > len(lines):
+        return []
+    current = lines[line_num - 1].strip()
+    if not re.match(r"if\b", current, re.IGNORECASE):
+        return []
+    if "(" in current:
+        return []
+    if re.search(r"\b(if\s+)?(exist|defined|errorlevel)\b", current, re.IGNORECASE):
+        # IF EXIST/ DEFINED / ERRORLEVEL forms may run a command without a block
+        return []
+    next_index = line_num
+    while next_index < len(lines):
+        nxt = lines[next_index].strip()
+        if not nxt or nxt.startswith("rem ") or nxt.startswith("::"):
+            next_index += 1
+            continue
+        if nxt.startswith("("):
+            return [
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["E039"],
+                    context="IF block open parenthesis must be on the same line as IF",
+                )
+            ]
+        break
+    return []
+
+
+def _check_for_do_paren_next_line(lines: list[str], line_num: int) -> List[LintIssue]:
+    """FOR block open parenthesis must be on the same line as DO (E040)."""
+    if line_num < 1 or line_num > len(lines):
+        return []
+    current = lines[line_num - 1].strip()
+    if not re.match(r"for\b", current, re.IGNORECASE):
+        return []
+    do_match = re.search(r"\bdo\b(.*)$", current, re.IGNORECASE)
+    if not do_match:
+        return []
+    if "(" in do_match.group(1):
+        return []
+    next_index = line_num
+    while next_index < len(lines):
+        nxt = lines[next_index].strip()
+        if not nxt or nxt.startswith("rem ") or nxt.startswith("::"):
+            next_index += 1
+            continue
+        if nxt.startswith("("):
+            return [
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["E040"],
+                    context="FOR block open parenthesis must be on the same line as DO",
+                )
+            ]
+        break
+    return []
+
+
 def _check_errorlevel_syntax(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for invalid errorlevel comparison syntax (E016)."""
     issues: List[LintIssue] = []
@@ -154,6 +273,19 @@ def _check_errorlevel_syntax(stripped: str, line_num: int) -> List[LintIssue]:
         return issues
 
     errorlevel_content: str = errorlevel_group_result.strip()
+
+    if re.match(r"%errorlevel%\s+\d+\b", errorlevel_content, re.IGNORECASE):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E016"],
+                context=(
+                    "Invalid 'IF %ERRORLEVEL% number' syntax - "
+                    "missing comparison operator (use EQU, NEQ, GEQ, etc.)"
+                ),
+            )
+        )
+        return issues
 
     # Check for invalid "if not %errorlevel% number" pattern (missing operator)
     if re.match(r"not\s+%errorlevel%\s+\d+", errorlevel_content, re.IGNORECASE):
@@ -276,6 +408,20 @@ def _quoted_path_has_invalid_chars(stripped: str) -> bool:
     return False
 
 
+def _unquoted_path_has_invalid_chars(stripped: str) -> bool:
+    """Return True when an unquoted path token contains invalid path characters."""
+    if _line_has_script_command(stripped):
+        return False
+    for token in stripped.split():
+        if token.startswith(("rem", "REM")):
+            break
+        if re.search(r"[a-zA-Z]:\\[^\"']*[<>|][^\"'\s]*", token):
+            return True
+        if re.search(r"\\\\[^\\]+\\[^\"'\s]*[<>|]", token):
+            return True
+    return False
+
+
 def _check_path_syntax(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for invalid path syntax (E005)."""
     if _line_has_script_command(stripped):
@@ -284,15 +430,17 @@ def _check_path_syntax(stripped: str, line_num: int) -> List[LintIssue]:
         return []
     if _line_has_xml_or_markup_prefix(stripped):
         return []
-    if not _quoted_path_has_invalid_chars(stripped):
-        return []
-    return [
-        LintIssue(
-            line_number=line_num,
-            rule=RULES["E005"],
-            context="Path contains invalid characters",
-        )
-    ]
+    if _quoted_path_has_invalid_chars(stripped) or _unquoted_path_has_invalid_chars(
+        stripped
+    ):
+        return [
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E005"],
+                context="Path contains invalid characters",
+            )
+        ]
+    return []
 
 
 def _should_skip_e009_quote_check(stripped: str) -> bool:
@@ -402,20 +550,21 @@ def _check_quotes(line: str, line_num: int) -> List[LintIssue]:
 def _check_for_loop_syntax(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for malformed FOR loop (E010)."""
     issues: List[LintIssue] = []
-    if (
-        re.match(r"for\s+.*", stripped, re.IGNORECASE)
-        and " do " not in stripped.lower()
-    ):
-        # Don't flag multiline FOR loops (those ending with opening parenthesis)
-        # or those that appear to continue on next line
-        if not re.search(r"\(\s*$", stripped):
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["E010"],
-                    context="FOR loop is missing required DO keyword",
-                )
+    if not re.match(r"for\s+.*", stripped, re.IGNORECASE):
+        return issues
+    lowered = stripped.lower()
+    has_do = bool(re.search(r"\bdo(?:\s|\()", lowered))
+    if has_do:
+        return issues
+    # Don't flag multiline FOR loops (those ending with opening parenthesis)
+    if not re.search(r"\(\s*$", stripped):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E010"],
+                context="FOR loop is missing required DO keyword",
             )
+        )
     return issues
 
 
@@ -445,7 +594,13 @@ def _has_special_variable_patterns(stripped: str) -> bool:
     )
 
 
-def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
+def _check_variable_expansion(
+    stripped: str,
+    line_num: int,
+    *,
+    lines: List[str] | None = None,
+    delayed_expansion_state: List[bool] | None = None,
+) -> List[LintIssue]:
     """Check for invalid variable expansion syntax (E011)."""
     issues: List[LintIssue] = []
 
@@ -462,15 +617,12 @@ def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
         r"%~?[fdpnxsatz]*[0-9*](?![0-9])", "", temp_stripped, flags=re.IGNORECASE
     )
 
-    # Remove all valid variable expansion patterns (including @ prefix)
+    # Remove all valid percent expansion patterns (including @ prefix)
     temp_no_percent = re.sub(
         r"%[A-Z0-9_~@]+[^%]*%", "", temp_stripped, flags=re.IGNORECASE
     )
-    temp_no_exclaim = re.sub(
-        r"![A-Z0-9_@]+[^!]*!", "", temp_stripped, flags=re.IGNORECASE
-    )
 
-    # Look for incomplete variable patterns that suggest mismatched delimiters
+    # Look for incomplete percent patterns that suggest mismatched delimiters
     if re.search(r"%[A-Z0-9_@]+(?:[^%]|$)", temp_no_percent, re.IGNORECASE):
         issues.append(
             LintIssue(
@@ -480,14 +632,27 @@ def _check_variable_expansion(stripped: str, line_num: int) -> List[LintIssue]:
             )
         )
 
-    if re.search(r"![A-Z0-9_@]+(?:[^!]|$)", temp_no_exclaim, re.IGNORECASE):
-        issues.append(
-            LintIssue(
-                line_number=line_num,
-                rule=RULES["E011"],
-                context="Delayed expansion variable may have mismatched ! delimiters",
+    de_state = delayed_expansion_state
+    if de_state is None and lines is not None:
+        de_state = _delayed_expansion_state_for_lines(lines)
+    de_active = (
+        de_state is not None
+        and line_num >= 1
+        and line_num <= len(de_state)
+        and de_state[line_num - 1]
+    )
+    if de_active:
+        temp_no_exclaim = re.sub(r"![^!]+!", "", temp_stripped, flags=re.IGNORECASE)
+        if re.search(r"![A-Z0-9_@]+(?:[^!]|$)", temp_no_exclaim, re.IGNORECASE):
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["E011"],
+                    context=(
+                        "Delayed expansion variable may have mismatched ! delimiters"
+                    ),
+                )
             )
-        )
     return issues
 
 
@@ -534,17 +699,16 @@ def _check_subroutine_call(
 
     if potential_label in labels:
         remainder = stripped[first_word_match.end() :].strip()
+        context = f"Attempting to invoke label '{first_word}' without CALL or GOTO"
         if remainder:
-            issues.append(
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["E012"],
-                    context=(
-                        f"Attempting to call label '{first_word}' "
-                        "without CALL or GOTO"
-                    ),
-                )
+            context = f"Attempting to call label '{first_word}' " "without CALL or GOTO"
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E012"],
+                context=context,
             )
+        )
 
     return issues
 
@@ -568,38 +732,52 @@ def _check_command_typos(stripped: str, line_num: int) -> List[LintIssue]:
     return issues
 
 
+def _invalid_percent_tilde_modifier_chars(interior: str) -> set[str]:
+    valid_modifiers: Set[str] = set(VALID_MODIFIERS)
+    invalid: set[str] = set()
+    index = 0
+    while index < len(interior):
+        char = interior[index]
+        lowered = char.lower()
+        if char == "$" or lowered in valid_modifiers:
+            index += 1
+            continue
+        if char.isalpha():
+            invalid.add(lowered)
+            index += 1
+            continue
+        break
+    parameter = interior[index:]
+    prefix_match = re.match(r"^([a-z]+)(\d.*)$", parameter, re.IGNORECASE)
+    if prefix_match:
+        for char in str(prefix_match.group(1)).lower():
+            if char not in valid_modifiers:
+                invalid.add(char)
+    return invalid
+
+
 def _check_parameter_modifiers(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for invalid parameter modifier combinations (E024, E025)."""
     issues: List[LintIssue] = []
 
-    # E024: Invalid parameter modifier combination
-    param_modifier_match: List[Tuple[str, str]] = re.findall(
-        r"%~([a-zA-Z]+)([0-9]+|[a-zA-Z])%", stripped, re.IGNORECASE
-    )
-    if param_modifier_match:
-        valid_modifiers: Set[str] = {"f", "d", "p", "n", "x", "s", "a", "t", "z"}
-        for modifier, param in param_modifier_match:
-            invalid_chars: Set[str] = set(modifier.lower()) - valid_modifiers
-            if invalid_chars:
-                issues.append(
-                    LintIssue(
-                        line_number=line_num,
-                        rule=RULES["E024"],
-                        context=f"Invalid parameter modifier characters: "
-                        f"{', '.join(invalid_chars)} in %~{modifier}{param}%",
-                    )
+    for match in re.finditer(r"%~([^%]+)%", stripped, re.IGNORECASE):
+        interior = match.group(1)
+        invalid_chars = _invalid_percent_tilde_modifier_chars(interior)
+        if invalid_chars:
+            issues.append(
+                LintIssue(
+                    line_number=line_num,
+                    rule=RULES["E024"],
+                    context=(
+                        f"Invalid parameter modifier characters: "
+                        f"{', '.join(sorted(invalid_chars))} in %~{interior}%"
+                    ),
                 )
+            )
 
     # E025: Parameter modifier on wrong context
-    # First, remove FOR loop variables with modifiers (%%~a) - these are VALID
     temp_stripped = re.sub(r"%%~[a-zA-Z]", "", stripped)
-
-    # Also remove batch file parameter modifiers like %~dp0, %~f1, etc. - these are VALID
-    # %0 refers to the batch file itself, %1-%9 are command line arguments
     temp_stripped = re.sub(r"%~[a-zA-Z]+[0-9]", "", temp_stripped)
-
-    # Now check for parameter modifiers used in wrong context (single % only)
-    # This catches things like %~dVARIABLE% which are invalid
     wrong_context_match: List[str] = re.findall(
         r"%~[a-zA-Z]+([^0-9%\s][^%\s]*|[A-Z_][A-Z0-9_]*)%", temp_stripped
     )
@@ -732,7 +910,7 @@ def _check_empty_variable_syntax(stripped: str, line_num: int) -> List[LintIssue
         return issues
 
     if re.search(
-        r'if\s+(?![\'"])(%[^%]+%)\s*==\s*""',
+        r'if\s+(?:(?:not)\s+)?(?![\'"])(%[^%]+%)\s*==\s*""',
         stripped,
         re.IGNORECASE,
     ):
@@ -745,11 +923,48 @@ def _check_empty_variable_syntax(stripped: str, line_num: int) -> List[LintIssue
                 ),
             )
         )
+        return issues
+
+    if re.search(
+        r"if\s+(?:(?:not)\s+)?(?![\'\"])(%[^%]+%)\s*==(?:\s|$)",
+        stripped,
+        re.IGNORECASE,
+    ):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E007"],
+                context=(
+                    "IF comparison with unquoted variable and empty right-hand side "
+                    "will break when the variable is unset"
+                ),
+            )
+        )
     return issues
 
 
+_SMART_QUOTE_CHARS = ("\u201c", "\u201d", "\u2018", "\u2019")
+
+
+def _check_smart_quotes(line: str, line_num: int) -> List[LintIssue]:
+    """Check for curly/smart quote characters (E035)."""
+    if any(char in line for char in _SMART_QUOTE_CHARS):
+        return [
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E035"],
+                context="Smart/curly quote characters are not valid batch delimiters",
+            )
+        ]
+    return []
+
+
 def _check_syntax_errors(
-    line: str, line_num: int, labels: Dict[str, int]
+    line: str,
+    line_num: int,
+    labels: Dict[str, int],
+    *,
+    lines: List[str] | None = None,
 ) -> List[LintIssue]:
     """Check for syntax error level issues."""
     issues: List[LintIssue] = []
@@ -764,13 +979,21 @@ def _check_syntax_errors(
     issues.extend(_check_path_syntax(stripped, line_num))
     issues.extend(_check_quotes(line, line_num))
     issues.extend(_check_for_loop_syntax(stripped, line_num))
-    issues.extend(_check_variable_expansion(stripped, line_num))
+    issues.extend(
+        _check_variable_expansion(
+            stripped,
+            line_num,
+            lines=lines,
+        )
+    )
     issues.extend(_check_subroutine_call(stripped, line_num, labels))
     issues.extend(_check_command_typos(stripped, line_num))
     issues.extend(_check_parameter_modifiers(stripped, line_num))
     issues.extend(_check_unc_path(stripped, line_num))
     issues.extend(_check_quote_escaping(stripped, line_num))
     issues.extend(_check_set_a_expression(stripped, line_num))
+    issues.extend(_check_set_p_syntax(stripped, line_num))
     issues.extend(_check_empty_variable_syntax(stripped, line_num))
+    issues.extend(_check_smart_quotes(line, line_num))
 
     return issues

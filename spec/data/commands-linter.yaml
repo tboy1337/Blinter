@@ -1,0 +1,88 @@
+unicode_problematic_commands:
+- echo
+- find
+- findstr
+- type
+architecture_specific_patterns:
+- Wow6432Node
+- Program Files \(x86\)
+- SysWow64
+dangerous_command_patterns:
+- pattern: del\s+(?:[/-]\w+\s+)*[\"']?\*\.\*[\"']?(\s|$)
+  rule_code: SEC003
+- pattern: del\s+(?:[/-]\w+\s+)*[\"']?\*/\*[\"']?(\s|$)
+  rule_code: SEC003
+- pattern: del\s+(?:[/-]\w+\s+)*[\"']?[a-z]:\\\*[\"']?(\s|$)
+  rule_code: SEC003
+- pattern: 'format\s+(?:[/-]\w+\s+)*[a-z]:'
+  rule_code: SEC003
+- pattern: \b(ps)?shutdown\s+[/-]
+  rule_code: SEC003
+- pattern: rmdir\s+/s\s+/q\s+
+  rule_code: SEC003
+- pattern: reg\s+delete\s+.*\s+/f
+  rule_code: SEC004
+command_casing_keywords:
+- attrib
+- call
+- cd
+- choice
+- cls
+- copy
+- del
+- dir
+- echo
+- enabledelayedexpansion
+- endlocal
+- exit
+- find
+- findstr
+- for
+- goto
+- if
+- ipconfig
+- mkdir
+- more
+- move
+- net
+- netstat
+- pause
+- ping
+- popd
+- powershell
+- pushd
+- reg
+- rem
+- rmdir
+- robocopy
+- sc
+- set
+- setlocal
+- sort
+- taskkill
+- tasklist
+- timeout
+- type
+- wmic
+- xcopy
+dangerous_command_names:
+- del
+- format
+- shutdown
+- psshutdown
+- rmdir
+- reg
+sensitive_keywords:
+- password
+- pwd
+- passwd
+- apikey
+- api_key
+- secret
+- token
+older_windows_commands:
+- choice
+- forfiles
+- icacls
+- where
+version: 1

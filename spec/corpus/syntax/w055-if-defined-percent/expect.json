@@ -1,0 +1,10 @@
+{
+  "description": "IF DEFINED %var% checks wrong name (W055)",
+  "rules": ["W055"],
+  "lines": {
+    "3": ["W055"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}

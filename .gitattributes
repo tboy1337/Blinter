@@ -72,6 +72,9 @@ pylintrc text eol=lf
 *.psm1 text eol=crlf
 *.psd1 text eol=crlf
 
+# Spec conformance corpus: preserve exact bytes for line-ending oracles
+spec/corpus/** -text
+
 # Project files - CRLF for Windows tools
 *.sln text eol=crlf
 *.vcxproj text eol=crlf

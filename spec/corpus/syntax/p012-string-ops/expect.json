@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "p012 string ops",
+  "lines": {
+    "3": [
+      "P012",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P012",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

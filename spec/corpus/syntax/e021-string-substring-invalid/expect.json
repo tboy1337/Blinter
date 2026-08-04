@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "e021 string substring invalid",
+  "lines": {
+    "3": [
+      "E021",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E021",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

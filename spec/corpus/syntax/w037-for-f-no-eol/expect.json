@@ -1,0 +1,22 @@
+{
+  "config": {},
+  "description": "w037 for f no eol",
+  "lines": {
+    "2": [
+      "W001",
+      "W035",
+      "W036",
+      "W037"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001",
+    "W035",
+    "W036",
+    "W037"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

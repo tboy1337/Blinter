@@ -1,0 +1,10 @@
+{
+  "description": "FOR loop variable case mismatch: %%i declared but %%I used (W059)",
+  "rules": ["W059"],
+  "lines": {
+    "2": ["W059"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}

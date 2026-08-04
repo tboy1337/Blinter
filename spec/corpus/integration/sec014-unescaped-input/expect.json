@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "sec014 unescaped input",
+  "lines": {
+    "2": [
+      "SEC014",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "SEC014",
+    "W001"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

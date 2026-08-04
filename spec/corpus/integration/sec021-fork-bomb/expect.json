@@ -1,0 +1,26 @@
+{
+  "config": {},
+  "description": "sec021 fork bomb",
+  "lines": {
+    "2": [
+      "S018",
+      "S027"
+    ],
+    "3": [
+      "SEC021"
+    ],
+    "4": [
+      "W004"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S018",
+    "S027",
+    "SEC021",
+    "W004"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "w006 ping no timeout",
+  "lines": {
+    "2": [
+      "W001",
+      "W006"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001",
+    "W006"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

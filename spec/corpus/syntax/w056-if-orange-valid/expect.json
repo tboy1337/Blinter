@@ -1,0 +1,8 @@
+{
+  "description": "ORANGE string literal must not trigger W056 pseudo-OR false positive",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W056"],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}

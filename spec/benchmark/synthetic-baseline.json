@@ -1,0 +1,7 @@
+{
+  "description": "Synthetic 2838-line batch file median lint time",
+  "line_count": 2838,
+  "runs": 5,
+  "median_seconds": 2.516,
+  "margin_ratio": 0.15
+}

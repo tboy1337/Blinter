@@ -1,0 +1,24 @@
+{
+  "config": {},
+  "description": "w021 if unquoted",
+  "lines": {
+    "2": [
+      "SEC002"
+    ],
+    "3": [
+      "W001",
+      "W005",
+      "W021"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "SEC002",
+    "W001",
+    "W005",
+    "W021"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

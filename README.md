@@ -9,7 +9,7 @@
 ## Features ✨
 
 ### 🔍 **Rule Categories**
-- **Built-in Rules** -- the registry currently ships **147** rules across 5 severity levels (see `blinter.rules.registry.RULE_COUNT`; numbering gaps reflect retired or consolidated rule IDs)
+- **Built-in Rules** -- the registry currently ships **175** rules across 5 severity levels (see `blinter.rules.registry.RULE_COUNT`; numbering gaps reflect retired or consolidated rule IDs)
 - **Error Level (E001-E999)**: Critical syntax errors that prevent execution
 - **Warning Level (W001-W999)**: Potential runtime issues and bad practices
 - **Style Level (S001-S999)**: Code formatting and readability improvements
@@ -78,10 +78,15 @@ pip uninstall Blinter
 
 ### 🔧 Manual Installation
 
-1. Clone the repository:
+1. Clone the repository (include the batch-spec submodule):
 ```cmd
-git clone https://github.com/tboy1337/Blinter.git
+git clone --recurse-submodules https://github.com/tboy1337/Blinter.git
 cd Blinter
+```
+
+If you already cloned without submodules:
+```cmd
+git submodule update --init --recursive
 ```
 
 2. (Optional) Create a virtual environment:

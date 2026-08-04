@@ -1,0 +1,9 @@
+@echo off
+set ERRORLEVEL=0
+set RANDOM=42
+set "DATE=2020"
+set HIGHESTNUMANODENUMBER=0
+set CD=C:\temp
+set TIME=12:00:00.00
+set CMDCMDLINE=cmd.exe
+set CMDEXTVERSION=1

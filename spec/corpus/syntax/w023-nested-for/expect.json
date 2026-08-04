@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "w023 nested for",
+  "lines": {
+    "3": [
+      "W001",
+      "W023",
+      "W039"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W001",
+    "W023",
+    "W039"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

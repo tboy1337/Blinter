@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "e003 if format",
+  "lines": {
+    "2": [
+      "E003",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E003",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

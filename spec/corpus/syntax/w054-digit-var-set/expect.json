@@ -1,0 +1,11 @@
+{
+  "description": "SET variable name starting with digit (W054)",
+  "rules": ["W054"],
+  "lines": {
+    "2": ["W054"],
+    "3": ["W054"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax", "expansion"]
+}

@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "e009 mismatched quotes",
+  "lines": {
+    "2": [
+      "E009"
+    ],
+    "3": [
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E009",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

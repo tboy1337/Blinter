@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "e031 multilevel caret",
+  "lines": {
+    "2": [
+      "E031",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E031",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "config": {},
+  "description": "e007 empty var check",
+  "lines": {
+    "2": [
+      "E006",
+      "E007",
+      "W001",
+      "W005",
+      "W021"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E006",
+    "E007",
+    "W001",
+    "W005",
+    "W021"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

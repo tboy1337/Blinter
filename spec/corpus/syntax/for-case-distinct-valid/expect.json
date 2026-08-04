@@ -1,0 +1,8 @@
+{
+  "description": "FOR loop variables are case-sensitive; %%i and %%I are distinct (oracle-confirmed)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W059"],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}

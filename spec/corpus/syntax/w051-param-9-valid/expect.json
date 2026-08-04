@@ -1,0 +1,10 @@
+{
+  "config": {},
+  "description": "Single-digit batch parameters are valid (W051 must not fire)",
+  "lines": {},
+  "must_not": ["W051"],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

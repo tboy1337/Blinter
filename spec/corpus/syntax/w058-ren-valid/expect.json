@@ -1,0 +1,8 @@
+{
+  "description": "Valid REN with filename-only destination must not trigger W058",
+  "rules": [],
+  "lines": {},
+  "must_not": ["W058"],
+  "config": {},
+  "tags": ["syntax"]
+}

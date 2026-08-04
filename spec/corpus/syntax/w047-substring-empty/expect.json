@@ -1,0 +1,10 @@
+{
+  "config": {},
+  "description": "Substring on empty-assigned variable (W047)",
+  "lines": {
+    "3": ["W047", "W001"]
+  },
+  "must_not": [],
+  "rules": ["W047", "W001"],
+  "tags": ["syntax", "expansion"]
+}

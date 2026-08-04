@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "p026 redundant disable delayed",
+  "lines": {
+    "13": [
+      "P003",
+      "P026",
+      "W001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P003",
+    "P026",
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

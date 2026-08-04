@@ -1,0 +1,10 @@
+{
+  "description": "else if with pseudo AND operator is invalid in cmd.exe (W056)",
+  "rules": ["W056"],
+  "lines": {
+    "4": ["W056"]
+  },
+  "must_not": [],
+  "config": {},
+  "tags": ["syntax", "control-flow"]
+}
