@@ -21,23 +21,37 @@ def is_path_under_root(path: Path, root: Path) -> bool:
     try:
         root_resolved = root.resolve()
         candidate = path if path.is_absolute() else Path.cwd() / path
+        resolved = candidate.resolve()
 
-        for part in [candidate, *candidate.parents]:
-            if part.is_symlink():
-                link_target = part.readlink()
-                resolved_link = (
+        if not _resolved_is_under_root(resolved, root_resolved):
+            return False
+
+        try:
+            relative = resolved.relative_to(root_resolved)
+        except ValueError:
+            return False
+
+        # Only inspect symlinks on the path from root to the candidate. Ancestor
+        # symlinks (e.g. macOS /var -> /private/var) must not fail containment.
+        current = root_resolved
+        for part in relative.parts:
+            next_path = current / part
+            if next_path.is_symlink():
+                link_target = next_path.readlink()
+                resolved_target = (
                     link_target
                     if link_target.is_absolute()
-                    else (part.parent / link_target)
+                    else (next_path.parent / link_target)
                 )
                 try:
-                    resolved_link = resolved_link.resolve()
+                    resolved_target = resolved_target.resolve()
                 except OSError:
                     return False
-                if not _resolved_is_under_root(resolved_link, root_resolved):
+                if not _resolved_is_under_root(resolved_target, root_resolved):
                     return False
+            current = next_path
 
-        return _resolved_is_under_root(candidate.resolve(), root_resolved)
+        return True
     except (OSError, ValueError) as path_error:
         logger.debug("Path %s is not under root %s: %s", path, root, path_error)
         return False
