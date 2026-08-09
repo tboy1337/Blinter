@@ -39,6 +39,8 @@ xref-Blinter.html
 *.manifest
 
 # Test and quality tooling
+testResults.xml
+spec/corpus/**/temp.txt
 .pytest_cache/
 .coverage
 .coverage.*

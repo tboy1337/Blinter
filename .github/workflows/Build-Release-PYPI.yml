@@ -78,8 +78,6 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install --upgrade setuptools
-          python -m pip install --upgrade wheel
           python -m pip install -e ".[dev]"
 
       - name: Run quality checks
@@ -171,8 +169,6 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install --upgrade setuptools
-          python -m pip install --upgrade wheel
           python -m pip install --upgrade build
 
       - name: Build pure Python wheel and sdist
@@ -226,8 +222,6 @@ jobs:
       - name: Install Twine
         run: |
           python -m pip install --upgrade pip
-          python -m pip install --upgrade setuptools
-          python -m pip install --upgrade wheel
           python -m pip install --upgrade twine
 
       - name: Publish to PyPI
