@@ -16,6 +16,7 @@ from blinter.patterns import (
     COMMON_COMMAND_TYPOS,
 )
 from blinter.rules.expansion_data import VALID_MODIFIERS
+from blinter.rules.helpers import PERCENT_TILDE_TOKEN_RE
 from blinter.rules.registry import RULES
 
 
@@ -760,7 +761,7 @@ def _check_parameter_modifiers(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for invalid parameter modifier combinations (E024, E025)."""
     issues: List[LintIssue] = []
 
-    for match in re.finditer(r"%~([^%]+)%", stripped, re.IGNORECASE):
+    for match in PERCENT_TILDE_TOKEN_RE.finditer(stripped):
         interior = match.group(1)
         invalid_chars = _invalid_percent_tilde_modifier_chars(interior)
         if invalid_chars:

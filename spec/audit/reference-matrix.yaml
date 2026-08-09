@@ -279,6 +279,7 @@ entries:
   - syntax/e017-invalid-modifier
   - syntax/e019-tilde-wrong-param
   - syntax/e019-percent-tilde-on-var
+  - syntax/e019-set-a-percent-tilde-params-valid
   - syntax/e024-invalid-modifier-combo
   - syntax/e025-tilde-wrong-context
   - syntax/w051-param-10-ambiguous

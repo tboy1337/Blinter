@@ -142,7 +142,7 @@ def _run_windows_powershell_checks(root: Path) -> None:
 
     pester_command = (
         "Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop; "
-        f"Invoke-Pester -Path '{pester_test}' -PassThru -EnableExit"
+        f"Invoke-Pester -Path '{pester_test}' -CI"
     )
     _run_powershell_step("Pester (exe smoke helpers)", pester_command, cwd=root)
 

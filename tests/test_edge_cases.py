@@ -26,7 +26,10 @@ from blinter.checkers.advanced import (
     _check_line_length,
     _check_magic_numbers,
 )
-from blinter.checkers.advanced.vars_syntax import _check_set_a_arithmetic
+from blinter.checkers.advanced.vars_syntax import (
+    _check_percent_tilde_syntax,
+    _check_set_a_arithmetic,
+)
 from blinter.checkers.globals import (
     _check_cmd_case_consistency,
     _check_code_duplication,
@@ -1190,6 +1193,26 @@ class TestStyleChecking:
         batch_file.write_text(content, encoding="utf-8")
         issues = lint_batch_file(str(batch_file))
         assert not [i for i in issues if i.rule.code == "E006"]
+
+
+class TestPercentTildeSyntaxE019:
+    """Percent-tilde on batch parameters must not false-positive E019."""
+
+    def test_set_a_dynamic_assignment_params_not_e019(self) -> None:
+        valid_lines = [
+            'set /a "%~3=%~1 + %~2"',
+            "SET /A %~2=%%~M + 2",
+            "echo %~dp0",
+            "echo %~n1",
+        ]
+        for line in valid_lines:
+            issues = _check_percent_tilde_syntax(line.strip(), 1)
+            assert not [i for i in issues if i.rule.code == "E019"], line
+
+    def test_percent_tilde_on_var_still_e019(self) -> None:
+        issues = _check_percent_tilde_syntax("echo %~nMYVAR%", 1)
+        e019_issues = [i for i in issues if i.rule.code == "E019"]
+        assert len(e019_issues) == 1
 
 
 class TestSetAArithmeticE022:

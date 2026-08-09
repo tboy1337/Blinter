@@ -1,0 +1,8 @@
+{
+  "config": {},
+  "description": "SET /A dynamic assignment via percent-tilde parameters (E019 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E019"],
+  "tags": ["syntax", "expansion"]
+}

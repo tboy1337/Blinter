@@ -5,6 +5,7 @@ from typing import List
 
 from blinter.models import LintIssue
 from blinter.rules.expansion_data import VALID_MODIFIERS
+from blinter.rules.helpers import PERCENT_TILDE_TOKEN_RE
 from blinter.rules.registry import RULES
 
 _FOR_F_OPTIONS_RE = re.compile(
@@ -349,7 +350,8 @@ def _check_advanced_process_mgmt(line: str, line_number: int) -> List[LintIssue]
     return issues
 
 
-_PERCENT_TILDE_TOKEN_RE = re.compile(r"%~([^%]+)%", re.IGNORECASE)
+# Match bounded percent-tilde tokens (delimited %~n1% or undelimited %~3 / %~dp0).
+_PERCENT_TILDE_TOKEN_RE = PERCENT_TILDE_TOKEN_RE
 
 
 def _split_percent_tilde_interior(interior: str) -> tuple[str, str]:

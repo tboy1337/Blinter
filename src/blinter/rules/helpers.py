@@ -1,9 +1,18 @@
 """Shared helpers for constructing LintIssue instances."""
 
+import re
 from typing import AbstractSet, List, Optional
 
 from blinter.models import BlinterConfig, LintIssue, Rule
 from blinter.rules.registry import RULES
+
+_PERCENT_TILDE_INTERIOR = (
+    r"(?:[fdpnxsatz$])*" r"(?:[A-Za-z_][A-Za-z0-9_]*:\d+|[0-9*]|[A-Za-z_][A-Za-z0-9_]*)"
+)
+PERCENT_TILDE_TOKEN_RE = re.compile(
+    rf"%~({_PERCENT_TILDE_INTERIOR})(?:%|(?![0-9A-Za-z%]))",
+    re.IGNORECASE,
+)
 
 
 def _has_any_enabled_rules(config: BlinterConfig, rule_codes: AbstractSet[str]) -> bool:
