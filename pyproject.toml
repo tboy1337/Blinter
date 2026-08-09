@@ -1,90 +1,94 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
+requires = [ "setuptools>=77" ]
 
 [project]
 name = "Blinter"
-version = "1.1.4"
-description = "Blinter is a linter for Windows batch files. It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems."
+version = "1.1.5"
+description = """\
+  Blinter is a linter for Windows batch files. It provides comprehensive static analysis to identify syntax errors, \
+  security vulnerabilities, performance issues and style problems.\
+  """
 readme = "README.md"
+keywords = [
+  "analysis",
+  "bat",
+  "batch",
+  "batch-file",
+  "batch-script",
+  "batchfile",
+  "cmd",
+  "lint",
+  "linter",
+  "linting",
+  "python",
+  "script",
+  "script-analysis",
+  "static",
+  "static-analysis",
+  "windows",
+]
 license = "AGPL-3.0-or-later"
-license-files = ["COPYING"]
-authors = [
-    {name = "tboy1337", email = "tboy1337@proton.me"}
-]
-maintainers = [
-    {name = "tboy1337", email = "tboy1337@proton.me"}
-]
-keywords = ["lint", "python", "windows", "analysis", "script", "linting", "linter", "static-analysis", "static", "batch", "batch-file", "cmd", "batch-script", "batchfile", "bat", "script-analysis"]
-classifiers = [
-    "Development Status :: 5 - Production/Stable",
-    "Intended Audience :: Developers",
-    "Operating System :: Microsoft :: Windows",
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
-    "Topic :: Software Development :: Quality Assurance",
-    "Topic :: Software Development :: Code Generators",
-    "Topic :: System :: Systems Administration",
-    "Environment :: Console",
-]
+license-files = [ "COPYING" ]
+maintainers = [ { name = "tboy1337", email = "tboy1337@proton.me" } ]
+authors = [ { name = "tboy1337", email = "tboy1337@proton.me" } ]
 requires-python = ">=3.11"
-dependencies = ["charset_normalizer"]
-
-[project.optional-dependencies]
-dev = [
-    # Core Testing Packages
-    "pytest",
-    "pytest-timeout",
-    "pytest-xdist",
-    "pytest-mock",
-    "pytest-cov",
-    # Linting
-    "pylint",
-    "mypy",
-    "autopep8",
-    "bandit",
-    # Security Analysis
-    "pip-audit",
-    # SSOT spec tooling
-    "pyyaml",
-    "types-PyYAML",
-    "jsonschema",
-    # Code Formatting
-    "black",
-    "isort",
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Code Generators",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: System :: Systems Administration",
 ]
-
-[project.urls]
-Homepage = "https://github.com/tboy1337/Blinter"
-Documentation = "https://github.com/tboy1337/Blinter"
-Repository = "https://github.com/tboy1337/Blinter.git"
-Issues = "https://github.com/tboy1337/Blinter/issues"
-
-[project.scripts]
-blinter = "blinter.cli.main:main"
-
-[tool.setuptools.packages.find]
-where = ["src"]
+dependencies = [ "charset-normalizer" ]
+optional-dependencies.dev = [
+  "autopep8",
+  "bandit",
+  # Code Formatting
+  "black",
+  "isort",
+  "jsonschema",
+  "mypy",
+  # Security Analysis
+  "pip-audit",
+  # Linting
+  "pylint",
+  "pyproject-fmt",
+  # Core Testing Packages
+  "pytest",
+  "pytest-cov",
+  "pytest-mock",
+  "pytest-timeout",
+  "pytest-xdist",
+  # SSOT spec tooling
+  "pyyaml",
+  "types-pyyaml",
+]
+urls.Documentation = "https://github.com/tboy1337/Blinter"
+urls.Homepage = "https://github.com/tboy1337/Blinter"
+urls.Issues = "https://github.com/tboy1337/Blinter/issues"
+urls.Repository = "https://github.com/tboy1337/Blinter.git"
+scripts.blinter = "blinter.cli.main:main"
 
 [tool.setuptools]
+packages.find.where = [ "src" ]
 include-package-data = true
-
-[tool.setuptools.data-files]
-"share/doc/blinter" = [
-    "docs/Batch-File-Linter-Requirements.md",
-    "docs/Architecture.md",
+package-data.blinter = [ "py.typed" ]
+data-files."share/doc/blinter" = [
+  "docs/Architecture.md",
+  "docs/Batch-File-Linter-Requirements.md",
 ]
 
-[tool.setuptools.package-data]
-blinter = ["py.typed"]
-
 [tool.black]
+target-version = [ "py311", "py312", "py313", "py314" ]
 line-length = 88
-target-version = ['py311', 'py312', 'py313', 'py314']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -106,39 +110,34 @@ skip-magic-trailing-comma = false
 
 [tool.isort]
 profile = "black"
-multi_line_output = 3
+atomic = true
+color_output = false
+quiet = false
+verbose = false
 line_length = 88
-include_trailing_comma = true
-force_grid_wrap = 0
+multi_line_output = 3
+balanced_wrapping = true
 use_parentheses = true
-ensure_newline_before_comments = true
-src_paths = ["src", "tests", "scripts"]
-known_first_party = ["blinter"]
-sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
-default_section = "THIRDPARTY"
+include_trailing_comma = true
 force_single_line = false
+force_grid_wrap = 0
+single_line_exclusions = [ "typing" ]
 force_sort_within_sections = true
 lexicographical = true
 order_by_type = true
-single_line_exclusions = ["typing"]
-balanced_wrapping = true
-atomic = true
+ensure_newline_before_comments = true
 lines_between_types = 1
 combine_as_imports = true
 combine_star = false
 from_first = false
-verbose = false
-quiet = false
-color_output = false
+sections = [ "FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER" ]
+default_section = "THIRDPARTY"
+known_first_party = [ "blinter" ]
+src_paths = [ "scripts", "src", "tests" ]
 
-[tool.mypy]
-# Configuration is in mypy.ini for compatibility and easier per-file overrides
-
-[tool.pylint]
 # Configuration is in pylintrc for full control and readability
-
 [tool.bandit]
-exclude_dirs = ["tests", ".venv", "venv", "build", "dist"]
+exclude_dirs = [ ".venv", "build", "dist", "tests", "venv" ]
 # B101: assert used in tests only (tests excluded above)
 # B108: hardcoded temp paths in SEC007 scan patterns, not runtime file I/O
-skips = ["B101", "B108"]
+skips = [ "B101", "B108" ]

@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 from pathlib import Path
 import platform
 import subprocess
 import sys
+import tomllib
 from typing import Sequence, cast
 
 # Portable directory names (no platform-specific separators).
@@ -77,6 +79,104 @@ def _autopep8_args(*, fix: bool) -> list[str]:
     mode_flag = "--in-place" if fix else "--diff"
     args.insert(3, mode_flag)
     return args
+
+
+def _parse_project_name(pyproject_text: str) -> str:
+    """Return [project].name from pyproject.toml text."""
+    data_object: object = tomllib.loads(pyproject_text)
+    if not isinstance(data_object, dict):
+        raise ValueError("pyproject.toml must contain a top-level table")
+    project_object: object = data_object.get("project")
+    if not isinstance(project_object, dict):
+        raise ValueError("pyproject.toml must contain a [project] table")
+    name_object: object = project_object.get("name")
+    if not isinstance(name_object, str) or not name_object:
+        raise ValueError("pyproject.toml [project].name must be a non-empty string")
+    return name_object
+
+
+def _set_project_name(pyproject_text: str, name: str) -> str:
+    """Replace the [project] table name assignment without touching inline-table names."""
+    lines = pyproject_text.splitlines()
+    in_project = False
+    replaced = False
+    updated: list[str] = []
+    for line in lines:
+        if line.strip() == "[project]":
+            in_project = True
+            updated.append(line)
+            continue
+        if in_project and line.startswith("[") and line.strip() != "[project]":
+            in_project = False
+        if in_project and not replaced:
+            stripped = line.lstrip()
+            if stripped.startswith("name ="):
+                prefix = line[: len(line) - len(stripped)]
+                updated.append(f'{prefix}name = "{name}"')
+                replaced = True
+                continue
+        updated.append(line)
+    if not replaced:
+        raise ValueError("pyproject.toml missing [project].name assignment")
+    trailing_newline = "\n" if pyproject_text.endswith("\n") else ""
+    return "\n".join(updated) + trailing_newline
+
+
+def _normalize_pyproject_text(text: str) -> str:
+    """Normalize pyproject.toml text for stable comparisons."""
+    return text.rstrip("\n")
+
+
+def _run_pyproject_fmt(*, fix: bool, cwd: Path) -> None:
+    """Run pyproject-fmt while preserving the branded [project].name value."""
+    pyproject_path = cwd / _PYPROJECT
+    original = pyproject_path.read_text(encoding="utf-8")
+    project_name = _parse_project_name(original)
+
+    print("==> pyproject-fmt")
+    if fix:
+        subprocess.run(
+            _python_m("pyproject_fmt", _PYPROJECT),
+            cwd=cwd,
+            check=False,
+        )
+        if not pyproject_path.is_file():
+            raise SystemExit("Step failed: pyproject-fmt (pyproject.toml missing)")
+        formatted = pyproject_path.read_text(encoding="utf-8")
+        pyproject_path.write_text(
+            _set_project_name(formatted, project_name),
+            encoding="utf-8",
+            newline="\n",
+        )
+        return
+
+    result = subprocess.run(
+        _python_m("pyproject_fmt", "--stdout", _PYPROJECT),
+        cwd=cwd,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if not result.stdout.strip():
+        if result.stdout:
+            print(result.stdout, file=sys.stderr)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
+        raise SystemExit(f"Step failed: pyproject-fmt (exit code {result.returncode})")
+
+    expected = _set_project_name(result.stdout, project_name)
+    if _normalize_pyproject_text(expected) != _normalize_pyproject_text(original):
+        diff = difflib.unified_diff(
+            original.splitlines(),
+            expected.splitlines(),
+            fromfile=_PYPROJECT,
+            tofile=_PYPROJECT,
+        )
+        for line in diff:
+            print(line)
+        raise SystemExit("Step failed: pyproject-fmt (formatting required)")
 
 
 def _isort_args(*, fix: bool) -> list[str]:
@@ -153,7 +253,7 @@ def main() -> None:
     parser.add_argument(
         "--fix",
         action="store_true",
-        help="Apply autopep8 and isort fixes before running checks",
+        help="Apply autopep8, isort, and pyproject-fmt fixes before running checks",
     )
     args = parser.parse_args()
     fix = cast(bool, args.fix)
@@ -206,6 +306,7 @@ def main() -> None:
         [
             ("autopep8 (trailing whitespace)", _autopep8_args(fix=fix)),
             ("isort", _isort_args(fix=fix)),
+            ("pyproject-fmt", []),
             ("black", _python_m("black", "--check", *_CHECK_DIRS)),
             (
                 "mypy",
@@ -239,7 +340,10 @@ def main() -> None:
     ]
 
     for name, step_args in subprocess_steps_before_pylint:
-        _run_step(name, step_args, cwd=root)
+        if name == "pyproject-fmt":
+            _run_pyproject_fmt(fix=fix, cwd=root)
+        else:
+            _run_step(name, step_args, cwd=root)
 
     _run_pylint_package(cwd=root, package_dir=package_dir, report_path=pylint_report)
 

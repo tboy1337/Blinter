@@ -25,3 +25,4 @@ jsonschema
 # Code Formatting
 black
 isort
+pyproject-fmt
