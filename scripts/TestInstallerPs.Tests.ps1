@@ -56,8 +56,8 @@ Describe 'Get-LatestBlinterRelease.ps1' {
                     tag_name   = 'v1.1.6'
                     assets     = @(
                         [PSCustomObject]@{
-                            name                 = 'Blinter-v1.0.6.zip'
-                            browser_download_url = 'https://example.com/Blinter-v1.0.6.zip'
+                            name                 = 'Blinter-v1.1.6.zip'
+                            browser_download_url = 'https://example.com/Blinter-v1.1.6.zip'
                         }
                     )
                 }
@@ -66,7 +66,7 @@ Describe 'Get-LatestBlinterRelease.ps1' {
 
         $output = & $fixturePath
         $LASTEXITCODE | Should -Be 0
-        $output | Should -Be 'https://example.com/Blinter-v1.0.6.zip v1.1.6'
+        $output | Should -Be 'https://example.com/Blinter-v1.1.6.zip v1.1.6'
     }
 }
 

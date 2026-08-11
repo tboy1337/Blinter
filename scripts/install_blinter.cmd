@@ -193,7 +193,7 @@ if exist "!PS_EXPAND!" del /F /Q "!PS_EXPAND!" >nul 2>&1
 
 REM Locate extracted executable
 set BLINTER_SOURCE_EXE=
-for /f "tokens=*" %%f in ('dir /b "%BLINTER_TEMP%\Blinter-v1.0.*.exe" 2^>nul') do (
+for /f "tokens=*" %%f in ('dir /b "%BLINTER_TEMP%\Blinter-v*.exe" 2^>nul') do (
     set BLINTER_SOURCE_EXE=!BLINTER_TEMP!\%%f
 )
 
@@ -278,7 +278,7 @@ REM Write PowerShell script to fetch latest release URL and tag
 echo $releases = Invoke-RestMethod -Uri 'https://api.github.com/repos/tboy1337/Blinter/releases?per_page=100'
 echo $release = $releases ^| Where-Object { -not $_.prerelease -and -not $_.draft } ^| Select-Object -First 1
 echo if (-not $release^) { Write-Output 'NOT_FOUND'; exit 0 }
-echo $asset = $release.assets ^| Where-Object { $_.name -like 'Blinter-v1.0.*.zip' } ^| Select-Object -First 1
+echo $asset = $release.assets ^| Where-Object { $_.name -like 'Blinter-v*.zip' } ^| Select-Object -First 1
 echo if (-not $asset^) { Write-Output 'NOT_FOUND'; exit 0 }
 echo $line = $asset.browser_download_url + ' ' + $release.tag_name
 echo Write-Output $line
