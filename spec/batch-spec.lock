@@ -1,6 +1,6 @@
 {
   "repo": "https://github.com/tboy1337/batch-spec",
-  "ref": "v0.68.0",
-  "commit": "23332506ff8b7aec2aa71f4706edd6929d7a99cf",
+  "ref": "v0.69.0",
+  "commit": "af66f2f3e0cedbc73b7e7ae60b014386dddf3eac",
   "path": "vendor/batch-spec"
 }
