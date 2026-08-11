@@ -77,29 +77,30 @@ def _check_for_f_suboptions(line: str, line_number: int) -> List[LintIssue]:
                 )
             )
 
-    if re.search(r"tokens=[^\"']*[a-zA-Z]", options, re.IGNORECASE):
-        issues.append(
-            LintIssue(
-                line_number,
-                RULES["E038"],
-                context="FOR /F tokens= contains invalid non-numeric characters",
-            )
-        )
-    else:
-        for range_match in re.finditer(
-            r"tokens=[^\"']*?(\d+)-(\d+)", options, re.IGNORECASE
-        ):
-            start = int(range_match.group(1))
-            end = int(range_match.group(2))
-            if start > end:
-                issues.append(
-                    LintIssue(
-                        line_number,
-                        RULES["E038"],
-                        context="FOR /F tokens= range must be ascending (for example 1-5)",
-                    )
+    tokens_match = re.search(r"tokens=([^\s\"']+)", options, re.IGNORECASE)
+    if tokens_match:
+        tokens_value = tokens_match.group(1)
+        if re.search(r"[a-zA-Z]", tokens_value, re.IGNORECASE):
+            issues.append(
+                LintIssue(
+                    line_number,
+                    RULES["E038"],
+                    context="FOR /F tokens= contains invalid non-numeric characters",
                 )
-                break
+            )
+        else:
+            for range_match in re.finditer(r"(\d+)-(\d+)", tokens_value):
+                start = int(range_match.group(1))
+                end = int(range_match.group(2))
+                if start > end:
+                    issues.append(
+                        LintIssue(
+                            line_number,
+                            RULES["E038"],
+                            context="FOR /F tokens= range must be ascending (for example 1-5)",
+                        )
+                    )
+                    break
 
     return issues
 
@@ -355,6 +356,16 @@ _PERCENT_TILDE_TOKEN_RE = PERCENT_TILDE_TOKEN_RE
 
 
 def _split_percent_tilde_interior(interior: str) -> tuple[str, str]:
+    if len(interior) == 1 and interior.isalpha():
+        return "", interior
+    if len(interior) > 1 and not re.search(r"\d", interior) and interior[-1].isalpha():
+        potential_modifiers = interior[:-1]
+        if all(
+            char == "$" or char.lower() in VALID_MODIFIERS
+            for char in potential_modifiers
+        ):
+            return potential_modifiers, interior[-1]
+
     modifiers: list[str] = []
     index = 0
     while index < len(interior):

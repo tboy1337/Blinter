@@ -452,10 +452,14 @@ def _line_opens_block_depth(line: str) -> int:
         return 1
     if re.search(r"\bfor\b", line, re.IGNORECASE) and (
         re.search(r"\bdo\s*\(\s*$", line, re.IGNORECASE)
-        or re.search(r"\bfor\b.*\(", line, re.IGNORECASE)
+        or re.search(r"\bin\s*\(\s*$", line, re.IGNORECASE)
     ):
         return 1
-    if re.search(r"\bif\b", line, re.IGNORECASE) and re.search(r"\(\s*$", line):
+    if (
+        re.search(r"\bif\b", line, re.IGNORECASE)
+        and re.search(r"\(\s*$", line)
+        and not re.match(r"echo\b", line, re.IGNORECASE)
+    ):
         return 1
     return 0
 

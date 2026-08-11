@@ -12,6 +12,7 @@ entries:
   - E001
   corpus:
   - syntax/e001-nested-parens
+  - syntax/e001-for-f-in-quoted-valid
 - construct: GOTO label resolution and unreachable flow
   sources:
   - MS Learn goto
@@ -280,6 +281,7 @@ entries:
   - syntax/e019-tilde-wrong-param
   - syntax/e019-percent-tilde-on-var
   - syntax/e019-set-a-percent-tilde-params-valid
+  - syntax/e019-for-loop-tilde-z-valid
   - syntax/e024-invalid-modifier-combo
   - syntax/e025-tilde-wrong-context
   - syntax/w051-param-10-ambiguous
@@ -652,6 +654,7 @@ entries:
   - syntax/e038-for-f-skip-invalid
   - syntax/e038-for-f-tokens-range
   - syntax/e038-for-f-valid
+  - syntax/e038-for-f-tokens-delims-valid
   - syntax/w048-for-f-csv
   - syntax/w063-for-f-token-overflow
   - syntax/w063-for-f-token-valid

@@ -1,0 +1,8 @@
+{
+  "description": "FOR /F IN (quoted file) without DO block must not leak E001 depth",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E001"],
+  "config": {},
+  "tags": ["syntax"]
+}

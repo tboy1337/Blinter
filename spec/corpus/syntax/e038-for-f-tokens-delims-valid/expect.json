@@ -1,0 +1,8 @@
+{
+  "description": "FOR /F tokens= and delims= in one options string (E038 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E038"],
+  "config": {},
+  "tags": ["syntax"]
+}

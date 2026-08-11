@@ -27,6 +27,7 @@ from blinter.checkers.advanced import (
     _check_magic_numbers,
 )
 from blinter.checkers.advanced.vars_syntax import (
+    _check_for_f_suboptions,
     _check_percent_tilde_syntax,
     _check_set_a_arithmetic,
 )
@@ -1209,10 +1210,43 @@ class TestPercentTildeSyntaxE019:
             issues = _check_percent_tilde_syntax(line.strip(), 1)
             assert not [i for i in issues if i.rule.code == "E019"], line
 
+    def test_for_loop_tilde_modifiers_not_e019(self) -> None:
+        """FOR loop %%~modifier+letter expansions must not false-positive E019."""
+        valid_lines = [
+            "for %%A in (%TEMP%\\example.zip) do set FILESIZE=%%~zA",
+            "for %%A in (*.txt) do echo %%~nxA",
+            "for %%A in (*.txt) do echo %%~dpA",
+            "for %%a in (*.txt) do echo %%~za",
+        ]
+        for line in valid_lines:
+            issues = _check_percent_tilde_syntax(line.strip(), 1)
+            assert not [i for i in issues if i.rule.code == "E019"], line
+
     def test_percent_tilde_on_var_still_e019(self) -> None:
         issues = _check_percent_tilde_syntax("echo %~nMYVAR%", 1)
         e019_issues = [i for i in issues if i.rule.code == "E019"]
         assert len(e019_issues) == 1
+
+
+class TestForFSuboptionsE038:
+    """FOR /F tokens= and skip= validation must not false-positive E038."""
+
+    def test_tokens_and_delims_combined_not_e038(self) -> None:
+        line = 'for /f "tokens=1,2 delims=|" %%a in ("url|tag") do ('
+        issues = _check_for_f_suboptions(line, 1)
+        assert not issues
+
+    def test_invalid_tokens_value_still_e038(self) -> None:
+        line = 'for /f "tokens=abc" %%a in ("data") do echo %%a'
+        issues = _check_for_f_suboptions(line, 1)
+        e038_issues = [i for i in issues if i.rule.code == "E038"]
+        assert len(e038_issues) == 1
+
+    def test_descending_tokens_range_still_e038(self) -> None:
+        line = 'for /f "tokens=5-1" %%a in ("data") do echo %%a'
+        issues = _check_for_f_suboptions(line, 1)
+        e038_issues = [i for i in issues if i.rule.code == "E038"]
+        assert len(e038_issues) == 1
 
 
 class TestSetAArithmeticE022:
@@ -1321,6 +1355,40 @@ class TestSecurityChecking:
     def test_unmatched_if_block_still_e001(self) -> None:
         """A missing closing parenthesis should still trigger E001."""
         issues = _check_nested_paren_mismatch(["if exist file.txt ("])
+        assert len(issues) == 1
+        assert issues[0].rule.code == "E001"
+
+    def test_for_f_in_quoted_single_line_not_e001(self) -> None:
+        """FOR /F IN ('file') on one line should not open an extra block."""
+        lines = [
+            "if exist file.txt (",
+            "    if !errorlevel! equ 0 (",
+            '        for /f "usebackq tokens=*" %%v in ("!VERSION_TEMP!") do set VAR=%%v',
+            "    ) else (",
+            "        echo fail",
+            "    )",
+            ")",
+        ]
+        issues = _check_nested_paren_mismatch(lines)
+        assert not issues
+
+    def test_echo_if_open_paren_in_redirect_block_not_e001(self) -> None:
+        """Echoed script lines ending with if ( must not open batch IF blocks."""
+        lines = [
+            "(",
+            "echo try {",
+            "echo if (",
+            "echo     Write-Host done",
+            "echo )",
+            "echo }",
+            ') > "%TEMP%\\helper.ps1"',
+        ]
+        issues = _check_nested_paren_mismatch(lines)
+        assert not issues
+
+    def test_for_in_multiline_list_still_opens_e001_when_unclosed(self) -> None:
+        """Multiline FOR IN ( lists should still participate in E001 tracking."""
+        issues = _check_nested_paren_mismatch(["for %%x in ("])
         assert len(issues) == 1
         assert issues[0].rule.code == "E001"
 
