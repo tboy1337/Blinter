@@ -227,7 +227,7 @@ try {
 
     Invoke-SmokeTest "exe 17 install script" {
         $result = Invoke-BlinterProcess -Binary $ExePath -CliArgs @(
-            "scripts\install_blinter.cmd", "--summary", "--no-config"
+            "scripts\install_blinter.cmd", "--summary", "--config", "scripts\blinter.ini"
         ) -WorkingDirectory $RepoRoot
         Test-LintExitCode -ExitCode $result.ExitCode
         Test-NoRuntimeCrash -Output $result.Output
@@ -235,7 +235,7 @@ try {
 
     Invoke-SmokeTest "exe 18 uninstall script" {
         $result = Invoke-BlinterProcess -Binary $ExePath -CliArgs @(
-            "scripts\uninstall_blinter.cmd", "--summary", "--no-config"
+            "scripts\uninstall_blinter.cmd", "--summary", "--config", "scripts\blinter.ini"
         ) -WorkingDirectory $RepoRoot
         Test-LintExitCode -ExitCode $result.ExitCode
         Test-NoRuntimeCrash -Output $result.Output

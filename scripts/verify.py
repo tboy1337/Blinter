@@ -31,7 +31,14 @@ _PYLINT_OUTPUT = "pylint-output.txt"
 _POWERSHELL_SCRIPT = Path("scripts") / "test_exe_smoke.ps1"
 _POWERSHELL_HELPERS = Path("scripts") / "TestExeSmoke.Helpers.ps1"
 _POWERSHELL_ANALYZER_SETTINGS = Path("scripts") / "PSScriptAnalyzerSettings.psd1"
-_PESTER_TEST = Path("scripts") / "TestExeSmoke.Tests.ps1"
+_PESTER_TESTS = (
+    Path("scripts") / "TestExeSmoke.Tests.ps1",
+    Path("scripts") / "TestInstallerPs.Tests.ps1",
+)
+_INSTALLER_PS_DIR = Path("scripts") / "installer_ps"
+_BLINTER_SCRIPTS_INI = Path("scripts") / "blinter.ini"
+_INSTALL_SCRIPT = Path("scripts") / "install_blinter.cmd"
+_UNINSTALL_SCRIPT = Path("scripts") / "uninstall_blinter.cmd"
 
 
 def _repo_root() -> Path:
@@ -213,13 +220,13 @@ def _run_powershell_step(name: str, command: str, *, cwd: Path | None = None) ->
         raise SystemExit(f"Step failed: {name} (exit code {result.returncode})")
 
 
-def _run_windows_powershell_checks(root: Path) -> None:
-    """Run PSScriptAnalyzer and Pester checks for the exe smoke script."""
-    helpers = root / _POWERSHELL_HELPERS
-    runner = root / _POWERSHELL_SCRIPT
-    analyzer_settings = root / _POWERSHELL_ANALYZER_SETTINGS
-    pester_test = root / _PESTER_TEST
+def _powershell_path(path: Path) -> str:
+    """Return a PowerShell-friendly absolute path string."""
+    return str(path.resolve()).replace("'", "''")
 
+
+def _ensure_powershell_modules(root: Path) -> None:
+    """Install PSScriptAnalyzer and Pester when missing."""
     ensure_modules = (
         "$ErrorActionPreference = 'Stop'; "
         "foreach ($moduleName in @('PSScriptAnalyzer', 'Pester')) { "
@@ -229,36 +236,77 @@ def _run_windows_powershell_checks(root: Path) -> None:
     )
     _run_powershell_step("PowerShell module prerequisites", ensure_modules, cwd=root)
 
+
+def _psscriptanalyzer_paths(root: Path) -> list[Path]:
+    """Return PowerShell files that should be analyzed."""
+    scripts_dir = root / "scripts"
+    paths = [
+        scripts_dir / _POWERSHELL_HELPERS.name,
+        scripts_dir / _POWERSHELL_SCRIPT.name,
+    ]
+    installer_ps_dir = root / _INSTALLER_PS_DIR
+    if installer_ps_dir.is_dir():
+        paths.extend(sorted(installer_ps_dir.glob("*.ps1")))
+    return paths
+
+
+def _run_psscriptanalyzer(root: Path) -> None:
+    """Run PSScriptAnalyzer on smoke and installer PowerShell scripts."""
+    analyzer_settings = _powershell_path(root / _POWERSHELL_ANALYZER_SETTINGS)
+    analyze_paths = [_powershell_path(path) for path in _psscriptanalyzer_paths(root)]
+    joined_paths = ", ".join(f"'{path}'" for path in analyze_paths)
     analyzer_command = (
         "$issues = @(); "
-        f"foreach ($path in @('{helpers}', '{runner}')) {{ "
+        f"foreach ($path in @({joined_paths})) {{ "
         f"$issues += Invoke-ScriptAnalyzer -Path $path -Settings '{analyzer_settings}' "
         "-Severity Warning }; "
         "if ($issues) { $issues | Format-Table -AutoSize; exit 1 }"
     )
     _run_powershell_step(
-        "PSScriptAnalyzer (exe smoke scripts)", analyzer_command, cwd=root
+        "PSScriptAnalyzer (PowerShell scripts)", analyzer_command, cwd=root
     )
 
+
+def _run_pester_tests(root: Path) -> None:
+    """Run all repository Pester test files."""
+    pester_paths = [_powershell_path(root / test_path) for test_path in _PESTER_TESTS]
+    joined_paths = ", ".join(f"'{path}'" for path in pester_paths)
     pester_command = (
         "Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop; "
-        f"Invoke-Pester -Path '{pester_test}' -CI"
+        f"Invoke-Pester -Path @({joined_paths}) -CI"
     )
-    _run_powershell_step("Pester (exe smoke helpers)", pester_command, cwd=root)
+    _run_powershell_step("Pester (PowerShell tests)", pester_command, cwd=root)
 
 
-def main() -> None:
-    """Execute formatting, linting, security, and test checks."""
-    parser = argparse.ArgumentParser(description="Run Blinter quality checks.")
-    parser.add_argument(
-        "--fix",
-        action="store_true",
-        help="Apply autopep8, isort, and pyproject-fmt fixes before running checks",
+def _run_blinter_install_scripts(root: Path) -> None:
+    """Lint install/uninstall batch scripts with the scripts blinter.ini profile."""
+    config_path = root / _BLINTER_SCRIPTS_INI
+    scripts_dir = root / "scripts"
+    _run_step(
+        "blinter (install/uninstall scripts)",
+        [
+            sys.executable,
+            "-m",
+            "blinter",
+            str(scripts_dir),
+            "--no-recursive",
+            "--config",
+            str(config_path),
+        ],
+        cwd=root,
     )
-    args = parser.parse_args()
-    fix = cast(bool, args.fix)
 
-    root = _repo_root()
+
+def _run_windows_powershell_checks(root: Path) -> None:
+    """Run PSScriptAnalyzer, Pester, and install-script lint checks."""
+    _ensure_powershell_modules(root)
+    _run_psscriptanalyzer(root)
+    _run_pester_tests(root)
+    _run_blinter_install_scripts(root)
+
+
+def _run_python_checks(root: Path, *, fix: bool) -> None:
+    """Run Python formatting, linting, security, and pytest checks."""
     pylint_report = root / _PYLINT_OUTPUT
     verify_script = str(_VERIFY_SCRIPT)
     corpus_lint_script = str(_CORPUS_LINT_SCRIPT)
@@ -349,6 +397,39 @@ def main() -> None:
 
     for name, step_args in subprocess_steps_after_pylint:
         _run_step(name, step_args, cwd=root)
+
+
+def main() -> None:
+    """Execute formatting, linting, security, and test checks."""
+    parser = argparse.ArgumentParser(description="Run Blinter quality checks.")
+    parser.add_argument(
+        "--fix",
+        action="store_true",
+        help="Apply autopep8, isort, and pyproject-fmt fixes before running checks",
+    )
+    parser.add_argument(
+        "--powershell-only",
+        action="store_true",
+        help=(
+            "Run only Windows PowerShell checks (PSScriptAnalyzer, Pester, "
+            "and blinter install/uninstall lint)"
+        ),
+    )
+    args = parser.parse_args()
+    fix = cast(bool, args.fix)
+    powershell_only = cast(bool, args.powershell_only)
+
+    root = _repo_root()
+    corpus_lint_script = str(_CORPUS_LINT_SCRIPT)
+
+    if powershell_only:
+        if not _is_windows():
+            raise SystemExit("PowerShell checks require Windows.")
+        _run_windows_powershell_checks(root)
+        print("All PowerShell verification steps passed.")
+        return
+
+    _run_python_checks(root, fix=fix)
 
     if _is_windows():
         _run_windows_powershell_checks(root)

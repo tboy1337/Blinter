@@ -1,6 +1,13 @@
 @echo off
 setlocal enabledelayedexpansion
 
+REM ============================================================================
+REM Blinter Installer/Updater
+REM Purpose: Download and install the latest Blinter release to %LOCALAPPDATA%
+REM Author: tboy1337
+REM Repository: https://github.com/tboy1337/Blinter
+REM ============================================================================
+
 REM Attempt to change to system drive to avoid issues with current directory/drive
 cd /d "%SystemDrive%" >nul 2>&1
 if %errorlevel% neq 0 (
@@ -26,16 +33,24 @@ echo + Blinter Installer/Updater +
 echo +===========================+
 echo.
 
+set BLINTER_DIR=%LOCALAPPDATA%\Programs\Blinter
+set BLINTER_BIN=%BLINTER_DIR%\bin
+set BLINTER_RELEASE_FILE=%BLINTER_DIR%\installed_release.txt
+set BLINTER_TEMP=%TEMP%\blinter_install_%RANDOM%_%RANDOM%
+set BLINTER_BACKUP=%TEMP%\blinter_backup_%RANDOM%_%RANDOM%
+set /a MIN_DOWNLOAD_BYTES=500*1000
+
 REM Detect latest Blinter version and download URL from GitHub API
 set BLINTER_URL=
 set BLINTER_VERSION=
+set "PS_GET_RELEASE=%BLINTER_TEMP%_get_release.ps1"
 
-for /f "delims=" %%i in ('powershell -NoProfile -Command "$releases = Invoke-RestMethod -Uri 'https://api.github.com/repos/tboy1337/Blinter/releases?per_page=100'; $release = $releases | Where-Object { -not $_.prerelease -and -not $_.draft } | Select-Object -First 1; if ($release) { $asset = $release.assets | Where-Object { $_.name -like 'Blinter-v1.0.*.zip' } | Select-Object -First 1; if ($asset) { Write-Output ($asset.browser_download_url + '|' + $release.tag_name) } else { Write-Output 'NOT_FOUND' } } else { Write-Output 'NOT_FOUND' }" 2^>nul') do (
-    for /f "tokens=1,2 delims=|" %%a in ("%%i") do (
-        set BLINTER_URL=%%a
-        set BLINTER_VERSION=%%b
-    )
+call :write_get_release_script
+for /f "tokens=1,2" %%a in ('powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_GET_RELEASE%" 2^>nul') do (
+    set BLINTER_URL=%%a
+    set BLINTER_VERSION=%%b
 )
+if exist "!PS_GET_RELEASE!" del /F /Q "!PS_GET_RELEASE!" >nul 2>&1
 
 if "!BLINTER_URL!"=="NOT_FOUND" (
     echo ERROR: Failed to find Windows download URL from GitHub API.
@@ -61,12 +76,6 @@ if "!BLINTER_VERSION!"=="" (
 echo Latest Blinter release: !BLINTER_VERSION!
 echo.
 
-set BLINTER_DIR=%LOCALAPPDATA%\Programs\Blinter
-set BLINTER_BIN=%BLINTER_DIR%\bin
-set BLINTER_RELEASE_FILE=%BLINTER_DIR%\installed_release.txt
-set BLINTER_TEMP=%TEMP%\blinter_install_%RANDOM%_%RANDOM%
-set BLINTER_BACKUP=%TEMP%\blinter_backup_%RANDOM%_%RANDOM%
-
 REM Create installation directory if it doesn't exist
 if not exist "%BLINTER_BIN%" (
     mkdir "%BLINTER_BIN%" >nul 2>&1
@@ -85,7 +94,7 @@ if exist "%BLINTER_BIN%\blinter.exe" (
     set "VERSION_TEMP=%TEMP%\blinter_version_%RANDOM%_%RANDOM%.txt"
     "%BLINTER_BIN%\blinter.exe" --version > "!VERSION_TEMP!" 2>&1
     if !errorlevel! equ 0 (
-        for /f "usebackq delims=" %%v in ("!VERSION_TEMP!") do set CURRENT_VERSION=%%v
+        for /f "usebackq tokens=*" %%v in ("!VERSION_TEMP!") do set CURRENT_VERSION=%%v
         del /F /Q "!VERSION_TEMP!" >nul 2>&1
         if not "!CURRENT_VERSION!"=="" (
             echo Current installed version: !CURRENT_VERSION!
@@ -97,7 +106,11 @@ if exist "%BLINTER_BIN%\blinter.exe" (
 )
 
 if exist "%BLINTER_RELEASE_FILE%" (
+    REM LINT:IGNORE SEC001
     set /p INSTALLED_RELEASE=<"%BLINTER_RELEASE_FILE%"
+    if not "!INSTALLED_RELEASE!"=="" (
+        if /i not "!INSTALLED_RELEASE:~0,1!"=="v" set "INSTALLED_RELEASE="
+    )
     if "!INSTALLED_RELEASE!"=="!BLINTER_VERSION!" (
         echo Blinter !BLINTER_VERSION! is already installed and up to date.
         goto :end
@@ -151,8 +164,16 @@ if not exist "%BLINTER_TEMP%.zip" (
     echo ERROR: Downloaded file not found at %BLINTER_TEMP%.zip
     goto :error_restore
 )
-for %%A in ("%BLINTER_TEMP%.zip") do set FILESIZE=%%~zA
-if !FILESIZE! lss 500000 (
+
+set FILESIZE=0
+set "PS_FILE_SIZE=%BLINTER_TEMP%_file_size.ps1"
+call :write_file_size_script
+for /f "delims=" %%S in ('powershell -NoProfile -ExecutionPolicy Bypass -File "!PS_FILE_SIZE!" 2^>nul') do (
+    set FILESIZE=%%S
+)
+if exist "!PS_FILE_SIZE!" del /F /Q "!PS_FILE_SIZE!" >nul 2>&1
+
+if !FILESIZE! lss !MIN_DOWNLOAD_BYTES! (
     echo ERROR: Downloaded file is too small ^(!FILESIZE! bytes^). Download may be corrupted.
     goto :error_restore
 )
@@ -161,15 +182,20 @@ REM Extract Blinter
 echo.
 echo Extracting Blinter...
 echo.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Expand-Archive -Path '%BLINTER_TEMP%.zip' -DestinationPath '%BLINTER_TEMP%' -Force -ErrorAction Stop; exit 0 } catch { Write-Host \"ERROR: $_\"; exit 1 }" 2>&1
+set "PS_EXPAND=%BLINTER_TEMP%_expand.ps1"
+call :write_expand_script
+powershell -NoProfile -ExecutionPolicy Bypass -File "!PS_EXPAND!" 2>&1
 if !errorlevel! neq 0 (
     echo ERROR: Failed to extract Blinter archive. Error code: !errorlevel!
     goto :error_restore
 )
+if exist "!PS_EXPAND!" del /F /Q "!PS_EXPAND!" >nul 2>&1
 
 REM Locate extracted executable
 set BLINTER_SOURCE_EXE=
-for /f "delims=" %%f in ('dir /b "%BLINTER_TEMP%\Blinter-v1.0.*.exe" 2^>nul') do set BLINTER_SOURCE_EXE=!BLINTER_TEMP!\%%f
+for /f "tokens=*" %%f in ('dir /b "%BLINTER_TEMP%\Blinter-v1.0.*.exe" 2^>nul') do (
+    set BLINTER_SOURCE_EXE=!BLINTER_TEMP!\%%f
+)
 
 if "!BLINTER_SOURCE_EXE!"=="" (
     echo ERROR: Blinter executable not found in extracted archive.
@@ -216,18 +242,22 @@ REM Update PATH environment variable
 echo.
 echo Updating PATH environment variable...
 echo.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $path = [Environment]::GetEnvironmentVariable('Path', 'User'); if ($null -eq $path) { $path = '' }; if ($path -notlike '*%BLINTER_BIN%*') { $newPath = if ($path -eq '') { '%BLINTER_BIN%' } else { $path.TrimEnd(';') + ';%BLINTER_BIN%' }; [Environment]::SetEnvironmentVariable('Path', $newPath, 'User'); Write-Host 'Blinter added to User PATH permanently' } else { Write-Host 'Blinter already in User PATH' }; exit 0 } catch { Write-Host \"ERROR: $_\"; exit 1 }" 2>&1
+set "PS_UPDATE_PATH=%BLINTER_TEMP%_update_path.ps1"
+call :write_update_path_script
+powershell -NoProfile -ExecutionPolicy Bypass -File "!PS_UPDATE_PATH!" 2>&1
 if !errorlevel! neq 0 (
     echo WARNING: Failed to update User PATH environment variable.
     echo You may need to manually add %BLINTER_BIN% to your PATH.
     echo.
 )
+if exist "!PS_UPDATE_PATH!" del /F /Q "!PS_UPDATE_PATH!" >nul 2>&1
 
 REM Update PATH for current session
 set "PATH=%PATH%;%BLINTER_BIN%"
 
 REM Success! Clean up temporary files and backup
 call :cleanup
+REM LINT:IGNORE SEC003
 if exist "%BLINTER_BACKUP%" rmdir /S /Q "%BLINTER_BACKUP%" >nul 2>&1
 
 echo.
@@ -242,24 +272,104 @@ echo In the current session, Blinter commands should already be available.
 echo.
 goto :end
 
+REM Write PowerShell script to fetch latest release URL and tag
+:write_get_release_script
+(
+echo $releases = Invoke-RestMethod -Uri 'https://api.github.com/repos/tboy1337/Blinter/releases?per_page=100'
+echo $release = $releases ^| Where-Object { -not $_.prerelease -and -not $_.draft } ^| Select-Object -First 1
+echo if (-not $release^) { Write-Output 'NOT_FOUND'; exit 0 }
+echo $asset = $release.assets ^| Where-Object { $_.name -like 'Blinter-v1.0.*.zip' } ^| Select-Object -First 1
+echo if (-not $asset^) { Write-Output 'NOT_FOUND'; exit 0 }
+echo $line = $asset.browser_download_url + ' ' + $release.tag_name
+echo Write-Output $line
+) > "!PS_GET_RELEASE!"
+exit /b 0
+
+REM Write PowerShell script to return downloaded archive size in bytes
+:write_file_size_script
+(
+echo $item = Get-Item -LiteralPath '%BLINTER_TEMP%.zip' -ErrorAction Stop
+echo Write-Output $item.Length
+) > "!PS_FILE_SIZE!"
+exit /b 0
+
+REM Write PowerShell script to expand the downloaded archive
+:write_expand_script
+(
+echo try {
+echo     Expand-Archive -LiteralPath '%BLINTER_TEMP%.zip' -DestinationPath '%BLINTER_TEMP%' -Force
+echo     exit 0
+echo }
+echo catch {
+echo     Write-Host "ERROR: $_"
+echo     exit 1
+echo }
+) > "!PS_EXPAND!"
+exit /b 0
+
+REM Write PowerShell script to add Blinter bin directory to user PATH
+:write_update_path_script
+(
+echo try {
+echo     $binPath = '%BLINTER_BIN%'
+echo     $path = [Environment]::GetEnvironmentVariable('Path', 'User'^)
+echo     if (-not $path^) { $path = '' }
+echo     if ($path -notlike "*$binPath*"^) {
+echo         if (-not $path^) { $newPath = $binPath } else { $newPath = $path.TrimEnd(';'^) + ';' + $binPath }
+echo         [Environment]::SetEnvironmentVariable('Path', $newPath, 'User'^)
+echo         Write-Host 'Blinter added to User PATH permanently'
+echo     }
+echo     else {
+echo         Write-Host 'Blinter already in User PATH'
+echo     }
+echo     exit 0
+echo }
+echo catch {
+echo     Write-Host "ERROR: $_"
+echo     exit 1
+echo }
+) > "!PS_UPDATE_PATH!"
+exit /b 0
+
+REM Subroutine: remove temporary install files and helper scripts
+:cleanup
+if exist "%BLINTER_TEMP%.zip" del /F /Q "%BLINTER_TEMP%.zip" >nul 2>&1
+REM LINT:IGNORE SEC003
+if exist "%BLINTER_TEMP%" rmdir /S /Q "%BLINTER_TEMP%" >nul 2>&1
+if exist "%BLINTER_TEMP%_get_release.ps1" del /F /Q "%BLINTER_TEMP%_get_release.ps1" >nul 2>&1
+if exist "%BLINTER_TEMP%_file_size.ps1" del /F /Q "%BLINTER_TEMP%_file_size.ps1" >nul 2>&1
+if exist "%BLINTER_TEMP%_expand.ps1" del /F /Q "%BLINTER_TEMP%_expand.ps1" >nul 2>&1
+if exist "%BLINTER_TEMP%_update_path.ps1" del /F /Q "%BLINTER_TEMP%_update_path.ps1" >nul 2>&1
+exit /b 0
+
+REM Restore previous installation after a failed upgrade, then clean up
 :error_restore
-REM Attempt to restore backup if upgrade failed
 if !NEEDS_BACKUP! equ 1 (
     if exist "%BLINTER_BACKUP%" (
         echo.
         echo Attempting to restore previous installation...
-        if exist "%BLINTER_BACKUP%\blinter.exe" copy /Y "%BLINTER_BACKUP%\blinter.exe" "%BLINTER_BIN%\" >nul 2>&1
-        if exist "%BLINTER_BACKUP%\installed_release.txt" copy /Y "%BLINTER_BACKUP%\installed_release.txt" "%BLINTER_DIR%\" >nul 2>&1
+        if exist "%BLINTER_BACKUP%\blinter.exe" (
+            copy /Y "%BLINTER_BACKUP%\blinter.exe" "%BLINTER_BIN%\" >nul 2>&1
+            if !errorlevel! neq 0 (
+                echo WARNING: Failed to restore blinter.exe from backup.
+            )
+        )
+        if exist "%BLINTER_BACKUP%\installed_release.txt" (
+            copy /Y "%BLINTER_BACKUP%\installed_release.txt" "%BLINTER_DIR%\" >nul 2>&1
+            if !errorlevel! neq 0 (
+                echo WARNING: Failed to restore installed_release.txt from backup.
+            )
+        )
         echo Previous installation restored.
         echo.
     )
 )
-
-:error_cleanup
-REM Clean up temporary files and backup
 call :cleanup
+REM LINT:IGNORE SEC003
 if exist "%BLINTER_BACKUP%" rmdir /S /Q "%BLINTER_BACKUP%" >nul 2>&1
+goto :error_exit
 
+REM Print failure message and exit with error code
 :error_exit
 echo.
 echo +========================================================+
@@ -272,12 +382,7 @@ timeout /t 5 /nobreak
 endlocal
 exit /b 1
 
+REM Successful completion
 :end
 endlocal
-exit /b 0
-
-:cleanup
-REM Subroutine to clean up temporary files
-if exist "%BLINTER_TEMP%.zip" del /F /Q "%BLINTER_TEMP%.zip" >nul 2>&1
-if exist "%BLINTER_TEMP%" rmdir /S /Q "%BLINTER_TEMP%" >nul 2>&1
 exit /b 0

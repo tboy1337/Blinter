@@ -1,6 +1,13 @@
 @echo off
 setlocal enabledelayedexpansion
 
+REM ============================================================================
+REM Blinter Uninstaller
+REM Purpose: Remove Blinter from %LOCALAPPDATA% and user PATH
+REM Author: tboy1337
+REM Repository: https://github.com/tboy1337/Blinter
+REM ============================================================================
+
 REM Attempt to change to system drive to avoid issues with current directory/drive
 cd /d "%SystemDrive%" >nul 2>&1
 if %errorlevel% neq 0 (
@@ -17,6 +24,7 @@ if %errorlevel% equ 0 (
 set BLINTER_DIR=%LOCALAPPDATA%\Programs\Blinter
 set BLINTER_BIN=%BLINTER_DIR%\bin
 set BLINTER_RELEASE_FILE=%BLINTER_DIR%\installed_release.txt
+set BLINTER_TEMP=%TEMP%\blinter_uninstall_%RANDOM%_%RANDOM%
 
 echo +=====================+
 echo + Blinter Uninstaller +
@@ -48,9 +56,15 @@ if exist "%BLINTER_BIN%\blinter.exe" (
 )
 
 if exist "%BLINTER_RELEASE_FILE%" (
+    REM LINT:IGNORE SEC001
     set /p INSTALLED_RELEASE=<"%BLINTER_RELEASE_FILE%"
-    echo Installed release: !INSTALLED_RELEASE!
-    echo.
+    if not "!INSTALLED_RELEASE!"=="" (
+        if /i not "!INSTALLED_RELEASE:~0,1!"=="v" set "INSTALLED_RELEASE="
+    )
+    if not "!INSTALLED_RELEASE!"=="" (
+        echo Installed release: !INSTALLED_RELEASE!
+        echo.
+    )
 )
 
 REM Confirm uninstallation
@@ -64,7 +78,7 @@ if /i not "!CONFIRM!"=="Y" (
     goto :end
 )
 
-REM Check for and terminate running Blinter processes
+REM Terminate running Blinter processes before file removal
 echo.
 echo Checking for running Blinter processes...
 echo.
@@ -74,7 +88,7 @@ for %%e in (blinter Blinter) do (
     tasklist /FI "IMAGENAME eq %%e.exe" 2>nul | find /I "%%e.exe" >nul 2>&1
     if !errorlevel! equ 0 (
         echo Terminating %%e.exe...
-        taskkill /F /IM "%%e.exe" >nul 2>&1
+        taskkill /F /FI "IMAGENAME eq %%e.exe" /IM "%%e.exe" >nul 2>&1
         if !errorlevel! equ 0 (
             echo Terminated %%e.exe
             set PROCESSES_KILLED=1
@@ -130,18 +144,22 @@ REM Remove Blinter from PATH
 echo.
 echo Removing Blinter from User PATH...
 echo.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $path = [Environment]::GetEnvironmentVariable('Path', 'User'); if ($null -eq $path) { Write-Host 'User PATH is empty'; exit 0 }; if ($path -like '*%BLINTER_BIN%*') { $pathArray = $path -split ';' | Where-Object { $_ -ne '' -and $_ -ne '%BLINTER_BIN%' }; $newPath = $pathArray -join ';'; [Environment]::SetEnvironmentVariable('Path', $newPath, 'User'); Write-Host 'Blinter removed from User PATH' } else { Write-Host 'Blinter not found in User PATH' }; exit 0 } catch { Write-Host \"ERROR: $_\"; exit 1 }" 2>&1
+set "PS_REMOVE_PATH=%BLINTER_TEMP%_remove_path.ps1"
+call :write_remove_path_script
+powershell -NoProfile -ExecutionPolicy Bypass -File "!PS_REMOVE_PATH!" 2>&1
 if %errorlevel% neq 0 (
     echo WARNING: Failed to remove Blinter from User PATH.
     echo You may need to manually remove it from your environment variables.
     echo.
 )
+if exist "!PS_REMOVE_PATH!" del /F /Q "!PS_REMOVE_PATH!" >nul 2>&1
 
-REM Remove Blinter installation directory
+REM Remove Blinter installation directory (user confirmed above)
 echo.
 echo Removing Blinter installation directory...
 echo.
 if exist "%BLINTER_DIR%" (
+    REM LINT:IGNORE SEC003
     rmdir /S /Q "%BLINTER_DIR%" >nul 2>&1
     if %errorlevel% equ 0 (
         echo Installation directory removed: %BLINTER_DIR%
@@ -175,6 +193,32 @@ echo Note: You may need to restart your terminal or IDE for PATH changes to take
 echo.
 goto :end
 
+REM Write PowerShell script to remove Blinter bin directory from user PATH
+:write_remove_path_script
+(
+echo try {
+echo     $binPath = '%BLINTER_BIN%'
+echo     $path = [Environment]::GetEnvironmentVariable('Path', 'User'^)
+echo     if (-not $path^) { Write-Host 'User PATH is empty'; exit 0 }
+echo     if ($path -like "*$binPath*"^) {
+echo         $pathArray = $path -split ';' ^| Where-Object { $_ -ne '' -and $_ -ne $binPath }
+echo         $newPath = $pathArray -join ';'
+echo         [Environment]::SetEnvironmentVariable('Path', $newPath, 'User'^)
+echo         Write-Host 'Blinter removed from User PATH'
+echo     }
+echo     else {
+echo         Write-Host 'Blinter not found in User PATH'
+echo     }
+echo     exit 0
+echo }
+echo catch {
+echo     Write-Host "ERROR: $_"
+echo     exit 1
+echo }
+) > "!PS_REMOVE_PATH!"
+exit /b 0
+
+REM Print failure message and exit with error code
 :error_exit
 echo.
 echo +==========================================================+
@@ -185,6 +229,7 @@ timeout /t 5 /nobreak
 endlocal
 exit /b 1
 
+REM Successful completion
 :end
 endlocal
 exit /b 0
