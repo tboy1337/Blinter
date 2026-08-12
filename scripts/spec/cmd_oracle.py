@@ -127,6 +127,9 @@ def _content_unsafe_reason(text: str, case_dir: Path) -> str | None:
         else:
             return "unbounded ping"
 
+    if re.search(r"\brobocopy\b", text, re.IGNORECASE):
+        return "robocopy may perform long file copy operations"
+
     timeout_match = re.search(r"timeout\s+/t\s+(\d+)", text, re.IGNORECASE)
     if timeout_match and int(timeout_match.group(1)) > 2:
         return f"long timeout ({timeout_match.group(1)}s)"

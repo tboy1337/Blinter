@@ -110,7 +110,7 @@ class TestGenerateFileVersionInfo:
         assert f"u'{project_version}'" in content
         major, minor, patch = _version_tuple(project_version)
         assert f"filevers=({major}, {minor}, {patch}, 0)" in content
-        assert "Blinter.exe" in content
+        assert "blinter.exe" in content
         assert "AGPL-3.0-or-later" in content
 
     def test_read_project_version_matches_pyproject(self) -> None:

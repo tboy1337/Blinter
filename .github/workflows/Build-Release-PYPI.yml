@@ -111,14 +111,13 @@ jobs:
           pyinstaller Blinter.spec
         shell: pwsh
 
-      - name: Rename executable
+      - name: Package executable for release
         run: |
-          Rename-Item -Path dist/Blinter.exe -NewName "Blinter-v${{ steps.version.outputs.version }}.exe"
-        shell: pwsh
-
-      - name: Zip the exe
-        run: |
-          Compress-Archive -Path "dist/Blinter-v${{ steps.version.outputs.version }}.exe" -DestinationPath "dist/Blinter-v${{ steps.version.outputs.version }}.zip"
+          $version = "${{ steps.version.outputs.version }}"
+          $folder = "dist/Blinter-v$version"
+          New-Item -ItemType Directory -Path $folder -Force
+          Move-Item -Path dist/blinter.exe -Destination "$folder/blinter.exe"
+          Compress-Archive -Path $folder -DestinationPath "dist/Blinter-v$version.zip"
         shell: pwsh
 
       - name: Upload artifact

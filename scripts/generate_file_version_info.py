@@ -59,7 +59,7 @@ def _build_version_info(version: str) -> str:
         StringStruct(u'FileVersion', u'{version}'),
         StringStruct(u'InternalName', u'Blinter'),
         StringStruct(u'LegalCopyright', u'{LEGAL_COPYRIGHT}'),
-        StringStruct(u'OriginalFilename', u'Blinter.exe'),
+        StringStruct(u'OriginalFilename', u'blinter.exe'),
         StringStruct(u'ProductName', u'Blinter'),
         StringStruct(u'ProductVersion', u'{version}')])
     ]),

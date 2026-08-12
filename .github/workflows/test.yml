@@ -135,8 +135,8 @@ jobs:
 
       - name: Verify executable exists
         run: |
-          if (-not (Test-Path -Path "dist\Blinter.exe" -PathType Leaf)) {
-            throw "dist\Blinter.exe was not produced by PyInstaller"
+          if (-not (Test-Path -Path "dist\blinter.exe" -PathType Leaf)) {
+            throw "dist\blinter.exe was not produced by PyInstaller"
           }
         shell: pwsh
 
@@ -147,5 +147,5 @@ jobs:
         shell: pwsh
 
       - name: Smoke test executable
-        run: .\scripts\test_exe_smoke.ps1 -ExePath .\dist\Blinter.exe
+        run: .\scripts\test_exe_smoke.ps1 -ExePath .\dist\blinter.exe
         shell: pwsh

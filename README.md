@@ -61,6 +61,7 @@ This installs the latest `blinter.exe` to `%LOCALAPPDATA%\Programs\Blinter\bin`,
 
 **Manual zip download (fallback):**
 - Download the latest `Blinter-v1.x.x.zip` from [GitHub Releases](https://github.com/tboy1337/Blinter/releases)
+- Extract the archive; the executable is `Blinter-v1.x.x\blinter.exe`
 - The one-line installer above is preferred; it keeps `blinter` on your `PATH` without manual setup.
 - ⚠️ **Note**: Some antivirus software may flag the executable as a false positive due to PyInstaller's runtime unpacking behavior. The executable is completely safe (all source code is open for inspection). **We recommend using pip installation to avoid this issue.**
 
@@ -146,7 +147,7 @@ python -m blinter --version
 **If using standalone executable (installer or manual download):**
 ```cmd
 # After the one-line installer, use blinter on PATH.
-# Manual zip downloads use the versioned name: Blinter-v1.x.x.exe
+# Manual zip: run Blinter-v1.x.x\blinter.exe or add that folder to PATH.
 
 # Analyze a single batch file
 blinter script.bat
@@ -440,8 +441,8 @@ blinter ./my-batch-scripts            # Analyze all files recursively
 blinter . --no-recursive              # Current directory only
 blinter ./scripts --summary           # With summary statistics
 
-# Manual zip only (versioned exe name):
-Blinter-v1.x.x.exe ./my-batch-scripts
+# Manual zip only (extract first):
+Blinter-v1.x.x\blinter.exe ./my-batch-scripts
 
 # Local development install:
 blinter ./my-batch-scripts      # Analyze all files recursively

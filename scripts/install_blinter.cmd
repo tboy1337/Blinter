@@ -193,16 +193,24 @@ if exist "!PS_EXPAND!" del /F /Q "!PS_EXPAND!" >nul 2>&1
 
 REM Locate extracted executable
 set BLINTER_SOURCE_EXE=
-for /f "tokens=*" %%f in ('dir /b "%BLINTER_TEMP%\Blinter-v*.exe" 2^>nul') do (
-    set BLINTER_SOURCE_EXE=!BLINTER_TEMP!\%%f
+set "BLINTER_SOURCE_EXE=%BLINTER_TEMP%\Blinter-!BLINTER_VERSION!\blinter.exe"
+if not exist "!BLINTER_SOURCE_EXE!" (
+    set BLINTER_SOURCE_EXE=
+    for /f "tokens=*" %%f in ('dir /s /b "%BLINTER_TEMP%\blinter.exe" 2^>nul') do (
+        set BLINTER_SOURCE_EXE=%%f
+        goto :found_exe
+    )
 )
 
 if "!BLINTER_SOURCE_EXE!"=="" (
     echo ERROR: Blinter executable not found in extracted archive.
     echo.
+    echo Expected layout: Blinter-!BLINTER_VERSION!\blinter.exe
     echo The archive structure may have changed or be corrupted.
     goto :error_restore
 )
+
+:found_exe
 
 REM Install Blinter executable
 echo Installing Blinter executable...

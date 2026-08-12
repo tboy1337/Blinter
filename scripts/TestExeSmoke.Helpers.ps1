@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Helper functions for Blinter.exe smoke testing.
+    Helper functions for blinter.exe smoke testing.
 #>
 Set-StrictMode -Version Latest
 

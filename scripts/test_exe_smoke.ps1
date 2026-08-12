@@ -1,14 +1,14 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Smoke tests for the PyInstaller-built Blinter.exe and parity with python -m blinter.
+    Smoke tests for the PyInstaller-built blinter.exe and parity with python -m blinter.
 
 .DESCRIPTION
-    Used by CI and locally after building dist\Blinter.exe. Creates ephemeral fixtures,
+    Used by CI and locally after building dist\blinter.exe. Creates ephemeral fixtures,
     runs functional exe scenarios, then compares exe output to the editable Python CLI.
 
 .PARAMETER ExePath
-    Path to Blinter.exe (default: dist\Blinter.exe under RepoRoot).
+    Path to blinter.exe (default: dist\blinter.exe under RepoRoot).
 
 .PARAMETER RepoRoot
     Repository root directory (default: parent of the scripts folder).
@@ -33,7 +33,7 @@ if (-not $RepoRoot) {
 }
 
 if (-not $ExePath) {
-    $ExePath = Join-Path $RepoRoot "dist\Blinter.exe"
+    $ExePath = Join-Path $RepoRoot "dist\blinter.exe"
 }
 
 if (-not $PythonPath) {
