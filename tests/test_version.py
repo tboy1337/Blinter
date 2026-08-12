@@ -140,3 +140,20 @@ class TestGenerateFileVersionInfo:
         output = repo_root / "file_version_info.txt"
         assert output.is_file()
         assert "VSVersionInfo(" in output.read_text(encoding="utf-8")
+
+
+class TestBlinterSpecIcon:
+    """Tests for PyInstaller spec icon configuration."""
+
+    def test_blinter_spec_references_application_icon(self) -> None:
+        """Blinter.spec must embed resources/blinter_icon.ico in the Windows exe."""
+        repo_root = Path(__file__).resolve().parent.parent
+        icon_path = repo_root / "resources" / "blinter_icon.ico"
+        spec_path = repo_root / "Blinter.spec"
+
+        assert icon_path.is_file(), "Application icon asset is missing"
+        spec_text = spec_path.read_text(encoding="utf-8")
+        assert re.search(
+            r"""icon\s*=\s*["']resources/blinter_icon\.ico["']""",
+            spec_text,
+        ), "Blinter.spec must set icon=resources/blinter_icon.ico"

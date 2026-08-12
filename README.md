@@ -1,6 +1,6 @@
 # Blinter
 
-**Blinter** is a linter for Windows batch files (`.bat` and `.cmd`). It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems. Blinter helps you write safer, more reliable and maintainable batch scripts. Even in 2026, batch files deserve professional tooling!
+**Blinter** is a linter for Windows batch files (`.bat` and `.cmd`). It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems. Blinter helps you write safer, more reliable and maintainable batch scripts.
 
 - ✅ **Configurable Options** - Configurable rules, `--verbose`/`--quiet` logging, robust error handling
 - ✅ **Unicode Support** - Support for international characters and filenames
@@ -60,7 +60,7 @@ curl -L https://raw.githubusercontent.com/tboy1337/Blinter/main/scripts/install_
 This installs the latest `blinter.exe` to `%LOCALAPPDATA%\Programs\Blinter\bin`, adds it to your user `PATH`, and handles updates automatically. Restart your terminal or IDE after installation for `PATH` changes to take effect.
 
 **Manual zip download (fallback):**
-- Download the latest `Blinter-v1.0.x.zip` from [GitHub Releases](https://github.com/tboy1337/Blinter/releases)
+- Download the latest `Blinter-v1.x.x.zip` from [GitHub Releases](https://github.com/tboy1337/Blinter/releases)
 - The one-line installer above is preferred; it keeps `blinter` on your `PATH` without manual setup.
 - ⚠️ **Note**: Some antivirus software may flag the executable as a false positive due to PyInstaller's runtime unpacking behavior. The executable is completely safe (all source code is open for inspection). **We recommend using pip installation to avoid this issue.**
 
@@ -146,7 +146,7 @@ python -m blinter --version
 **If using standalone executable (installer or manual download):**
 ```cmd
 # After the one-line installer, use blinter on PATH.
-# Manual zip downloads use the versioned name: Blinter-v1.0.x.exe
+# Manual zip downloads use the versioned name: Blinter-v1.x.x.exe
 
 # Analyze a single batch file
 blinter script.bat
@@ -441,7 +441,7 @@ blinter . --no-recursive              # Current directory only
 blinter ./scripts --summary           # With summary statistics
 
 # Manual zip only (versioned exe name):
-Blinter-v1.0.x.exe ./my-batch-scripts
+Blinter-v1.x.x.exe ./my-batch-scripts
 
 # Local development install:
 blinter ./my-batch-scripts      # Analyze all files recursively
@@ -530,17 +530,6 @@ Baseline snapshots are per-machine and only comparable against the same local co
 The test suite enforces 90% branch coverage (`pytest.ini`, `.coveragerc`). CI runs pytest on Python 3.11–3.14, static analysis (black, isort, mypy, pylint, bandit), and Windows executable smoke tests on every push and pull request to `main`. Releases run automatically when `version` in `pyproject.toml` is bumped on `main`.
 
 See [docs/Architecture.md](docs/Architecture.md) for module layout and extension points.
-
-## Releasing
-
-Version is defined only in [`pyproject.toml`](pyproject.toml) (`version = "..."`).
-
-1. Bump `version` in `pyproject.toml` and push to `main`.
-2. The [Build-Release-PYPI](.github/workflows/Build-Release-PYPI.yml) workflow runs automatically, verifies tests and quality checks, then publishes wheels to PyPI and a Windows `.exe` to GitHub Releases tagged `v{version}`.
-
-No separate git tag is required — the workflow reads the version from `pyproject.toml` and creates the release tag for you.
-
-To re-run a failed release for the current `pyproject.toml` version without bumping it again, use the workflow's manual **Run workflow** (`workflow_dispatch`) button on GitHub Actions.
 
 ## Contributing 🤝
 

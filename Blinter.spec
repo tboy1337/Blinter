@@ -3,6 +3,7 @@
 
 This spec file includes optimizations to reduce antivirus false positives:
 - Version information resource for legitimacy
+- Application icon from resources/blinter_icon.ico
 - Disabled UPX compression (--noupx) which triggers heuristic detection
 - Console application metadata
 - Company and product information
@@ -122,4 +123,5 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     version="file_version_info.txt",
+    icon="resources/blinter_icon.ico",
 )
