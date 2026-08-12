@@ -527,8 +527,6 @@ py scripts/corpus_lint.py --check-baseline
 
 Baseline snapshots are per-machine and only comparable against the same local corpus. Regenerate with `py scripts/generate_corpus_baseline.py` after rule changes or corpus updates.
 
-The test suite enforces 90% branch coverage (`pytest.ini`, `.coveragerc`). CI runs pytest on Python 3.11–3.14, static analysis (black, isort, mypy, pylint, bandit), and Windows executable smoke tests on every push and pull request to `main`. Releases run automatically when `version` in `pyproject.toml` is bumped on `main`.
-
 See [docs/Architecture.md](docs/Architecture.md) for module layout and extension points.
 
 ## Contributing 🤝
