@@ -558,12 +558,10 @@ Report security vulnerabilities privately as described in [SECURITY.md](SECURITY
 
 This project is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later) — see [COPYING](https://github.com/tboy1337/Blinter/blob/main/COPYING) for details.
 
-<p align="center">
-  <sub>Icon by <a href="https://www.flaticon.com/authors/acidmit">Acidmit</a> · <a href="https://www.flaticon.com/">Flaticon</a></sub>
-</p>
+<div align="center">
 
-<p align="center">
-  <a href="https://pepy.tech/projects/blinter">
-    <img alt="PyPI Downloads (total)" src="https://static.pepy.tech/personalized-badge/blinter?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" />
-  </a>
-</p>
+Icon by [Acidmit](https://www.flaticon.com/authors/acidmit) · [Flaticon](https://www.flaticon.com/)
+
+[![PyPI Downloads (total)](https://static.pepy.tech/personalized-badge/blinter?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/blinter)
+
+</div>
