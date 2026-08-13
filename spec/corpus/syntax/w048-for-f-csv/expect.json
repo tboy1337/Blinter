@@ -3,17 +3,16 @@
   "description": "w048 for f csv",
   "lines": {
     "2": [
-      "P009",
       "W001",
-      "W020",
       "W048"
     ]
   },
-  "must_not": [],
-  "rules": [
+  "must_not": [
     "P009",
+    "W020"
+  ],
+  "rules": [
     "W001",
-    "W020",
     "W048"
   ],
   "tags": [

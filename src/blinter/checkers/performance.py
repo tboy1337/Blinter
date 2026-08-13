@@ -43,7 +43,7 @@ def _check_for_loop_optimization(stripped: str, line_num: int) -> List[LintIssue
     )
     if for_match:
         for_options = str(for_match.group(1) or for_match.group(2) or "").lower()
-        if "tokens=" not in for_options:
+        if "tokens=" not in for_options and "delims=" not in for_options:
             issues.append(
                 LintIssue(
                     line_number=line_num,

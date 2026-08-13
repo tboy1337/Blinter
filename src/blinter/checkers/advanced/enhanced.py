@@ -14,7 +14,9 @@ from blinter.rules.registry import RULES
 def _check_for_f_options(stripped: str, line_number: int) -> Optional[LintIssue]:
     """Check FOR /F without proper options (W020)."""
     if re.match(
-        r'\s*for\s+/f\s+(?!.*"[^"]*tokens[^"]*")[^(]*\(', stripped, re.IGNORECASE
+        r'\s*for\s+/f\s+(?!.*"[^"]*(?:tokens|delims)[^"]*")[^(]*\(',
+        stripped,
+        re.IGNORECASE,
     ):
         return LintIssue(
             line_number=line_number,

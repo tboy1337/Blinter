@@ -7,6 +7,7 @@ from typing import (
     DefaultDict,
     Dict,
     List,
+    Optional,
     Tuple,
 )
 
@@ -703,15 +704,22 @@ def _check_error_handling_warnings(lines: List[str]) -> List[LintIssue]:
     return issues
 
 
+def _collect_label_line_numbers(lines: List[str]) -> Dict[str, int]:
+    """Map label names to their first defining line number."""
+    label_lines: Dict[str, int] = {}
+    for i, line in enumerate(lines, start=1):
+        label_match = re.match(r"^\s*:([a-zA-Z_][a-zA-Z0-9_]*)\s*$", line.strip())
+        if label_match:
+            label_name = str(label_match.group(1)).lower()
+            if label_name not in label_lines:
+                label_lines[label_name] = i
+    return label_lines
+
+
 def _check_infinite_loop_warnings(lines: List[str]) -> List[LintIssue]:
     """Check for potential infinite loops (W004)."""
     issues: List[LintIssue] = []
-    loop_labels: set[str] = set()
-
-    for line in lines:
-        label_match = re.match(r"^\s*:([a-zA-Z_][a-zA-Z0-9_]*)\s*$", line.strip())
-        if label_match:
-            loop_labels.add(str(label_match.group(1)).lower())
+    label_lines = _collect_label_line_numbers(lines)
 
     for i, line in enumerate(lines, start=1):
         stripped = line.strip().lower()
@@ -719,7 +727,11 @@ def _check_infinite_loop_warnings(lines: List[str]) -> List[LintIssue]:
         if not goto_match:
             continue
         target = str(goto_match.group(1)).lower()
-        if target not in loop_labels:
+        target_line = label_lines.get(target)
+        if target_line is None:
+            continue
+        # Forward jumps to exit handlers are not loops; only backward jumps are.
+        if target_line >= i:
             continue
         context_lines = lines[max(0, i - 5) : min(len(lines), i + 5)]
         has_exit_guard = any(
@@ -771,10 +783,33 @@ def _check_locked_file_operations(lines: List[str]) -> List[LintIssue]:
     return issues
 
 
+def _collect_call_subroutine_labels(lines: List[str]) -> set[str]:
+    """Return label names invoked via CALL :label."""
+    call_labels: set[str] = set()
+    for line in lines:
+        for match in re.finditer(
+            r"\bcall\s+:([a-zA-Z_][a-zA-Z0-9_]*)\b", line, re.IGNORECASE
+        ):
+            call_labels.add(str(match.group(1)).lower())
+    return call_labels
+
+
+def _label_containing_line(lines: List[str], line_index: int) -> Optional[str]:
+    """Return the nearest preceding label name for a zero-based line index."""
+    for index in range(line_index, -1, -1):
+        label_match = re.match(
+            r"^\s*:([a-zA-Z_][a-zA-Z0-9_]*)\s*$", lines[index].strip()
+        )
+        if label_match:
+            return str(label_match.group(1)).lower()
+    return None
+
+
 def _check_endlocal_before_exit(lines: List[str]) -> List[LintIssue]:
     """Check for SETLOCAL without ENDLOCAL before EXIT (P006)."""
     issues: List[LintIssue] = []
     setlocal_depth = 0
+    call_subroutine_labels = _collect_call_subroutine_labels(lines)
 
     for i, line in enumerate(lines, start=1):
         stripped = line.strip().lower()
@@ -782,13 +817,18 @@ def _check_endlocal_before_exit(lines: List[str]) -> List[LintIssue]:
             setlocal_depth += 1
         if "endlocal" in stripped and setlocal_depth > 0:
             setlocal_depth -= 1
-        if re.match(r"exit\b", stripped) and setlocal_depth > 0:
-            issues.append(
-                LintIssue(
-                    line_number=i,
-                    rule=RULES["P006"],
-                    context="EXIT with active SETLOCAL should be preceded by ENDLOCAL",
-                )
+        if not re.match(r"exit\b", stripped) or setlocal_depth <= 0:
+            continue
+        if re.match(r"exit\s+/b\b", stripped):
+            current_label = _label_containing_line(lines, i - 1)
+            if current_label and current_label in call_subroutine_labels:
+                continue
+        issues.append(
+            LintIssue(
+                line_number=i,
+                rule=RULES["P006"],
+                context="EXIT with active SETLOCAL should be preceded by ENDLOCAL",
             )
+        )
 
     return issues

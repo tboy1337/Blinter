@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "tasklist before taskkill in block",
+  "lines": {},
+  "must_not": [
+    "W043"
+  ],
+  "rules": [],
+  "tags": [
+    "integration"
+  ]
+}

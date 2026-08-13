@@ -119,17 +119,27 @@ def _check_code_duplication(lines: List[str]) -> List[LintIssue]:
     return issues
 
 
+def _is_interactive_set_prompt(line: str) -> bool:
+    """Return True when set /p prompts the user (not file input redirection)."""
+    if not re.search(r"set\s+/p\s+", line, re.IGNORECASE):
+        return False
+    return not re.search(r"set\s+/p\s+\S+\s*=<", line, re.IGNORECASE)
+
+
 def _check_missing_pause(lines: List[str]) -> List[LintIssue]:
     """Check for missing PAUSE in interactive scripts (W014)."""
     issues: List[LintIssue] = []
 
     has_user_input = any(
-        re.search(r"set\s+/p\s+", line, re.IGNORECASE)
-        or re.search(r"choice\s+", line, re.IGNORECASE)
+        _is_interactive_set_prompt(line) or re.search(r"choice\s+", line, re.IGNORECASE)
         for line in lines
     )
 
-    has_pause = any(re.search(r"pause", line, re.IGNORECASE) for line in lines)
+    has_pause = any(
+        re.search(r"\bpause\b", line, re.IGNORECASE)
+        or re.search(r"\btimeout\s+/t\b", line, re.IGNORECASE)
+        for line in lines
+    )
 
     if has_user_input and not has_pause:
         # Find an appropriate line number (near the end)

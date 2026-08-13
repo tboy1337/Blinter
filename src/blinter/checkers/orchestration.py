@@ -131,7 +131,7 @@ def _append_line_checks(  # pylint: disable=too-many-arguments,too-many-position
             )
         )
         issues.extend(_check_advanced_for_rules(line, line_number, lines=lines))
-        issues.extend(_check_advanced_process_mgmt(line, line_number))
+        issues.extend(_check_advanced_process_mgmt(lines, line_number))
 
     if run_style:
         issues.extend(_check_style_issues(line, line_number, config.max_line_length))

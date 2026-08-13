@@ -466,4 +466,7 @@ SAFE_COMMAND_INJECTION_PATTERNS: List[str] = [
     r"^(?:if\s+%[^%]+%\s+(?:EQU|NEQ)\s+\d+\s+)?wmic\b.*%nul\d+%\s*\|\s*find\b",
     r"^set\s+\"\w+=[^\"]*&(?:call|echo)\b",
     r"^set\s+@\w+=.*&\s*set\s+@",
+    r"powershell\b.*-file\s+[\"']?%[a-zA-Z_][a-zA-Z0-9_]*%",
+    r"^for\s+/f\b.*\bpowershell\b.*-file\b",
+    r'^"[^"]*%[a-zA-Z_][a-zA-Z0-9_]*%[^"]*\.exe"[^&|]*>',
 ]

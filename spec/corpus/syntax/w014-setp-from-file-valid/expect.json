@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "set /p file input is not interactive",
+  "lines": {
+    "3": [
+      "W001"
+    ]
+  },
+  "must_not": [
+    "W014"
+  ],
+  "rules": [
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

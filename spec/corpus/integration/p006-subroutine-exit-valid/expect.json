@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "exit /b in call subroutine is valid",
+  "lines": {},
+  "must_not": [
+    "P006"
+  ],
+  "rules": [],
+  "tags": [
+    "integration"
+  ]
+}

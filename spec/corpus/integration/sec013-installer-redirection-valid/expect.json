@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "installer-style redirection with script-controlled vars",
+  "lines": {},
+  "must_not": [
+    "SEC013"
+  ],
+  "rules": [],
+  "tags": [
+    "integration"
+  ]
+}

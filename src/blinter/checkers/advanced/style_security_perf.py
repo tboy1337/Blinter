@@ -686,9 +686,30 @@ def _is_safe_file_redirection_only(stripped: str) -> bool:
     )
 
 
+def _is_safe_installer_style_redirection(stripped: str) -> bool:
+    """Return True for script-controlled commands that only redirect output."""
+    if re.search(r"\bfor\s+/f\b.*\bpowershell\b.*-file\b", stripped, re.IGNORECASE):
+        return True
+    if re.search(
+        r'^"[^"]*(?:%[a-zA-Z_][a-zA-Z0-9_]*%|![^!]+!)[^"]*\.exe"[^&|]*(?:>|\^>)',
+        stripped,
+        re.IGNORECASE,
+    ):
+        return not _has_unsafe_command_chaining(stripped)
+    if re.search(r"\bcurl\b", stripped, re.IGNORECASE) and re.search(
+        r"(?:>|\^>|2>&1)", stripped
+    ):
+        return not _has_unsafe_command_chaining(stripped)
+    if re.search(r"\bfor\s+/f\b.*\b(dir|powershell)\b", stripped, re.IGNORECASE):
+        return True
+    return False
+
+
 def _is_safe_command_injection(stripped: str) -> bool:
     """Check if a command with variables is safe from injection attacks."""
     if _uses_only_system_variables(stripped):
+        return True
+    if _is_safe_installer_style_redirection(stripped):
         return True
     if any(
         re.search(pattern, stripped, re.IGNORECASE)

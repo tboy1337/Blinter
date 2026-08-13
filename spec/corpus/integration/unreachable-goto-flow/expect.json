@@ -2,21 +2,18 @@
   "config": {},
   "description": "unreachable goto flow",
   "lines": {
-    "2": [
-      "W004"
-    ],
     "3": [
       "S018",
       "S027"
     ]
   },
   "must_not": [
-    "E008"
+    "E008",
+    "W004"
   ],
   "rules": [
     "S018",
-    "S027",
-    "W004"
+    "S027"
   ],
   "tags": [
     "integration"

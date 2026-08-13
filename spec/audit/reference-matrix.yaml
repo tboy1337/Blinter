@@ -409,6 +409,7 @@ entries:
   corpus:
   - syntax/p005-endlocal-without-setlocal
   - integration/p006-missing-endlocal
+  - integration/p006-subroutine-exit-valid
   - integration/p027-setlocal-nesting
 - construct: Temporary files, randomness, and predictable paths
   sources:
@@ -458,6 +459,7 @@ entries:
   - syntax/p022-redir-in-loop
   - syntax/p023-seta-in-loop
   - syntax/p025-wildcard-star
+  - syntax/p009-w020-for-f-missing-options
   - syntax/w048-for-f-csv
   - integration/sec018-insecure-redirection
   - syntax/e030-improper-caret
@@ -579,12 +581,15 @@ entries:
   - syntax/w009-older-windows-cmd
   - syntax/w010-architecture-specific
   - integration/w014-missing-pause
+  - syntax/w014-setp-from-file-valid
   - syntax/w026-inefficient-modifiers
   - syntax/w027-interpreter-diff
   - integration/w028-bat-errorlevel-ext
   - syntax/w031-unicode-filename
   - syntax/w042-timeout-nobreak
+  - syntax/p009-w020-for-f-missing-options
   - syntax/w048-for-f-csv
+  - integration/w004-goto-exit-handler
   - integration/p002-code-duplication
   - integration/sec003-dangerous-del
   - integration/sec004-dangerous-reg
@@ -608,6 +613,7 @@ entries:
   - syntax/s023-magic-timeout
   - integration/sec015-taskkill-unfiltered
   - syntax/w043-taskkill-no-verify
+  - integration/w043-tasklist-before-taskkill
   - syntax/w060-setx-equals-sign
   - syntax/w060-setx-valid
 - construct: Duplicate GOTO labels
@@ -661,6 +667,7 @@ entries:
   - syntax/e038-for-f-valid
   - syntax/e038-for-f-tokens-delims-valid
   - syntax/w048-for-f-csv
+  - syntax/for-f-delims-only-valid
   - syntax/w063-for-f-token-overflow
   - syntax/w063-for-f-token-valid
   - syntax/w063-for-f-token-star-overflow
@@ -727,6 +734,7 @@ entries:
   - integration/sec010-sensitive-echo
   - integration/sec011-path-traversal
   - integration/sec013-var-injection
+  - integration/sec013-installer-redirection-valid
   - integration/sec014-unescaped-input
   - integration/sec015-taskkill-unfiltered
   - integration/w005-unquoted-var

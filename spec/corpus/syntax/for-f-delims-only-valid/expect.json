@@ -1,0 +1,19 @@
+{
+  "config": {},
+  "description": "for /f delims= captures whole line",
+  "lines": {
+    "5": [
+      "W001"
+    ]
+  },
+  "must_not": [
+    "P009",
+    "W020"
+  ],
+  "rules": [
+    "W001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

@@ -317,9 +317,20 @@ def _check_advanced_for_rules(
     return issues
 
 
-def _check_advanced_process_mgmt(line: str, line_number: int) -> List[LintIssue]:
+def _has_recent_tasklist_verification(lines: List[str], line_number: int) -> bool:
+    """Return True when a recent line verifies process existence before TASKKILL."""
+    start = max(0, line_number - 6)
+    for prior_line in lines[start : line_number - 1]:
+        prior = prior_line.strip().lower()
+        if prior.startswith("tasklist") or ("tasklist" in prior and "find" in prior):
+            return True
+    return False
+
+
+def _check_advanced_process_mgmt(lines: List[str], line_number: int) -> List[LintIssue]:
     """Check for process management best practices."""
     issues: List[LintIssue] = []
+    line = lines[line_number - 1]
     stripped = line.strip().lower()
 
     # W042: Timeout command without /NOBREAK option
@@ -338,13 +349,14 @@ def _check_advanced_process_mgmt(line: str, line_number: int) -> List[LintIssue]
 
     # W043: Process management without proper verification
     if stripped.startswith("taskkill") and "tasklist" not in stripped:
-        issues.append(
-            LintIssue(
-                line_number,
-                RULES["W043"],
-                context="TASKKILL should verify process existence first",
+        if not _has_recent_tasklist_verification(lines, line_number):
+            issues.append(
+                LintIssue(
+                    line_number,
+                    RULES["W043"],
+                    context="TASKKILL should verify process existence first",
+                )
             )
-        )
 
     # SEC015: Process killing without authentication
     if "taskkill" in stripped and "/f" in stripped and "/fi" not in stripped:

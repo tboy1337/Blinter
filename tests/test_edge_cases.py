@@ -455,7 +455,7 @@ class TestPerformanceIssueChecking:
         issues = _check_performance_issues(
             [""],
             1,
-            'FOR /F "delims=," %%i IN (file.txt) DO echo %%i',
+            'FOR /F "usebackq" %%i IN (file.txt) DO echo %%i',
             False,
             False,
             False,
@@ -466,6 +466,22 @@ class TestPerformanceIssueChecking:
         )
         assert len(issues) == 1
         assert "P009" in issues[0].rule.code
+
+    def test_for_loop_with_delims_only_is_not_p009(self) -> None:
+        """FOR /F with delims= captures the full line and should not trigger P009."""
+        issues = _check_performance_issues(
+            [""],
+            1,
+            'FOR /F "delims=," %%i IN (file.txt) DO echo %%i',
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
+        )
+        assert not issues
 
     def test_temporary_file_without_random(self) -> None:
         """Test temporary file without random name."""
@@ -540,6 +556,16 @@ class TestGlobalFunctionChecking:
         issues = _check_missing_pause(lines)
         assert len(issues) == 1
         assert "W014" in issues[0].rule.code
+
+    def test_check_missing_pause_ignores_setp_file_input(self) -> None:
+        """set /p VAR=<file should not count as interactive user input."""
+        lines = [
+            'set /p marker=<"release.txt"',
+            "echo %marker%",
+        ]
+
+        issues = _check_missing_pause(lines)
+        assert not issues
 
     def test_check_missing_pause_with_choice(self) -> None:
         """Test missing PAUSE detection when script has CHOICE command."""
@@ -1821,6 +1847,19 @@ class TestGlobalChecks:
         w004_issues = [issue for issue in issues if issue.rule.code == "W004"]
         assert len(w004_issues) == 1
 
+    def test_goto_forward_to_label_does_not_trigger_w004(self) -> None:
+        """Forward GOTO to an exit handler should not trigger W004."""
+        lines = [
+            "@echo off",
+            "if 1==1 goto :end",
+            "echo never",
+            ":end",
+            "exit /b 0",
+        ]
+        issues = _check_new_global_rules(lines, "test.bat")
+        w004_issues = [issue for issue in issues if issue.rule.code == "W004"]
+        assert not w004_issues
+
     def test_locked_path_operation_triggers_w007(self) -> None:
         """File operations under system paths should trigger W007."""
         lines = ["@echo off", "copy file.txt C:\\Windows\\System32\\file.txt"]
@@ -1834,6 +1873,21 @@ class TestGlobalChecks:
         issues = _check_new_global_rules(lines, "test.bat")
         p006_issues = [issue for issue in issues if issue.rule.code == "P006"]
         assert len(p006_issues) == 1
+
+    def test_subroutine_exit_b_does_not_trigger_p006(self) -> None:
+        """exit /b inside a CALL subroutine should not trigger P006."""
+        lines = [
+            "@echo off",
+            "setlocal",
+            "call :helper",
+            "endlocal",
+            "exit /b 0",
+            ":helper",
+            "exit /b 0",
+        ]
+        issues = _check_new_global_rules(lines, "test.bat")
+        p006_issues = [issue for issue in issues if issue.rule.code == "P006"]
+        assert not p006_issues
 
     def test_self_modification_triggers_sec019(self) -> None:
         """Writing to the running script should trigger SEC019."""
@@ -3596,7 +3650,7 @@ class TestAdvancedSecurityPerformanceRules:
         """SEC015 triggers for TASKKILL /F without /FI filters."""
         from blinter.checkers.advanced.vars_syntax import _check_advanced_process_mgmt
 
-        issues = _check_advanced_process_mgmt("taskkill /f /im notepad.exe\n", 1)
+        issues = _check_advanced_process_mgmt(["taskkill /f /im notepad.exe"], 1)
         codes = {issue.rule.code for issue in issues}
         assert "SEC015" in codes
 
@@ -3605,10 +3659,22 @@ class TestAdvancedSecurityPerformanceRules:
         from blinter.checkers.advanced.vars_syntax import _check_advanced_process_mgmt
 
         issues = _check_advanced_process_mgmt(
-            'taskkill /f /fi "imagename eq notepad.exe" /im notepad.exe\n', 1
+            ['taskkill /f /fi "imagename eq notepad.exe" /im notepad.exe'], 1
         )
         codes = {issue.rule.code for issue in issues}
         assert "SEC015" not in codes
+
+    def test_w043_ignores_taskkill_after_tasklist(self) -> None:
+        """TASKKILL after TASKLIST in the same block should not trigger W043."""
+        from blinter.checkers.advanced.vars_syntax import _check_advanced_process_mgmt
+
+        lines = [
+            'tasklist /FI "IMAGENAME eq notepad.exe" 2>nul | find /I notepad.exe >nul',
+            "taskkill /F /IM notepad.exe >nul 2>&1",
+        ]
+        issues = _check_advanced_process_mgmt(lines, 2)
+        codes = {issue.rule.code for issue in issues}
+        assert "W043" not in codes
 
     def test_for_loop_performance_rules(self) -> None:
         """P019 and P022 trigger inside FOR blocks."""

@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "for /f missing tokens and delims options",
+  "lines": {
+    "2": [
+      "P009",
+      "W020"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P009",
+    "W020"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}
