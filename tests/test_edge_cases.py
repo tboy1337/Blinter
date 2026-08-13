@@ -1237,7 +1237,9 @@ class TestPercentTildeSyntaxE019:
             assert not [i for i in issues if i.rule.code == "E019"], line
             assert not [i for i in issues if i.rule.code == "E017"], line
 
-    def test_for_loop_bare_tilde_integration_not_e017_e024(self, tmp_path: Path) -> None:
+    def test_for_loop_bare_tilde_integration_not_e017_e024(
+        self, tmp_path: Path
+    ) -> None:
         """FOR loop bare %%~X must not false-positive E017/E024."""
         batch_file = tmp_path / "test.bat"
         batch_file.write_text(
@@ -1275,13 +1277,13 @@ class TestForFSuboptionsE038:
 
     def test_skip_variable_not_e038(self) -> None:
         line = (
-            'for /f "skip=%@KEEP_HISTORICAL% tokens=*" %%v in (\'dir /b\') do echo %%v'
+            "for /f \"skip=%@KEEP_HISTORICAL% tokens=*\" %%v in ('dir /b') do echo %%v"
         )
         issues = _check_for_f_suboptions(line, 1)
         assert not issues
 
     def test_skip_delayed_expansion_not_e038(self) -> None:
-        line = 'for /f "skip=!SKIP_COUNT! tokens=*" %%v in (\'dir /b\') do echo %%v'
+        line = "for /f \"skip=!SKIP_COUNT! tokens=*\" %%v in ('dir /b') do echo %%v"
         issues = _check_for_f_suboptions(line, 1)
         assert not issues
 
