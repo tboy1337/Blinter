@@ -19,7 +19,7 @@ pip-audit
 
 # SSOT spec tooling
 pyyaml
-types-PyYAML
+types-pyyaml
 jsonschema
 
 # Code Formatting
