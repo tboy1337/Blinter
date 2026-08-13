@@ -141,8 +141,8 @@ RULES: Dict[str, Rule] = {
         code="E019",
         name="Percent-tilde on non-parameter variable",
         severity=RuleSeverity.ERROR,
-        explanation="Percent-tilde syntax only works with command-line parameters (%1-%9) and FOR loop variables",
-        recommendation="Use percent-tilde only with %1-%9 parameters or FOR loop variables like %%i",
+        explanation="Percent-tilde syntax only works with command-line parameters (%0-%9) and FOR loop variables",
+        recommendation="Use percent-tilde only with %0-%9 parameters or FOR loop variables like %%i",
     ),
     "E020": Rule(
         code="E020",

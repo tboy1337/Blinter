@@ -10,7 +10,7 @@ _PERCENT_TILDE_INTERIOR = (
     r"(?:[fdpnxsatz$])*" r"(?:[A-Za-z_][A-Za-z0-9_]*:\d+|[0-9*]|[A-Za-z_][A-Za-z0-9_]*)"
 )
 PERCENT_TILDE_TOKEN_RE = re.compile(
-    rf"%~({_PERCENT_TILDE_INTERIOR})(?:%|(?![0-9A-Za-z%]))",
+    rf"%~({_PERCENT_TILDE_INTERIOR})(?:%|(?![0-9]))",
     re.IGNORECASE,
 )
 

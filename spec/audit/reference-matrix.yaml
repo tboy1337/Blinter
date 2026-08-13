@@ -282,6 +282,7 @@ entries:
   - syntax/e019-percent-tilde-on-var
   - syntax/e019-set-a-percent-tilde-params-valid
   - syntax/e019-for-loop-tilde-z-valid
+  - syntax/e019-percent-tilde-dp0-adjacent-valid
   - syntax/e024-invalid-modifier-combo
   - syntax/e025-tilde-wrong-context
   - syntax/w051-param-10-ambiguous

@@ -1204,11 +1204,23 @@ class TestPercentTildeSyntaxE019:
             'set /a "%~3=%~1 + %~2"',
             "SET /A %~2=%%~M + 2",
             "echo %~dp0",
+            'set "OUT=%~dp0log.txt"',
+            'CALL "%~dp0helper.bat"',
             "echo %~n1",
         ]
         for line in valid_lines:
             issues = _check_percent_tilde_syntax(line.strip(), 1)
             assert not [i for i in issues if i.rule.code == "E019"], line
+
+    def test_dp0_adjacent_literal_integration_not_e019(self, tmp_path: Path) -> None:
+        """Issue #35: %~dp0 followed by literal text must not false-positive E019."""
+        batch_file = tmp_path / "test.bat"
+        batch_file.write_text(
+            '@echo off\nset "OUT=%~dp0log.txt"\nexit /b 0\n',
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(batch_file))
+        assert not [i for i in issues if i.rule.code == "E019"]
 
     def test_for_loop_tilde_modifiers_not_e019(self) -> None:
         """FOR loop %%~modifier+letter expansions must not false-positive E019."""

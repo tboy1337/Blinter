@@ -1,0 +1,8 @@
+{
+  "description": "%~dp0 with adjacent literal suffix (E019 negative control, issue #35)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E019"],
+  "config": {},
+  "tags": ["syntax"]
+}
