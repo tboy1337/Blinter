@@ -1,0 +1,8 @@
+{
+  "description": "EXIT /B inside conditional block must not flag later code as unreachable (E008 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E008"],
+  "config": {},
+  "tags": ["integration"]
+}

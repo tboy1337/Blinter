@@ -5,7 +5,7 @@ from typing import List
 
 from blinter.models import LintIssue
 from blinter.rules.expansion_data import VALID_MODIFIERS
-from blinter.rules.helpers import PERCENT_TILDE_TOKEN_RE
+from blinter.rules.helpers import PERCENT_TILDE_TOKEN_RE, strip_for_metavar_tilde_tokens
 from blinter.rules.registry import RULES
 
 _FOR_F_OPTIONS_RE = re.compile(
@@ -14,6 +14,14 @@ _FOR_F_OPTIONS_RE = re.compile(
 )
 _FOR_LOOP_VAR_RE = re.compile(r"%%([a-zA-Z])", re.IGNORECASE)
 _FOR_BODY_VAR_RE = re.compile(r"%%([a-zA-Z])")
+_SKIP_VARIABLE_RE = re.compile(r"(?:%[^%]+%|![^!]+!)")
+
+
+def _is_valid_for_f_skip_value(skip_value: str) -> bool:
+    """Return True when skip= is a positive literal or expandable variable."""
+    if re.fullmatch(r"\d+", skip_value):
+        return int(skip_value) >= 1
+    return _SKIP_VARIABLE_RE.fullmatch(skip_value) is not None
 
 
 def _for_f_options_string(line: str) -> str:
@@ -68,7 +76,7 @@ def _check_for_f_suboptions(line: str, line_number: int) -> List[LintIssue]:
     skip_match = re.search(r"skip=(\S+)", options, re.IGNORECASE)
     if skip_match:
         skip_value = skip_match.group(1)
-        if not re.fullmatch(r"\d+", skip_value) or int(skip_value) < 1:
+        if not _is_valid_for_f_skip_value(skip_value):
             issues.append(
                 LintIssue(
                     line_number,
@@ -404,8 +412,9 @@ def _check_percent_tilde_syntax(stripped: str, line_number: int) -> List[LintIss
     """Check for percent-tilde syntax issues (E017, E019)."""
     issues: List[LintIssue] = []
     valid_modifiers = VALID_MODIFIERS
+    scan_line = strip_for_metavar_tilde_tokens(stripped)
 
-    for match in _PERCENT_TILDE_TOKEN_RE.finditer(stripped):
+    for match in _PERCENT_TILDE_TOKEN_RE.finditer(scan_line):
         interior = str(match.group(1))
         modifiers, parameter = _split_percent_tilde_interior(interior)
         has_path_search = "$" in modifiers

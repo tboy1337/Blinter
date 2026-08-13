@@ -1,0 +1,8 @@
+{
+  "description": "FOR loop bare %%~X quote-strip expansion (E017/E019/E024 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E017", "E019", "E024"],
+  "config": {},
+  "tags": ["syntax"]
+}

@@ -1,0 +1,8 @@
+{
+  "description": "FOR /F skip= with percent-expanded variable (E038 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E038"],
+  "config": {},
+  "tags": ["syntax"]
+}

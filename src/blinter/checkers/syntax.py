@@ -16,7 +16,7 @@ from blinter.patterns import (
     COMMON_COMMAND_TYPOS,
 )
 from blinter.rules.expansion_data import VALID_MODIFIERS
-from blinter.rules.helpers import PERCENT_TILDE_TOKEN_RE
+from blinter.rules.helpers import PERCENT_TILDE_TOKEN_RE, strip_for_metavar_tilde_tokens
 from blinter.rules.registry import RULES
 
 
@@ -760,8 +760,9 @@ def _invalid_percent_tilde_modifier_chars(interior: str) -> set[str]:
 def _check_parameter_modifiers(stripped: str, line_num: int) -> List[LintIssue]:
     """Check for invalid parameter modifier combinations (E024, E025)."""
     issues: List[LintIssue] = []
+    scan_line = strip_for_metavar_tilde_tokens(stripped)
 
-    for match in PERCENT_TILDE_TOKEN_RE.finditer(stripped):
+    for match in PERCENT_TILDE_TOKEN_RE.finditer(scan_line):
         interior = match.group(1)
         invalid_chars = _invalid_percent_tilde_modifier_chars(interior)
         if invalid_chars:
@@ -777,7 +778,7 @@ def _check_parameter_modifiers(stripped: str, line_num: int) -> List[LintIssue]:
             )
 
     # E025: Parameter modifier on wrong context
-    temp_stripped = re.sub(r"%%~[a-zA-Z]", "", stripped)
+    temp_stripped = strip_for_metavar_tilde_tokens(stripped)
     temp_stripped = re.sub(r"%~[a-zA-Z]+[0-9]", "", temp_stripped)
     wrong_context_match: List[str] = re.findall(
         r"%~[a-zA-Z]+([^0-9%\s][^%\s]*|[A-Z_][A-Z0-9_]*)%", temp_stripped

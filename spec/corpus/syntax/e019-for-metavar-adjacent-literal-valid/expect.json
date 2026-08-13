@@ -1,0 +1,8 @@
+{
+  "description": "FOR metavar %%~A with adjacent literal suffix (E019 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E019"],
+  "config": {},
+  "tags": ["syntax"]
+}

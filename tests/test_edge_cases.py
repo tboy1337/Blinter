@@ -1229,10 +1229,23 @@ class TestPercentTildeSyntaxE019:
             "for %%A in (*.txt) do echo %%~nxA",
             "for %%A in (*.txt) do echo %%~dpA",
             "for %%a in (*.txt) do echo %%~za",
+            'for %%b in (1) do set "p=%%~b"',
+            'set "flag=?%%~a*"',
         ]
         for line in valid_lines:
             issues = _check_percent_tilde_syntax(line.strip(), 1)
             assert not [i for i in issues if i.rule.code == "E019"], line
+            assert not [i for i in issues if i.rule.code == "E017"], line
+
+    def test_for_loop_bare_tilde_integration_not_e017_e024(self, tmp_path: Path) -> None:
+        """FOR loop bare %%~X must not false-positive E017/E024."""
+        batch_file = tmp_path / "test.bat"
+        batch_file.write_text(
+            '@echo off\nfor %%b in (1) do set "p=%%~b"\nexit /b 0\n',
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(batch_file))
+        assert not [i for i in issues if i.rule.code in {"E017", "E024"}]
 
     def test_percent_tilde_on_var_still_e019(self) -> None:
         issues = _check_percent_tilde_syntax("echo %~nMYVAR%", 1)
@@ -1256,6 +1269,24 @@ class TestForFSuboptionsE038:
 
     def test_descending_tokens_range_still_e038(self) -> None:
         line = 'for /f "tokens=5-1" %%a in ("data") do echo %%a'
+        issues = _check_for_f_suboptions(line, 1)
+        e038_issues = [i for i in issues if i.rule.code == "E038"]
+        assert len(e038_issues) == 1
+
+    def test_skip_variable_not_e038(self) -> None:
+        line = (
+            'for /f "skip=%@KEEP_HISTORICAL% tokens=*" %%v in (\'dir /b\') do echo %%v'
+        )
+        issues = _check_for_f_suboptions(line, 1)
+        assert not issues
+
+    def test_skip_delayed_expansion_not_e038(self) -> None:
+        line = 'for /f "skip=!SKIP_COUNT! tokens=*" %%v in (\'dir /b\') do echo %%v'
+        issues = _check_for_f_suboptions(line, 1)
+        assert not issues
+
+    def test_invalid_skip_word_still_e038(self) -> None:
+        line = 'for /f "skip=abc tokens=*" %%a in ("data") do echo %%a'
         issues = _check_for_f_suboptions(line, 1)
         e038_issues = [i for i in issues if i.rule.code == "E038"]
         assert len(e038_issues) == 1

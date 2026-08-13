@@ -410,8 +410,12 @@ def _scan_for_unreachable_code(
         # Update parentheses depth
         current_paren_depth = _update_paren_depth(line, current_paren_depth)
 
+        # EXIT/GOTO inside a block: code after the block closes is reachable.
+        if exit_paren_depth > 0 and current_paren_depth < exit_paren_depth:
+            return None
+
         # Handle closing parentheses specially
-        if line == ")":
+        if line == ")" or line.startswith(")"):
             if current_paren_depth < exit_paren_depth:
                 return None
             continue

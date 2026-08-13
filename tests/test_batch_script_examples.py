@@ -192,6 +192,40 @@ class TestCorpusTargetedFiles:
         assert len(names) == len(corpus_files())
         assert "%MM%.cmd" in names
 
+    def test_backup_cert_no_e038_skip_variable_false_positive(self) -> None:
+        file_path = CORPUS_DIR / "BackupCert.BAT"
+        if not file_path.is_file():
+            pytest.skip("BackupCert.BAT not in corpus")
+        issues = lint_batch_file(str(file_path))
+        e038 = [issue for issue in issues if issue.rule.code == "E038"]
+        assert len(e038) == 0
+
+    def test_clean_temp_no_e008_false_positive(self) -> None:
+        file_path = CORPUS_DIR / "CleanTemp.BAT"
+        if not file_path.is_file():
+            pytest.skip("CleanTemp.BAT not in corpus")
+        issues = lint_batch_file(str(file_path))
+        e008 = [issue for issue in issues if issue.rule.code == "E008"]
+        assert len(e008) == 0
+
+    def test_check_integrity_bounded_e019(self) -> None:
+        file_path = CORPUS_DIR / "CheckIntegrity.BAT"
+        if not file_path.is_file():
+            pytest.skip("CheckIntegrity.BAT not in corpus")
+        issues = lint_batch_file(str(file_path))
+        e019 = [issue for issue in issues if issue.rule.code == "E019"]
+        assert len(e019) <= 1
+
+    def test_percent_mm_bounded_e017_e024(self) -> None:
+        file_path = CORPUS_DIR / "%MM%.cmd"
+        if not file_path.is_file():
+            pytest.skip("%MM%.cmd not in corpus")
+        issues = lint_batch_file(str(file_path))
+        e017 = [issue for issue in issues if issue.rule.code == "E017"]
+        e024 = [issue for issue in issues if issue.rule.code == "E024"]
+        assert len(e017) == 0
+        assert len(e024) == 0
+
 
 class TestNamingRuleRegression:
     """S022 global naming and S017 per-line case checks."""

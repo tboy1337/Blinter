@@ -10,9 +10,15 @@ _PERCENT_TILDE_INTERIOR = (
     r"(?:[fdpnxsatz$])*" r"(?:[A-Za-z_][A-Za-z0-9_]*:\d+|[0-9*]|[A-Za-z_][A-Za-z0-9_]*)"
 )
 PERCENT_TILDE_TOKEN_RE = re.compile(
-    rf"%~({_PERCENT_TILDE_INTERIOR})(?:%|(?![0-9]))",
+    rf"(?<!\%)%~({_PERCENT_TILDE_INTERIOR})(?:%|(?![0-9]))",
     re.IGNORECASE,
 )
+_FOR_METAVAR_TILDE_RE = re.compile(r"%%~[A-Za-z]")
+
+
+def strip_for_metavar_tilde_tokens(line: str) -> str:
+    """Remove FOR-loop %%~X tokens before percent-tilde parameter checks."""
+    return _FOR_METAVAR_TILDE_RE.sub("", line)
 
 
 def _has_any_enabled_rules(config: BlinterConfig, rule_codes: AbstractSet[str]) -> bool:
