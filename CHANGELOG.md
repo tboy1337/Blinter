@@ -2,6 +2,12 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.16] - 2026-08-13
+
+### Changed
+
+- Build-Release-PYPI waits for Test, CodeQL, and Dependency Graph to pass on `main` before publishing; expect up to three short workflow runs per push until all prerequisites are green (only the final run releases when the version is bumped)
+
 ## [1.1.15] - 2026-08-13
 
 ### Fixed

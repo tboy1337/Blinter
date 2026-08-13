@@ -1,22 +1,92 @@
 name: "Build-Release-PYPI"
 
+# Release runs after Test, CodeQL, and Dependency Graph all succeed on main.
+# workflow_run fires once per upstream workflow (~3 quick runs per push); only the
+# run where verify-ci-prerequisites sets ready=true proceeds to build/release.
 on:
   workflow_run:
-    workflows: ["Test"]
+    workflows: ["Test", "CodeQL", "Dependency Graph"]
     types: [completed]
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: release-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: true
+
 permissions:
+  actions: read
   contents: write
   id-token: write
 
 jobs:
-  check-version:
-    name: Check pyproject.toml version bump
+  verify-ci-prerequisites:
+    name: Verify Test, CodeQL, and Dependency Graph passed
     if: >
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.set_ready.outputs.ready }}
+    steps:
+      - name: Skip prerequisite check for manual dispatch
+        if: github.event_name == 'workflow_dispatch'
+        id: set_ready
+        run: echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Verify required workflows succeeded for commit
+        if: github.event_name != 'workflow_dispatch'
+        id: set_ready
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          # Match workflow file paths; run display names differ from workflow names
+          # (e.g. CodeQL runs appear as "Push on main").
+          REQUIRED=(
+            "Test:.github/workflows/test.yml"
+            "CodeQL:dynamic/github-code-scanning/codeql"
+            "Dependency Graph:dynamic/dependabot/update-graph"
+          )
+
+          for entry in "${REQUIRED[@]}"; do
+            workflow_label="${entry%%:*}"
+            workflow_path="${entry#*:}"
+            run_json=$(gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}&per_page=30" \
+              --jq "[.workflow_runs[] | select(.path == \"${workflow_path}\")] | sort_by(.created_at) | last")
+
+            if [ -z "$run_json" ] || [ "$run_json" = "null" ]; then
+              echo "No run found for workflow '${workflow_label}' (${workflow_path}) on ${HEAD_SHA}; not ready yet."
+              echo "ready=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            status=$(echo "$run_json" | jq -r '.status')
+            conclusion=$(echo "$run_json" | jq -r '.conclusion')
+
+            if [ "$status" != "completed" ]; then
+              echo "Workflow '${workflow_label}' status=${status}; not ready yet."
+              echo "ready=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            if [ "$conclusion" != "success" ]; then
+              echo "Workflow '${workflow_label}' conclusion=${conclusion}; blocking release."
+              exit 1
+            fi
+
+            echo "Workflow '${workflow_label}' succeeded."
+          done
+
+          echo "All required workflows succeeded for ${HEAD_SHA}."
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+  check-version:
+    name: Check pyproject.toml version bump
+    needs: [verify-ci-prerequisites]
+    if: needs.verify-ci-prerequisites.outputs.ready == 'true'
     runs-on: ubuntu-latest
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
