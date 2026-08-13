@@ -210,6 +210,7 @@ if "!BLINTER_SOURCE_EXE!"=="" (
     goto :error_restore
 )
 
+REM Resume install after executable path is resolved
 :found_exe
 
 REM Install Blinter executable

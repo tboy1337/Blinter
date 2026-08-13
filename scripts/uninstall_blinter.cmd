@@ -67,16 +67,8 @@ if exist "%BLINTER_RELEASE_FILE%" (
     )
 )
 
-REM Confirm uninstallation
-echo This will remove Blinter from your system.
-echo Installation directory: %BLINTER_DIR%
+echo Removing Blinter from: %BLINTER_DIR%
 echo.
-set /p CONFIRM="Are you sure you want to uninstall Blinter? (Y/N): "
-if /i not "!CONFIRM!"=="Y" (
-    echo.
-    echo Uninstallation cancelled.
-    goto :end
-)
 
 REM Terminate running Blinter processes before file removal
 echo.
@@ -154,7 +146,7 @@ if %errorlevel% neq 0 (
 )
 if exist "!PS_REMOVE_PATH!" del /F /Q "!PS_REMOVE_PATH!" >nul 2>&1
 
-REM Remove Blinter installation directory (user confirmed above)
+REM Remove Blinter installation directory after file and PATH cleanup
 echo.
 echo Removing Blinter installation directory...
 echo.
