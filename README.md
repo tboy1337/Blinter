@@ -1,16 +1,12 @@
 # Blinter
 
-<p align="center">
-  <a href="https://pypi.org/project/Blinter">
-    <img src="https://img.shields.io/pypi/pyversions/Blinter.svg" alt="Supported Python versions" />
-  </a>
-  <a href="https://pepy.tech/projects/blinter">
-    <img alt="PyPI Downloads (month)" src="https://static.pepy.tech/personalized-badge/blinter?period=month&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads%20%2F%20month" />
-  </a>
-  <a href="https://www.bestpractices.dev/projects/14056">
-    <img src="https://www.bestpractices.dev/projects/14056/badge" alt="OpenSSF Best Practices" />
-  </a>
-</p>
+<div align="center">
+
+[![Supported Python versions](https://img.shields.io/pypi/pyversions/Blinter.svg)](https://pypi.org/project/Blinter)
+[![PyPI Downloads (month)](https://static.pepy.tech/personalized-badge/blinter?period=month&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads%20%2F%20month)](https://pepy.tech/projects/blinter)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14056/badge)](https://www.bestpractices.dev/projects/14056)
+
+</div>
 
 **Blinter** is a linter for Windows batch files (`.bat` and `.cmd`). It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems. Blinter helps you write safer, more reliable and maintainable batch scripts.
 
