@@ -4,7 +4,7 @@ requires = [ "setuptools>=77" ]
 
 [project]
 name = "Blinter"
-version = "1.1.12"
+version = "1.1.13"
 description = """\
   Blinter is a linter for Windows batch files. It provides comprehensive static analysis to identify syntax errors, \
   security vulnerabilities, performance issues and style problems.\
@@ -135,7 +135,6 @@ default_section = "THIRDPARTY"
 known_first_party = [ "blinter" ]
 src_paths = [ "scripts", "src", "tests" ]
 
-# Configuration is in pylintrc for full control and readability
 [tool.bandit]
 exclude_dirs = [ ".venv", "build", "dist", "tests", "venv" ]
 # B101: assert used in tests only (tests excluded above)

@@ -44,9 +44,9 @@
 - **Variable Tracking**: Identifies undefined variables and unsafe usage patterns
 - **Security Scanning**: Path traversal attacks, command injection risks, unsafe temp file creation
 - **Performance Optimization**: DIR flag optimization, unnecessary output detection, string operation efficiency
-- **Cross-Platform Compatibility**: Warns about Windows version issues and deprecated commands
+- **Cross-Platform Batch Compatibility**: Warns about Windows version issues and deprecated commands in batch scripts
 - **Large File Handling**: Efficiently processes large batch files with performance monitoring
-- **Robust Encoding Detection**: Handles UTF-8, UTF-16, Latin-1 and 6 more encoding formats
+- **Robust Encoding Detection**: Automatic detection via charset_normalizer, with nine built-in fallbacks (UTF-8, UTF-8 BOM, UTF-16, UTF-32, Latin-1, ASCII, CP437, CP850, CP1252)
 - **Advanced Escaping Techniques**: Validates caret escape sequences, multilevel escaping, and continuation characters
 - **Professional FOR Command Analysis**: Checks for usebackq, proper tokenizing, delimiters, and skip options
 - **Process Management Best Practices**: Timeout command usage, process verification, and restart patterns
@@ -226,7 +226,7 @@ blinter --version
 - `<path>`: Path to a batch file (`.bat` or `.cmd`) OR directory containing batch files
 - `--summary`: Display summary statistics of issues found
 - `--severity`: Deprecated legacy flag (emits a warning, no effect); use `min_severity` in `blinter.ini` instead
-- `--max-line-length <n>`: Set maximum line length for S011 rule (default: 100)
+- `--max-line-length <n>`: Set maximum line length for S011 and S020 rules (default: 100)
 - `--no-recursive`: When processing directories, only analyze files in the specified directory (not subdirectories)
 - `--follow-calls`: Automatically analyze scripts called by CALL statements and merge their variable context. When enabled, variables defined in called scripts (including transitively called scripts within depth and file limits) are recognized as "defined" in the calling script (position-aware: only after the CALL statement). This eliminates false positive undefined variable errors for configuration scripts
 - `--config <path>`: Load settings from a custom configuration file instead of `blinter.ini` in the current directory
@@ -235,7 +235,7 @@ blinter --version
 - `--create-config --force`: Overwrite an existing blinter.ini when creating the default configuration
 - `--output <path>`: Write a structured JSON lint report to the given file path (human-readable output is unchanged unless `--format json` is also set)
 - `--format json`: Suppress human-readable stdout and emit JSON (to stdout, or only to `--output` when both flags are used)
-- `--verbose`: Show detailed logging output (INFO level)
+- `--verbose`: Show detailed debug logging on stderr (DEBUG level)
 - `--quiet`: Suppress non-error logging output (ERROR level only)
 - `--help`: Show help menu and rule categories
 - `--version`: Display version information
@@ -248,7 +248,7 @@ blinter --version
 |---------|---------|-------------|---------|
 | `[general]` | `recursive` | Search subdirectories when analyzing folders | `true` |
 | `[general]` | `show_summary` | Display summary statistics after analysis | `false` |
-| `[general]` | `max_line_length` | Maximum line length for S011 rule | `100` |
+| `[general]` | `max_line_length` | Maximum line length for S011 and S020 rules | `100` |
 | `[general]` | `max_scan_files` | Maximum batch files to scan in a directory | `1000` |
 | `[general]` | `follow_calls` | Analyze scripts called by CALL statements with shared variable context | `false` |
 | `[general]` | `min_severity` | Minimum severity level to report | None (all) |
@@ -416,7 +416,8 @@ flowchart BT
 |-----------|------|---------|-------------|
 | `recursive` | `bool` | `True` | Search subdirectories when linting a folder |
 | `show_summary` | `bool` | `False` | Show summary statistics in CLI output |
-| `max_line_length` | `int` | `100` | Maximum line length for S011 rule |
+| `max_line_length` | `int` | `100` | Maximum line length for S011 and S020 rules |
+| `max_scan_files` | `int` | `1000` | Maximum batch files to scan in a directory |
 | `follow_calls` | `bool` | `False` | Lint scripts referenced by `CALL` statements |
 | `scan_root` | `str` \| `None` | `None` | Root path for `--follow-calls` containment (CLI sets automatically) |
 | `enabled_rules` | `Set[str]` | empty | If non-empty, only these rule codes run |
@@ -555,7 +556,7 @@ See [docs/Architecture.md](docs/Architecture.md) for module layout and extension
 
 Report security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
-**Special thanks goes out to [BrainWaveCC](https://github.com/BrainWaveCC) for all the help bug hunting.**
+**Special thanks go out to [BrainWaveCC](https://github.com/BrainWaveCC) for all the help bug hunting.**
 
 ## License 📄
 
