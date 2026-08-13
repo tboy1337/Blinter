@@ -4,8 +4,8 @@
   <a href="https://pypi.org/project/Blinter">
     <img src="https://img.shields.io/pypi/pyversions/Blinter.svg" alt="Supported Python versions" />
   </a>
-  <a href="https://pepy.tech/project/blinter/">
-    <img alt="Download Count Total" src="https://static.pepy.tech/badge/blinter/month" />
+  <a href="https://pepy.tech/projects/blinter">
+    <img alt="PyPI Downloads (month)" src="https://static.pepy.tech/personalized-badge/blinter?period=month&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads%20%2F%20month" />
   </a>
   <a href="https://www.bestpractices.dev/projects/14056">
     <img src="https://www.bestpractices.dev/projects/14056/badge" alt="OpenSSF Best Practices" />
@@ -559,6 +559,14 @@ Report security vulnerabilities privately as described in [SECURITY.md](SECURITY
 
 ## License 📄
 
-This project is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later) - see [COPYING](https://github.com/tboy1337/Blinter/blob/main/COPYING) for details.
+This project is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later) — see [COPYING](https://github.com/tboy1337/Blinter/blob/main/COPYING) for details.
 
-[Letter b icons created by Acidmit - Flaticon](https://www.flaticon.com/free-icons/letter-b)
+<p align="center">
+  <sub>Icon by <a href="https://www.flaticon.com/authors/acidmit">Acidmit</a> · <a href="https://www.flaticon.com/">Flaticon</a></sub>
+</p>
+
+<p align="center">
+  <a href="https://pepy.tech/projects/blinter">
+    <img alt="PyPI Downloads (total)" src="https://static.pepy.tech/personalized-badge/blinter?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" />
+  </a>
+</p>
