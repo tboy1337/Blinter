@@ -2,11 +2,12 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## [1.1.17] - 2026-08-13
 
 ### Changed
 
 - CI and release are a single Test workflow: CodeQL, dependency graph submission, and PyPI/GitHub release run in one pipeline with explicit `needs` dependencies (no `workflow_run` chaining)
+- CodeQL analysis runs in CI for Python and GitHub Actions workflow files; GitHub default CodeQL setup must remain disabled (Settings > Code security)
 
 ## [1.1.16] - 2026-08-13
 
