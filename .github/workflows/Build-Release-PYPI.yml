@@ -29,19 +29,20 @@ jobs:
     outputs:
       ready: ${{ steps.set_ready.outputs.ready }}
     steps:
-      - name: Skip prerequisite check for manual dispatch
-        if: github.event_name == 'workflow_dispatch'
-        id: set_ready
-        run: echo "ready=true" >> "$GITHUB_OUTPUT"
-
-      - name: Verify required workflows succeeded for commit
-        if: github.event_name != 'workflow_dispatch'
+      - name: Verify CI prerequisites
         id: set_ready
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual workflow_dispatch; skipping prerequisite check."
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           # Match workflow file paths; run display names differ from workflow names
           # (e.g. CodeQL runs appear as "Push on main").
           REQUIRED=(
