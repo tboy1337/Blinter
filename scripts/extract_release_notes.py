@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print the latest release-notes section from docs/CHANGELOG.md to stdout."""
+"""Print the latest release-notes section from CHANGELOG.md to stdout."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import re
 import sys
 from pathlib import Path
 
-_CHANGELOG = Path(__file__).resolve().parent.parent / "docs" / "CHANGELOG.md"
+_CHANGELOG = Path(__file__).resolve().parent.parent / "CHANGELOG.md"
 _SECTION_RE = re.compile(r"^## \[(?P<version>[^\]]+)\].*$", re.MULTILINE)
 
 
