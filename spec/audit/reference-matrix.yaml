@@ -133,6 +133,7 @@ entries:
   - E008
   corpus:
   - integration/e008-unreachable-after-exit
+  - integration/e008-exit-in-conditional-block-valid
   - integration/s015-inconsistent-goto-colon
 - construct: EXIT and SHIFT batch parameters
   sources:
@@ -283,6 +284,8 @@ entries:
   - syntax/e019-set-a-percent-tilde-params-valid
   - syntax/e019-for-loop-tilde-z-valid
   - syntax/e019-percent-tilde-dp0-adjacent-valid
+  - syntax/e019-for-metavar-bare-tilde-valid
+  - syntax/e019-for-metavar-adjacent-literal-valid
   - syntax/e024-invalid-modifier-combo
   - syntax/e025-tilde-wrong-context
   - syntax/w051-param-10-ambiguous
@@ -653,6 +656,7 @@ entries:
   - syntax/e037-for-f-eol-valid
   - syntax/e038-for-f-skip-zero
   - syntax/e038-for-f-skip-invalid
+  - syntax/e038-for-f-skip-variable-valid
   - syntax/e038-for-f-tokens-range
   - syntax/e038-for-f-valid
   - syntax/e038-for-f-tokens-delims-valid
