@@ -44,6 +44,7 @@ jobs:
           python -m mypy src/blinter tests scripts/verify.py scripts/corpus_lint.py scripts/corpus_baseline.py scripts/generate_corpus_baseline.py scripts/benchmark_lint.py
           python -m pylint src/blinter
           python -m bandit -r src/blinter -c pyproject.toml -ll -q
+          python -m pip_audit -r requirements.txt -r requirements-dev.txt
           python scripts/benchmark_lint.py --runs 3 --check-baseline
 
   quality-windows:

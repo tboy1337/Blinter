@@ -1,5 +1,17 @@
 # Blinter
 
+<p align="center">
+  <a href="https://pypi.org/project/Blinter">
+    <img src="https://img.shields.io/pypi/pyversions/Blinter.svg" alt="Supported Python versions" />
+  </a>
+  <a href="https://pepy.tech/project/blinter/">
+    <img alt="Download Count Total" src="https://static.pepy.tech/badge/blinter/month" />
+  </a>
+  <a href="https://www.bestpractices.dev/projects/14056">
+    <img src="https://www.bestpractices.dev/projects/14056/badge" alt="OpenSSF Best Practices" />
+  </a>
+</p>
+
 **Blinter** is a linter for Windows batch files (`.bat` and `.cmd`). It provides comprehensive static analysis to identify syntax errors, security vulnerabilities, performance issues and style problems. Blinter helps you write safer, more reliable and maintainable batch scripts.
 
 - ✅ **Configurable Options** - Configurable rules, `--verbose`/`--quiet` logging, robust error handling
@@ -532,7 +544,7 @@ See [docs/Architecture.md](docs/Architecture.md) for module layout and extension
 
 ## Contributing 🤝
 
-**Contributions are welcome!** 
+**Contributions are welcome!** See [CONTRIBUTING.md](CONTRIBUTING.md) for the full process, coding standards, and testing policy.
 
 ### Ways to Contribute
 - 🐛 Report bugs or issues
@@ -540,6 +552,8 @@ See [docs/Architecture.md](docs/Architecture.md) for module layout and extension
 - 📖 Improve documentation
 - 🧪 Add test cases
 - 🔧 Submit bug fixes or enhancements
+
+Report security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
 **Special thanks goes out to [BrainWaveCC](https://github.com/BrainWaveCC) for all the help bug hunting.**
 

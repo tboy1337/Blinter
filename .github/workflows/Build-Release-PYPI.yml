@@ -170,11 +170,19 @@ jobs:
           name: windows-build
           path: ./build
 
+      - name: Extract release notes
+        id: release_notes
+        run: |
+          NOTES_FILE="${RUNNER_TEMP}/release-notes.md"
+          python scripts/extract_release_notes.py > "$NOTES_FILE"
+          echo "path=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
           artifacts: ./build/Blinter-v${{ needs.check-version.outputs.version }}.zip
           tag: v${{ needs.check-version.outputs.version }}
+          bodyFile: ${{ steps.release_notes.outputs.path }}
           token: ${{ secrets.GITHUB_TOKEN }}
           allowUpdates: true
           removeArtifacts: true
