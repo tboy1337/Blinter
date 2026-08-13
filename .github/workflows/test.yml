@@ -1,5 +1,7 @@
 name: Test
 
+# Single pipeline for CI and release on main. Release jobs use needs (not workflow_run).
+# CodeQL runs here; keep GitHub default CodeQL setup disabled (Settings > Code security).
 on:
   pull_request:
     branches:
