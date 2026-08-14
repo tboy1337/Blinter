@@ -1,4 +1,4 @@
-name: Test
+name: CI
 
 # Single pipeline for CI and release on main. Release jobs use needs (not workflow_run).
 # CodeQL runs here; keep GitHub default CodeQL setup disabled (Settings > Code security).
@@ -154,24 +154,36 @@ jobs:
         shell: pwsh
 
   codeql:
-    name: CodeQL
+    name: CodeQL (${{ matrix.language }})
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
+      packages: read
       security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            build-mode: none
+          - language: actions
+            build-mode: none
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
-          languages: python, actions
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{matrix.language}}"
 
   dependency-graph:
     name: Dependency Graph
@@ -183,7 +195,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Submit dependency snapshot
-        uses: advanced-security/component-detection-dependency-submission-action@v0.1.3
+        uses: advanced-security/component-detection-dependency-submission-action@v0.1.4
         with:
           detectorArgs: Pip=EnableIfDefaultOff
 
