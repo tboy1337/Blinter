@@ -41,7 +41,7 @@
 - **Security Scanning**: Path traversal attacks, command injection risks, unsafe temp file creation
 - **Performance Optimization**: DIR flag optimization, unnecessary output detection, string operation efficiency
 - **Cross-Platform Batch Compatibility**: Warns about Windows version issues and deprecated commands in batch scripts
-- **Large File Handling**: Efficiently processes large batch files with performance monitoring
+- **Large File Handling**: Efficiently processes large batch files, with a warning when a file exceeds 10MB and a hard reject above 50MB
 - **Robust Encoding Detection**: Automatic detection via charset_normalizer, with nine built-in fallbacks (UTF-8, UTF-8 BOM, UTF-16, UTF-32, Latin-1, ASCII, CP437, CP850, CP1252)
 - **Advanced Escaping Techniques**: Validates caret escape sequences, multilevel escaping, and continuation characters
 - **Professional FOR Command Analysis**: Checks for usebackq, proper tokenizing, delimiters, and skip options
@@ -426,7 +426,7 @@ flowchart BT
 - `.bat` files (traditional batch files)
 - `.cmd` files (recommended for modern Windows)
 - **Unicode filenames** and international characters supported
-- **Large files** handled efficiently with performance monitoring
+- **Large files** handled efficiently, with a warning above 10MB and a hard reject above 50MB
 
 ### 📁 **Directory Processing**
 

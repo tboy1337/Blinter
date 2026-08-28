@@ -2,6 +2,21 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.18] - 2026-08-29
+
+### Added
+
+- Standalone installer verifies the GitHub release zip SHA256 before extracting
+- Compatibility and Unicode warning checks live in `warnings_compat` (W009, W010, W011, W027, W029)
+
+### Changed
+
+- Windows CI runs the cmd.exe corpus oracle; the Linux quality job validates the spec corpus
+- cmd.exe oracle executes read-only WMIC queries (still present on Windows 10); interactive or mutating WMIC remains skipped
+- Spec docs, Architecture, and funding metadata match the 219-case corpus and batch-spec lock v0.69.2
+- README documents large-file handling as a 10MB warning and 50MB reject
+- Removed unused SST experiment scripts (`port_rule_impl.py`, `compare_patterns.py`, `experiment_benchmark.py`)
+
 ## [1.1.17] - 2026-08-13
 
 ### Changed
@@ -112,6 +127,9 @@ All notable changes to Blinter are documented in this file. Release tags follow 
 
 Older 1.0.x releases are available on the [GitHub Releases](https://github.com/tboy1337/Blinter/releases) page.
 
+[1.1.18]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.18
+[1.1.17]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.17
+[1.1.16]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.16
 [1.1.15]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.15
 [1.1.14]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.14
 [1.1.13]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.13

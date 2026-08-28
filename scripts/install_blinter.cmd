@@ -43,14 +43,23 @@ set /a MIN_DOWNLOAD_BYTES=500*1000
 REM Detect latest Blinter version and download URL from GitHub API
 set BLINTER_URL=
 set BLINTER_VERSION=
+set BLINTER_SHA256=
 set "PS_GET_RELEASE=%BLINTER_TEMP%_get_release.ps1"
 
 call :write_get_release_script
-for /f "tokens=1,2" %%a in ('powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_GET_RELEASE%" 2^>nul') do (
+for /f "tokens=1,2,3" %%a in ('powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_GET_RELEASE%" 2^>nul') do (
     set BLINTER_URL=%%a
     set BLINTER_VERSION=%%b
+    set BLINTER_SHA256=%%c
 )
 if exist "!PS_GET_RELEASE!" del /F /Q "!PS_GET_RELEASE!" >nul 2>&1
+
+if "!BLINTER_URL!"=="MISSING_DIGEST" (
+    echo ERROR: GitHub release is missing a SHA256 digest. Cannot verify download.
+    echo.
+    echo Refusing to install an unverifiable archive.
+    goto :error_exit
+)
 
 if "!BLINTER_URL!"=="NOT_FOUND" (
     echo ERROR: Failed to find Windows download URL from GitHub API.
@@ -70,6 +79,13 @@ if "!BLINTER_VERSION!"=="" (
     echo ERROR: Failed to parse Blinter version from GitHub API response.
     echo.
     echo Cannot proceed with installation.
+    goto :error_exit
+)
+
+if "!BLINTER_SHA256!"=="" (
+    echo ERROR: GitHub release is missing a SHA256 digest. Cannot verify download.
+    echo.
+    echo Refusing to install an unverifiable archive.
     goto :error_exit
 )
 
@@ -177,6 +193,16 @@ if !FILESIZE! lss !MIN_DOWNLOAD_BYTES! (
     echo ERROR: Downloaded file is too small ^(!FILESIZE! bytes^). Download may be corrupted.
     goto :error_restore
 )
+
+REM Verify SHA256 digest from the GitHub release asset
+set "PS_HASH_VERIFY=%BLINTER_TEMP%_hash_verify.ps1"
+call :write_hash_verify_script
+powershell -NoProfile -ExecutionPolicy Bypass -File "!PS_HASH_VERIFY!" 2>&1
+if !errorlevel! neq 0 (
+    echo ERROR: SHA256 digest mismatch. The download may be corrupted or tampered with.
+    goto :error_restore
+)
+if exist "!PS_HASH_VERIFY!" del /F /Q "!PS_HASH_VERIFY!" >nul 2>&1
 
 REM Extract Blinter
 echo.
@@ -289,7 +315,10 @@ echo $release = $releases ^| Where-Object { -not $_.prerelease -and -not $_.draf
 echo if (-not $release^) { Write-Output 'NOT_FOUND'; exit 0 }
 echo $asset = $release.assets ^| Where-Object { $_.name -like 'Blinter-v*.zip' } ^| Select-Object -First 1
 echo if (-not $asset^) { Write-Output 'NOT_FOUND'; exit 0 }
-echo $line = $asset.browser_download_url + ' ' + $release.tag_name
+echo $digest = $null
+echo if ($asset.PSObject.Properties['digest']^) { $digest = [string]$asset.digest }
+echo if (-not $digest^) { Write-Output 'MISSING_DIGEST'; exit 0 }
+echo $line = $asset.browser_download_url + ' ' + $release.tag_name + ' ' + $digest
 echo Write-Output $line
 ) > "!PS_GET_RELEASE!"
 exit /b 0
@@ -300,6 +329,17 @@ REM Write PowerShell script to return downloaded archive size in bytes
 echo $item = Get-Item -LiteralPath '%BLINTER_TEMP%.zip' -ErrorAction Stop
 echo Write-Output $item.Length
 ) > "!PS_FILE_SIZE!"
+exit /b 0
+
+REM Write PowerShell script to verify the downloaded archive SHA256
+:write_hash_verify_script
+(
+echo $expected = '%BLINTER_SHA256%'
+echo $actual = (Get-FileHash -LiteralPath '%BLINTER_TEMP%.zip' -Algorithm SHA256^).Hash.ToLowerInvariant()
+echo $normalized = $expected.ToLowerInvariant() -replace '^sha256:', ''
+echo if ($actual -ne $normalized^) { Write-Output 'MISMATCH'; exit 1 }
+echo Write-Output 'OK'
+) > "!PS_HASH_VERIFY!"
 exit /b 0
 
 REM Write PowerShell script to expand the downloaded archive
@@ -347,6 +387,7 @@ REM LINT:IGNORE SEC003
 if exist "%BLINTER_TEMP%" rmdir /S /Q "%BLINTER_TEMP%" >nul 2>&1
 if exist "%BLINTER_TEMP%_get_release.ps1" del /F /Q "%BLINTER_TEMP%_get_release.ps1" >nul 2>&1
 if exist "%BLINTER_TEMP%_file_size.ps1" del /F /Q "%BLINTER_TEMP%_file_size.ps1" >nul 2>&1
+if exist "%BLINTER_TEMP%_hash_verify.ps1" del /F /Q "%BLINTER_TEMP%_hash_verify.ps1" >nul 2>&1
 if exist "%BLINTER_TEMP%_expand.ps1" del /F /Q "%BLINTER_TEMP%_expand.ps1" >nul 2>&1
 if exist "%BLINTER_TEMP%_update_path.ps1" del /F /Q "%BLINTER_TEMP%_update_path.ps1" >nul 2>&1
 exit /b 0

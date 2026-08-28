@@ -9,7 +9,7 @@ BeforeAll {
 Describe 'Installer batch PowerShell parity' {
     It 'matches fixture content for each write_*_script block' {
         $pairs = Get-InstallerPsParityPairs -ScriptsRoot $script:ScriptsRoot -InstallerPsRoot $script:InstallerPsRoot
-        $pairs.Count | Should -Be 5
+        $pairs.Count | Should -Be 6
 
         foreach ($pair in $pairs) {
             $normalizedExtracted = Normalize-InstallerPsText -Content $pair.Extracted
@@ -46,7 +46,31 @@ Describe 'Get-LatestBlinterRelease.ps1' {
         $output | Should -Be 'NOT_FOUND'
     }
 
-    It 'outputs URL and tag when a matching asset exists' {
+    It 'outputs URL tag and digest when a matching asset exists' {
+        $fixturePath = Join-Path $script:InstallerPsRoot 'Get-LatestBlinterRelease.ps1'
+        Mock Invoke-RestMethod {
+            return @(
+                [PSCustomObject]@{
+                    prerelease = $false
+                    draft      = $false
+                    tag_name   = 'v1.1.6'
+                    assets     = @(
+                        [PSCustomObject]@{
+                            name                 = 'Blinter-v1.1.6.zip'
+                            browser_download_url = 'https://example.com/Blinter-v1.1.6.zip'
+                            digest               = 'sha256:abc123'
+                        }
+                    )
+                }
+            )
+        }
+
+        $output = & $fixturePath
+        $LASTEXITCODE | Should -Be 0
+        $output | Should -Be 'https://example.com/Blinter-v1.1.6.zip v1.1.6 sha256:abc123'
+    }
+
+    It 'outputs MISSING_DIGEST when the asset has no digest' {
         $fixturePath = Join-Path $script:InstallerPsRoot 'Get-LatestBlinterRelease.ps1'
         Mock Invoke-RestMethod {
             return @(
@@ -66,7 +90,34 @@ Describe 'Get-LatestBlinterRelease.ps1' {
 
         $output = & $fixturePath
         $LASTEXITCODE | Should -Be 0
-        $output | Should -Be 'https://example.com/Blinter-v1.1.6.zip v1.1.6'
+        $output | Should -Be 'MISSING_DIGEST'
+    }
+}
+
+Describe 'Test-BlinterArchiveHash.ps1' {
+    It 'exits 0 when the archive hash matches the GitHub digest' {
+        $tempFile = Join-Path $TestDrive 'archive.zip'
+        Set-Content -LiteralPath $tempFile -Value 'blinter-archive' -NoNewline
+        $hash = (Get-FileHash -LiteralPath $tempFile -Algorithm SHA256).Hash
+        $script = Get-Content -LiteralPath (Join-Path $script:InstallerPsRoot 'Test-BlinterArchiveHash.ps1') -Raw
+        $script = $script.Replace('__BLINTER_TEMP__', ($tempFile -replace '\.zip$', ''))
+        $script = $script.Replace('__BLINTER_SHA256__', "sha256:$hash")
+        $tempScript = Join-Path $TestDrive 'verify.ps1'
+        Set-Content -LiteralPath $tempScript -Value $script
+        & $tempScript
+        $LASTEXITCODE | Should -Be 0
+    }
+
+    It 'exits 1 when the archive hash does not match' {
+        $tempFile = Join-Path $TestDrive 'archive.zip'
+        Set-Content -LiteralPath $tempFile -Value 'blinter-archive' -NoNewline
+        $script = Get-Content -LiteralPath (Join-Path $script:InstallerPsRoot 'Test-BlinterArchiveHash.ps1') -Raw
+        $script = $script.Replace('__BLINTER_TEMP__', ($tempFile -replace '\.zip$', ''))
+        $script = $script.Replace('__BLINTER_SHA256__', 'sha256:deadbeef')
+        $tempScript = Join-Path $TestDrive 'verify.ps1'
+        Set-Content -LiteralPath $tempScript -Value $script
+        & $tempScript
+        $LASTEXITCODE | Should -Be 1
     }
 }
 

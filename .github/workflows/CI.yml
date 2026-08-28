@@ -36,6 +36,7 @@ jobs:
       - name: Run quality checks
         run: |
           python scripts/spec/validate_spec.py
+          python scripts/spec/validate_corpus.py
           python scripts/spec/generate_rules.py --check
           python scripts/spec/generate_expansion.py --check
           python scripts/spec/generate_commands.py --check
@@ -66,6 +67,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
+
+      - name: Run cmd.exe corpus oracle
+        run: python scripts/spec/cmd_oracle.py
 
       - name: Run PowerShell verification checks
         run: python scripts/verify.py --powershell-only

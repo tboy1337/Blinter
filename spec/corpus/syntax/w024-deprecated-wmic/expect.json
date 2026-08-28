@@ -10,6 +10,7 @@
     ]
   },
   "must_not": [],
+  "oracle": "run",
   "rules": [
     "W001",
     "W002",

@@ -12,6 +12,13 @@ function Get-InstallerPsScriptMap {
                 Fixture      = 'Get-DownloadedFileSize.ps1'
                 Placeholders = @{ '%BLINTER_TEMP%' = '__BLINTER_TEMP__' }
             }
+            'write_hash_verify_script' = @{
+                Fixture      = 'Test-BlinterArchiveHash.ps1'
+                Placeholders = @{
+                    '%BLINTER_TEMP%'   = '__BLINTER_TEMP__'
+                    '%BLINTER_SHA256%' = '__BLINTER_SHA256__'
+                }
+            }
             'write_expand_script' = @{
                 Fixture      = 'Expand-BlinterArchive.ps1'
                 Placeholders = @{ '%BLINTER_TEMP%' = '__BLINTER_TEMP__' }

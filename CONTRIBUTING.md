@@ -38,7 +38,7 @@ Match the existing codebase style:
 | Tool | Purpose |
 | ---- | ------- |
 | [Black](https://black.readthedocs.io/) | Python formatting (`line-length = 88`) |
-| [isort](https://pychecks.com/isort/) | Import sorting (Black-compatible profile) |
+| [isort](https://pycqa.github.io/isort/) | Import sorting (Black-compatible profile) |
 | [mypy](https://mypy-lang.org/) | Static type checking (`strict` mode) |
 | [pylint](https://pylint.readthedocs.io/) | Linting (`pylintrc`) |
 | [bandit](https://bandit.readthedocs.io/) | Security linting for Python |

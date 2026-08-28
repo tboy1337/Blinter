@@ -1,7 +1,7 @@
 # Blinter Linter Specification
 
 Blinter owns **linter** artifacts: rule catalog, security/style command policy, and the
-203-case conformance corpus. The **batch language** SSOT lives in the pinned
+219-case conformance corpus. The **batch language** SSOT lives in the pinned
 [`batch-spec`](https://github.com/tboy1337/batch-spec) submodule at `vendor/batch-spec`.
 
 ## Submodule setup
@@ -12,7 +12,7 @@ git clone --recurse-submodules https://github.com/tboy1337/Blinter.git
 git submodule update --init --recursive
 ```
 
-The pinned release is recorded in [`batch-spec.lock`](batch-spec.lock) (currently `v0.69.0`).
+The pinned release is recorded in [`batch-spec.lock`](batch-spec.lock) (currently `v0.69.2`).
 
 ## Layout
 

@@ -93,3 +93,12 @@ def test_batch_spec_lock_matches_checkout() -> None:
         f"Checked-out batch-spec ({checkout}) does not match lock "
         f"({lock.get('ref', expected)})"
     )
+
+
+def test_spec_readme_lock_ref_matches_lockfile() -> None:
+    """spec/README.md must cite the pinned batch-spec lock ref."""
+    lock = json.loads(_LOCK_PATH.read_text(encoding="utf-8"))
+    ref = lock.get("ref")
+    assert isinstance(ref, str) and ref, "batch-spec.lock must include a nonempty ref"
+    readme = (_REPO_ROOT / "spec" / "README.md").read_text(encoding="utf-8")
+    assert f"`{ref}`" in readme

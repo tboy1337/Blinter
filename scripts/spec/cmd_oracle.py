@@ -169,8 +169,18 @@ def _content_unsafe_reason(text: str, case_dir: Path) -> str | None:
             return "reg delete"
 
     if re.search(r"\bwmic\b", text, re.IGNORECASE):
-        if re.search(r"\bwmic\b[^\n]*\b(delete|call|create)\b", text, re.IGNORECASE):
-            return "wmic mutating command"
+        # WMIC still ships on Windows 10 (deprecated since 21H1, not removed).
+        # Missing binaries (Windows 11 24H2+ without the FoD) fail fast; the
+        # oracle accepts any exit code. Skip only the interactive shell and
+        # mutating verbs — not read-only `get`/`list` queries.
+        if re.search(r"^\s*wmic\s*$", text, re.IGNORECASE | re.MULTILINE):
+            return "interactive wmic prompt"
+        if re.search(
+            r"\bwmic\b[^\n]*\b(?:delete|call|create)\b",
+            text,
+            re.IGNORECASE,
+        ):
+            return "mutating wmic"
 
     if re.search(r"\bshutdown\b", text, re.IGNORECASE):
         return "shutdown"

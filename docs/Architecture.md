@@ -22,6 +22,7 @@ src/blinter/
     orchestration.py   # _process_file_checks, _filter_issues_by_config
     syntax.py          # Error-level syntax rules
     warnings.py        # Warning-level rules
+    warnings_compat.py # Unicode and compatibility warning helpers
     style.py           # Style rules
     security.py        # Security rules
     performance.py     # Performance rules
@@ -117,7 +118,7 @@ When `follow_calls` is enabled, Blinter resolves `CALL` targets to read variable
 | ANTLR grammar, expansion rules, command catalog, cmd-help | [`vendor/batch-spec`](../vendor/batch-spec) ([`tboy1337/batch-spec`](https://github.com/tboy1337/batch-spec), pinned in [`spec/batch-spec.lock`](../spec/batch-spec.lock)) |
 | [`spec/data/rules.yaml`](../spec/data/rules.yaml) | Rule catalog (`checker: regex`; see `RULE_COUNT`) |
 | [`spec/data/commands-linter.yaml`](../spec/data/commands-linter.yaml) | Security/style command policy (merged with batch-spec `commands.yaml` for `patterns.py`; pins W009 `older_windows_commands`) |
-| [`spec/corpus/`](../spec/corpus/) | 203 committed fixtures + `expect.json` oracles |
+| [`spec/corpus/`](../spec/corpus/) | 219 committed fixtures + `expect.json` oracles |
 | [`spec/audit/`](../spec/audit/) | Reference matrix and audit baselines |
 
 Clone with `git clone --recurse-submodules` or run `git submodule update --init --recursive` after checkout.
@@ -132,4 +133,4 @@ Deprecated/removed command tables come from batch-spec `commands.yaml` unchanged
 
 Corpus policy: every rule in `rules.yaml` must have at least one corpus assertion (see `audit_ssot.py` coverage checks).
 
-**Performance gate:** [`scripts/benchmark_lint.py`](../scripts/benchmark_lint.py) with `--check-baseline` compares the synthetic-file median against [`spec/benchmark/synthetic-baseline.json`](../spec/benchmark/synthetic-baseline.json). Local A/B timing uses [`scripts/experiment_benchmark.py`](../scripts/experiment_benchmark.py).
+**Performance gate:** [`scripts/benchmark_lint.py`](../scripts/benchmark_lint.py) with `--check-baseline` compares the synthetic-file median against [`spec/benchmark/synthetic-baseline.json`](../spec/benchmark/synthetic-baseline.json).
