@@ -9,6 +9,10 @@ All notable changes to Blinter are documented in this file. Release tags follow 
 - Standalone installer verifies the GitHub release zip SHA256 before extracting
 - Compatibility and Unicode warning checks live in `warnings_compat` (W009, W010, W011, W027, W029)
 
+### Fixed
+
+- Installer SHA256 verification hashes with .NET so it works when Windows PowerShell inherits pwsh's `PSModulePath` (GitHub Actions Windows jobs)
+
 ### Changed
 
 - Windows CI runs the cmd.exe corpus oracle; the Linux quality job validates the spec corpus

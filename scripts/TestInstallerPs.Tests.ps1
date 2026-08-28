@@ -98,7 +98,13 @@ Describe 'Test-BlinterArchiveHash.ps1' {
     It 'exits 0 when the archive hash matches the GitHub digest' {
         $tempFile = Join-Path $TestDrive 'archive.zip'
         Set-Content -LiteralPath $tempFile -Value 'blinter-archive' -NoNewline
-        $hash = (Get-FileHash -LiteralPath $tempFile -Algorithm SHA256).Hash
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $stream = [System.IO.File]::OpenRead($tempFile)
+            try {
+                $hash = [System.BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '')
+            } finally { $stream.Dispose() }
+        } finally { $sha.Dispose() }
         $script = Get-Content -LiteralPath (Join-Path $script:InstallerPsRoot 'Test-BlinterArchiveHash.ps1') -Raw
         $script = $script.Replace('__BLINTER_TEMP__', ($tempFile -replace '\.zip$', ''))
         $script = $script.Replace('__BLINTER_SHA256__', "sha256:$hash")

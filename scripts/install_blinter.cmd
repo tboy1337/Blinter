@@ -335,7 +335,13 @@ REM Write PowerShell script to verify the downloaded archive SHA256
 :write_hash_verify_script
 (
 echo $expected = '%BLINTER_SHA256%'
-echo $actual = (Get-FileHash -LiteralPath '%BLINTER_TEMP%.zip' -Algorithm SHA256^).Hash.ToLowerInvariant()
+echo $sha = [System.Security.Cryptography.SHA256]::Create()
+echo try {
+echo     $stream = [System.IO.File]::OpenRead('%BLINTER_TEMP%.zip')
+echo     try {
+echo         $actual = [System.BitConverter]::ToString($sha.ComputeHash($stream^)^).Replace('-', '').ToLowerInvariant()
+echo     } finally { $stream.Dispose(^) }
+echo } finally { $sha.Dispose(^) }
 echo $normalized = $expected.ToLowerInvariant() -replace '^sha256:', ''
 echo if ($actual -ne $normalized^) { Write-Output 'MISMATCH'; exit 1 }
 echo Write-Output 'OK'

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import os
 from pathlib import Path
 import platform
 import subprocess
@@ -201,6 +202,18 @@ def _powershell_executable() -> str:
     return "powershell"
 
 
+def _windows_powershell_env() -> dict[str, str]:
+    """Environment for Windows PowerShell 5.1 child processes.
+
+    GitHub Actions Windows jobs default to pwsh. ``python`` then ``powershell.exe``
+    inherits pwsh's ``PSModulePath``, so 5.1 loads Core ``Microsoft.PowerShell.Utility``
+    and cmdlets such as ``Get-FileHash`` raise CommandNotFoundException.
+    """
+    env = os.environ.copy()
+    env.pop("PSModulePath", None)
+    return env
+
+
 def _run_powershell_step(name: str, command: str, *, cwd: Path | None = None) -> None:
     """Run a PowerShell command on Windows."""
     print(f"==> {name}")
@@ -214,6 +227,7 @@ def _run_powershell_step(name: str, command: str, *, cwd: Path | None = None) ->
             command,
         ],
         cwd=cwd if cwd is not None else _repo_root(),
+        env=_windows_powershell_env(),
         check=False,
     )
     if result.returncode != 0:
