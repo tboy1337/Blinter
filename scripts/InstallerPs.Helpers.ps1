@@ -192,3 +192,71 @@ function Invoke-InstallerPsScriptAnalyzer {
     }
     return $issues
 }
+
+function New-InstallerPsSubstitutedScript {
+    param(
+        [Parameter(Mandatory)]
+        [string]$FixturePath,
+        [Parameter(Mandatory)]
+        [hashtable]$Replacements,
+        [Parameter(Mandatory)]
+        [string]$DestinationPath
+    )
+
+    if (-not (Test-Path -LiteralPath $FixturePath)) {
+        throw "Fixture not found: $FixturePath"
+    }
+
+    $script = Get-Content -LiteralPath $FixturePath -Raw
+    foreach ($entry in $Replacements.GetEnumerator()) {
+        $script = $script.Replace([string]$entry.Key, [string]$entry.Value)
+    }
+
+    $destinationDir = Split-Path -Parent $DestinationPath
+    if ($destinationDir -and -not (Test-Path -LiteralPath $destinationDir)) {
+        New-Item -ItemType Directory -Path $destinationDir | Out-Null
+    }
+
+    Set-Content -LiteralPath $DestinationPath -Value $script
+    Write-Verbose "Wrote substituted installer fixture $FixturePath to $DestinationPath"
+    return $DestinationPath
+}
+
+function Invoke-InstallerPsPathFixture {
+    param(
+        [Parameter(Mandatory)]
+        [string]$FixturePath,
+        [Parameter(Mandatory)]
+        [string]$BinPath,
+        [AllowNull()]
+        [object]$InitialUserPath,
+        [Parameter(Mandatory)]
+        [string]$TempScriptPath
+    )
+
+    $getCall = "[Environment]::GetEnvironmentVariable('Path', 'User')"
+    $setCall = "[Environment]::SetEnvironmentVariable('Path', `$newPath, 'User')"
+
+    $script = Get-Content -LiteralPath $FixturePath -Raw
+    if ($script.IndexOf($getCall) -lt 0) {
+        throw "Expected $getCall in $FixturePath"
+    }
+    if ($script.IndexOf($setCall) -lt 0) {
+        throw "Expected SetEnvironmentVariable Path call in $FixturePath"
+    }
+
+    # Pester Mock cannot intercept .NET static methods, so tests rewrite the
+    # fixture against a global fake User PATH instead of mutating the real one.
+    $script = $script.Replace('__BLINTER_BIN__', $BinPath)
+    $script = $script.Replace($getCall, '$global:BlinterTestUserPath')
+    $script = $script.Replace($setCall, '$global:BlinterTestUserPath = $newPath')
+
+    Set-Content -LiteralPath $TempScriptPath -Value $script
+    $global:BlinterTestUserPath = $InitialUserPath
+    Write-Verbose "Invoking path fixture $FixturePath with fake User PATH '$InitialUserPath'"
+    & $TempScriptPath
+    return [PSCustomObject]@{
+        ExitCode = $LASTEXITCODE
+        UserPath = $global:BlinterTestUserPath
+    }
+}

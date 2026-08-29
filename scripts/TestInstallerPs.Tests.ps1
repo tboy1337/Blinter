@@ -128,28 +128,134 @@ Describe 'Test-BlinterArchiveHash.ps1' {
 }
 
 Describe 'Update-BlinterUserPath.ps1' {
-    It 'builds a PATH value that appends the bin directory' {
-        $binPath = 'C:\Test\Blinter\bin'
-        $path = 'C:\Existing'
-        if (-not $path) { $path = '' }
-        if ($path -notlike "*$binPath*") {
-            if (-not $path) {
-                $newPath = $binPath
-            }
-            else {
-                $newPath = $path.TrimEnd(';') + ';' + $binPath
-            }
-        }
-        $newPath | Should -Be 'C:\Existing;C:\Test\Blinter\bin'
+    AfterEach {
+        Remove-Variable -Name BlinterTestUserPath -Scope Global -ErrorAction SilentlyContinue
+    }
+
+    It 'appends the bin directory when it is missing from User PATH' {
+        $result = Invoke-InstallerPsPathFixture `
+            -FixturePath (Join-Path $script:InstallerPsRoot 'Update-BlinterUserPath.ps1') `
+            -BinPath 'C:\Test\Blinter\bin' `
+            -InitialUserPath 'C:\Existing' `
+            -TempScriptPath (Join-Path $TestDrive 'update-path.ps1')
+        $result.ExitCode | Should -Be 0
+        $result.UserPath | Should -Be 'C:\Existing;C:\Test\Blinter\bin'
+    }
+
+    It 'leaves User PATH unchanged when the bin directory is already present' {
+        $result = Invoke-InstallerPsPathFixture `
+            -FixturePath (Join-Path $script:InstallerPsRoot 'Update-BlinterUserPath.ps1') `
+            -BinPath 'C:\Test\Blinter\bin' `
+            -InitialUserPath 'C:\Test\Blinter\bin;C:\Other' `
+            -TempScriptPath (Join-Path $TestDrive 'update-path-present.ps1')
+        $result.ExitCode | Should -Be 0
+        $result.UserPath | Should -Be 'C:\Test\Blinter\bin;C:\Other'
+    }
+
+    It 'uses the bin directory as User PATH when the current value is empty' {
+        $result = Invoke-InstallerPsPathFixture `
+            -FixturePath (Join-Path $script:InstallerPsRoot 'Update-BlinterUserPath.ps1') `
+            -BinPath 'C:\Test\Blinter\bin' `
+            -InitialUserPath '' `
+            -TempScriptPath (Join-Path $TestDrive 'update-path-empty.ps1')
+        $result.ExitCode | Should -Be 0
+        $result.UserPath | Should -Be 'C:\Test\Blinter\bin'
     }
 }
 
 Describe 'Remove-BlinterUserPath.ps1' {
-    It 'removes the bin path from the user PATH' {
-        $binPath = 'C:\Test\Blinter\bin'
-        $path = 'C:\Alpha;C:\Test\Blinter\bin;C:\Beta'
-        $pathArray = $path -split ';' | Where-Object { $_ -ne '' -and $_ -ne $binPath }
-        $newPath = $pathArray -join ';'
-        $newPath | Should -Be 'C:\Alpha;C:\Beta'
+    AfterEach {
+        Remove-Variable -Name BlinterTestUserPath -Scope Global -ErrorAction SilentlyContinue
+    }
+
+    It 'removes the bin directory from User PATH' {
+        $result = Invoke-InstallerPsPathFixture `
+            -FixturePath (Join-Path $script:InstallerPsRoot 'Remove-BlinterUserPath.ps1') `
+            -BinPath 'C:\Test\Blinter\bin' `
+            -InitialUserPath 'C:\Alpha;C:\Test\Blinter\bin;C:\Beta' `
+            -TempScriptPath (Join-Path $TestDrive 'remove-path.ps1')
+        $result.ExitCode | Should -Be 0
+        $result.UserPath | Should -Be 'C:\Alpha;C:\Beta'
+    }
+
+    It 'leaves User PATH unchanged when the bin directory is absent' {
+        $result = Invoke-InstallerPsPathFixture `
+            -FixturePath (Join-Path $script:InstallerPsRoot 'Remove-BlinterUserPath.ps1') `
+            -BinPath 'C:\Test\Blinter\bin' `
+            -InitialUserPath 'C:\Alpha;C:\Beta' `
+            -TempScriptPath (Join-Path $TestDrive 'remove-path-absent.ps1')
+        $result.ExitCode | Should -Be 0
+        $result.UserPath | Should -Be 'C:\Alpha;C:\Beta'
+    }
+
+    It 'exits 0 when User PATH is empty' {
+        $result = Invoke-InstallerPsPathFixture `
+            -FixturePath (Join-Path $script:InstallerPsRoot 'Remove-BlinterUserPath.ps1') `
+            -BinPath 'C:\Test\Blinter\bin' `
+            -InitialUserPath '' `
+            -TempScriptPath (Join-Path $TestDrive 'remove-path-empty.ps1')
+        $result.ExitCode | Should -Be 0
+        $result.UserPath | Should -Be ''
+    }
+}
+
+Describe 'Expand-BlinterArchive.ps1' {
+    It 'extracts the zip to the destination directory' {
+        $payloadDir = Join-Path $TestDrive 'payload-src'
+        New-Item -ItemType Directory -Path $payloadDir | Out-Null
+        $payloadFile = Join-Path $payloadDir 'readme.txt'
+        Set-Content -LiteralPath $payloadFile -Value 'blinter-payload' -NoNewline
+
+        $tempStem = Join-Path $TestDrive 'blinter-temp'
+        Compress-Archive -LiteralPath $payloadFile -DestinationPath "$tempStem.zip" -Force
+
+        $tempScript = Join-Path $TestDrive 'expand.ps1'
+        New-InstallerPsSubstitutedScript `
+            -FixturePath (Join-Path $script:InstallerPsRoot 'Expand-BlinterArchive.ps1') `
+            -Replacements @{ '__BLINTER_TEMP__' = $tempStem } `
+            -DestinationPath $tempScript
+
+        & $tempScript
+        $LASTEXITCODE | Should -Be 0
+        $extracted = Join-Path $tempStem 'readme.txt'
+        Test-Path -LiteralPath $extracted | Should -BeTrue
+        (Get-Content -LiteralPath $extracted -Raw) | Should -Be 'blinter-payload'
+    }
+
+    It 'exits 1 when the archive is missing' {
+        $tempScript = Join-Path $TestDrive 'expand-missing.ps1'
+        New-InstallerPsSubstitutedScript `
+            -FixturePath (Join-Path $script:InstallerPsRoot 'Expand-BlinterArchive.ps1') `
+            -Replacements @{ '__BLINTER_TEMP__' = (Join-Path $TestDrive 'missing-archive') } `
+            -DestinationPath $tempScript
+
+        & $tempScript
+        $LASTEXITCODE | Should -Be 1
+    }
+}
+
+Describe 'Get-DownloadedFileSize.ps1' {
+    It 'writes the zip file length' {
+        $tempStem = Join-Path $TestDrive 'size-archive'
+        [System.IO.File]::WriteAllBytes("$tempStem.zip", [byte[]](1..20))
+
+        $tempScript = Join-Path $TestDrive 'size.ps1'
+        New-InstallerPsSubstitutedScript `
+            -FixturePath (Join-Path $script:InstallerPsRoot 'Get-DownloadedFileSize.ps1') `
+            -Replacements @{ '__BLINTER_TEMP__' = $tempStem } `
+            -DestinationPath $tempScript
+
+        $output = & $tempScript
+        $output | Should -Be 20
+    }
+
+    It 'throws when the zip is missing' {
+        $tempScript = Join-Path $TestDrive 'size-missing.ps1'
+        New-InstallerPsSubstitutedScript `
+            -FixturePath (Join-Path $script:InstallerPsRoot 'Get-DownloadedFileSize.ps1') `
+            -Replacements @{ '__BLINTER_TEMP__' = (Join-Path $TestDrive 'missing-size') } `
+            -DestinationPath $tempScript
+
+        { & $tempScript } | Should -Throw
     }
 }

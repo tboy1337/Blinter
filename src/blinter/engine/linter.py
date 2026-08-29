@@ -98,7 +98,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
 
     _begin_structure_cache_pass()
 
-    # Detect embedded PowerShell/VBScript blocks to avoid false positives
+    # Detect embedded PowerShell/VBScript/C#/JScript blocks to avoid false positives
     skip_lines = _detect_embedded_script_blocks(lines)
 
     issues: List[LintIssue] = []

@@ -52,15 +52,33 @@ POWERSHELL_PATTERNS: List[str] = [
 VBSCRIPT_PATTERNS: List[str] = [
     r"^\s*Dim\s+",
     r"^\s*Set\s+\w+\s*=\s*CreateObject",
-    r"WScript\.",
+    r"^\s*WScript\.",
     r"^\s*On\s+Error\s+Resume\s+Next",
     r"^\s*Function\s+\w+\(",
     r"^\s*Sub\s+\w+\(",
     r"^\s*End\s+Function",
     r"^\s*End\s+Sub",
+    r"^\s*MsgBox\b",
+    r"^\s*InputBox\b",
+    r"^\s*Option\s+Explicit",
+    r"^\s*ReDim\b",
+    r"^\s*CreateObject\s*\(",
     r"^\s*'",
 ]
 
+# In-file JScript hybrids (polyglot header + body after */). Do not match
+# echo-to-temp payloads; those lines are still batch.
+JSCRIPT_PATTERNS: List[str] = [
+    r"^\s*@if\s*\(.+\)\s*@end\s*/\*",
+    r"^\s*\*/\s*$",
+    r"^\s*var\s+\w+",
+    r"^\s*new\s+ActiveXObject\s*\(",
+    r"^\s*WScript\.",
+]
+
+# Opening braces and hex literals are skipped as continuation once a real
+# C# starter line has opened a block. Matching them on their own
+# false-positives on batch `set HEX=0x..` and stray `{` lines.
 CSHARP_PATTERNS: List[str] = [
     r"^\s*using\s+System",
     r"^\s*(public|private|protected|internal)\s+(class|static|void|string|int|bool)",
@@ -70,8 +88,6 @@ CSHARP_PATTERNS: List[str] = [
     r"\bfor\s*\(\s*uint\s+\w+\s*=",
     r"\bfor\s*\(\s*long\s+\w+\s*=",
     r"byte\s+\w+\s+in\s+",
-    r"^\s*{\s*$",
-    r"0x[0-9A-Fa-f]+",
     r"\b(uint|byte|long|ushort|ulong)\s+",
 ]
 
@@ -87,6 +103,8 @@ BATCH_INDICATORS: List[str] = [
     r"^exit\s+",
     r"^pause\s*$",
     r"^timeout\s+",
+    r"^@?cscript(?:\.exe)?(?:\s|/|$)",
+    r"^@?wscript(?:\.exe)?(?:\s|/|$)",
 ]
 
 SAFE_COMMAND_INJECTION_PATTERNS: List[str] = [

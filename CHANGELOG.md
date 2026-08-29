@@ -2,6 +2,21 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.19] - 2026-08-29
+
+### Fixed
+
+- Embedded C#/JScript/VBScript skip detection: in-file JScript polyglots, tighter VBScript and C# starters, and `if`/`for` inside those blocks no longer close the skip region (`echo`-to-temp payloads and `cscript`/`wscript` invocations stay linted)
+
+### Added
+
+- SSOT corpus fixtures for embedded skip behavior (`embedded-csharp-skip`, `embedded-jscript-skip`, `embedded-vbscript-skip`)
+
+### Changed
+
+- Spec docs, Architecture, and funding metadata match the 222-case corpus
+- Installer Pester tests exercise PATH update/remove, archive expand, and download-size fixtures without mutating the real User PATH
+
 ## [1.1.18] - 2026-08-29
 
 ### Added
@@ -131,6 +146,7 @@ All notable changes to Blinter are documented in this file. Release tags follow 
 
 Older 1.0.x releases are available on the [GitHub Releases](https://github.com/tboy1337/Blinter/releases) page.
 
+[1.1.19]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.19
 [1.1.18]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.18
 [1.1.17]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.17
 [1.1.16]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.16

@@ -3387,18 +3387,342 @@ class TestEmbeddedScriptDetection:  # pylint: disable=too-few-public-methods
         assert 4 in skip_lines
 
     def test_detect_embedded_csharp_block(self) -> None:
-        """C# syntax after a label is skipped during linting."""
+        """C# using/namespace/class/foreach lines after a label are skipped."""
         from blinter.parsing.embedded import _detect_embedded_script_blocks
 
         lines = [
             "@echo off",
             ":csharpblock",
-            "foreach (string item in items)",
             "using System;",
+            "namespace Demo",
+            "public class Helper",
+            "{",
+            "    public static int Add(int a, int b) => a + b;",
+            "    foreach (string item in items)",
+            "    for (int i = 0; i < 10; i++)",
+            "}",
+            "echo resumed",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 3 in skip_lines
+        assert 4 in skip_lines
+        assert 5 in skip_lines
+        assert 6 in skip_lines
+        assert 7 in skip_lines
+        assert 8 in skip_lines
+        assert 9 in skip_lines
+        assert 11 not in skip_lines
+
+    def test_csharp_block_ends_on_batch_resume(self) -> None:
+        """Batch commands after an embedded C# block are linted again."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            ":csharpblock",
+            "using System;",
+            "public class Helper",
+            "exit /b 0",
+            ":after",
+            "echo after label",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 3 in skip_lines
+        assert 4 in skip_lines
+        assert 5 not in skip_lines
+        assert 7 not in skip_lines
+
+    def test_hex_literal_in_batch_is_not_treated_as_csharp(self) -> None:
+        """Batch hex values must not open a C# skip block."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            "set HEX=0x1A",
+            "echo %HEX%",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert skip_lines == set()
+
+    def test_lone_brace_in_batch_is_not_treated_as_csharp(self) -> None:
+        """A stray opening brace in batch must not open a C# skip block."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            "echo start",
+            "{",
+            "echo still batch",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert skip_lines == set()
+
+    def test_embedded_csharp_is_not_flagged_as_batch_commands(
+        self, tmp_path: Path
+    ) -> None:
+        """Skipped C# lines must not produce unknown-command errors."""
+        script = tmp_path / "embedded_csharp.cmd"
+        script.write_text(
+            "@echo off\r\n"
+            ":csharpblock\r\n"
+            "using System;\r\n"
+            "namespace Demo\r\n"
+            "public class Helper\r\n"
+            "echo done\r\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(script))
+        csharp_lines = {3, 4, 5}
+        codes_on_csharp = {
+            issue.rule.code for issue in issues if issue.line_number in csharp_lines
+        }
+        assert "E013" not in codes_on_csharp
+        assert "E012" not in codes_on_csharp
+
+    def test_echo_to_temp_vbscript_is_not_skipped(self) -> None:
+        """Echo-generated VBScript payloads remain batch lines."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            r'set "vbs=%temp%\%~n0_%random%.vbs"',
+            r'>"%vbs%" echo Dim x',
+            r'>>"%vbs%" echo WScript.Echo x',
+            r'cscript //nologo "%vbs%"',
+            r'del "%vbs%"',
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert skip_lines == set()
+
+    def test_echo_wscript_payload_is_not_skipped(self) -> None:
+        """Unanchored WScript in an echo line must not open a skip block."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            'echo WScript.Echo "hi"',
             "exit /b 0",
         ]
         skip_lines = _detect_embedded_script_blocks(lines)
-        assert 3 in skip_lines or 4 in skip_lines
+        assert skip_lines == set()
+
+    def test_infile_vbscript_msgbox_and_option_explicit_skipped(self) -> None:
+        """MsgBox and Option Explicit after a label are skipped; exit resumes."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            ":vbsblock",
+            "Option Explicit",
+            'MsgBox "hello"',
+            "exit /b 0",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 3 in skip_lines
+        assert 4 in skip_lines
+        assert 5 not in skip_lines
+
+    def test_jscript_polyglot_skips_header_and_body_not_batch_interior(self) -> None:
+        """JScript /* */ wraps batch; only header and post-*/ body are skipped."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@if (1==1) @end /*",
+            "@echo off",
+            r'cscript //nologo //E:JScript "%~f0" %*',
+            "exit /b",
+            "*/",
+            'WScript.Echo("Hello from JScript!");',
+            "var x = 1",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 1 in skip_lines
+        assert 2 not in skip_lines
+        assert 3 not in skip_lines
+        assert 4 not in skip_lines
+        assert 5 in skip_lines
+        assert 6 in skip_lines
+        assert 7 in skip_lines
+
+    def test_jscript_var_after_label_is_skipped(self) -> None:
+        """JScript var declarations after a label are skipped."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            ":jsblock",
+            "var x = 1",
+            'WScript.Echo("hi")',
+            "exit /b 0",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 3 in skip_lines
+        assert 4 in skip_lines
+        assert 5 not in skip_lines
+
+    def test_wscript_echo_after_label_keeps_jscript_if_for(self) -> None:
+        """WScript.Echo after a label must not lock VBScript over JScript if/for."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            ":jsblock",
+            'WScript.Echo("hi")',
+            "if (x) {",
+            "    for (var i = 0; i < 2; i++) {",
+            "        WScript.Echo(i)",
+            "    }",
+            "}",
+            "exit /b 0",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 3 in skip_lines
+        assert 4 in skip_lines
+        assert 5 in skip_lines
+        assert 6 in skip_lines
+        assert 9 not in skip_lines
+
+    def test_jscript_if_and_for_in_body_are_skipped(self) -> None:
+        """JScript if/for after var must not close the skip block."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            ":jsblock",
+            "var x = 1",
+            "if (x) {",
+            "    for (var i = 0; i < 10; i++) {",
+            "        WScript.Echo(i)",
+            "    }",
+            "}",
+            "exit /b 0",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 3 in skip_lines
+        assert 4 in skip_lines
+        assert 5 in skip_lines
+        assert 6 in skip_lines
+        assert 9 not in skip_lines
+
+    def test_jscript_block_ends_on_batch_if(self) -> None:
+        """Real batch if after JScript still ends the skip block."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            ":jsblock",
+            "var x = 1",
+            "if exist file.txt echo found",
+            "echo still batch",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 3 in skip_lines
+        assert 4 not in skip_lines
+        assert 5 not in skip_lines
+
+    def test_csharp_for_immediately_after_starter_is_skipped(self) -> None:
+        """C# for after using must stay in the skip block."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            ":csharpblock",
+            "using System;",
+            "for (int i = 0; i < 10; i++)",
+            "echo resumed",
+        ]
+        skip_lines = _detect_embedded_script_blocks(lines)
+        assert 3 in skip_lines
+        assert 4 in skip_lines
+        assert 5 not in skip_lines
+
+    def test_infile_vbscript_is_not_flagged_as_batch_commands(
+        self, tmp_path: Path
+    ) -> None:
+        """Skipped VBScript lines must not produce unknown-command errors."""
+        script = tmp_path / "embedded_vbs.cmd"
+        script.write_text(
+            "@echo off\r\n"
+            ":vbsblock\r\n"
+            "Dim obj\r\n"
+            'Set obj = CreateObject("Scripting.FileSystemObject")\r\n'
+            "echo done\r\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(script))
+        vbs_lines = {3, 4}
+        codes_on_vbs = {
+            issue.rule.code for issue in issues if issue.line_number in vbs_lines
+        }
+        assert "E013" not in codes_on_vbs
+        assert "E012" not in codes_on_vbs
+
+    def test_jscript_polyglot_body_is_not_flagged_as_batch_commands(
+        self, tmp_path: Path
+    ) -> None:
+        """JScript after */ must not produce unknown-command errors."""
+        script = tmp_path / "embedded_jscript.cmd"
+        script.write_text(
+            "@if (1==1) @end /*\r\n"
+            "@echo off\r\n"
+            'cscript //nologo //E:JScript "%~f0" %*\r\n'
+            "exit /b\r\n"
+            "*/\r\n"
+            'WScript.Echo("Hello from JScript!");\r\n'
+            "var x = 1\r\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(script))
+        jscript_lines = {5, 6, 7}
+        codes_on_js = {
+            issue.rule.code for issue in issues if issue.line_number in jscript_lines
+        }
+        assert "E013" not in codes_on_js
+        assert "E012" not in codes_on_js
+
+    def test_jscript_if_and_for_are_not_flagged_as_batch_commands(
+        self, tmp_path: Path
+    ) -> None:
+        """JScript if/for in an open block must not produce unknown-command errors."""
+        script = tmp_path / "embedded_jscript_control.cmd"
+        script.write_text(
+            "@echo off\r\n"
+            ":jsblock\r\n"
+            "var x = 1\r\n"
+            "if (x) {\r\n"
+            "    for (var i = 0; i < 10; i++) {\r\n"
+            "        WScript.Echo(i)\r\n"
+            "    }\r\n"
+            "}\r\n"
+            "echo done\r\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(script))
+        jscript_lines = {3, 4, 5, 6}
+        codes_on_js = {
+            issue.rule.code for issue in issues if issue.line_number in jscript_lines
+        }
+        assert "E013" not in codes_on_js
+        assert "E012" not in codes_on_js
+
+    def test_csharp_for_is_not_flagged_as_batch_commands(self, tmp_path: Path) -> None:
+        """C# for immediately after using must not produce unknown-command errors."""
+        script = tmp_path / "embedded_csharp_for.cmd"
+        script.write_text(
+            "@echo off\r\n"
+            ":csharpblock\r\n"
+            "using System;\r\n"
+            "for (int i = 0; i < 10; i++)\r\n"
+            "echo done\r\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(script))
+        csharp_lines = {3, 4}
+        codes_on_csharp = {
+            issue.rule.code for issue in issues if issue.line_number in csharp_lines
+        }
+        assert "E013" not in codes_on_csharp
+        assert "E012" not in codes_on_csharp
 
 
 class TestSuppressionCommentParsing:

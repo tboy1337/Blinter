@@ -5,6 +5,7 @@ import re
 from typing import (
     Dict,
     List,
+    Optional,
     Set,
     Tuple,
 )
@@ -13,9 +14,50 @@ from blinter.logging_config import logger
 from blinter.patterns import (
     BATCH_INDICATORS,
     CSHARP_PATTERNS,
+    JSCRIPT_PATTERNS,
     POWERSHELL_PATTERNS,
     VBSCRIPT_PATTERNS,
 )
+
+_SCRIPT_TYPE_LABELS = {
+    "powershell": "PowerShell",
+    "vbscript": "VBScript",
+    "csharp": "C#",
+    "jscript": "JScript",
+}
+
+_SCRIPT_LANGUAGE_PATTERNS: Dict[str, List[str]] = {
+    "powershell": POWERSHELL_PATTERNS,
+    "vbscript": VBSCRIPT_PATTERNS,
+    "csharp": CSHARP_PATTERNS,
+    "jscript": JSCRIPT_PATTERNS,
+}
+
+# Keep an open block alive. Never used to start a new block, so batch
+# ``if exist`` / ``for %i`` still terminate other script types.
+_SCRIPT_CONTINUATION_PATTERNS: Dict[str, List[str]] = {
+    "jscript": [
+        r"^\s*if\s*\(",
+        r"^\s*for\s*\(",
+    ],
+    "csharp": [
+        r"^\s*if\s*\(",
+        r"^\s*for\s*\(",
+    ],
+}
+
+
+def _empty_block_states() -> Dict[str, bool]:
+    """Return a fresh language-block map with every type inactive."""
+    return {name: False for name in _SCRIPT_TYPE_LABELS}
+
+
+def _active_script_type(block_states: Dict[str, bool]) -> Optional[str]:
+    """Return the active embedded-script type, if any."""
+    for script_type, is_active in block_states.items():
+        if is_active:
+            return script_type
+    return None
 
 
 def _is_script_language_line(line: str, patterns: List[str]) -> bool:
@@ -35,22 +77,35 @@ def _is_script_language_line(line: str, patterns: List[str]) -> bool:
     return False
 
 
-def _is_batch_code_line(line: str, stripped: str) -> bool:
+def _is_batch_code_line(
+    line: str,
+    stripped: str,
+    *,
+    active_script_type: Optional[str] = None,
+) -> bool:
     """
     Check if a line looks like batch code rather than embedded script.
 
     Args:
         line: The full line to check
         stripped: The stripped version of the line
+        active_script_type: Open embedded-script type, if any
 
     Returns:
         True if the line appears to be batch code
     """
     for pattern in BATCH_INDICATORS:
         if re.match(pattern, stripped, re.IGNORECASE):
-            # Additional check: make sure it's not PowerShell
-            if not any(re.search(p, line, re.IGNORECASE) for p in POWERSHELL_PATTERNS):
-                return True
+            if active_script_type is not None:
+                language_patterns = _SCRIPT_LANGUAGE_PATTERNS[active_script_type]
+                continuation = _SCRIPT_CONTINUATION_PATTERNS.get(active_script_type, [])
+                if _is_script_language_line(
+                    line, language_patterns
+                ) or _is_script_language_line(line, continuation):
+                    return False
+            elif _is_script_language_line(line, POWERSHELL_PATTERNS):
+                return False
+            return True
     return False
 
 
@@ -104,7 +159,7 @@ def _handle_script_block_end(
         block_start: Line where the block started
 
     Returns:
-        False to indicate the block has ended
+        True if the block remains active, False if it ended
     """
     if is_batch_line:
         logger.debug(
@@ -168,7 +223,7 @@ def _process_script_blocks(
     ctx: ScriptProcessingContext,
 ) -> Tuple[Dict[str, bool], int, bool]:
     """
-    Process script language blocks (PowerShell, VBScript, C#).
+    Process script language blocks (PowerShell, VBScript, C#, JScript).
 
     Args:
         ctx: Script processing context
@@ -178,10 +233,13 @@ def _process_script_blocks(
     """
     # Check for script patterns
     script_patterns = {
-        "powershell": _is_script_language_line(ctx.line, POWERSHELL_PATTERNS),
-        "vbscript": _is_script_language_line(ctx.line, VBSCRIPT_PATTERNS),
-        "csharp": _is_script_language_line(ctx.line, CSHARP_PATTERNS),
+        script_type: _is_script_language_line(ctx.line, patterns)
+        for script_type, patterns in _SCRIPT_LANGUAGE_PATTERNS.items()
     }
+    # WScript. is in both VBScript and JScript. Prefer JScript so a block
+    # that starts with WScript.Echo(...) keeps if ( / for ( continuation.
+    if script_patterns["vbscript"] and script_patterns["jscript"]:
+        script_patterns["vbscript"] = False
 
     # Handle block starts for each script type
     for script_type, is_script_line in script_patterns.items():
@@ -195,7 +253,7 @@ def _process_script_blocks(
                 is_script_line,
                 ctx.block_states[script_type],
                 other_blocks,
-                script_type.capitalize(),
+                _SCRIPT_TYPE_LABELS[script_type],
                 ctx.line_num,
                 ctx.last_label_line,
             )
@@ -206,16 +264,20 @@ def _process_script_blocks(
 
     # Handle block ends if in any block
     if any(ctx.block_states.values()):
-        is_batch_line = _is_batch_code_line(ctx.line, ctx.stripped)
+        is_batch_line = _is_batch_code_line(
+            ctx.line,
+            ctx.stripped,
+            active_script_type=_active_script_type(ctx.block_states),
+        )
         for script_type in ctx.block_states:
             if ctx.block_states[script_type]:
-                ended = _handle_script_block_end(
+                still_in_block = _handle_script_block_end(
                     is_batch_line,
-                    script_type.capitalize(),
+                    _SCRIPT_TYPE_LABELS[script_type],
                     ctx.line_num,
                     ctx.block_start_line,
                 )
-                ctx.block_states[script_type] = not ended
+                ctx.block_states[script_type] = still_in_block
         if not is_batch_line:
             ctx.skip_lines.add(ctx.line_num)
 
@@ -226,7 +288,8 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals
     lines: List[str],
 ) -> Set[int]:
     """
-    Detect embedded PowerShell, VBScript, C#, or other script blocks within batch files.
+    Detect embedded PowerShell, VBScript, C#, JScript, or other script blocks
+    within batch files.
 
     These embedded scripts are common in advanced batch files and should be skipped
     during batch-specific linting to avoid false positives.
@@ -235,7 +298,12 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals
     1. PowerShell blocks: Lines with $variable syntax, PowerShell cmdlets, operators
     2. VBScript blocks: Lines with VBScript syntax (Dim, Set, WScript, etc.)
     3. C# blocks: Lines with C# syntax (foreach with types, int/uint, using statements)
-    4. Context-based: Script blocks typically appear after labels
+    4. JScript blocks: Polyglot @if/@end /* header, */ closer, var/ActiveXObject
+    5. Context-based: Script blocks typically appear after labels
+
+    Echo-to-temp payloads (echo Dim x) stay batch and are not skipped. JScript
+    /* */ polyglots skip only the header and the body after */; the batch
+    interior is still linted.
 
     Args:
         lines: List of lines from the batch file
@@ -244,7 +312,7 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals
         Set of line numbers (1-indexed) that should be skipped during linting
     """
     skip_lines: Set[int] = set()
-    block_states = {"powershell": False, "vbscript": False, "csharp": False}
+    block_states = _empty_block_states()
     in_powershell_heredoc = False
     block_start_line = 0
     last_label_line = 0
@@ -272,7 +340,7 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals
         # Track labels (potential start of embedded script block)
         if re.match(r"^:[a-zA-Z_][\w]*(?:\s|$)", stripped):
             last_label_line = i
-            block_states = {"powershell": False, "vbscript": False, "csharp": False}
+            block_states = _empty_block_states()
             continue
 
         # Process script blocks
@@ -292,7 +360,8 @@ def _detect_embedded_script_blocks(  # pylint: disable=too-many-locals
 
     if skip_lines:
         logger.info(
-            "Detected and skipping %d lines of embedded PowerShell/VBScript/C# code",
+            "Detected and skipping %d lines of embedded "
+            "PowerShell/VBScript/C#/JScript code",
             len(skip_lines),
         )
 

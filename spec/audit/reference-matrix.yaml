@@ -765,3 +765,20 @@ entries:
   - integration/sec023-autorun-inf
   - integration/sec024-self-copy-removable
   - syntax/e027-unc-cd
+- construct: Embedded C# blocks skipped during batch linting
+  sources:
+  - Blinter embedded-language detection
+  ssot_artifacts:
+  - patterns CSHARP_PATTERNS
+  rules: []
+  corpus:
+  - integration/embedded-csharp-skip
+- construct: Embedded VBScript and JScript blocks skipped during batch linting
+  sources:
+  - Blinter embedded-language detection
+  ssot_artifacts:
+  - patterns VBSCRIPT_PATTERNS JSCRIPT_PATTERNS
+  rules: []
+  corpus:
+  - integration/embedded-vbscript-skip
+  - integration/embedded-jscript-skip

@@ -1,0 +1,26 @@
+{
+  "config": {},
+  "description": "JScript polyglot body after */ is skipped; batch cscript interior is still linted",
+  "lines": {
+    "4": [
+      "E008"
+    ],
+    "7": [
+      "E008"
+    ],
+    "11": [
+      "S018"
+    ]
+  },
+  "must_not": [
+    "E012",
+    "E013"
+  ],
+  "rules": [
+    "E008",
+    "S018"
+  ],
+  "tags": [
+    "integration"
+  ]
+}
