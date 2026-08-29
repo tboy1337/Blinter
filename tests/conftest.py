@@ -1,5 +1,6 @@
 """pytest configuration and shared fixtures for blinter tests."""
 
+import _io
 import builtins
 import io
 import os
@@ -10,7 +11,6 @@ from typing import Any, Generator
 from unittest.mock import MagicMock, patch
 import warnings
 
-import _io
 import pytest
 
 from tests.corpus_support import (
