@@ -327,6 +327,30 @@ rules:
     good:
       - set /p name=Enter your name
       - 'set /p "name=Enter your name: "'
+- code: E042
+  name: Text after closing parenthesis in block
+  severity: ERROR
+  explanation: Inside a parenthesized block, cmd.exe treats an unquoted closing parenthesis
+    as the end of a command group; leftover text is then parsed as a new command and
+    causes a syntax error (exit 255)
+  recommendation: Escape parentheses as ^(...^), quote the text, or remove the trailing
+    text after the closing parenthesis
+  checker: regex
+  examples:
+    bad:
+      - |-
+        for %%D in (C) do (
+            echo --- text (parens) ---
+        )
+    good:
+      - |-
+        for %%D in (C) do (
+            echo text (parens)
+        )
+      - |-
+        for %%D in (C) do (
+            echo --- text ^(parens^) ---
+        )
 - code: P001
   name: Redundant file existence check
   severity: PERFORMANCE

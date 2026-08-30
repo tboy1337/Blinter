@@ -47,6 +47,7 @@
 - **E039**: IF block parenthesis must be on same line
 - **E040**: FOR block parenthesis must be on same line as DO
 - **E041**: SET /P missing variable assignment
+- **E042**: Text after closing parenthesis in block
 ### Warning Level Rules (W001-W999)
 **Auto-generated from spec/data/rules.yaml**
 
@@ -197,7 +198,7 @@
 
 <!-- GENERATED:rule-catalog:end -->
 
-**Blinter** provides comprehensive static analysis with **built-in rules** registered in `blinter.rules.registry` (currently **175** rules; see `RULE_COUNT` in that module). Rule IDs may have gaps where rules were retired or consolidated (for example W041, S025, P011).
+**Blinter** provides comprehensive static analysis with **built-in rules** registered in `blinter.rules.registry` (currently **176** rules; see `RULE_COUNT` in that module). Rule IDs may have gaps where rules were retired or consolidated (for example W041, S025, P011).
 
 Across 5 severity levels:
 

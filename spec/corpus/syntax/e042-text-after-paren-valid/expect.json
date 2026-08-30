@@ -1,0 +1,8 @@
+{
+  "description": "Caret-escaped, quoted, or nothing-after-close parens in blocks are valid (E042 negative control)",
+  "rules": [],
+  "lines": {},
+  "must_not": ["E042"],
+  "config": {},
+  "tags": ["syntax"]
+}

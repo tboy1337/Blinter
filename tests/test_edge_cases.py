@@ -16,6 +16,7 @@ from blinter import (
     main,
     read_file_with_encoding,
 )
+from blinter.models import LintIssue
 from blinter.checkers.advanced import (
     _check_advanced_style_rules,
     _check_advanced_vars,
@@ -1318,6 +1319,137 @@ class TestForFSuboptionsE038:
         issues = _check_for_f_suboptions(line, 1)
         e038_issues = [i for i in issues if i.rule.code == "E038"]
         assert len(e038_issues) == 1
+
+
+class TestTextAfterCloseParenE042:
+    """Text after ')' inside a parenthesized block is a cmd.exe parse error (E042)."""
+
+    @staticmethod
+    def _e042_codes(issues: List[LintIssue]) -> List[int]:
+        return [issue.line_number for issue in issues if issue.rule.code == "E042"]
+
+    def test_issue_36_for_block_reports_e042(self, tmp_path: Path) -> None:
+        """Issue #36 reproduction: trailing text after inner ) inside FOR."""
+        batch_file = tmp_path / "issue36.cmd"
+        batch_file.write_text(
+            "@echo off\n"
+            "for %%D in (C) do (\n"
+            "    echo --- text (parens) ---\n"
+            ")\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(batch_file))
+        assert 3 in self._e042_codes(issues)
+
+    def test_nothing_after_close_not_e042(self, tmp_path: Path) -> None:
+        """Inner (parens) with nothing after the close is valid inside a block."""
+        batch_file = tmp_path / "nothing-after.cmd"
+        batch_file.write_text(
+            "@echo off\n" "for %%D in (C) do (\n" "    echo text (parens)\n" ")\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(batch_file))
+        assert not self._e042_codes(issues)
+
+    def test_caret_and_quotes_not_e042(self, tmp_path: Path) -> None:
+        """Caret-escaped and double-quoted parentheses are not grouping operators."""
+        batch_file = tmp_path / "escaped.cmd"
+        batch_file.write_text(
+            "@echo off\n"
+            "for %%D in (C) do (\n"
+            "    echo --- text ^(parens^) ---\n"
+            '    echo --- text "(parens)" ---\n'
+            ")\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(batch_file))
+        assert not self._e042_codes(issues)
+
+    def test_toplevel_trailing_text_not_e042(self, tmp_path: Path) -> None:
+        """Outside a block, parentheses in ECHO text are literal."""
+        batch_file = tmp_path / "toplevel.cmd"
+        batch_file.write_text(
+            "@echo off\n" "echo --- text (parens) ---\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(batch_file))
+        assert not self._e042_codes(issues)
+
+    def test_same_line_for_block_reports_e042(self, tmp_path: Path) -> None:
+        """Same-line FOR DO ( body still treats inner ) as a group closer."""
+        batch_file = tmp_path / "same-line.cmd"
+        batch_file.write_text(
+            "@echo off\n" "for %%D in (C) do (echo --- text (parens) ---)\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(batch_file))
+        assert 2 in self._e042_codes(issues)
+
+    def test_colon_comment_in_block_reports_e042(self, tmp_path: Path) -> None:
+        """:: comments inside blocks are still parsed for parentheses."""
+        batch_file = tmp_path / "colon-comment.cmd"
+        batch_file.write_text(
+            "@echo off\n"
+            "for %%D in (C) do (\n"
+            "    :: echo --- text (parens) ---\n"
+            ")\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(batch_file))
+        assert 3 in self._e042_codes(issues)
+
+    def test_rem_comment_in_block_not_e042(self, tmp_path: Path) -> None:
+        """REM comments with a following space are not parsed as grouping."""
+        batch_file = tmp_path / "rem-comment.cmd"
+        batch_file.write_text(
+            "@echo off\n"
+            "for %%D in (C) do (\n"
+            "    rem echo --- text (parens) ---\n"
+            ")\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(batch_file))
+        assert not self._e042_codes(issues)
+
+    def test_echo_a_then_group_b_reports_e042(self, tmp_path: Path) -> None:
+        """A second group immediately after ) is unexpected at parse time."""
+        batch_file = tmp_path / "echo-a-b.cmd"
+        batch_file.write_text(
+            "@echo off\n" "for %%D in (C) do (\n" "    echo (a) (b)\n" ")\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(batch_file))
+        assert 3 in self._e042_codes(issues)
+
+    def test_same_line_if_block_reports_e042(self, tmp_path: Path) -> None:
+        """Same-line IF ( body still treats inner ) as a group closer."""
+        batch_file = tmp_path / "same-line-if.cmd"
+        batch_file.write_text(
+            "@echo off\n" "if 1==1 (echo --- text (parens) ---)\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(batch_file))
+        assert 2 in self._e042_codes(issues)
+
+    def test_bare_paren_group_reports_e042(self, tmp_path: Path) -> None:
+        """Command groups that start with ( use the same grouping rules."""
+        batch_file = tmp_path / "bare-group.cmd"
+        batch_file.write_text(
+            "@echo off\n" "(\n" "    echo --- text (parens) ---\n" ")\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(batch_file))
+        assert 3 in self._e042_codes(issues)
+
+    def test_same_line_group_reports_e042(self, tmp_path: Path) -> None:
+        """A same-line ( group body still treats inner ) as a group closer."""
+        batch_file = tmp_path / "same-line-group.cmd"
+        batch_file.write_text(
+            "@echo off\n" "(echo --- text (parens) ---)\n",
+            encoding="utf-8",
+        )
+        issues = lint_batch_file(str(batch_file))
+        assert 2 in self._e042_codes(issues)
 
 
 class TestSetAArithmeticE022:

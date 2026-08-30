@@ -4,10 +4,12 @@ import re
 from typing import (
     Dict,
     List,
+    Optional,
     Set,
     Tuple,
 )
 
+from blinter.checkers.warnings import _paren_depth_before_line
 from blinter.models import LintIssue
 from blinter.parsing.structure import _delayed_expansion_state_for_lines
 from blinter.patterns import (
@@ -961,6 +963,107 @@ def _check_smart_quotes(line: str, line_num: int) -> List[LintIssue]:
     return []
 
 
+_VALID_AFTER_CLOSE_PAREN_RE = re.compile(
+    r"^(?:[&|<>)]|\d*>|else\b|do\b)",
+    re.IGNORECASE,
+)
+_REM_COMMENT_RE = re.compile(r"^@?rem(?:\s|$)", re.IGNORECASE)
+_DO_BLOCK_OPEN_RE = re.compile(r"\bdo\s*\(", re.IGNORECASE)
+_ELSE_BLOCK_OPEN_RE = re.compile(r"\belse\s*\(", re.IGNORECASE)
+_LEADING_GROUP_OPEN_RE = re.compile(r"^@?\(")
+_IF_LINE_RE = re.compile(r"^@?if\b", re.IGNORECASE)
+
+
+def _is_caret_escaped(text: str, index: int) -> bool:
+    """Return True when an odd number of carets precede text[index]."""
+    caret_count = 0
+    pos = index - 1
+    while pos >= 0 and text[pos] == "^":
+        caret_count += 1
+        pos -= 1
+    return caret_count % 2 == 1
+
+
+def _first_unquoted_open_paren(text: str) -> Optional[int]:
+    """Return the index of the first unquoted, unescaped '('."""
+    in_quotes = False
+    for index, char in enumerate(text):
+        if char == '"' and not _is_caret_escaped(text, index):
+            in_quotes = not in_quotes
+            continue
+        if in_quotes or char != "(" or _is_caret_escaped(text, index):
+            continue
+        return index
+    return None
+
+
+def _invalid_token_after_close_paren(text: str) -> Optional[str]:
+    """Return the unexpected token after an inner ')' if cmd.exe would reject it."""
+    in_quotes = False
+    for index, char in enumerate(text):
+        if char == '"' and not _is_caret_escaped(text, index):
+            in_quotes = not in_quotes
+            continue
+        if in_quotes or char != ")" or _is_caret_escaped(text, index):
+            continue
+        remainder = text[index + 1 :].lstrip()
+        if not remainder or _VALID_AFTER_CLOSE_PAREN_RE.match(remainder):
+            continue
+        token = remainder.split()[0]
+        return token
+    return None
+
+
+def _regions_inside_paren_blocks(stripped: str, depth_before: int) -> List[str]:
+    """Return line slices that cmd.exe parses with block grouping rules."""
+    if depth_before > 0:
+        return [stripped]
+    regions: List[str] = []
+    if _LEADING_GROUP_OPEN_RE.match(stripped):
+        group_open_at = stripped.find("(")
+        regions.append(stripped[group_open_at + 1 :])
+    for match in _DO_BLOCK_OPEN_RE.finditer(stripped):
+        regions.append(stripped[match.end() :])
+    for match in _ELSE_BLOCK_OPEN_RE.finditer(stripped):
+        regions.append(stripped[match.end() :])
+    if _IF_LINE_RE.match(stripped):
+        if_open_at = _first_unquoted_open_paren(stripped)
+        if if_open_at is not None:
+            regions.append(stripped[if_open_at + 1 :])
+    return regions
+
+
+def _check_text_after_close_paren_in_block(
+    stripped: str,
+    line_num: int,
+    lines: List[str] | None,
+) -> List[LintIssue]:
+    """Flag leftover text after ')' inside a parenthesized block (E042)."""
+    if not stripped or _REM_COMMENT_RE.match(stripped):
+        return []
+    depth_before = 0
+    if lines is not None:
+        depth_before = _paren_depth_before_line(lines, line_num)
+    unexpected: Optional[str] = None
+    for region in _regions_inside_paren_blocks(stripped, depth_before):
+        unexpected = _invalid_token_after_close_paren(region)
+        if unexpected is not None:
+            break
+    if unexpected is None:
+        return []
+    return [
+        LintIssue(
+            line_number=line_num,
+            rule=RULES["E042"],
+            context=(
+                f"{unexpected!r} after ')' is a cmd.exe syntax error inside a "
+                "parenthesized block; escape parentheses as ^(...^) or remove "
+                "the trailing text"
+            ),
+        )
+    ]
+
+
 def _check_syntax_errors(
     line: str,
     line_num: int,
@@ -995,6 +1098,7 @@ def _check_syntax_errors(
     issues.extend(_check_quote_escaping(stripped, line_num))
     issues.extend(_check_set_a_expression(stripped, line_num))
     issues.extend(_check_set_p_syntax(stripped, line_num))
+    issues.extend(_check_text_after_close_paren_in_block(stripped, line_num, lines))
     issues.extend(_check_empty_variable_syntax(stripped, line_num))
     issues.extend(_check_smart_quotes(line, line_num))
 

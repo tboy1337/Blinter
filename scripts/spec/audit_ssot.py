@@ -44,7 +44,7 @@ _VALID_MODIFIERS_FROZENSET_RE = re.compile(
     r"VALID_MODIFIERS:\s*FrozenSet\[str\]\s*=\s*frozenset\(\{([^}]*)\}\)"
 )
 _E_RULE_CASE_RE = re.compile(r"^e(\d{3})-", re.IGNORECASE)
-_E_RULE_COVERAGE_TARGET = {f"E{index:03d}" for index in range(1, 42)}
+_E_RULE_COVERAGE_TARGET = {f"E{index:03d}" for index in range(1, 43)}
 _RULES_IN_CODE_RE = re.compile(r'RULES\[\s*["\']([A-Z]+\d+)["\']\s*\]')
 _RULE_CODE_KWARG_RE = re.compile(r'rule_code\s*=\s*["\']([A-Z]+\d+)["\']')
 _S011_RULE_USAGE_RE = re.compile(r"_s011_rule\s*\(")
@@ -87,6 +87,7 @@ _MATRIX_CORPUS_RULE_ALLOWLIST: frozenset[str] = frozenset(
         "syntax/e039-if-paren-sameline-valid",
         "syntax/e040-for-do-paren-sameline-valid",
         "syntax/e041-set-p-valid",
+        "syntax/e042-text-after-paren-valid",
         "syntax/w063-for-f-tokens-star-suffix-valid",
         "syntax/w017-not-errorlevel-one-valid",
         "syntax/w034-useback-synonym-valid",
@@ -693,7 +694,7 @@ def _audit_corpus(findings: list[AuditFinding], valid_rules: set[str]) -> None:
             AuditFinding(
                 "error",
                 "corpus",
-                f"E001–E041 corpus coverage incomplete: missing {', '.join(missing_target)}",
+                f"E001–E042 corpus coverage incomplete: missing {', '.join(missing_target)}",
             )
         )
     error_rules = {c for c in valid_rules if c.startswith("E") and c[1:].isdigit()}
@@ -707,7 +708,7 @@ def _audit_corpus(findings: list[AuditFinding], valid_rules: set[str]) -> None:
             AuditFinding(
                 "warning",
                 "corpus",
-                f"E001–E041 coverage {target_pct:.1f}% ({len(covered_target)}/{len(target_rules)})",
+                f"E001–E042 coverage {target_pct:.1f}% ({len(covered_target)}/{len(target_rules)})",
             )
         )
     if pct < 100.0:

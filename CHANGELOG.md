@@ -2,6 +2,16 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.20] - 2026-08-30
+
+### Added
+
+- **E042** detects text after a closing parenthesis inside a parenthesized IF/FOR/(group) block, a fatal cmd.exe parse error (fixes [#36](https://github.com/tboy1337/Blinter/issues/36))
+
+### Changed
+
+- Spec docs, Architecture, and funding metadata match the 226-case corpus and 176 rules
+
 ## [1.1.19] - 2026-08-29
 
 ### Fixed
@@ -146,6 +156,7 @@ All notable changes to Blinter are documented in this file. Release tags follow 
 
 Older 1.0.x releases are available on the [GitHub Releases](https://github.com/tboy1337/Blinter/releases) page.
 
+[1.1.20]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.20
 [1.1.19]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.19
 [1.1.18]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.18
 [1.1.17]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.17

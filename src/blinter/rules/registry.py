@@ -291,6 +291,13 @@ RULES: Dict[str, Rule] = {
         explanation="SET /P requires variable=[promptString] per SET /?; a prompt-only quoted string without a variable name causes a cmd.exe syntax error",
         recommendation='Use SET /P var=Prompt or SET /P "var=Prompt text" before reading user input',
     ),
+    "E042": Rule(
+        code="E042",
+        name="Text after closing parenthesis in block",
+        severity=RuleSeverity.ERROR,
+        explanation="Inside a parenthesized block, cmd.exe treats an unquoted closing parenthesis as the end of a command group; leftover text is then parsed as a new command and causes a syntax error (exit 255)",
+        recommendation="Escape parentheses as ^(...^), quote the text, or remove the trailing text after the closing parenthesis",
+    ),
     # Performance Level Rules (P001-P999)
     "P001": Rule(
         code="P001",

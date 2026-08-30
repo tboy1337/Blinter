@@ -17,7 +17,7 @@
 ## Features ✨
 
 ### 🔍 **Rule Categories**
-- **Built-in Rules** -- the registry currently ships **175** rules across 5 severity levels (see `blinter.rules.registry.RULE_COUNT`; numbering gaps reflect retired or consolidated rule IDs)
+- **Built-in Rules** -- the registry currently ships **176** rules across 5 severity levels (see `blinter.rules.registry.RULE_COUNT`; numbering gaps reflect retired or consolidated rule IDs)
 - **Error Level (E001-E999)**: Critical syntax errors that prevent execution
 - **Warning Level (W001-W999)**: Potential runtime issues and bad practices
 - **Style Level (S001-S999)**: Code formatting and readability improvements

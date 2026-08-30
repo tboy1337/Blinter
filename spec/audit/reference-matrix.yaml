@@ -13,6 +13,19 @@ entries:
   corpus:
   - syntax/e001-nested-parens
   - syntax/e001-for-f-in-quoted-valid
+- construct: Text after closing parenthesis inside parenthesized blocks
+  sources:
+  - MS Learn batch syntax
+  - cmd.exe parenthesized block parsing
+  ssot_artifacts:
+  - rules E042
+  rules:
+  - E042
+  corpus:
+  - syntax/e042-text-after-paren-in-block
+  - syntax/e042-nested-if-in-for
+  - syntax/e042-text-after-paren-valid
+  - syntax/e042-same-line-block
 - construct: GOTO label resolution and unreachable flow
   sources:
   - MS Learn goto
