@@ -11,12 +11,12 @@ import pytest
 
 from blinter import (
     BlinterConfig,
+    LintIssue,
     find_batch_files,
     lint_batch_file,
     main,
     read_file_with_encoding,
 )
-from blinter.models import LintIssue
 from blinter.checkers.advanced import (
     _check_advanced_style_rules,
     _check_advanced_vars,
