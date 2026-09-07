@@ -4558,3 +4558,20 @@ class TestResidualFalsePositives:
         p024 = [issue for issue in issues if issue.rule.code == "P024"]
         assert len(p024) == 1
         assert p024[0].line_number == 8
+
+    def test_quoted_if_operand_holding_a_space(self) -> None:
+        """#40: a quoted operand is one token, so the predicate ends where it does."""
+        from blinter.parsing.context import _is_setlocal_command
+
+        assert _is_setlocal_command('if exist "C:\\Program Files\\a.txt" setlocal')
+        assert _is_setlocal_command(
+            'if not "%A%"=="b c" setlocal enabledelayedexpansion'
+        )
+
+    def test_escaped_separator_and_pipe_do_not_start_a_command(self) -> None:
+        """#40: a caret escapes ``&``, and a pipe runs its right side elsewhere."""
+        from blinter.parsing.context import _command_segments, _is_setlocal_command
+
+        assert _command_segments("echo a ^& setlocal") == []
+        assert not _is_setlocal_command("echo a ^& setlocal")
+        assert _command_segments('dir | find "x"') == ['dir | find "x"']

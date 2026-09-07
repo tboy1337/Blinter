@@ -62,7 +62,14 @@ def _first_command_token(line: str) -> str:
 
 
 def _split_command_separators(body: str) -> list[str]:
-    """Split a command body on ``&``, ``&&`` and ``||`` found outside quoting."""
+    """
+    Split a command body on the unescaped ``&``, ``&&`` and ``||`` outside quoting.
+
+    A caret escapes the character after it, so ``^&`` is data rather than a
+    separator. A single ``|`` is a pipe rather than a separator: what follows
+    it runs in its own ``cmd``, so a ``SETLOCAL`` there is not this line's and
+    a label named there is not jumped to by it.
+    """
     parts: list[str] = []
     current: list[str] = []
     quote = ""
@@ -75,21 +82,58 @@ def _split_command_separators(body: str) -> list[str]:
                 quote = ""
             index += 1
             continue
+        if char == "^":
+            current.append(char)
+            if index + 1 < len(body):
+                current.append(body[index + 1])
+            index += 2
+            continue
         if char in '"`':
             quote = char
             current.append(char)
             index += 1
             continue
-        if char in "&|":
+        if char == "&" or body[index : index + 2] == "||":
             parts.append("".join(current))
             current = []
-            while index < len(body) and body[index] in "&|":
-                index += 1
+            index += 2 if body[index : index + 2] in ("&&", "||") else 1
             continue
         current.append(char)
         index += 1
     parts.append("".join(current))
     return parts
+
+
+def _split_tokens(text: str) -> list[str]:
+    """
+    Split ``text`` on whitespace outside quoting, keeping each token's quotes.
+
+    ``str.split`` would break a quoted operand holding a space into two
+    tokens, which moves every token after it: an ``IF`` predicate counted by
+    position would then end one token short of the command it guards.
+    """
+    tokens: list[str] = []
+    current: list[str] = []
+    quote = ""
+    for char in text:
+        if quote:
+            current.append(char)
+            if char == quote:
+                quote = ""
+            continue
+        if char in '"`':
+            quote = char
+            current.append(char)
+            continue
+        if char.isspace():
+            if current:
+                tokens.append("".join(current))
+                current = []
+            continue
+        current.append(char)
+    if current:
+        tokens.append("".join(current))
+    return tokens
 
 
 def _strip_if_predicate(tokens: list[str]) -> list[str]:
@@ -130,7 +174,7 @@ def _command_segments(line: str) -> list[str]:
         return []
     segments: list[str] = []
     for part in _split_command_separators(body):
-        tokens = part.strip().lstrip("(").strip().split()
+        tokens = _split_tokens(part.strip().lstrip("(").strip())
         while tokens and tokens[0].lower() in ("do", "else"):
             tokens = tokens[1:]
         tokens = _strip_if_predicate(tokens)
