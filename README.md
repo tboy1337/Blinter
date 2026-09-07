@@ -502,7 +502,8 @@ py scripts/verify.py --fix  # auto-fix whitespace and imports first
 
 Windows standalone executable (no Python on the target machine). Release builds
 run on GitHub Actions `windows-latest` with Visual Studio 2022 (MSVC 14.3+),
-which is what Nuitka needs for Python 3.14:
+which is what Nuitka needs for Python 3.14. The onefile is LTO-compiled, payload-
+compressed (no UPX), and unpacks to a versioned cache directory after the first run:
 
 ```bash
 pip install nuitka

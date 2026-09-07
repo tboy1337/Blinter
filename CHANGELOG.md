@@ -2,6 +2,12 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.23] - 2026-09-07
+
+### Changed
+
+- Windows `blinter.exe` Nuitka build uses LTO, cached onefile extract, stripped docstrings/asserts, and unused-stdlib nofollow; UPX stays off
+
 ## [1.1.22] - 2026-09-07
 
 ### Changed

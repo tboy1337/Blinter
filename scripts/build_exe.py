@@ -22,6 +22,31 @@ OUTPUT_FILENAME = "blinter.exe"
 COMPANY_NAME = "tboy1337"
 PRODUCT_NAME = "Blinter"
 FILE_DESCRIPTION = "Blinter - Professional Batch File Linter for Windows"
+# Cached extract path: faster relaunch, stable path for Windows Firewall/AV.
+ONEFILE_TEMPDIR_SPEC = "{CACHE_DIR}/{COMPANY}/{PRODUCT}/{VERSION}"
+PYTHON_FLAGS: tuple[str, ...] = ("-m", "no_docstrings", "no_asserts", "safe_path")
+NOFOLLOW_IMPORT_TO: tuple[str, ...] = (
+    "tkinter",
+    "_tkinter",
+    "turtle",
+    "idlelib",
+    "curses",
+    "_curses",
+    "lib2to3",
+    "ensurepip",
+    "venv",
+    "distutils",
+    "unittest",
+    "doctest",
+    "pydoc",
+    "xmlrpc",
+    "http.server",
+    "sqlite3",
+    "_sqlite3",
+    "asyncio",
+    "multiprocessing",
+    "test",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +117,27 @@ def nuitka_environment(repo_root: Path) -> dict[str, str]:
     return env
 
 
+def _optimization_flags() -> list[str]:
+    """Return size/speed flags that stay AV-safe and do not change CLI behavior."""
+    flags: list[str] = [
+        "--lto=yes",
+        "--deployment",
+        "--noinclude-default-mode=nofollow",
+        f"--onefile-tempdir-spec={ONEFILE_TEMPDIR_SPEC}",
+        "--onefile-cache-mode=cached",
+        "--file-reference-choice=runtime",
+    ]
+    for python_flag in PYTHON_FLAGS:
+        flags.append(f"--python-flag={python_flag}")
+    for module_name in NOFOLLOW_IMPORT_TO:
+        flags.append(f"--nofollow-import-to={module_name}")
+    logger.info(
+        "Nuitka optimizations: LTO, deployment, cached onefile extract, "
+        "no docstrings/asserts, nofollow unused stdlib; UPX is not used"
+    )
+    return flags
+
+
 def build_nuitka_command(
     *,
     version: str,
@@ -109,12 +155,12 @@ def build_nuitka_command(
         f"--output-filename={OUTPUT_FILENAME}",
         f"--output-dir={OUTPUT_DIR.as_posix()}",
         f"--include-package={ENTRY_MODULE}",
-        f"--include-package-data={ENTRY_MODULE}",
         "--include-module=charset_normalizer",
         f"--include-data-files=pyproject.toml={ENTRY_MODULE}/pyproject.toml",
-        "--python-flag=-m",
-        "--file-reference-choice=runtime",
+        f"--company-name={COMPANY_NAME}",
+        f"--product-name={PRODUCT_NAME}",
     ]
+    command.extend(_optimization_flags())
     if windows:
         if mingw:
             logger.info("Selecting MinGW64 toolchain (experimental on Python 3.13+)")
@@ -128,8 +174,6 @@ def build_nuitka_command(
         command.extend(
             [
                 f"--windows-icon-from-ico={ICON_PATH.as_posix()}",
-                f"--company-name={COMPANY_NAME}",
-                f"--product-name={PRODUCT_NAME}",
                 f"--file-version={version}",
                 f"--product-version={version}",
                 f"--file-description={FILE_DESCRIPTION}",

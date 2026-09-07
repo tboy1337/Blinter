@@ -16,10 +16,13 @@ from scripts.build_exe import (
     FILE_DESCRIPTION,
     ICON_PATH,
     MAIN_FILE,
+    NOFOLLOW_IMPORT_TO,
+    ONEFILE_TEMPDIR_SPEC,
     OUTPUT_DIR,
     OUTPUT_FILENAME,
     PACKAGE_DIR,
     PRODUCT_NAME,
+    PYTHON_FLAGS,
     TYPED_MARKER,
     _is_windows,
     _read_project_version,
@@ -183,7 +186,7 @@ class TestBuildExe:
         assert f"--output-filename={OUTPUT_FILENAME}" in command
         assert f"--output-dir={OUTPUT_DIR.as_posix()}" in command
         assert "--include-package=blinter" in command
-        assert "--include-package-data=blinter" in command
+        assert "--include-package-data=blinter" not in command
         assert "--include-module=charset_normalizer" in command
         assert "--include-data-files=pyproject.toml=blinter/pyproject.toml" in command
         assert "--python-flag=-m" in command
@@ -196,6 +199,26 @@ class TestBuildExe:
         assert f"--file-description={FILE_DESCRIPTION}" in command
         assert command[-1] == PACKAGE_DIR.as_posix()
         assert "blinter.exe" in joined
+
+    def test_build_command_applies_size_and_speed_flags(self) -> None:
+        """Onefile builds must stay compressed, cached, LTO-enabled, and UPX-free."""
+        command = build_nuitka_command(
+            version="1.2.3",
+            python_executable=sys.executable,
+            windows=True,
+        )
+        assert "--lto=yes" in command
+        assert "--deployment" in command
+        assert "--noinclude-default-mode=nofollow" in command
+        assert f"--onefile-tempdir-spec={ONEFILE_TEMPDIR_SPEC}" in command
+        assert "--onefile-cache-mode=cached" in command
+        assert "--onefile-no-compression" not in command
+        assert "--upx" not in command
+        assert not any(part.startswith("--upx") for part in command)
+        for python_flag in PYTHON_FLAGS:
+            assert f"--python-flag={python_flag}" in command
+        for module_name in NOFOLLOW_IMPORT_TO:
+            assert f"--nofollow-import-to={module_name}" in command
 
     def test_build_command_uses_mingw_when_requested(self) -> None:
         """Local MinGW builds must opt into the experimental 3.13+ flag."""
@@ -219,7 +242,9 @@ class TestBuildExe:
         assert "--msvc=latest" not in command
         assert "--mingw64" not in command
         assert not any(part.startswith("--windows-icon-from-ico=") for part in command)
-        assert not any(part.startswith("--company-name=") for part in command)
+        assert not any(part.startswith("--file-version=") for part in command)
+        assert f"--company-name={COMPANY_NAME}" in command
+        assert "--lto=yes" in command
         assert command[-1] == PACKAGE_DIR.as_posix()
 
     def test_application_icon_asset_exists(self) -> None:
@@ -306,6 +331,7 @@ class TestBuildExe:
         assert "--mingw64" not in command
         assert "--msvc=latest" not in command
         assert not any(part.startswith("--windows-icon-from-ico=") for part in command)
+        assert "--lto=yes" in command
 
     def test_main_reports_launch_failures(self, mocker: MockerFixture) -> None:
         """OS errors starting Nuitka should return exit code 1."""
