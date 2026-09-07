@@ -12,15 +12,14 @@ _PACKAGE_NAME = "Blinter"
 
 
 def _pyproject_path() -> Path:
-    """Return pyproject.toml for source trees or PyInstaller bundles."""
+    """Return pyproject.toml for source trees or Nuitka frozen bundles."""
+    module_file = Path(__file__).resolve()
+    package_dir = module_file.parent
     frozen_raw: object = getattr(sys, "frozen", False)
     if frozen_raw is True:
-        meipass_raw: object = getattr(sys, "_MEIPASS", "")
-        if isinstance(meipass_raw, str) and meipass_raw:
-            bundled = Path(meipass_raw) / "pyproject.toml"
-            if bundled.is_file():
-                return bundled
-    return Path(__file__).resolve().parent.parent.parent / "pyproject.toml"
+        # Nuitka onefile extracts next to the compiled package directory.
+        return package_dir.parent / "pyproject.toml"
+    return package_dir.parent.parent / "pyproject.toml"
 
 
 def _fallback_version() -> str:

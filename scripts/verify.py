@@ -383,6 +383,10 @@ def _run_python_checks(root: Path, *, fix: bool) -> None:
                     str(Path("scripts") / "benchmark_lint.py"),
                 ),
             ),
+            (
+                "mypy (build_exe)",
+                _python_m("mypy", str(Path("scripts") / "build_exe.py")),
+            ),
         ]
     )
 

@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Smoke tests for the PyInstaller-built blinter.exe and parity with python -m blinter.
+    Smoke tests for the Nuitka-built blinter.exe and parity with python -m blinter.
 
 .DESCRIPTION
     Used by CI and locally after building dist\blinter.exe. Creates ephemeral fixtures,

@@ -2,6 +2,12 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.22] - 2026-09-07
+
+### Changed
+
+- Windows standalone `blinter.exe` is now built with Nuitka (`scripts/build_exe.py`) instead of PyInstaller
+
 ## [1.1.21] - 2026-08-31
 
 ### Changed

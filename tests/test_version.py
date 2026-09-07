@@ -1,9 +1,9 @@
 """Tests for package version resolution."""
 
 from importlib.metadata import PackageNotFoundError, version
+import os
 from pathlib import Path
 import re
-import subprocess
 import sys
 
 import pytest
@@ -11,10 +11,22 @@ from pytest_mock import MockerFixture
 
 from blinter._version import _fallback_version, _pyproject_path, get_version
 from blinter.rules.registry import RULE_COUNT
-from scripts.generate_file_version_info import (
-    _build_version_info,
+from scripts.build_exe import (
+    COMPANY_NAME,
+    FILE_DESCRIPTION,
+    ICON_PATH,
+    MAIN_FILE,
+    OUTPUT_DIR,
+    OUTPUT_FILENAME,
+    PACKAGE_DIR,
+    PRODUCT_NAME,
+    TYPED_MARKER,
     _read_project_version,
-    _version_tuple,
+    _validate_inputs,
+    build_nuitka_command,
+    main,
+    nuitka_environment,
+    run_nuitka,
 )
 
 
@@ -71,16 +83,35 @@ class TestVersion:
         mocker.patch("blinter._version._pyproject_path", return_value=pyproject)
         assert _fallback_version() == "unknown"
 
-    def test_pyproject_path_uses_meipass_when_frozen(
+    def test_pyproject_path_uses_compiled_layout_when_frozen(
         self, mocker: MockerFixture, tmp_path: Path
     ) -> None:
         """Test frozen executables resolve version from bundled pyproject.toml."""
         bundled = tmp_path / "pyproject.toml"
         bundled.write_text('[project]\nversion = "9.9.9"\n', encoding="utf-8")
+        package_dir = tmp_path / "blinter"
+        package_dir.mkdir()
+        version_module = package_dir / "_version.py"
+        version_module.write_text("# test fixture\n", encoding="utf-8")
         mocker.patch("blinter._version.sys.frozen", True, create=True)
-        mocker.patch("blinter._version.sys._MEIPASS", str(tmp_path), create=True)
+        mocker.patch("blinter._version.__file__", str(version_module))
         assert _pyproject_path() == bundled
         assert get_version() == "9.9.9"
+
+    def test_pyproject_path_frozen_missing_bundle_stays_in_extract_dir(
+        self, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """Test frozen lookup does not walk out of the Nuitka extract directory."""
+        package_dir = tmp_path / "blinter"
+        package_dir.mkdir()
+        version_module = package_dir / "_version.py"
+        version_module.write_text("# test fixture\n", encoding="utf-8")
+        mocker.patch("blinter._version.sys.frozen", True, create=True)
+        mocker.patch("blinter._version.__file__", str(version_module))
+        bundled = tmp_path / "pyproject.toml"
+        assert _pyproject_path() == bundled
+        assert not bundled.is_file()
+        assert _fallback_version() == "unknown"
 
     def test_readme_rule_count_matches_registry(self) -> None:
         """README should reference the live RULE_COUNT from the registry."""
@@ -92,26 +123,8 @@ class TestVersion:
         ), f"README must state **{RULE_COUNT}** rules explicitly"
 
 
-class TestGenerateFileVersionInfo:
-    """Tests for Windows executable version resource generation."""
-
-    def test_version_tuple_pads_short_versions(self) -> None:
-        """Short version strings should pad missing segments with zero."""
-        assert _version_tuple("1") == (1, 0, 0)
-        assert _version_tuple("1.2") == (1, 2, 0)
-        assert _version_tuple("1.2.3") == (1, 2, 3)
-
-    def test_build_version_info_includes_pyproject_version(self) -> None:
-        """Generated VSVersionInfo should embed the project version."""
-        from tests.conftest import get_project_version
-
-        project_version = get_project_version()
-        content = _build_version_info(project_version)
-        assert f"u'{project_version}'" in content
-        major, minor, patch = _version_tuple(project_version)
-        assert f"filevers=({major}, {minor}, {patch}, 0)" in content
-        assert "blinter.exe" in content
-        assert "AGPL-3.0-or-later" in content
+class TestBuildExe:
+    """Tests for the Nuitka Windows executable build script."""
 
     def test_read_project_version_matches_pyproject(self) -> None:
         """Script should read the same version as test helpers."""
@@ -122,38 +135,149 @@ class TestGenerateFileVersionInfo:
             _read_project_version(repo_root / "pyproject.toml") == get_project_version()
         )
 
-    def test_generate_script_writes_version_file(self) -> None:
-        """CLI entry point should write file_version_info.txt in the repo root."""
-        repo_root = Path(__file__).resolve().parent.parent
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(repo_root / "scripts" / "generate_file_version_info.py"),
-            ],
-            cwd=repo_root,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=30,
+    def test_validate_inputs_requires_pyproject(self, tmp_path: Path) -> None:
+        """Build validation should fail loudly when pyproject.toml is missing."""
+        with pytest.raises(FileNotFoundError, match="pyproject.toml"):
+            _validate_inputs(tmp_path)
+
+    def test_nuitka_environment_prepends_src(self, tmp_path: Path) -> None:
+        """Nuitka must import the src/ layout package during compilation."""
+        env = nuitka_environment(tmp_path)
+        src_dir = str(tmp_path / "src")
+        pythonpath = env["PYTHONPATH"]
+        assert pythonpath == src_dir or pythonpath.startswith(src_dir + os.pathsep)
+
+    def test_build_command_includes_windows_metadata(self) -> None:
+        """Nuitka command must embed icon, version, package, and data files."""
+        from tests.conftest import get_project_version
+
+        project_version = get_project_version()
+        command = build_nuitka_command(
+            version=project_version,
+            python_executable=sys.executable,
+            windows=True,
+            mingw=False,
         )
-        assert result.returncode == 0, result.stderr
-        output = repo_root / "file_version_info.txt"
-        assert output.is_file()
-        assert "VSVersionInfo(" in output.read_text(encoding="utf-8")
+        joined = " ".join(command)
+        assert command[:3] == [sys.executable, "-m", "nuitka"]
+        assert "--mode=onefile" in command
+        assert "--assume-yes-for-downloads" in command
+        assert "--msvc=latest" in command
+        assert "--mingw64" not in command
+        assert f"--output-filename={OUTPUT_FILENAME}" in command
+        assert f"--output-dir={OUTPUT_DIR.as_posix()}" in command
+        assert "--include-package=blinter" in command
+        assert "--include-package-data=blinter" in command
+        assert "--include-module=charset_normalizer" in command
+        assert "--include-data-files=pyproject.toml=pyproject.toml" in command
+        assert "--python-flag=-m" in command
+        assert f"--windows-icon-from-ico={ICON_PATH.as_posix()}" in command
+        assert f"--company-name={COMPANY_NAME}" in command
+        assert f"--product-name={PRODUCT_NAME}" in command
+        assert f"--file-version={project_version}" in command
+        assert f"--product-version={project_version}" in command
+        assert f"--file-description={FILE_DESCRIPTION}" in command
+        assert command[-1] == PACKAGE_DIR.as_posix()
+        assert "blinter.exe" in joined
 
+    def test_build_command_uses_mingw_when_requested(self) -> None:
+        """Local MinGW builds must opt into the experimental 3.13+ flag."""
+        command = build_nuitka_command(
+            version="1.2.3",
+            python_executable=sys.executable,
+            windows=True,
+            mingw=True,
+        )
+        assert "--mingw64" in command
+        assert "--experimental=force-mingw64" in command
+        assert "--msvc=latest" not in command
 
-class TestBlinterSpecIcon:
-    """Tests for PyInstaller spec icon configuration."""
+    def test_build_command_omits_windows_flags_off_windows(self) -> None:
+        """Non-Windows invocations should not pass MSVC or PE resource flags."""
+        command = build_nuitka_command(
+            version="1.2.3",
+            python_executable=sys.executable,
+            windows=False,
+        )
+        assert "--msvc=latest" not in command
+        assert "--mingw64" not in command
+        assert not any(part.startswith("--windows-icon-from-ico=") for part in command)
+        assert not any(part.startswith("--company-name=") for part in command)
+        assert command[-1] == PACKAGE_DIR.as_posix()
 
-    def test_blinter_spec_references_application_icon(self) -> None:
-        """Blinter.spec must embed resources/blinter_icon.ico in the Windows exe."""
+    def test_application_icon_asset_exists(self) -> None:
+        """The ICO referenced by the Nuitka build must be present."""
         repo_root = Path(__file__).resolve().parent.parent
-        icon_path = repo_root / "resources" / "blinter_icon.ico"
-        spec_path = repo_root / "Blinter.spec"
+        assert (repo_root / ICON_PATH).is_file(), "Application icon asset is missing"
+        assert (repo_root / MAIN_FILE).is_file(), "package __main__ module is missing"
+        assert (repo_root / TYPED_MARKER).is_file(), "py.typed marker is missing"
+        _validate_inputs(repo_root)
 
-        assert icon_path.is_file(), "Application icon asset is missing"
-        spec_text = spec_path.read_text(encoding="utf-8")
-        assert re.search(
-            r"""icon\s*=\s*["']resources/blinter_icon\.ico["']""",
-            spec_text,
-        ), "Blinter.spec must set icon=resources/blinter_icon.ico"
+    def test_read_project_version_rejects_missing_version(self, tmp_path: Path) -> None:
+        """Invalid pyproject.toml must fail before Nuitka is launched."""
+        pyproject = tmp_path / "pyproject.toml"
+        pyproject.write_text("[project]\nname = 'Blinter'\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="project.version"):
+            _read_project_version(pyproject)
+
+    def test_run_nuitka_returns_subprocess_exit_code(
+        self, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """A Nuitka compiler failure should surface its exit code."""
+        mocker.patch(
+            "scripts.build_exe.subprocess.run",
+            return_value=mocker.Mock(returncode=7),
+        )
+        assert run_nuitka([sys.executable, "-m", "nuitka"], tmp_path) == 7
+
+    def test_run_nuitka_fails_when_output_missing(
+        self, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """Success from Nuitka without dist/blinter.exe is still a build failure."""
+        mocker.patch(
+            "scripts.build_exe.subprocess.run",
+            return_value=mocker.Mock(returncode=0),
+        )
+        assert run_nuitka([sys.executable, "-m", "nuitka"], tmp_path) == 1
+
+    def test_run_nuitka_succeeds_when_exe_exists(
+        self, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """A completed onefile build must leave dist/blinter.exe in place."""
+        dist_dir = tmp_path / OUTPUT_DIR
+        dist_dir.mkdir()
+        (dist_dir / OUTPUT_FILENAME).write_bytes(b"exe")
+        mocker.patch(
+            "scripts.build_exe.subprocess.run",
+            return_value=mocker.Mock(returncode=0),
+        )
+        assert run_nuitka([sys.executable, "-m", "nuitka"], tmp_path) == 0
+
+    def test_main_returns_2_when_inputs_missing(
+        self, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """CLI should exit 2 when required build inputs are absent."""
+        mocker.patch("scripts.build_exe.ROOT", tmp_path)
+        assert main([]) == 2
+
+    def test_main_invokes_nuitka_with_mingw_flag(self, mocker: MockerFixture) -> None:
+        """--mingw must reach the Nuitka command line."""
+        repo_root = Path(__file__).resolve().parent.parent
+        mocker.patch("scripts.build_exe.ROOT", repo_root)
+        mocker.patch("scripts.build_exe.os.name", "nt")
+        run = mocker.patch("scripts.build_exe.run_nuitka", return_value=0)
+        assert main(["--mingw"]) == 0
+        command = run.call_args[0][0]
+        assert "--mingw64" in command
+        assert "--experimental=force-mingw64" in command
+        assert run.call_args[0][1] == repo_root
+
+    def test_main_reports_launch_failures(self, mocker: MockerFixture) -> None:
+        """OS errors starting Nuitka should return exit code 1."""
+        repo_root = Path(__file__).resolve().parent.parent
+        mocker.patch("scripts.build_exe.ROOT", repo_root)
+        mocker.patch(
+            "scripts.build_exe.run_nuitka",
+            side_effect=OSError("nuitka missing"),
+        )
+        assert main([]) == 1
