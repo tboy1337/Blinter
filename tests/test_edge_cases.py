@@ -2084,6 +2084,19 @@ class TestGlobalChecks:
         assert len(p024_issues) == 1
         assert p024_issues[0].line_number == 8
 
+    def test_extra_endlocal_does_not_trigger_p024(self) -> None:
+        """P024 requires a second SETLOCAL; extra ENDLOCAL is a different rule."""
+        lines = [
+            "@echo off",
+            "setlocal",
+            "echo hi",
+            "endlocal",
+            "endlocal",
+            "exit /b 0",
+        ]
+        issues = _check_new_global_rules(lines, "test.cmd")
+        assert all(issue.rule.code != "P024" for issue in issues)
+
     def test_if_goto_and_call_labels_are_not_s010(self) -> None:
         """Labels reached via IF/|| GOTO or IF CALL are not dead (issue #39)."""
         lines = [
@@ -3614,6 +3627,32 @@ class TestEmbeddedScriptDetection:  # pylint: disable=too-few-public-methods
         assert 2 not in hyphen_skip
         assert 2 not in plain_skip
         assert hyphen_skip == plain_skip
+
+    def test_cmdlet_like_script_filenames_are_not_powershell(self) -> None:
+        """Cmdlet patterns must not backtrack into names with blocked extensions."""
+        filename_lines = (
+            r"set X=set-permissions.bat",
+            r"set X=Get-Item.cmd",
+            r"set X=Write-Output.exe",
+            r"set X=New-Item.com",
+            r"set X=Set-config.ps1",
+            r"set X=Set-config.psm1",
+            r"set X=Set-config.psd1",
+            r"set X=Set-config.ps1xml",
+            r"set X=Set-config.vbs",
+        )
+        for filename_line in filename_lines:
+            skip_lines = _detect_embedded_script_blocks(["@echo off", filename_line])
+            assert 2 not in skip_lines, filename_line
+
+    def test_real_powershell_cmdlets_are_still_detected(self) -> None:
+        """Bare Get-/Set-/Write-/New- cmdlets still open a PowerShell skip region."""
+        skip_lines = _detect_embedded_script_blocks(
+            ["@echo off", "Write-Host $name", "Get-ChildItem", "Set-Item -Path x"]
+        )
+        assert 2 in skip_lines
+        assert 3 in skip_lines
+        assert 4 in skip_lines
 
     def test_hyphenated_filename_keeps_per_line_rules(self, tmp_path: Path) -> None:
         """set-permissions.bat must still get W005 and SEC006 (issue #38)."""

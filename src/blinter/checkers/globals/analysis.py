@@ -611,25 +611,17 @@ def _check_var_naming(lines: List[str]) -> List[LintIssue]:
 
 
 def _check_setlocal_redundancy(lines: List[str]) -> List[LintIssue]:
-    """Check for redundant SETLOCAL/ENDLOCAL pairs."""
+    """Flag a second real SETLOCAL command (P024). Unmatched ENDLOCAL is not P024."""
     issues: List[LintIssue] = []
     setlocal_lines = [
         index for index, line in enumerate(lines, start=1) if _is_setlocal_command(line)
     ]
-    endlocal_lines = [
-        index for index, line in enumerate(lines, start=1) if _is_endlocal_command(line)
-    ]
-
-    if len(setlocal_lines) > 1:
-        line_number = setlocal_lines[1]
-    elif len(endlocal_lines) > 1:
-        line_number = endlocal_lines[1]
-    else:
+    if len(setlocal_lines) < 2:
         return issues
 
     issues.append(
         LintIssue(
-            line_number=line_number,
+            line_number=setlocal_lines[1],
             rule=RULES["P024"],
             context="Multiple SETLOCAL commands create unnecessary overhead",
         )

@@ -2,6 +2,13 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.25] - 2026-09-07
+
+### Fixed
+
+- PowerShell `Get-`/`Set-`/`Write-`/`New-` detection no longer backtracks into hyphenated filenames, and ignores `.psm1`/`.psd1`/`.ps1xml` script modules the same way as `.ps1`
+- **P024** reports only a second real `SETLOCAL`; extra `ENDLOCAL` is left to its own rules
+
 ## [1.1.24] - 2026-09-07
 
 ### Fixed
