@@ -426,6 +426,7 @@ entries:
   - integration/p006-missing-endlocal
   - integration/p006-subroutine-exit-valid
   - integration/p027-setlocal-nesting
+  - integration/p024-setlocal-in-comment-valid
 - construct: Temporary files, randomness, and predictable paths
   sources:
   - MS Learn environment variables
@@ -495,6 +496,7 @@ entries:
   - integration/p002-code-duplication
   - integration/p017-repeated-exist
   - integration/p027-setlocal-nesting
+  - integration/p024-setlocal-in-comment-valid
 - construct: Global style conventions and readability
   sources:
   - Community batch style

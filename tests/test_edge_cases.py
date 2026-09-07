@@ -4364,3 +4364,36 @@ class TestFalsePositiveReports37To40:
         issues = _check_global_style_rules(lines, "test.cmd")
         assert len([issue for issue in issues if issue.rule.code == "S010"]) == 1
 
+    def test_setlocal_in_comment_is_not_counted(self) -> None:
+        """Issue #40: a REM mentioning setlocal is not a SETLOCAL."""
+        lines = [
+            "@echo off",
+            "setlocal disabledelayedexpansion",
+            "REM filler",
+            "REM filler",
+            "REM filler",
+            "REM filler",
+            "REM a bare setlocal inherits the caller state",
+            "set V=1",
+            "endlocal",
+            "exit /b 0",
+        ]
+        issues = _check_new_global_rules(lines, "test.bat")
+        codes = {issue.rule.code for issue in issues}
+        assert "P024" not in codes
+        assert "P006" not in codes
+
+    def test_setlocal_after_ampersand_is_counted(self) -> None:
+        """Issue #40 control: ``cmd & setlocal`` is a SETLOCAL."""
+        lines = [
+            "@echo off",
+            "setlocal",
+            "echo step1",
+            "echo step2",
+            "echo step3",
+            "echo step4",
+            "echo step5",
+            "echo again & setlocal",
+        ]
+        issues = _check_new_global_rules(lines, "test.bat")
+        assert len([issue for issue in issues if issue.rule.code == "P024"]) == 1

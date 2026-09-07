@@ -1,0 +1,13 @@
+{
+  "config": {},
+  "description": "The word setlocal inside a REM is not a SETLOCAL command: no P024 and no P006 for a balanced pair (issue #40)",
+  "lines": {},
+  "must_not": [
+    "P006",
+    "P024"
+  ],
+  "rules": [],
+  "tags": [
+    "integration"
+  ]
+}

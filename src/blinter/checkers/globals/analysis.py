@@ -70,6 +70,29 @@ def _check_global_style_rules(lines: List[str], file_path: str) -> List[LintIssu
 
 _GOTO_REFERENCE_RE = re.compile(r"\bgoto\s+:?([a-zA-Z_][\w]*)")
 _CALL_REFERENCE_RE = re.compile(r"\bcall\s+:([a-zA-Z_][\w]*)")
+_COMMAND_SEGMENT_SPLIT_RE = re.compile(r"[&|()]+")
+
+
+def _line_runs_command(lowered: str, command: str) -> bool:
+    """
+    Return True when ``command`` is executed by the (lowercased) line.
+
+    A command word is one that begins the line or a ``&``, ``|`` or ``(``
+    segment of it, after an optional ``@`` and an optional ``do``/``else``.
+    A comment or an ``echo`` mentioning the word is not an execution of it.
+    """
+    if _is_comment_line(lowered):
+        return False
+    segments: List[str] = [
+        str(part) for part in _COMMAND_SEGMENT_SPLIT_RE.split(lowered)
+    ]
+    for segment in segments:
+        tokens: List[str] = segment.strip().lstrip("@").split()
+        while tokens and tokens[0] in ("do", "else"):
+            tokens = tokens[1:]
+        if tokens and tokens[0] == command:
+            return True
+    return False
 
 
 def _check_unused_labels(lines: List[str]) -> List[LintIssue]:
@@ -620,12 +643,17 @@ def _check_var_naming(lines: List[str]) -> List[LintIssue]:
 def _check_setlocal_redundancy(lines: List[str]) -> List[LintIssue]:
     """Check for redundant SETLOCAL/ENDLOCAL pairs."""
     issues: List[LintIssue] = []
-    setlocal_count = sum(1 for line in lines if "setlocal" in line.lower())
-    endlocal_count = sum(1 for line in lines if "endlocal" in line.lower())
+    lowered_lines = [line.strip().lower() for line in lines]
+    setlocal_count = sum(
+        1 for lowered in lowered_lines if _line_runs_command(lowered, "setlocal")
+    )
+    endlocal_count = sum(
+        1 for lowered in lowered_lines if _line_runs_command(lowered, "endlocal")
+    )
 
     if setlocal_count > 1 or endlocal_count > 1:
-        for i, line in enumerate(lines, start=1):
-            if "setlocal" in line.lower() and i > 5:  # Not at beginning
+        for i, lowered in enumerate(lowered_lines, start=1):
+            if _line_runs_command(lowered, "setlocal") and i > 5:  # Not at beginning
                 issues.append(
                     LintIssue(
                         line_number=i,
@@ -817,9 +845,9 @@ def _check_endlocal_before_exit(lines: List[str]) -> List[LintIssue]:
 
     for i, line in enumerate(lines, start=1):
         stripped = line.strip().lower()
-        if "setlocal" in stripped:
+        if _line_runs_command(stripped, "setlocal"):
             setlocal_depth += 1
-        if "endlocal" in stripped and setlocal_depth > 0:
+        if _line_runs_command(stripped, "endlocal") and setlocal_depth > 0:
             setlocal_depth -= 1
         if not re.match(r"exit\b", stripped) or setlocal_depth <= 0:
             continue
