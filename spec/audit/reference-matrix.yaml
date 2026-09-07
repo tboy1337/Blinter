@@ -205,6 +205,7 @@ entries:
   - syntax/w059-for-case-mismatch
   - syntax/w059-for-case-mismatch-block
   - syntax/w059-for-case-consistent-valid
+  - syntax/w036-for-f-usebackq-command-valid
 - construct: SET /A syntax errors in FOR context
   sources:
   - MS Learn set /A

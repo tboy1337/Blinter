@@ -1,0 +1,13 @@
+{
+  "config": {},
+  "description": "FOR /F usebackq backquoted command is not a data file, even when its text contains \"file\" (issue #37)",
+  "lines": {},
+  "must_not": [
+    "W036",
+    "W037"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

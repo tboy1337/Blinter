@@ -4260,3 +4260,34 @@ class TestExitFlowW001Goto:  # pylint: disable=too-few-public-methods
         issues = _check_missing_exit_statement(lines)
         codes = {issue.rule.code for issue in issues}
         assert "W001" not in codes
+
+
+class TestFalsePositiveReports37To40:
+    """Regression tests for the false positives reported in issues #37-#40."""
+
+    @staticmethod
+    def _lint(tmp_path: Path, name: str, content: str) -> set[str]:
+        batch_file = tmp_path / name
+        batch_file.write_text(content, encoding="utf-8")
+        return {issue.rule.code for issue in lint_batch_file(str(batch_file))}
+
+    def test_w036_not_on_usebackq_command(self, tmp_path: Path) -> None:
+        """Issue #37: a backquoted usebackq operand is a command, not a data file."""
+        content = (
+            "@echo off\n"
+            'for /f "usebackq delims=" %%V in (`powershell -NoProfile -Command "1+1"`)'
+            ' do set "D=%%V"\n'
+            "exit /b 0\n"
+        )
+        assert "W036" not in self._lint(tmp_path, "test.bat", content)
+
+    def test_w036_still_on_usebackq_quoted_file(self, tmp_path: Path) -> None:
+        """Issue #37 control: a double-quoted usebackq operand is still a file."""
+        content = (
+            "@echo off\n"
+            'for /f "usebackq delims=" %%V in ("C:\\data\\input-file.txt")'
+            ' do set "D=%%V"\n'
+            "exit /b 0\n"
+        )
+        assert "W036" in self._lint(tmp_path, "test.bat", content)
+

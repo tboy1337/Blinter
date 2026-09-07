@@ -194,6 +194,11 @@ def _for_f_file_set_operand(line: str) -> str:
     operand = str(in_match.group(1)).strip()
     if operand.startswith("'") and operand.endswith("'"):
         return ""
+    if "usebackq" in lowered and operand.startswith("`") and operand.endswith("`"):
+        # Under usebackq a backquoted operand is a command to run, not a
+        # file to read, so its text (``powershell -NoProfile ...``) says
+        # nothing about data files or header rows.
+        return ""
     return operand
 
 
