@@ -205,6 +205,7 @@ entries:
   - syntax/w059-for-case-mismatch
   - syntax/w059-for-case-mismatch-block
   - syntax/w059-for-case-consistent-valid
+  - syntax/w036-for-f-command-with-parens-valid
   - syntax/w036-for-f-command-noprofile-valid
   - syntax/w036-for-f-usebackq-quoted-file
 - construct: SET /A syntax errors in FOR context

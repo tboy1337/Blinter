@@ -4442,3 +4442,34 @@ class TestExitFlowW001Goto:  # pylint: disable=too-few-public-methods
         issues = _check_missing_exit_statement(lines)
         codes = {issue.rule.code for issue in issues}
         assert "W001" not in codes
+
+
+class TestResidualFalsePositives:
+    """Edge cases of the false positives fixed in v1.1.24 (#37-#40)."""
+
+    @staticmethod
+    def _lint(tmp_path: Path, name: str, content: str) -> set[str]:
+        batch_file = tmp_path / name
+        batch_file.write_text(content, encoding="utf-8")
+        return {issue.rule.code for issue in lint_batch_file(str(batch_file))}
+
+    def test_w036_command_operand_containing_parentheses(self, tmp_path: Path) -> None:
+        """#37: the operand ends at the balancing parenthesis, not the first one."""
+        content = (
+            "@echo off\n"
+            'for /f "usebackq delims=" %%L in (`powershell -NoProfile -Command '
+            '"(Get-Item .).FullName"`) do set "D=%%L"\n'
+            "exit /b 0\n"
+        )
+        assert "W036" not in self._lint(tmp_path, "test.bat", content)
+
+    def test_w036_still_reported_for_a_quoted_data_file(self, tmp_path: Path) -> None:
+        """#37 control: a double-quoted operand is still a data file."""
+        content = (
+            "@echo off\n"
+            'for /f "usebackq delims=" %%V in ("C:\\data\\input-file.txt")'
+            ' do set "D=%%V"\n'
+            "exit /b 0\n"
+        )
+        assert "W036" in self._lint(tmp_path, "test.bat", content)
+
