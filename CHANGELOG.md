@@ -2,6 +2,23 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **W036** no longer treats a `FOR /F` `usebackq` backquoted command as a data file when its text contains `file` (e.g. `powershell -NoProfile`) (fixes [#37](https://github.com/tboy1337/Blinter/issues/37))
+- Embedded-PowerShell detection no longer classifies a batch line as PowerShell because a file name such as `set-permissions.bat` matches a cmdlet pattern; per-line rules run on it again (fixes [#38](https://github.com/tboy1337/Blinter/issues/38))
+- **S010** counts a `goto`/`call` reference anywhere on a line (`if ... goto :label`, `cmd || goto :label`), not only at its start; references inside comments do not count (fixes [#39](https://github.com/tboy1337/Blinter/issues/39))
+- **P024** and **P006** count `setlocal`/`endlocal` only where the line runs the command, so the word inside a comment or an `echo` is no longer a `SETLOCAL` (fixes [#40](https://github.com/tboy1337/Blinter/issues/40))
+
+### Added
+
+- SSOT corpus fixtures for the four cases above (`w036-for-f-usebackq-command-valid`, `embedded-hyphenated-filename-not-powershell`, `s010-goto-after-if-valid`, `p024-setlocal-in-comment-valid`)
+
+### Changed
+
+- Spec docs, Architecture, and funding metadata match the 230-case corpus
+
 ## [1.1.23] - 2026-09-07
 
 ### Changed
