@@ -111,8 +111,9 @@ def build_nuitka_command(
         f"--include-package={ENTRY_MODULE}",
         f"--include-package-data={ENTRY_MODULE}",
         "--include-module=charset_normalizer",
-        "--include-data-files=pyproject.toml=pyproject.toml",
+        f"--include-data-files=pyproject.toml={ENTRY_MODULE}/pyproject.toml",
         "--python-flag=-m",
+        "--file-reference-choice=runtime",
     ]
     if windows:
         if mingw:

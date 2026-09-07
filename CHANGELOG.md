@@ -8,6 +8,10 @@ All notable changes to Blinter are documented in this file. Release tags follow 
 
 - Windows standalone `blinter.exe` is now built with Nuitka (`scripts/build_exe.py`) instead of PyInstaller
 
+### Fixed
+
+- Frozen `blinter.exe --version` reads the bundled `pyproject.toml` from the Nuitka extract layout
+
 ## [1.1.21] - 2026-08-31
 
 ### Changed

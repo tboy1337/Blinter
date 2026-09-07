@@ -64,7 +64,7 @@ try {
             throw "exit $($result.ExitCode): $($result.Output)"
         }
         if ($result.Output -notmatch [regex]::Escape($ExpectedVersion)) {
-            throw "expected version $ExpectedVersion in output"
+            throw "expected version $ExpectedVersion in output, got: $($result.Output)"
         }
         Test-NoRuntimeCrash -Output $result.Output
     }

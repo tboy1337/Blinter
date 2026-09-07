@@ -84,22 +84,37 @@ class TestVersion:
         mocker.patch("blinter._version._pyproject_path", return_value=pyproject)
         assert _fallback_version() == "unknown"
 
-    def test_pyproject_path_uses_compiled_layout_when_frozen(
+    def test_pyproject_path_uses_package_dir_when_frozen(
         self, mocker: MockerFixture, tmp_path: Path
     ) -> None:
-        """Test frozen executables resolve version from bundled pyproject.toml."""
-        bundled = tmp_path / "pyproject.toml"
-        bundled.write_text('[project]\nversion = "9.9.9"\n', encoding="utf-8")
+        """Test frozen executables resolve version next to the compiled package."""
         package_dir = tmp_path / "blinter"
         package_dir.mkdir()
+        bundled = package_dir / "pyproject.toml"
+        bundled.write_text('[project]\nversion = "9.9.9"\n', encoding="utf-8")
         version_module = package_dir / "_version.py"
         version_module.write_text("# test fixture\n", encoding="utf-8")
-        mocker.patch("blinter._version.sys.frozen", True, create=True)
+        mocker.patch("blinter._version._is_compiled", return_value=True)
         mocker.patch("blinter._version.__file__", str(version_module))
         assert _pyproject_path() == bundled
         assert get_version() == "9.9.9"
 
-    def test_pyproject_path_frozen_missing_bundle_stays_in_extract_dir(
+    def test_pyproject_path_frozen_falls_back_to_extract_root(
+        self, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """Test frozen lookup uses extract-root pyproject.toml when not in the package."""
+        bundled = tmp_path / "pyproject.toml"
+        bundled.write_text('[project]\nversion = "8.8.8"\n', encoding="utf-8")
+        package_dir = tmp_path / "blinter"
+        package_dir.mkdir()
+        version_module = package_dir / "_version.py"
+        version_module.write_text("# test fixture\n", encoding="utf-8")
+        mocker.patch("blinter._version._is_compiled", return_value=True)
+        mocker.patch("blinter._version.__file__", str(version_module))
+        assert _pyproject_path() == bundled
+        assert get_version() == "8.8.8"
+
+    def test_pyproject_path_frozen_missing_bundle_stays_in_package_dir(
         self, mocker: MockerFixture, tmp_path: Path
     ) -> None:
         """Test frozen lookup does not walk out of the Nuitka extract directory."""
@@ -107,9 +122,9 @@ class TestVersion:
         package_dir.mkdir()
         version_module = package_dir / "_version.py"
         version_module.write_text("# test fixture\n", encoding="utf-8")
-        mocker.patch("blinter._version.sys.frozen", True, create=True)
+        mocker.patch("blinter._version._is_compiled", return_value=True)
         mocker.patch("blinter._version.__file__", str(version_module))
-        bundled = tmp_path / "pyproject.toml"
+        bundled = package_dir / "pyproject.toml"
         assert _pyproject_path() == bundled
         assert not bundled.is_file()
         assert _fallback_version() == "unknown"
@@ -170,8 +185,9 @@ class TestBuildExe:
         assert "--include-package=blinter" in command
         assert "--include-package-data=blinter" in command
         assert "--include-module=charset_normalizer" in command
-        assert "--include-data-files=pyproject.toml=pyproject.toml" in command
+        assert "--include-data-files=pyproject.toml=blinter/pyproject.toml" in command
         assert "--python-flag=-m" in command
+        assert "--file-reference-choice=runtime" in command
         assert f"--windows-icon-from-ico={ICON_PATH.as_posix()}" in command
         assert f"--company-name={COMPANY_NAME}" in command
         assert f"--product-name={PRODUCT_NAME}" in command
