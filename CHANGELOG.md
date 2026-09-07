@@ -2,6 +2,23 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **W036**/**W037**: a backquoted `FOR /F` command carrying its own parentheses (for example `(Invoke-WebRequest ...).Headers`) is read to the balancing parenthesis, so it is no longer mistaken for a data file (follow-up to [#37](https://github.com/tboy1337/Blinter/issues/37))
+- Cmdlet-shaped file names are no longer read as embedded PowerShell in two further forms: a drive-relative `C:Set-Permissions`, and `ForEach-Object.bat`, whose pattern carried none of the boundaries the other cmdlet patterns gained in 1.1.25 (follow-up to [#38](https://github.com/tboy1337/Blinter/issues/38))
+- **S010**: a `REM` or `ECHO` segment after a command separator, as in `echo done & rem call :label`, no longer counts as a label reference (follow-up to [#39](https://github.com/tboy1337/Blinter/issues/39))
+- **P024**/**P006**/**P003**: a command after an `IF` predicate or a separator, as in `if defined FLAG setlocal`, is a command the line runs, so `SETLOCAL`/`ENDLOCAL` are no longer undercounted (follow-up to [#40](https://github.com/tboy1337/Blinter/issues/40))
+
+### Added
+
+- SSOT corpus fixtures for the four cases above
+
+### Changed
+
+- Spec docs, Architecture, and funding metadata match the 235-case corpus
+
 ## [1.1.25] - 2026-09-07
 
 ### Fixed

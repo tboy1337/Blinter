@@ -4,16 +4,18 @@
 
 _None_
 
-## WARNING (20)
+## WARNING (22)
 
 - **[reference-matrix]** Nested parentheses and block structure: corpus syntax/e001-for-f-in-quoted-valid does not assert any of ['E001']
 - **[reference-matrix]** Unreachable code after EXIT/GOTO: corpus integration/e008-exit-in-conditional-block-valid does not assert any of ['E008']
+- **[reference-matrix]** FOR loop syntax and variable forms: corpus syntax/w036-for-f-command-with-parens-valid does not assert any of ['E010', 'E020', 'E040', 'W036', 'W038', 'W059']
 - **[reference-matrix]** Percent-tilde (%~) parameter expansion: corpus syntax/e019-set-a-percent-tilde-params-valid does not assert any of ['E017', 'E019', 'E024', 'E025', 'W051']
 - **[reference-matrix]** Percent-tilde (%~) parameter expansion: corpus syntax/e019-for-loop-tilde-z-valid does not assert any of ['E017', 'E019', 'E024', 'E025', 'W051']
 - **[reference-matrix]** Percent-tilde (%~) parameter expansion: corpus syntax/e019-percent-tilde-dp0-adjacent-valid does not assert any of ['E017', 'E019', 'E024', 'E025', 'W051']
 - **[reference-matrix]** Percent-tilde (%~) parameter expansion: corpus syntax/e019-for-metavar-bare-tilde-valid does not assert any of ['E017', 'E019', 'E024', 'E025', 'W051']
 - **[reference-matrix]** Percent-tilde (%~) parameter expansion: corpus syntax/e019-for-metavar-adjacent-literal-valid does not assert any of ['E017', 'E019', 'E024', 'E025', 'W051']
 - **[reference-matrix]** SETLOCAL/ENDLOCAL pairing and nesting limit: corpus integration/p006-subroutine-exit-valid does not assert any of ['P005', 'P006', 'P027']
+- **[reference-matrix]** SETLOCAL/ENDLOCAL pairing and nesting limit: corpus integration/p024-conditional-setlocal does not assert any of ['P005', 'P006', 'P027']
 - **[reference-matrix]** FOR loop and I/O performance anti-patterns: corpus syntax/w048-for-f-csv does not assert any of ['P009', 'P010', 'P013', 'P014', 'P015', 'P016', 'P018', 'P019', 'P020', 'P021', 'P022', 'P023', 'P025']
 - **[reference-matrix]** Compatibility, portability, and environment warnings: corpus syntax/w014-setp-from-file-valid does not assert any of ['W002', 'W003', 'W004', 'W005', 'W006', 'W007', 'W008', 'W009', 'W010', 'W011', 'W012', 'W014', 'W020', 'W026', 'W027', 'W028', 'W030', 'W031', 'W032', 'W033', 'W042', 'W043', 'W060']
 - **[reference-matrix]** Compatibility, portability, and environment warnings: corpus syntax/w048-for-f-csv does not assert any of ['W002', 'W003', 'W004', 'W005', 'W006', 'W007', 'W008', 'W009', 'W010', 'W011', 'W012', 'W014', 'W020', 'W026', 'W027', 'W028', 'W030', 'W031', 'W032', 'W033', 'W042', 'W043', 'W060']
