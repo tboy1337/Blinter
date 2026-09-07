@@ -21,6 +21,7 @@ from scripts.build_exe import (
     PACKAGE_DIR,
     PRODUCT_NAME,
     TYPED_MARKER,
+    _is_windows,
     _read_project_version,
     _validate_inputs,
     build_nuitka_command,
@@ -260,17 +261,35 @@ class TestBuildExe:
         mocker.patch("scripts.build_exe.ROOT", tmp_path)
         assert main([]) == 2
 
+    def test_is_windows_matches_os_name(self) -> None:
+        """Platform detection must follow os.name without mutating the process."""
+        assert _is_windows() is (os.name == "nt")
+
     def test_main_invokes_nuitka_with_mingw_flag(self, mocker: MockerFixture) -> None:
         """--mingw must reach the Nuitka command line."""
         repo_root = Path(__file__).resolve().parent.parent
         mocker.patch("scripts.build_exe.ROOT", repo_root)
-        mocker.patch("scripts.build_exe.os.name", "nt")
+        mocker.patch("scripts.build_exe._is_windows", return_value=True)
         run = mocker.patch("scripts.build_exe.run_nuitka", return_value=0)
         assert main(["--mingw"]) == 0
         command = run.call_args[0][0]
         assert "--mingw64" in command
         assert "--experimental=force-mingw64" in command
         assert run.call_args[0][1] == repo_root
+
+    def test_main_omits_windows_flags_when_not_windows(
+        self, mocker: MockerFixture
+    ) -> None:
+        """POSIX hosts must not receive MSVC or MinGW flags even with --mingw."""
+        repo_root = Path(__file__).resolve().parent.parent
+        mocker.patch("scripts.build_exe.ROOT", repo_root)
+        mocker.patch("scripts.build_exe._is_windows", return_value=False)
+        run = mocker.patch("scripts.build_exe.run_nuitka", return_value=0)
+        assert main(["--mingw"]) == 0
+        command = run.call_args[0][0]
+        assert "--mingw64" not in command
+        assert "--msvc=latest" not in command
+        assert not any(part.startswith("--windows-icon-from-ico=") for part in command)
 
     def test_main_reports_launch_failures(self, mocker: MockerFixture) -> None:
         """OS errors starting Nuitka should return exit code 1."""

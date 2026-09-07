@@ -72,6 +72,13 @@ def _validate_inputs(repo_root: Path) -> Path:
     return pyproject_path
 
 
+def _is_windows() -> bool:
+    """Return True when this process is running on native Windows."""
+    windows = os.name == "nt"
+    logger.debug("Detected os.name=%s (windows=%s)", os.name, windows)
+    return windows
+
+
 def nuitka_environment(repo_root: Path) -> dict[str, str]:
     """Return env vars so Nuitka can import the src/ layout package."""
     env = os.environ.copy()
@@ -180,7 +187,7 @@ def main(argv: list[str] | None = None) -> int:
         logger.error("%s", exc)
         return 2
 
-    windows = os.name == "nt"
+    windows = _is_windows()
     if not windows:
         logger.warning(
             "This script targets Windows onefile builds; "
