@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "A label reached by if ... goto or cmd || goto is referenced, not dead code (issue #39)",
+  "lines": {},
+  "must_not": [
+    "S010"
+  ],
+  "rules": [],
+  "tags": [
+    "integration"
+  ]
+}

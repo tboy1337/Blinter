@@ -68,6 +68,10 @@ def _check_global_style_rules(lines: List[str], file_path: str) -> List[LintIssu
     return issues
 
 
+_GOTO_REFERENCE_RE = re.compile(r"\bgoto\s+:?([a-zA-Z_][\w]*)")
+_CALL_REFERENCE_RE = re.compile(r"\bcall\s+:([a-zA-Z_][\w]*)")
+
+
 def _check_unused_labels(lines: List[str]) -> List[LintIssue]:
     """Check for labels that are never referenced by GOTO or CALL (S010)."""
     issues: List[LintIssue] = []
@@ -82,14 +86,14 @@ def _check_unused_labels(lines: List[str]) -> List[LintIssue]:
             continue
 
         lowered = stripped.lower()
-        goto_match = re.match(r"goto\s+(:?)([a-zA-Z_][\w]*)", lowered)
-        if goto_match:
-            referenced.add(str(goto_match.group(2)).lower())
+        if _is_comment_line(lowered):
             continue
-
-        call_match = re.match(r"call\s+(:)([a-zA-Z_][\w]*)", lowered)
-        if call_match:
-            referenced.add(str(call_match.group(2)).lower())
+        # A reference need not begin the line: ``if ... goto :x`` and
+        # ``cmd || goto :x`` are the ordinary forms, so scan the whole line.
+        for goto_match in _GOTO_REFERENCE_RE.finditer(lowered):
+            referenced.add(str(goto_match.group(1)).lower())
+        for call_match in _CALL_REFERENCE_RE.finditer(lowered):
+            referenced.add(str(call_match.group(1)).lower())
 
     for label_name, line_num in labels.items():
         if label_name not in referenced:

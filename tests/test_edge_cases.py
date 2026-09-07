@@ -4324,3 +4324,43 @@ class TestFalsePositiveReports37To40:
         lines = ["@echo off", ":psblock", "Get-ChildItem C:\\", "Set-Location C:\\"]
         assert {3, 4} <= _detect_embedded_script_blocks(lines)
 
+    def test_s010_goto_after_if_is_a_reference(self) -> None:
+        """Issue #39: ``if ... goto :label`` references the label."""
+        lines = [
+            "@echo off",
+            'if "%~1"=="" goto :from_if',
+            "dir || goto :from_or",
+            "goto :from_bare",
+            ":from_if",
+            "exit /b 0",
+            ":from_or",
+            "exit /b 0",
+            ":from_bare",
+            "exit /b 0",
+        ]
+        issues = _check_global_style_rules(lines, "test.cmd")
+        assert not [issue for issue in issues if issue.rule.code == "S010"]
+
+    def test_s010_call_after_if_is_a_reference(self) -> None:
+        """Issue #39: ``if ... call :label`` references the label."""
+        lines = [
+            "@echo off",
+            'if "%~1"=="" call :helper',
+            "exit /b 0",
+            ":helper",
+            "exit /b 0",
+        ]
+        issues = _check_global_style_rules(lines, "test.cmd")
+        assert not [issue for issue in issues if issue.rule.code == "S010"]
+
+    def test_s010_reference_in_comment_does_not_count(self) -> None:
+        """Issue #39 control: a comment naming the label is not a reference."""
+        lines = [
+            "@echo off",
+            "REM see goto :unused for details",
+            ":unused",
+            "exit /b 0",
+        ]
+        issues = _check_global_style_rules(lines, "test.cmd")
+        assert len([issue for issue in issues if issue.rule.code == "S010"]) == 1
+

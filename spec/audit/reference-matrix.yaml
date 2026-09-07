@@ -233,6 +233,7 @@ entries:
   - W057
   corpus:
   - syntax/e012-missing-call
+  - integration/s010-goto-after-if-valid
   - syntax/e014-call-missing-colon
   - syntax/e015-goto-eof-missing-colon
   - integration/sec016-restart-no-limit
