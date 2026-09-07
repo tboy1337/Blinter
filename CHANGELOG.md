@@ -2,6 +2,20 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.26] - 2026-09-07
+
+### Fixed
+
+- **W036** reads a FOR /F command operand to the parenthesis that balances `IN (`, so nested `(` inside a backquoted command is not treated as a file ([#37](https://github.com/tboy1337/Blinter/issues/37), [#42](https://github.com/tboy1337/Blinter/pull/42))
+- Drive-relative names such as `C:Set-Permissions` and `ForEach-Object.bat` are no longer classified as embedded PowerShell ([#38](https://github.com/tboy1337/Blinter/issues/38), [#42](https://github.com/tboy1337/Blinter/pull/42))
+- **S010** ignores `CALL`/`GOTO` inside an inline `REM` or `ECHO` segment after `&` ([#39](https://github.com/tboy1337/Blinter/issues/39), [#42](https://github.com/tboy1337/Blinter/pull/42))
+- **P024**/**P006** count `SETLOCAL`/`ENDLOCAL` after an `IF` predicate or `&` ([#40](https://github.com/tboy1337/Blinter/issues/40), [#42](https://github.com/tboy1337/Blinter/pull/42))
+
+### Changed
+
+- Pinned batch-spec language SSOT to v0.70.1 (FOR /F usebackq backtick commands keep nested parentheses as data)
+- Spec docs, Architecture, and funding metadata match the 235-case corpus
+
 ## [1.1.25] - 2026-09-07
 
 ### Fixed

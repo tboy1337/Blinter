@@ -94,6 +94,7 @@ _MATRIX_CORPUS_RULE_ALLOWLIST: frozenset[str] = frozenset(
         "syntax/p024-p006-setlocal-in-comment-valid",
         "syntax/s010-if-goto-call-valid",
         "syntax/w036-for-f-command-noprofile-valid",
+        "syntax/w036-for-f-command-with-parens-valid",
         "syntax/exit-shift-smoke-valid",
         "syntax/if-defined-var",
         "syntax/if-else-block",
