@@ -1,0 +1,18 @@
+{
+  "config": {},
+  "description": "A hyphenated file name such as set-permissions.bat does not make a batch line embedded PowerShell; per-line rules still run on it (issue #38)",
+  "lines": {
+    "2": [
+      "W005",
+      "SEC006"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W005",
+    "SEC006"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

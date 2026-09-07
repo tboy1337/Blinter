@@ -375,10 +375,12 @@ POWERSHELL_PATTERNS: List[str] = [
     r"-le\s+",
     r"-gt\s+",
     r"-lt\s+",
-    r"Get-\w+",
-    r"Set-\w+",
-    r"Write-\w+",
-    r"New-\w+",
+    # A cmdlet name stands alone: not inside a path (``\set-permissions``)
+    # and not a hyphenated file name (``set-permissions.bat``).
+    r"(?<![\w\\/.-])Get-[A-Za-z]+(?![\w.\\/-])",
+    r"(?<![\w\\/.-])Set-[A-Za-z]+(?![\w.\\/-])",
+    r"(?<![\w\\/.-])Write-[A-Za-z]+(?![\w.\\/-])",
+    r"(?<![\w\\/.-])New-[A-Za-z]+(?![\w.\\/-])",
     r"foreach\s*\(",
     r"ForEach-Object",
     r"\|\s*%\s*{",

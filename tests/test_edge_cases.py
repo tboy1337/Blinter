@@ -4291,3 +4291,36 @@ class TestFalsePositiveReports37To40:
         )
         assert "W036" in self._lint(tmp_path, "test.bat", content)
 
+    def test_hyphenated_filename_is_not_embedded_powershell(self) -> None:
+        """Issue #38: ``set-permissions.bat`` is a file name, not a cmdlet."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        for line in (
+            "if %choice%==7 set X=C:\\Windows\\set-permissions.bat",
+            "call set-permissions.bat",
+            'if "%choice%"=="7" set "SCRIPT=scripts\\get-status.bat"',
+        ):
+            assert not _detect_embedded_script_blocks(["@echo off", line]), line
+
+    def test_hyphenated_filename_keeps_per_line_rules(self, tmp_path: Path) -> None:
+        """Issue #38: the line keeps the findings its twin without the hyphen has."""
+        hyphen = self._lint(
+            tmp_path,
+            "a.bat",
+            "@echo off\nif %choice%==7 set X=C:\\Windows\\set-permissions.bat\nexit /b 0\n",
+        )
+        plain = self._lint(
+            tmp_path,
+            "b.bat",
+            "@echo off\nif %choice%==7 set X=C:\\Windows\\setpermissions.bat\nexit /b 0\n",
+        )
+        assert hyphen == plain
+        assert {"W005", "SEC006"} <= hyphen
+
+    def test_real_cmdlets_still_detected(self) -> None:
+        """Issue #38 control: cmdlets standing alone are still PowerShell."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = ["@echo off", ":psblock", "Get-ChildItem C:\\", "Set-Location C:\\"]
+        assert {3, 4} <= _detect_embedded_script_blocks(lines)
+
