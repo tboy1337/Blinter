@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "A SETLOCAL after an IF predicate is a SETLOCAL the line runs, so P024 counts it (follow-up to #40)",
+  "lines": {
+    "8": [
+      "P024"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "P024"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

@@ -235,6 +235,7 @@ entries:
   - W057
   corpus:
   - syntax/e012-missing-call
+  - integration/s010-inline-rem-not-a-reference
   - syntax/e014-call-missing-colon
   - syntax/e015-goto-eof-missing-colon
   - integration/w013-duplicate-label
@@ -427,6 +428,7 @@ entries:
   - integration/p006-missing-endlocal
   - integration/p006-subroutine-exit-valid
   - integration/p027-setlocal-nesting
+  - integration/p024-conditional-setlocal
   - syntax/p024-p006-setlocal-in-comment-valid
 - construct: Temporary files, randomness, and predictable paths
   sources:
@@ -497,6 +499,7 @@ entries:
   - integration/p002-code-duplication
   - integration/p017-repeated-exist
   - integration/p027-setlocal-nesting
+  - integration/p024-conditional-setlocal
   - syntax/p024-p006-setlocal-in-comment-valid
 - construct: Global style conventions and readability
   sources:

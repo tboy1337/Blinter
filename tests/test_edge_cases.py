@@ -4506,3 +4506,55 @@ class TestResidualFalsePositives:
         )
         assert hyphen == plain
 
+    def test_inline_rem_segment_is_not_a_label_reference(self) -> None:
+        """#39: ``echo done & rem call :x`` executes no CALL."""
+        lines = [
+            "@echo off",
+            "echo done & rem call :unused",
+            "echo goto :unused",
+            "exit /b 0",
+            ":unused",
+            "exit /b 0",
+        ]
+        issues = _check_global_style_rules(lines, "test.cmd")
+        assert len([issue for issue in issues if issue.rule.code == "S010"]) == 1
+
+    def test_reference_after_a_separator_still_counts(self) -> None:
+        """#39 control: a jump in a later segment is a reference."""
+        lines = [
+            "@echo off",
+            "echo hi & goto :used",
+            'if "%~1"=="" goto :used',
+            ":used",
+            "exit /b 0",
+        ]
+        issues = _check_global_style_rules(lines, "test.cmd")
+        assert not [issue for issue in issues if issue.rule.code == "S010"]
+
+    def test_setlocal_after_an_if_predicate_is_counted(self) -> None:
+        """#40: ``if defined FLAG setlocal`` runs a SETLOCAL."""
+        from blinter.parsing.context import _is_endlocal_command, _is_setlocal_command
+
+        assert _is_setlocal_command("if defined FLAG setlocal")
+        assert _is_setlocal_command("echo step & setlocal")
+        assert _is_setlocal_command('if /i "%a%"=="b" setlocal enabledelayedexpansion')
+        assert _is_endlocal_command("if not exist out.txt endlocal")
+        assert not _is_setlocal_command("REM a bare setlocal inherits caller state")
+        assert not _is_setlocal_command("echo run setlocal first")
+
+    def test_conditional_setlocal_counts_toward_p024(self) -> None:
+        """#40: a conditional second SETLOCAL is no longer undercounted."""
+        lines = [
+            "@echo off",
+            "setlocal",
+            "echo s1",
+            "echo s2",
+            "echo s3",
+            "echo s4",
+            "echo s5",
+            "if defined FLAG setlocal",
+        ]
+        issues = _check_new_global_rules(lines, "test.bat")
+        p024 = [issue for issue in issues if issue.rule.code == "P024"]
+        assert len(p024) == 1
+        assert p024[0].line_number == 8
