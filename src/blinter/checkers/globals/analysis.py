@@ -16,7 +16,14 @@ from blinter.checkers.globals.for_scope import (
 )
 from blinter.constants import LARGE_FILE_LINE_THRESHOLD
 from blinter.models import LintIssue
-from blinter.parsing.context import _is_comment_line
+from blinter.parsing.context import (
+    _call_subroutine_label_names,
+    _goto_and_call_label_names,
+    _is_comment_line,
+    _is_endlocal_command,
+    _is_setlocal_command,
+    _iter_goto_label_refs,
+)
 from blinter.rules.helpers import _add_issue
 from blinter.rules.registry import RULES
 
@@ -81,15 +88,7 @@ def _check_unused_labels(lines: List[str]) -> List[LintIssue]:
             labels[str(label_match.group(1)).lower()] = i
             continue
 
-        lowered = stripped.lower()
-        goto_match = re.match(r"goto\s+(:?)([a-zA-Z_][\w]*)", lowered)
-        if goto_match:
-            referenced.add(str(goto_match.group(2)).lower())
-            continue
-
-        call_match = re.match(r"call\s+(:)([a-zA-Z_][\w]*)", lowered)
-        if call_match:
-            referenced.add(str(call_match.group(2)).lower())
+        referenced.update(_goto_and_call_label_names(line))
 
     for label_name, line_num in labels.items():
         if label_name not in referenced:
@@ -114,16 +113,14 @@ def _check_goto_colon_consistency(  # pylint: disable=too-many-locals
 
     # Collect all GOTO statements (excluding GOTO :EOF which has special rules)
     for i, line in enumerate(lines, start=1):
-        stripped = line.strip().lower()
-        goto_match = re.match(r"goto\s+(:?\S+)", stripped, re.IGNORECASE)
-        if goto_match:
-            label_text: str = goto_match.group(1).lower()
-            # Skip GOTO :EOF and GOTO EOF as they have special handling
-            if label_text not in [":eof", "eof"]:
-                # Skip dynamic labels (containing variables)
-                if not re.search(r"%[^%]+%|!\w+!", label_text):
-                    uses_colon: bool = label_text.startswith(":")
-                    goto_statements.append((i, label_text, uses_colon))
+        for label_text_raw, _name in _iter_goto_label_refs(line):
+            label_text = label_text_raw.lower()
+            if label_text in {":eof", "eof"}:
+                continue
+            if re.search(r"%[^%]+%|!\w+!", label_text):
+                continue
+            uses_colon = label_text.startswith(":")
+            goto_statements.append((i, label_text, uses_colon))
 
     if len(goto_statements) < 2:
         # Need at least 2 GOTO statements to check consistency
@@ -616,21 +613,27 @@ def _check_var_naming(lines: List[str]) -> List[LintIssue]:
 def _check_setlocal_redundancy(lines: List[str]) -> List[LintIssue]:
     """Check for redundant SETLOCAL/ENDLOCAL pairs."""
     issues: List[LintIssue] = []
-    setlocal_count = sum(1 for line in lines if "setlocal" in line.lower())
-    endlocal_count = sum(1 for line in lines if "endlocal" in line.lower())
+    setlocal_lines = [
+        index for index, line in enumerate(lines, start=1) if _is_setlocal_command(line)
+    ]
+    endlocal_lines = [
+        index for index, line in enumerate(lines, start=1) if _is_endlocal_command(line)
+    ]
 
-    if setlocal_count > 1 or endlocal_count > 1:
-        for i, line in enumerate(lines, start=1):
-            if "setlocal" in line.lower() and i > 5:  # Not at beginning
-                issues.append(
-                    LintIssue(
-                        line_number=i,
-                        rule=RULES["P024"],
-                        context="Multiple SETLOCAL commands create unnecessary overhead",
-                    )
-                )
-                break
+    if len(setlocal_lines) > 1:
+        line_number = setlocal_lines[1]
+    elif len(endlocal_lines) > 1:
+        line_number = endlocal_lines[1]
+    else:
+        return issues
 
+    issues.append(
+        LintIssue(
+            line_number=line_number,
+            rule=RULES["P024"],
+            context="Multiple SETLOCAL commands create unnecessary overhead",
+        )
+    )
     return issues
 
 
@@ -722,32 +725,29 @@ def _check_infinite_loop_warnings(lines: List[str]) -> List[LintIssue]:
     label_lines = _collect_label_line_numbers(lines)
 
     for i, line in enumerate(lines, start=1):
-        stripped = line.strip().lower()
-        goto_match = re.match(r"goto\s+:?([a-zA-Z_][a-zA-Z0-9_]*)\b", stripped)
-        if not goto_match:
-            continue
-        target = str(goto_match.group(1)).lower()
-        target_line = label_lines.get(target)
-        if target_line is None:
-            continue
-        # Forward jumps to exit handlers are not loops; only backward jumps are.
-        if target_line >= i:
-            continue
-        context_lines = lines[max(0, i - 5) : min(len(lines), i + 5)]
-        has_exit_guard = any(
-            "set /a" in ctx.lower() or "counter" in ctx.lower() for ctx in context_lines
-        )
-        if not has_exit_guard:
-            issues.append(
-                LintIssue(
-                    line_number=i,
-                    rule=RULES["W004"],
-                    context=(
-                        f"GOTO :{target} may create an infinite loop "
-                        "without exit condition"
-                    ),
-                )
+        for _raw, target in _iter_goto_label_refs(line):
+            target_line = label_lines.get(target)
+            if target_line is None:
+                continue
+            # Forward jumps to exit handlers are not loops; only backward jumps are.
+            if target_line >= i:
+                continue
+            context_lines = lines[max(0, i - 5) : min(len(lines), i + 5)]
+            has_exit_guard = any(
+                "set /a" in ctx.lower() or "counter" in ctx.lower()
+                for ctx in context_lines
             )
+            if not has_exit_guard:
+                issues.append(
+                    LintIssue(
+                        line_number=i,
+                        rule=RULES["W004"],
+                        context=(
+                            f"GOTO :{target} may create an infinite loop "
+                            "without exit condition"
+                        ),
+                    )
+                )
 
     return issues
 
@@ -787,10 +787,7 @@ def _collect_call_subroutine_labels(lines: List[str]) -> set[str]:
     """Return label names invoked via CALL :label."""
     call_labels: set[str] = set()
     for line in lines:
-        for match in re.finditer(
-            r"\bcall\s+:([a-zA-Z_][a-zA-Z0-9_]*)\b", line, re.IGNORECASE
-        ):
-            call_labels.add(str(match.group(1)).lower())
+        call_labels.update(_call_subroutine_label_names(line))
     return call_labels
 
 
@@ -813,9 +810,9 @@ def _check_endlocal_before_exit(lines: List[str]) -> List[LintIssue]:
 
     for i, line in enumerate(lines, start=1):
         stripped = line.strip().lower()
-        if "setlocal" in stripped:
+        if _is_setlocal_command(line):
             setlocal_depth += 1
-        if "endlocal" in stripped and setlocal_depth > 0:
+        if _is_endlocal_command(line) and setlocal_depth > 0:
             setlocal_depth -= 1
         if not re.match(r"exit\b", stripped) or setlocal_depth <= 0:
             continue

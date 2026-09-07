@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "FOR /F usebackq backtick command with -NoProfile is not a data file (W036)",
+  "lines": {},
+  "must_not": [
+    "W036"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

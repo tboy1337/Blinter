@@ -3,7 +3,6 @@
   "description": "forward goto exit handler",
   "lines": {
     "4": [
-      "S010",
       "S018",
       "S027"
     ]
@@ -12,7 +11,6 @@
     "W004"
   ],
   "rules": [
-    "S010",
     "S018",
     "S027"
   ],

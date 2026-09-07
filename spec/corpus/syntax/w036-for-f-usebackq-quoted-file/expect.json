@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "FOR /F usebackq single-quoted filename still needs skip= for headers (W036)",
+  "lines": {
+    "2": [
+      "W035",
+      "W036",
+      "W037"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W035",
+    "W036",
+    "W037"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

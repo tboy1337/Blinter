@@ -3,6 +3,7 @@
 import re
 from typing import List
 
+from blinter.logging_config import logger
 from blinter.models import LintIssue
 from blinter.rules.expansion_data import VALID_MODIFIERS
 from blinter.rules.helpers import PERCENT_TILDE_TOKEN_RE, strip_for_metavar_tilde_tokens
@@ -183,8 +184,19 @@ def _check_for_f_token_overflow(
     return issues
 
 
+def _for_f_uses_usebackq(line: str) -> bool:
+    """Return True when FOR /F options include usebackq (or the useback synonym)."""
+    lowered = line.lower()
+    return "usebackq" in lowered or "useback" in lowered
+
+
 def _for_f_file_set_operand(line: str) -> str:
-    """Return the FOR /F IN (...) operand text, excluding backtick command forms."""
+    """Return the FOR /F IN (...) operand text when it names a data file.
+
+    Backtick-quoted operands are commands (with usebackq) or invalid command
+    forms (without it), never files. Without usebackq, a single-quoted operand
+    is a command. With usebackq, single-quoted operands are filenames.
+    """
     lowered = line.lower()
     if "/f" not in lowered:
         return ""
@@ -192,7 +204,23 @@ def _for_f_file_set_operand(line: str) -> str:
     if not in_match:
         return ""
     operand = str(in_match.group(1)).strip()
-    if operand.startswith("'") and operand.endswith("'"):
+    if not operand:
+        return ""
+    if operand.startswith("`") and operand.endswith("`"):
+        logger.debug(
+            "FOR /F operand is backtick-quoted command, skipping file checks: %s",
+            operand,
+        )
+        return ""
+    if (
+        not _for_f_uses_usebackq(line)
+        and operand.startswith("'")
+        and operand.endswith("'")
+    ):
+        logger.debug(
+            "FOR /F operand is single-quoted command, skipping file checks: %s",
+            operand,
+        )
         return ""
     return operand
 

@@ -1,11 +1,15 @@
 """Comment detection and safe-context helpers for checkers."""
 
 import re
-from typing import cast
+from typing import Iterator, cast
 
+from blinter.logging_config import logger
 from blinter.patterns import (
     _DANGEROUS_CMDS_REGEX,
 )
+
+_GOTO_LABEL_RE = re.compile(r"\bgoto\s+(:?)([a-zA-Z_][\w]*)", re.IGNORECASE)
+_CALL_LABEL_RE = re.compile(r"\bcall\s+:([a-zA-Z_][\w]*)", re.IGNORECASE)
 
 
 def _is_comment_line(line: str) -> bool:
@@ -35,6 +39,92 @@ def _is_comment_or_label(line: str) -> bool:
 def _is_echo_statement(stripped: str) -> bool:
     """Return True when the line is an ECHO output statement."""
     return stripped.startswith(("echo ", "echo\t", "@echo ", "@echo\t"))
+
+
+def _command_body(line: str) -> str:
+    """Return command text after whitespace and a leading @, or empty for comments."""
+    if _is_comment_line(line):
+        return ""
+    stripped = line.strip()
+    if stripped.startswith("@"):
+        stripped = stripped[1:].lstrip()
+    return stripped
+
+
+def _first_command_token(line: str) -> str:
+    """Return the first command token, ignoring comments and a leading @."""
+    body = _command_body(line)
+    if not body:
+        return ""
+    return body.split()[0].lower()
+
+
+def _is_setlocal_command(line: str) -> bool:
+    """Return True when the line's command token is SETLOCAL."""
+    if _is_comment_line(line) and "setlocal" in line.lower():
+        logger.debug("Ignoring SETLOCAL mention in comment: %s", line.strip())
+        return False
+    return _first_command_token(line) == "setlocal"
+
+
+def _is_endlocal_command(line: str) -> bool:
+    """Return True when the line's command token is ENDLOCAL."""
+    if _is_comment_line(line) and "endlocal" in line.lower():
+        logger.debug("Ignoring ENDLOCAL mention in comment: %s", line.strip())
+        return False
+    return _first_command_token(line) == "endlocal"
+
+
+def _executable_jump_text(line: str) -> str:
+    """Return the executable portion of a line for GOTO/CALL reference scans.
+
+    Full-line comments are excluded. ECHO output is excluded unless a command
+    separator (``&``, ``&&``, ``||``) starts a later command such as
+    ``echo x || goto :label``.
+    """
+    if _is_comment_line(line):
+        return ""
+    body = _command_body(line)
+    lowered = body.lower()
+    if lowered.startswith(("echo ", "echo\t")):
+        separator = re.search(r"&&|\|\||&", body)
+        if separator is None:
+            logger.debug(
+                "Ignoring GOTO/CALL mention inside echo output: %s", line.strip()
+            )
+            return ""
+        return body[separator.end() :]
+    return body
+
+
+def _iter_goto_label_refs(line: str) -> Iterator[tuple[str, str]]:
+    """Yield (raw_target, label_name) for executable GOTO destinations."""
+    text = _executable_jump_text(line)
+    if not text:
+        return
+    for match in _GOTO_LABEL_RE.finditer(text):
+        colon = str(match.group(1) or "")
+        name = str(match.group(2))
+        yield colon + name, name.lower()
+
+
+def _goto_and_call_label_names(line: str) -> set[str]:
+    """Return label names referenced by GOTO or CALL :label on an executable line."""
+    text = _executable_jump_text(line)
+    if not text:
+        return set()
+    names = {name for _raw, name in _iter_goto_label_refs(line)}
+    for match in _CALL_LABEL_RE.finditer(text):
+        names.add(str(match.group(1)).lower())
+    return names
+
+
+def _call_subroutine_label_names(line: str) -> set[str]:
+    """Return label names invoked via CALL :label on an executable line."""
+    text = _executable_jump_text(line)
+    if not text:
+        return set()
+    return {str(match.group(1)).lower() for match in _CALL_LABEL_RE.finditer(text)}
 
 
 def _set_line_without_dangerous_substitution(stripped: str) -> bool:

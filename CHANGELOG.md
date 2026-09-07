@@ -2,6 +2,19 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.24] - 2026-09-07
+
+### Fixed
+
+- **P024** and **P006** no longer treat the word `setlocal`/`endlocal` inside comments as commands, and P024 reports the second real `SETLOCAL` ([#40](https://github.com/tboy1337/Blinter/issues/40))
+- **S010** counts labels reached by `if ... goto`/`call` and `|| goto`, while ignoring `goto`/`call` inside comments or echo output ([#39](https://github.com/tboy1337/Blinter/issues/39))
+- Hyphenated filenames such as `set-permissions.bat` are no longer classified as embedded PowerShell, so per-line rules still run ([#38](https://github.com/tboy1337/Blinter/issues/38))
+- **W036** no longer treats FOR /F command operands (for example `powershell -NoProfile` under usebackq backticks) as data files ([#37](https://github.com/tboy1337/Blinter/issues/37))
+
+### Changed
+
+- Spec docs, Architecture, and funding metadata match the 231-case corpus
+
 ## [1.1.23] - 2026-09-07
 
 ### Changed

@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "Labels reached via IF GOTO, IF CALL, or || GOTO are not dead (S010)",
+  "lines": {},
+  "must_not": [
+    "S010"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}
