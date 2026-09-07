@@ -68,31 +68,61 @@ def _check_global_style_rules(lines: List[str], file_path: str) -> List[LintIssu
     return issues
 
 
-_GOTO_REFERENCE_RE = re.compile(r"\bgoto\s+:?([a-zA-Z_][\w]*)")
-_CALL_REFERENCE_RE = re.compile(r"\bcall\s+:([a-zA-Z_][\w]*)")
+_GOTO_REFERENCE_RE = re.compile(r"goto\s+:?([a-zA-Z_][\w]*)")
+_CALL_REFERENCE_RE = re.compile(r"call\s+:([a-zA-Z_][\w]*)")
 _COMMAND_SEGMENT_SPLIT_RE = re.compile(r"[&|()]+")
+_IF_COMPARISON_OPERATORS = frozenset({"==", "equ", "neq", "lss", "leq", "gtr", "geq"})
+
+
+def _strip_if_predicate(tokens: List[str]) -> List[str]:
+    """
+    Return the tokens of the command an ``if`` line runs, or the tokens as given.
+
+    ``if [/i] [not] defined X``, ``exist X``, ``errorlevel N`` and
+    ``cmdextversion N`` take two tokens; a comparison takes ``a op b``, or a
+    single token where ``a==b`` is written without spaces.
+    """
+    if not tokens or tokens[0] != "if":
+        return tokens
+    rest = tokens[1:]
+    while rest and rest[0] in ("/i", "not"):
+        rest = rest[1:]
+    if not rest:
+        return []
+    if rest[0] in ("defined", "exist", "errorlevel", "cmdextversion"):
+        return rest[2:]
+    if len(rest) >= 3 and rest[1] in _IF_COMPARISON_OPERATORS:
+        return rest[3:]
+    if "==" in rest[0]:
+        return rest[1:]
+    return rest
+
+
+def _command_segments(lowered: str) -> List[str]:
+    """
+    Return each command a (lowercased) line runs, as text starting at its verb.
+
+    A command begins the line or a ``&``, ``|`` or ``(`` segment of it, after
+    an optional ``@``, an optional ``do``/``else`` and an optional ``if``
+    predicate. A comment line yields nothing, and an ``echo`` or a ``REM``
+    segment mentioning a word is not an execution of it.
+    """
+    if _is_comment_line(lowered):
+        return []
+    commands: List[str] = []
+    for part in _COMMAND_SEGMENT_SPLIT_RE.split(lowered):
+        tokens: List[str] = str(part).strip().lstrip("@").split()
+        while tokens and tokens[0] in ("do", "else"):
+            tokens = tokens[1:]
+        tokens = _strip_if_predicate(tokens)
+        if tokens:
+            commands.append(" ".join(tokens))
+    return commands
 
 
 def _line_runs_command(lowered: str, command: str) -> bool:
-    """
-    Return True when ``command`` is executed by the (lowercased) line.
-
-    A command word is one that begins the line or a ``&``, ``|`` or ``(``
-    segment of it, after an optional ``@`` and an optional ``do``/``else``.
-    A comment or an ``echo`` mentioning the word is not an execution of it.
-    """
-    if _is_comment_line(lowered):
-        return False
-    segments: List[str] = [
-        str(part) for part in _COMMAND_SEGMENT_SPLIT_RE.split(lowered)
-    ]
-    for segment in segments:
-        tokens: List[str] = segment.strip().lstrip("@").split()
-        while tokens and tokens[0] in ("do", "else"):
-            tokens = tokens[1:]
-        if tokens and tokens[0] == command:
-            return True
-    return False
+    """Return True when ``command`` is a command the (lowercased) line runs."""
+    return any(segment.split()[0] == command for segment in _command_segments(lowered))
 
 
 def _check_unused_labels(lines: List[str]) -> List[LintIssue]:
@@ -108,15 +138,16 @@ def _check_unused_labels(lines: List[str]) -> List[LintIssue]:
             labels[str(label_match.group(1)).lower()] = i
             continue
 
-        lowered = stripped.lower()
-        if _is_comment_line(lowered):
-            continue
         # A reference need not begin the line: ``if ... goto :x`` and
-        # ``cmd || goto :x`` are the ordinary forms, so scan the whole line.
-        for goto_match in _GOTO_REFERENCE_RE.finditer(lowered):
-            referenced.add(str(goto_match.group(1)).lower())
-        for call_match in _CALL_REFERENCE_RE.finditer(lowered):
-            referenced.add(str(call_match.group(1)).lower())
+        # ``cmd || goto :x`` are the ordinary forms. It must begin a command,
+        # though: ``echo goto :x`` and ``rem goto :x`` run no GOTO.
+        for segment in _command_segments(stripped.lower()):
+            goto_match = _GOTO_REFERENCE_RE.match(segment)
+            if goto_match:
+                referenced.add(str(goto_match.group(1)).lower())
+            call_match = _CALL_REFERENCE_RE.match(segment)
+            if call_match:
+                referenced.add(str(call_match.group(1)).lower())
 
     for label_name, line_num in labels.items():
         if label_name not in referenced:

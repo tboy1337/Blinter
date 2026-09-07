@@ -4397,3 +4397,55 @@ class TestFalsePositiveReports37To40:
         ]
         issues = _check_new_global_rules(lines, "test.bat")
         assert len([issue for issue in issues if issue.rule.code == "P024"]) == 1
+
+    def test_drive_relative_and_foreach_object_filenames_not_powershell(self) -> None:
+        """Review of #38: ``C:Set-Permissions`` and ``ForEach-Object.bat`` are paths."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        for line in (
+            "if %choice%==7 set X=C:Set-Permissions",
+            "call C:\\Windows\\ForEach-Object.bat",
+        ):
+            assert not _detect_embedded_script_blocks(["@echo off", line]), line
+        lines = ["@echo off", ":psblock", "Get-ChildItem | ForEach-Object { $_ }"]
+        assert 3 in _detect_embedded_script_blocks(lines)
+
+    def test_w036_backticks_without_usebackq_are_not_a_command(
+        self, tmp_path: Path
+    ) -> None:
+        """Review of #37: without usebackq, backticks are literal file-set text."""
+        content = (
+            "@echo off\n"
+            'for /f "delims=" %%V in (`echo usebackq file.txt`) do set "D=%%V"\n'
+            "exit /b 0\n"
+        )
+        assert "W036" in self._lint(tmp_path, "test.bat", content)
+
+    def test_setlocal_after_if_predicate_is_counted(self) -> None:
+        """Review of #40: ``if defined FLAG setlocal`` runs a SETLOCAL."""
+        lines = [
+            "@echo off",
+            "setlocal",
+            "echo step1",
+            "echo step2",
+            "echo step3",
+            "echo step4",
+            "echo step5",
+            "if defined FLAG setlocal",
+            'if "%x%"=="1" endlocal',
+            "if not exist out.txt endlocal",
+        ]
+        issues = _check_new_global_rules(lines, "test.bat")
+        assert len([issue for issue in issues if issue.rule.code == "P024"]) == 1
+
+    def test_s010_goto_inside_echo_is_not_a_reference(self) -> None:
+        """Review of #39: ``echo goto :x`` and ``rem goto :x`` run no GOTO."""
+        lines = [
+            "@echo off",
+            "echo goto :unused",
+            "echo done & rem call :unused",
+            ":unused",
+            "exit /b 0",
+        ]
+        issues = _check_global_style_rules(lines, "test.cmd")
+        assert len([issue for issue in issues if issue.rule.code == "S010"]) == 1

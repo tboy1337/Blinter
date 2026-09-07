@@ -375,14 +375,15 @@ POWERSHELL_PATTERNS: List[str] = [
     r"-le\s+",
     r"-gt\s+",
     r"-lt\s+",
-    # A cmdlet name stands alone: not inside a path (``\set-permissions``)
-    # and not a hyphenated file name (``set-permissions.bat``).
-    r"(?<![\w\\/.-])Get-[A-Za-z]+(?![\w.\\/-])",
-    r"(?<![\w\\/.-])Set-[A-Za-z]+(?![\w.\\/-])",
-    r"(?<![\w\\/.-])Write-[A-Za-z]+(?![\w.\\/-])",
-    r"(?<![\w\\/.-])New-[A-Za-z]+(?![\w.\\/-])",
+    # A cmdlet name stands alone: not inside a path (``\set-permissions``,
+    # ``C:Set-Permissions``) and not a hyphenated file name
+    # (``set-permissions.bat``).
+    r"(?<![\w\\/.:-])Get-[A-Za-z]+(?![\w.\\/:-])",
+    r"(?<![\w\\/.:-])Set-[A-Za-z]+(?![\w.\\/:-])",
+    r"(?<![\w\\/.:-])Write-[A-Za-z]+(?![\w.\\/:-])",
+    r"(?<![\w\\/.:-])New-[A-Za-z]+(?![\w.\\/:-])",
     r"foreach\s*\(",
-    r"ForEach-Object",
+    r"(?<![\w\\/.:-])ForEach-Object(?![\w.\\/:-])",
     r"\|\s*%\s*{",
     r"\.Get\(\)",
     r"\.OpenSubKey\(",
