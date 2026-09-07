@@ -791,6 +791,14 @@ entries:
   rules: []
   corpus:
   - integration/embedded-csharp-skip
+- construct: Embedded PowerShell detection versus cmdlet-shaped file names
+  sources:
+  - Blinter embedded-language detection
+  ssot_artifacts:
+  - patterns POWERSHELL_PATTERNS
+  rules: []
+  corpus:
+  - integration/embedded-cmdlet-lookalike-filenames
 - construct: Embedded VBScript and JScript blocks skipped during batch linting
   sources:
   - Blinter embedded-language detection

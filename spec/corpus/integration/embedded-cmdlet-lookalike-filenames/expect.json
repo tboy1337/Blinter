@@ -1,0 +1,20 @@
+{
+  "config": {},
+  "description": "Drive-relative, hyphenated and ForEach-Object file names are batch code, so per-line rules still run on them (follow-up to #38)",
+  "lines": {
+    "2": [
+      "W005"
+    ],
+    "4": [
+      "SEC006"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W005",
+    "SEC006"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

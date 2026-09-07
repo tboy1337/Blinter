@@ -4473,3 +4473,36 @@ class TestResidualFalsePositives:
         )
         assert "W036" in self._lint(tmp_path, "test.bat", content)
 
+    def test_cmdlet_lookalike_filenames_are_batch_code(self) -> None:
+        """#38: drive-relative, quoted and ForEach-Object file names are not cmdlets."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        for line in (
+            "if %choice%==7 set X=C:Set-Permissions",
+            'if %choice%==7 set "X=set-permissions.bat"',
+            "call C:\\Windows\\ForEach-Object.bat",
+        ):
+            assert not _detect_embedded_script_blocks(["@echo off", line]), line
+
+    def test_real_cmdlets_are_still_powershell(self) -> None:
+        """#38 control: cmdlets standing alone still start a skip region."""
+        from blinter.parsing.embedded import _detect_embedded_script_blocks
+
+        lines = [
+            "@echo off",
+            ":psblock",
+            "Get-ChildItem C:\\ | ForEach-Object { $_.Name }",
+            "Set-Location C:\\",
+        ]
+        assert {3, 4} <= _detect_embedded_script_blocks(lines)
+
+    def test_hyphenated_filename_keeps_its_findings(self, tmp_path: Path) -> None:
+        """#38: the line draws what its twin without the hyphen draws."""
+        hyphen = self._lint(
+            tmp_path, "a.bat", '@echo off\nif %c%==7 set "X=set-permissions.bat"\n'
+        )
+        plain = self._lint(
+            tmp_path, "b.bat", '@echo off\nif %c%==7 set "X=setpermissions.bat"\n'
+        )
+        assert hyphen == plain
+
