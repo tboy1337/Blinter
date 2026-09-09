@@ -3,19 +3,25 @@
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
+import tomllib
 
 import pytest
 from pytest_mock import MockerFixture
 
 from blinter._version import _fallback_version, _pyproject_path, get_version
 from blinter.rules.registry import RULE_COUNT
+from scripts.extract_release_notes import extract_latest_section
 from scripts.generate_file_version_info import (
     _build_version_info,
     _read_project_version,
     _version_tuple,
 )
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_UV_EXECUTABLE = shutil.which("uv")
 
 
 class TestVersion:
@@ -157,3 +163,103 @@ class TestBlinterSpecIcon:
             r"""icon\s*=\s*["']resources/blinter_icon\.ico["']""",
             spec_text,
         ), "Blinter.spec must set icon=resources/blinter_icon.ico"
+
+
+class TestUvSupport:
+    """Tests that uv remains a documented, resolvable install path."""
+
+    def test_readme_documents_uv_tool_and_uvx(self) -> None:
+        """README must document persistent and one-shot uv install commands."""
+        readme = (_REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        assert "uv tool install Blinter" in readme
+        assert "uvx blinter" in readme
+
+    def test_contributing_documents_uv_sync(self) -> None:
+        """CONTRIBUTING must document uv sync with the dev extra."""
+        contributing = (_REPO_ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
+        assert "uv sync --extra dev" in contributing
+
+    def test_pyproject_declares_uv_package_and_dev_extra(self) -> None:
+        """pyproject.toml must keep the uv package flag and pip dev extra."""
+        with (_REPO_ROOT / "pyproject.toml").open("rb") as pyproject_file:
+            pyproject_data: object = tomllib.load(pyproject_file)
+        assert isinstance(pyproject_data, dict)
+        tool_object: object = pyproject_data.get("tool")
+        assert isinstance(tool_object, dict)
+        uv_object: object = tool_object.get("uv")
+        assert isinstance(uv_object, dict)
+        assert uv_object.get("package") is True
+        project_object: object = pyproject_data.get("project")
+        assert isinstance(project_object, dict)
+        extras_object: object = project_object.get("optional-dependencies")
+        assert isinstance(extras_object, dict)
+        dev_extra: object = extras_object.get("dev")
+        assert isinstance(dev_extra, list)
+        assert len(dev_extra) > 0
+
+    @pytest.mark.skipif(_UV_EXECUTABLE is None, reason="uv is not installed")
+    def test_uv_resolves_dev_extra(self) -> None:
+        """uv must be able to compile pyproject.toml with the dev extra."""
+        assert _UV_EXECUTABLE is not None
+        result = subprocess.run(
+            [
+                _UV_EXECUTABLE,
+                "pip",
+                "compile",
+                "pyproject.toml",
+                "--extra",
+                "dev",
+                "--quiet",
+            ],
+            cwd=_REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert result.returncode == 0, result.stderr
+        compiled = result.stdout.casefold()
+        assert "charset-normalizer" in compiled or "charset_normalizer" in compiled
+        assert "pytest" in compiled
+
+
+class TestExtractReleaseNotes:
+    """Tests for changelog section extraction used by GitHub Releases."""
+
+    def test_skips_unreleased_and_returns_latest_version(self, tmp_path: Path) -> None:
+        """Unreleased notes must not replace the latest versioned section."""
+        changelog = tmp_path / "CHANGELOG.md"
+        changelog.write_text(
+            "# Changelog\n\n"
+            "## [Unreleased]\n\n"
+            "### Added\n\n"
+            "- In-progress work\n\n"
+            "## [1.2.3] - 2026-01-01\n\n"
+            "### Fixed\n\n"
+            "- Released fix\n\n"
+            "## [1.2.2] - 2025-12-01\n\n"
+            "### Added\n\n"
+            "- Older change\n",
+            encoding="utf-8",
+        )
+        section = extract_latest_section(changelog)
+        assert "[1.2.3]" in section
+        assert "Released fix" in section
+        assert "Unreleased" not in section
+        assert "In-progress work" not in section
+
+    def test_extracts_first_section_when_no_unreleased(self, tmp_path: Path) -> None:
+        """The newest versioned heading is used when Unreleased is absent."""
+        changelog = tmp_path / "CHANGELOG.md"
+        changelog.write_text(
+            "## [9.9.9] - 2026-09-01\n\nOnly this.\n",
+            encoding="utf-8",
+        )
+        assert "9.9.9" in extract_latest_section(changelog)
+
+    def test_repo_changelog_latest_versioned_section_is_non_empty(self) -> None:
+        """The repository changelog must yield a versioned release section."""
+        section = extract_latest_section(_REPO_ROOT / "CHANGELOG.md")
+        assert section.startswith("## [")
+        assert not section.lower().startswith("## [unreleased]")
+        assert len(section) > 20

@@ -57,7 +57,18 @@
 pip install Blinter
 ```
 
-**Option 2: Standalone executable (no Python)**
+**Option 2: Install via uv**
+```cmd
+uv tool install Blinter
+```
+
+Run without installing:
+
+```cmd
+uvx blinter
+```
+
+**Option 3: Standalone executable (no Python)**
 
 If you prefer a standalone `.exe` over pip, use the one-line installer:
 
@@ -85,6 +96,11 @@ curl -L https://raw.githubusercontent.com/tboy1337/Blinter/main/scripts/uninstal
 pip uninstall Blinter
 ```
 
+**uv installation:**
+```cmd
+uv tool uninstall Blinter
+```
+
 ### 🔧 Manual Installation
 
 1. Clone the repository (include the batch-spec submodule):
@@ -98,26 +114,31 @@ If you already cloned without submodules:
 git submodule update --init --recursive
 ```
 
-2. (Optional) Create a virtual environment:
+2. Install development dependencies (includes runtime deps).
+
+**uv** (creates `.venv`, editable install, and the `dev` extra):
+```cmd
+uv sync --extra dev
+```
+
+**pip** (optional venv, then editable install):
 ```cmd
 python -m venv venv
 venv\Scripts\activate.bat
-```
-
-3. Install development dependencies (includes runtime deps):
-```cmd
 pip install -e ".[dev]"
 ```
 
+After `uv sync --extra dev`, run the quality gate with `uv run python scripts/verify.py`. After a pip install, use `py scripts/verify.py`.
+
 ### Prerequisites
-- **Python 3.11+** (required for pip installation and development)
+- **Python 3.11+** (required for pip installation and development; uv can provision this interpreter)
 - **Windows OS** (required for standalone executable)
 
 ## Usage 📟
 
 ### Basic Usage
 
-**If installed via pip:**
+**If installed via pip or uv:**
 ```cmd
 # Analyze a single batch file
 blinter script.bat
@@ -184,7 +205,8 @@ blinter --version
 
 **If using a local development install:**
 ```cmd
-pip install -e .
+uv sync --extra dev
+# or: pip install -e .
 
 # Analyze a single batch file
 blinter script.bat
@@ -494,10 +516,12 @@ Warnings and style issues alone do not fail the run when exit code would otherwi
 Install development dependencies and run the quality gate locally before releasing:
 
 ```bash
-pip install -e ".[dev]"
-# Or: pip install -e . && pip install -r requirements-dev.txt
-py scripts/verify.py        # full gate (format, mypy, pylint, bandit, pip-audit, pytest)
-py scripts/verify.py --fix  # auto-fix whitespace and imports first
+uv sync --extra dev
+# or: pip install -e ".[dev]"
+# or: pip install -e . && pip install -r requirements-dev.txt
+uv run python scripts/verify.py   # after uv sync
+# or: py scripts/verify.py        # full gate (format, mypy, pylint, bandit, pip-audit, pytest)
+py scripts/verify.py --fix        # auto-fix whitespace and imports first
 ```
 
 Optional manual steps (same checks as `verify.py`):

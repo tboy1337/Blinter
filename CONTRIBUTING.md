@@ -24,9 +24,9 @@ Security issues must **not** be filed as public issues. See [SECURITY.md](SECURI
 
 1. Fork the repository and create a branch from `main`.
 2. Clone with submodules: `git clone --recurse-submodules https://github.com/tboy1337/Blinter.git`
-3. Install development dependencies: `pip install -e ".[dev]"`
+3. Install development dependencies: `uv sync --extra dev` (or `pip install -e ".[dev]"`)
 4. Make your changes and add or update tests where appropriate.
-5. Run the full local quality gate: `py scripts/verify.py`
+5. Run the full local quality gate: `uv run python scripts/verify.py` (or `py scripts/verify.py`)
 6. Open a pull request against `main` with a clear description of the change and how you tested it.
 
 Maintainers review PRs on GitHub. Address review feedback with additional commits on the same branch.

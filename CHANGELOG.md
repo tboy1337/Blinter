@@ -2,6 +2,12 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.22] - 2026-09-09
+
+### Added
+
+- uv support for install (`uv tool install Blinter`, `uvx blinter`) and development (`uv sync --extra dev`); CI Python installs use uv. pip remains a first-class path.
+
 ## [1.1.21] - 2026-08-31
 
 ### Changed
@@ -162,6 +168,7 @@ All notable changes to Blinter are documented in this file. Release tags follow 
 
 Older 1.0.x releases are available on the [GitHub Releases](https://github.com/tboy1337/Blinter/releases) page.
 
+[1.1.22]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.22
 [1.1.21]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.21
 [1.1.20]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.20
 [1.1.19]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.19
