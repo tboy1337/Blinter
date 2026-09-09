@@ -3,11 +3,8 @@ batch-script-examples/
 batch-examples-*.json
 tests/fixtures/corpus-baseline.json
 blinter-*/
-file_version_info.txt
 pylint-report.txt
 pylint-output.txt
-*.spec
-!Blinter.spec
 
 # Python bytecode
 __pycache__/
@@ -34,10 +31,12 @@ var/
 lib/
 lib64/
 
-# PyInstaller
-warn-Blinter.txt
-xref-Blinter.html
+# Nuitka
+*.build
+*.dist
+*.onefile-build
 *.manifest
+nuitka-crash-report.xml
 
 # Test and quality tooling
 testResults.xml

@@ -2,11 +2,61 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
-## [1.1.22] - 2026-09-09
+## [1.1.27] - 2026-09-09
 
 ### Added
 
 - uv support for install (`uv tool install Blinter`, `uvx blinter`) and development (`uv sync --extra dev`); CI Python installs use uv. pip remains a first-class path.
+
+## [1.1.26] - 2026-09-07
+
+### Fixed
+
+- **W036** reads a FOR /F command operand to the parenthesis that balances `IN (`, so nested `(` inside a backquoted command is not treated as a file ([#37](https://github.com/tboy1337/Blinter/issues/37), [#42](https://github.com/tboy1337/Blinter/pull/42))
+- Drive-relative names such as `C:Set-Permissions` and `ForEach-Object.bat` are no longer classified as embedded PowerShell ([#38](https://github.com/tboy1337/Blinter/issues/38), [#42](https://github.com/tboy1337/Blinter/pull/42))
+- **S010** ignores `CALL`/`GOTO` inside an inline `REM` or `ECHO` segment after `&` ([#39](https://github.com/tboy1337/Blinter/issues/39), [#42](https://github.com/tboy1337/Blinter/pull/42))
+- **P024**/**P006** count `SETLOCAL`/`ENDLOCAL` after an `IF` predicate or `&` ([#40](https://github.com/tboy1337/Blinter/issues/40), [#42](https://github.com/tboy1337/Blinter/pull/42))
+
+### Changed
+
+- Pinned batch-spec language SSOT to v0.70.1 (FOR /F usebackq backtick commands keep nested parentheses as data)
+- Spec docs, Architecture, and funding metadata match the 235-case corpus
+
+## [1.1.25] - 2026-09-07
+
+### Fixed
+
+- PowerShell `Get-`/`Set-`/`Write-`/`New-` detection no longer backtracks into hyphenated filenames, and ignores `.psm1`/`.psd1`/`.ps1xml` script modules the same way as `.ps1`
+- **P024** reports only a second real `SETLOCAL`; extra `ENDLOCAL` is left to its own rules
+
+## [1.1.24] - 2026-09-07
+
+### Fixed
+
+- **P024** and **P006** no longer treat the word `setlocal`/`endlocal` inside comments as commands, and P024 reports the second real `SETLOCAL` ([#40](https://github.com/tboy1337/Blinter/issues/40))
+- **S010** counts labels reached by `if ... goto`/`call` and `|| goto`, while ignoring `goto`/`call` inside comments or echo output ([#39](https://github.com/tboy1337/Blinter/issues/39))
+- Hyphenated filenames such as `set-permissions.bat` are no longer classified as embedded PowerShell, so per-line rules still run ([#38](https://github.com/tboy1337/Blinter/issues/38))
+- **W036** no longer treats FOR /F command operands (for example `powershell -NoProfile` under usebackq backticks) as data files ([#37](https://github.com/tboy1337/Blinter/issues/37))
+
+### Changed
+
+- Spec docs, Architecture, and funding metadata match the 231-case corpus
+
+## [1.1.23] - 2026-09-07
+
+### Changed
+
+- Windows `blinter.exe` Nuitka build uses LTO, cached onefile extract, stripped docstrings/asserts, and unused-stdlib nofollow; UPX stays off
+
+## [1.1.22] - 2026-09-07
+
+### Changed
+
+- Windows standalone `blinter.exe` is now built with Nuitka (`scripts/build_exe.py`) instead of PyInstaller
+
+### Fixed
+
+- Frozen `blinter.exe --version` reads the bundled `pyproject.toml` from the Nuitka extract layout
 
 ## [1.1.21] - 2026-08-31
 
@@ -168,6 +218,11 @@ All notable changes to Blinter are documented in this file. Release tags follow 
 
 Older 1.0.x releases are available on the [GitHub Releases](https://github.com/tboy1337/Blinter/releases) page.
 
+[1.1.27]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.27
+[1.1.26]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.26
+[1.1.25]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.25
+[1.1.24]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.24
+[1.1.23]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.23
 [1.1.22]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.22
 [1.1.21]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.21
 [1.1.20]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.20

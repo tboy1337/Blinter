@@ -6,6 +6,7 @@ from typing import (
 )
 
 from blinter.models import LintIssue
+from blinter.parsing.context import _is_endlocal_command, _is_setlocal_command
 from blinter.parsing.structure import _delayed_expansion_active_at_line
 from blinter.patterns import (
     _COMPILED_SETLOCAL_DISABLE,
@@ -142,7 +143,7 @@ def _check_redundant_disable_delay(
 def _check_performance_issues(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     _lines: List[str],
     line_num: int,
-    line: str,  # pylint: disable=unused-argument
+    line: str,
     has_setlocal: bool,
     has_set_commands: bool,
     has_delayed_expansion: bool,
@@ -156,7 +157,7 @@ def _check_performance_issues(  # pylint: disable=too-many-arguments,too-many-po
     stripped = line.strip()
 
     # P003: Unnecessary SETLOCAL
-    if "setlocal" in stripped.lower() and not has_set_commands:
+    if _is_setlocal_command(line) and not has_set_commands:
         issues.append(
             LintIssue(
                 line_number=line_num,
@@ -176,7 +177,7 @@ def _check_performance_issues(  # pylint: disable=too-many-arguments,too-many-po
         )
 
     # P005: ENDLOCAL without SETLOCAL
-    if "endlocal" in stripped.lower() and not has_setlocal:
+    if _is_endlocal_command(line) and not has_setlocal:
         issues.append(
             LintIssue(
                 line_number=line_num,
@@ -233,13 +234,12 @@ def _check_setlocal_nesting_depth(lines: List[str]) -> List[LintIssue]:
     max_depth = 0
     max_line = 0
     for index, line in enumerate(lines, start=1):
-        stripped = line.strip().lower()
-        if stripped.startswith("setlocal"):
+        if _is_setlocal_command(line):
             depth += 1
             if depth > max_depth:
                 max_depth = depth
                 max_line = index
-        elif stripped.startswith("endlocal"):
+        elif _is_endlocal_command(line):
             depth = max(depth - 1, 0)
     if max_depth > 32:
         return [

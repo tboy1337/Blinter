@@ -1,11 +1,19 @@
 """Comment detection and safe-context helpers for checkers."""
 
 import re
-from typing import cast
+from typing import Iterator, cast
 
+from blinter.logging_config import logger
 from blinter.patterns import (
     _DANGEROUS_CMDS_REGEX,
 )
+
+_GOTO_LABEL_RE = re.compile(r"\bgoto\s+(:?)([a-zA-Z_][\w]*)", re.IGNORECASE)
+_CALL_LABEL_RE = re.compile(r"\bcall\s+:([a-zA-Z_][\w]*)", re.IGNORECASE)
+_IF_UNARY_PREDICATES = frozenset({"defined", "exist", "errorlevel", "cmdextversion"})
+_IF_COMPARISON_OPERATORS = frozenset({"==", "equ", "neq", "lss", "leq", "gtr", "geq"})
+_SEGMENT_PREFIXES = frozenset({"do", "else"})
+_NON_COMMAND_STARTERS = frozenset({"echo", "rem"})
 
 
 def _is_comment_line(line: str) -> bool:
@@ -35,6 +43,200 @@ def _is_comment_or_label(line: str) -> bool:
 def _is_echo_statement(stripped: str) -> bool:
     """Return True when the line is an ECHO output statement."""
     return stripped.startswith(("echo ", "echo\t", "@echo ", "@echo\t"))
+
+
+def _command_body(line: str) -> str:
+    """Return command text after whitespace and a leading @, or empty for comments."""
+    if _is_comment_line(line):
+        return ""
+    stripped = line.strip()
+    if stripped.startswith("@"):
+        stripped = stripped[1:].lstrip()
+    return stripped
+
+
+def _split_command_separators(body: str) -> list[str]:
+    """Split on unescaped ``&``, ``&&`` and ``||`` outside quoting.
+
+    A caret escapes the next character (``^&`` is data). A lone ``|`` is a
+    pipe whose right-hand side runs in another ``cmd``, so it is not a
+    separator for SETLOCAL or GOTO/CALL on this line.
+    """
+    parts: list[str] = []
+    current: list[str] = []
+    quote = ""
+    index = 0
+    while index < len(body):
+        char = body[index]
+        if quote:
+            current.append(char)
+            if char == quote:
+                quote = ""
+            index += 1
+            continue
+        if char == "^":
+            current.append(char)
+            if index + 1 < len(body):
+                current.append(body[index + 1])
+            index += 2
+            continue
+        if char in '"`':
+            quote = char
+            current.append(char)
+            index += 1
+            continue
+        two = body[index : index + 2]
+        if char == "&" or two == "||":
+            parts.append("".join(current))
+            current = []
+            index += 2 if two in ("&&", "||") else 1
+            continue
+        current.append(char)
+        index += 1
+    parts.append("".join(current))
+    return parts
+
+
+def _split_tokens(text: str) -> list[str]:
+    """Split on whitespace outside quoting, keeping each token's quotes."""
+    tokens: list[str] = []
+    current: list[str] = []
+    quote = ""
+    for char in text:
+        if quote:
+            current.append(char)
+            if char == quote:
+                quote = ""
+            continue
+        if char in '"`':
+            quote = char
+            current.append(char)
+            continue
+        if char.isspace():
+            if current:
+                tokens.append("".join(current))
+                current = []
+            continue
+        current.append(char)
+    if current:
+        tokens.append("".join(current))
+    return tokens
+
+
+def _strip_if_predicate(tokens: list[str]) -> list[str]:
+    """Return tokens of the command an ``IF`` runs, or ``tokens`` unchanged."""
+    if not tokens or tokens[0].lower() != "if":
+        return tokens
+    rest = tokens[1:]
+    while rest and rest[0].lower() in ("/i", "not"):
+        rest = rest[1:]
+    if not rest:
+        return []
+    first = rest[0].lower()
+    if first in _IF_UNARY_PREDICATES:
+        return rest[2:]
+    if len(rest) >= 3 and rest[1].lower() in _IF_COMPARISON_OPERATORS:
+        return rest[3:]
+    if "==" in rest[0]:
+        return rest[1:]
+    return rest
+
+
+def _command_segments(line: str) -> list[str]:
+    """Return each command a line runs, starting at its command word.
+
+    Drops ``ECHO`` output and ``REM``/``::`` segments so
+    ``echo done & rem call :label`` is not a CALL, while
+    ``echo x || goto :label`` still is.
+    """
+    body = _command_body(line)
+    if not body:
+        return []
+    segments: list[str] = []
+    for part in _split_command_separators(body):
+        tokens = _split_tokens(part.strip().lstrip("(").strip())
+        while tokens and tokens[0].lower() in _SEGMENT_PREFIXES:
+            tokens = tokens[1:]
+        tokens = _strip_if_predicate(tokens)
+        if not tokens:
+            continue
+        first = tokens[0].lower()
+        if first in _NON_COMMAND_STARTERS or first.startswith("::"):
+            logger.debug(
+                "Ignoring non-command segment %r on line: %s", first, line.strip()
+            )
+            continue
+        segments.append(" ".join(tokens))
+    return segments
+
+
+def _line_runs_command(line: str, command: str) -> bool:
+    """Return True when one of the commands the line runs is ``command``."""
+    return any(
+        segment.split()[0].lower() == command for segment in _command_segments(line)
+    )
+
+
+def _is_setlocal_command(line: str) -> bool:
+    """Return True when the line runs SETLOCAL, including after IF or ``&``."""
+    if _is_comment_line(line) and "setlocal" in line.lower():
+        logger.debug("Ignoring SETLOCAL mention in comment: %s", line.strip())
+        return False
+    runs = _line_runs_command(line, "setlocal")
+    if runs:
+        logger.debug("SETLOCAL command detected: %s", line.strip())
+    return runs
+
+
+def _is_endlocal_command(line: str) -> bool:
+    """Return True when the line runs ENDLOCAL, including after IF or ``&``."""
+    if _is_comment_line(line) and "endlocal" in line.lower():
+        logger.debug("Ignoring ENDLOCAL mention in comment: %s", line.strip())
+        return False
+    return _line_runs_command(line, "endlocal")
+
+
+def _executable_jump_text(line: str) -> str:
+    """Return executable GOTO/CALL text from command segments.
+
+    Comments and ECHO output are excluded whether they are the whole line
+    or an ``&``-separated segment.
+    """
+    segments = _command_segments(line)
+    if not segments:
+        logger.debug("No executable GOTO/CALL context on line: %s", line.strip())
+        return ""
+    return " & ".join(segments)
+
+
+def _iter_goto_label_refs(line: str) -> Iterator[tuple[str, str]]:
+    """Yield (raw_target, label_name) for executable GOTO destinations."""
+    text = _executable_jump_text(line)
+    if not text:
+        return
+    for match in _GOTO_LABEL_RE.finditer(text):
+        colon = str(match.group(1) or "")
+        name = str(match.group(2))
+        yield colon + name, name.lower()
+
+
+def _goto_and_call_label_names(line: str) -> set[str]:
+    """Return label names referenced by GOTO or CALL :label on an executable line."""
+    text = _executable_jump_text(line)
+    if not text:
+        return set()
+    names = {name for _raw, name in _iter_goto_label_refs(line)}
+    for match in _CALL_LABEL_RE.finditer(text):
+        names.add(str(match.group(1)).lower())
+    return names
+
+
+def _call_subroutine_label_names(line: str) -> set[str]:
+    """Return label names invoked via CALL :label on an executable line."""
+    text = _executable_jump_text(line)
+    if not text:
+        return set()
+    return {str(match.group(1)).lower() for match in _CALL_LABEL_RE.finditer(text)}
 
 
 def _set_line_without_dangerous_substitution(stripped: str) -> bool:

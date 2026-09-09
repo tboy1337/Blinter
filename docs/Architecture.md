@@ -74,7 +74,7 @@ flowchart BT
 - `lint_batch_file`, `read_file_with_encoding`, `find_batch_files`
 - `load_config`, `create_default_config_file`, `main`
 - `BlinterConfig`, `LintIssue`, `Rule`, `RuleSeverity`
-- `__version__`, `__author__`, `__license__` — `__version__` is read from `[project].version` in `pyproject.toml` when developing from a source checkout; otherwise it uses installed package metadata (`importlib.metadata`), with a final fallback to parsing `pyproject.toml` (see `_version.py`).
+- `__version__`, `__author__`, `__license__` — `__version__` is read from `[project].version` in `pyproject.toml` when developing from a source checkout or a Nuitka onefile extract (bundled `pyproject.toml` next to the compiled `blinter` package). Otherwise it uses installed package metadata (`importlib.metadata`), with a final fallback to parsing `pyproject.toml` (see `_version.py`).
 
 **Internal / extension imports** (import from subpackages):
 
@@ -118,7 +118,7 @@ When `follow_calls` is enabled, Blinter resolves `CALL` targets to read variable
 | ANTLR grammar, expansion rules, command catalog, cmd-help | [`vendor/batch-spec`](../vendor/batch-spec) ([`tboy1337/batch-spec`](https://github.com/tboy1337/batch-spec), pinned in [`spec/batch-spec.lock`](../spec/batch-spec.lock)) |
 | [`spec/data/rules.yaml`](../spec/data/rules.yaml) | Rule catalog (`checker: regex`; see `RULE_COUNT`) |
 | [`spec/data/commands-linter.yaml`](../spec/data/commands-linter.yaml) | Security/style command policy (merged with batch-spec `commands.yaml` for `patterns.py`; pins W009 `older_windows_commands`) |
-| [`spec/corpus/`](../spec/corpus/) | 226 committed fixtures + `expect.json` oracles |
+| [`spec/corpus/`](../spec/corpus/) | 235 committed fixtures + `expect.json` oracles |
 | [`spec/audit/`](../spec/audit/) | Reference matrix and audit baselines |
 
 Clone with `git clone --recurse-submodules` or run `git submodule update --init --recursive` after checkout.
@@ -134,3 +134,7 @@ Deprecated/removed command tables come from batch-spec `commands.yaml` unchanged
 Corpus policy: every rule in `rules.yaml` must have at least one corpus assertion (see `audit_ssot.py` coverage checks).
 
 **Performance gate:** [`scripts/benchmark_lint.py`](../scripts/benchmark_lint.py) with `--check-baseline` compares the synthetic-file median against [`spec/benchmark/synthetic-baseline.json`](../spec/benchmark/synthetic-baseline.json).
+
+## Windows executable
+
+GitHub Actions compiles a Nuitka `--mode=onefile` `blinter.exe` via [`scripts/build_exe.py`](../scripts/build_exe.py) using `--msvc=latest` on `windows-latest` (Visual Studio 2022 / MSVC 14.3+, required for Python 3.14). The build enables LTO, caches the onefile extract under `{CACHE_DIR}/{COMPANY}/{PRODUCT}/{VERSION}` for faster relaunch and a stable path for Windows Firewall, and does **not** use UPX. The release zip still contains a single `Blinter-vVERSION/blinter.exe` so the existing installer contract is unchanged.

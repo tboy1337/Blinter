@@ -1,0 +1,13 @@
+{
+  "config": {},
+  "description": "A backquoted FOR /F command carrying its own parentheses is still a command, so no W036/W037 (follow-up to #37)",
+  "lines": {},
+  "must_not": [
+    "W036",
+    "W037"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

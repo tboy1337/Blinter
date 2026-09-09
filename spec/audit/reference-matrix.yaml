@@ -205,6 +205,9 @@ entries:
   - syntax/w059-for-case-mismatch
   - syntax/w059-for-case-mismatch-block
   - syntax/w059-for-case-consistent-valid
+  - syntax/w036-for-f-command-with-parens-valid
+  - syntax/w036-for-f-command-noprofile-valid
+  - syntax/w036-for-f-usebackq-quoted-file
 - construct: SET /A syntax errors in FOR context
   sources:
   - MS Learn set /A
@@ -232,12 +235,13 @@ entries:
   - W057
   corpus:
   - syntax/e012-missing-call
+  - integration/s010-inline-rem-not-a-reference
   - syntax/e014-call-missing-colon
   - syntax/e015-goto-eof-missing-colon
-  - integration/sec016-restart-no-limit
   - integration/w013-duplicate-label
   - syntax/w057-bat-without-call
   - syntax/w057-bat-with-call-valid
+  - syntax/s010-if-goto-call-valid
 - construct: Command typos and removed/deprecated commands
   sources:
   - vendor/batch-spec/data/commands.yaml
@@ -424,6 +428,8 @@ entries:
   - integration/p006-missing-endlocal
   - integration/p006-subroutine-exit-valid
   - integration/p027-setlocal-nesting
+  - integration/p024-conditional-setlocal
+  - syntax/p024-p006-setlocal-in-comment-valid
 - construct: Temporary files, randomness, and predictable paths
   sources:
   - MS Learn environment variables
@@ -493,6 +499,8 @@ entries:
   - integration/p002-code-duplication
   - integration/p017-repeated-exist
   - integration/p027-setlocal-nesting
+  - integration/p024-conditional-setlocal
+  - syntax/p024-p006-setlocal-in-comment-valid
 - construct: Global style conventions and readability
   sources:
   - Community batch style
@@ -786,6 +794,14 @@ entries:
   rules: []
   corpus:
   - integration/embedded-csharp-skip
+- construct: Embedded PowerShell detection versus cmdlet-shaped file names
+  sources:
+  - Blinter embedded-language detection
+  ssot_artifacts:
+  - patterns POWERSHELL_PATTERNS
+  rules: []
+  corpus:
+  - integration/embedded-cmdlet-lookalike-filenames
 - construct: Embedded VBScript and JScript blocks skipped during batch linting
   sources:
   - Blinter embedded-language detection
@@ -795,3 +811,14 @@ entries:
   corpus:
   - integration/embedded-vbscript-skip
   - integration/embedded-jscript-skip
+- construct: Hyphenated batch filenames are not embedded PowerShell
+  sources:
+  - Blinter embedded-language detection
+  ssot_artifacts:
+  - patterns POWERSHELL_PATTERNS
+  rules:
+  - E006
+  - W005
+  - SEC006
+  corpus:
+  - integration/embedded-ps-filename-not-skipped

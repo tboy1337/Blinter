@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "A REM or ECHO segment naming a label is not a reference, so the label is still dead code (follow-up to #39)",
+  "lines": {
+    "6": [
+      "S010"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S010"
+  ],
+  "tags": [
+    "integration"
+  ]
+}

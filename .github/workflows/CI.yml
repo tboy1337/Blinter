@@ -45,6 +45,7 @@ jobs:
           python -m black --check src tests scripts
           python -m isort --check-only src tests scripts
           python -m mypy src/blinter tests scripts/verify.py scripts/corpus_lint.py scripts/corpus_baseline.py scripts/generate_corpus_baseline.py scripts/benchmark_lint.py
+          python -m mypy scripts/build_exe.py
           python -m pylint src/blinter
           python -m bandit -r src/blinter -c pyproject.toml -ll -q
           python -m pip_audit -r requirements.txt -r requirements-dev.txt
@@ -124,26 +125,20 @@ jobs:
           .\venv\Scripts\Activate.ps1
           uv pip install --upgrade setuptools
           uv pip install --upgrade wheel
-          uv pip install --upgrade pyinstaller
+          uv pip install --upgrade nuitka
           uv pip install --upgrade -r requirements.txt
-        shell: pwsh
-
-      - name: Generate version info file
-        run: |
-          .\venv\Scripts\Activate.ps1
-          python scripts/generate_file_version_info.py
         shell: pwsh
 
       - name: Build executable
         run: |
           .\venv\Scripts\Activate.ps1
-          pyinstaller Blinter.spec
+          python scripts/build_exe.py
         shell: pwsh
 
       - name: Verify executable exists
         run: |
           if (-not (Test-Path -Path "dist\blinter.exe" -PathType Leaf)) {
-            throw "dist\blinter.exe was not produced by PyInstaller"
+            throw "dist\blinter.exe was not produced by Nuitka"
           }
         shell: pwsh
 
@@ -291,20 +286,14 @@ jobs:
           .\venv\Scripts\Activate.ps1
           uv pip install --upgrade setuptools
           uv pip install --upgrade wheel
-          uv pip install --upgrade pyinstaller
+          uv pip install --upgrade nuitka
           uv pip install --upgrade -r requirements.txt
-        shell: pwsh
-
-      - name: Generate version info file
-        run: |
-          .\venv\Scripts\Activate.ps1
-          python scripts/generate_file_version_info.py
         shell: pwsh
 
       - name: Build executable
         run: |
           .\venv\Scripts\Activate.ps1
-          pyinstaller Blinter.spec
+          python scripts/build_exe.py
         shell: pwsh
 
       - name: Package executable for release

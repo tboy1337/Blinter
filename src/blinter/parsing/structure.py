@@ -12,6 +12,7 @@ from typing import (
 
 from blinter.constants import BUILTIN_VARS
 from blinter.models import LintIssue
+from blinter.parsing.context import _is_endlocal_command, _is_setlocal_command
 from blinter.patterns import (
     _COMPILED_SETLOCAL_DISABLE,
 )
@@ -314,15 +315,15 @@ def _build_delayed_expansion_state(lines: List[str]) -> List[bool]:
     stack: List[bool] = []
     state: List[bool] = []
     for line in lines:
-        stripped = line.strip().lower()
-        if re.match(r"setlocal\b", stripped):
+        if _is_setlocal_command(line):
+            stripped = line.strip().lstrip("@").strip().lower()
             if "enabledelayedexpansion" in stripped:
                 stack.append(True)
             elif "disabledelayedexpansion" in stripped:
                 stack.append(False)
             else:
                 stack.append(stack[-1] if stack else False)
-        elif re.match(r"endlocal\b", stripped):
+        elif _is_endlocal_command(line):
             if stack:
                 stack.pop()
         state.append(stack[-1] if stack else False)
@@ -358,12 +359,12 @@ def _analyze_script_structure(
         Tuple of (has_setlocal, has_set_commands, has_delayed_expansion, uses_delayed_vars,
                   has_disable_delayed_expansion, has_literal_exclamations, disable_expansion_lines)
     """
-    has_setlocal = any("setlocal" in line.lower() for line in lines)
+    has_setlocal = any(_is_setlocal_command(line) for line in lines)
     has_set_commands = any(
         re.match(r"\s*set\s+[^=]+=.*", line, re.IGNORECASE) for line in lines
     )
     has_delayed_expansion = any(
-        re.search(r"setlocal\s+enabledelayedexpansion", line, re.IGNORECASE)
+        _is_setlocal_command(line) and "enabledelayedexpansion" in line.lower()
         for line in lines
     )
     # Match any content between exclamation marks, including special chars like @, -, #, $, etc.

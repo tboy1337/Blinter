@@ -18,6 +18,7 @@ from blinter import (
     read_file_with_encoding,
 )
 from blinter.checkers.advanced import (
+    _check_advanced_for_rules,
     _check_advanced_style_rules,
     _check_advanced_vars,
     _check_enhanced_commands,
@@ -31,6 +32,7 @@ from blinter.checkers.advanced.vars_syntax import (
     _check_for_f_suboptions,
     _check_percent_tilde_syntax,
     _check_set_a_arithmetic,
+    _for_f_file_set_operand,
 )
 from blinter.checkers.globals import (
     _check_cmd_case_consistency,
@@ -56,6 +58,7 @@ from blinter.io.encoding import (
     _validate_and_read_file,
 )
 from blinter.parsing.context import _is_command_in_safe_context
+from blinter.parsing.embedded import _detect_embedded_script_blocks
 from blinter.parsing.structure import (
     _analyze_script_structure,
     _collect_labels,
@@ -2043,6 +2046,118 @@ class TestGlobalChecks:
         issues = _check_new_global_rules(lines, "test.bat")
         p024_issues = [issue for issue in issues if issue.rule.code == "P024"]
         assert len(p024_issues) == 1
+        assert p024_issues[0].line_number == 8
+
+    def test_setlocal_in_comment_does_not_trigger_p024_or_p006(self) -> None:
+        """REM mentioning setlocal is not a SETLOCAL command (issue #40)."""
+        lines = [
+            "@echo off",
+            "setlocal disabledelayedexpansion",
+            "REM filler",
+            "REM filler",
+            "REM filler",
+            "REM filler",
+            "REM a bare setlocal inherits the caller state",
+            "set V=1",
+            "endlocal",
+            "exit /b 0",
+        ]
+        issues = _check_new_global_rules(lines, "test.cmd")
+        codes = {issue.rule.code for issue in issues}
+        assert "P024" not in codes
+        assert "P006" not in codes
+
+    def test_p024_points_at_second_setlocal_not_comment(self) -> None:
+        """P024 reports the second SETLOCAL command, not a comment (issue #40)."""
+        lines = [
+            "@echo off",
+            "setlocal",
+            "echo step1",
+            "echo step2",
+            "echo step3",
+            "echo step4",
+            "REM mention setlocal here",
+            "setlocal enabledelayedexpansion",
+        ]
+        issues = _check_new_global_rules(lines, "test.cmd")
+        p024_issues = [issue for issue in issues if issue.rule.code == "P024"]
+        assert len(p024_issues) == 1
+        assert p024_issues[0].line_number == 8
+
+    def test_extra_endlocal_does_not_trigger_p024(self) -> None:
+        """P024 requires a second SETLOCAL; extra ENDLOCAL is a different rule."""
+        lines = [
+            "@echo off",
+            "setlocal",
+            "echo hi",
+            "endlocal",
+            "endlocal",
+            "exit /b 0",
+        ]
+        issues = _check_new_global_rules(lines, "test.cmd")
+        assert all(issue.rule.code != "P024" for issue in issues)
+
+    def test_if_goto_and_call_labels_are_not_s010(self) -> None:
+        """Labels reached via IF/|| GOTO or IF CALL are not dead (issue #39)."""
+        lines = [
+            "@echo off",
+            'if "%~1"=="" goto :from_if',
+            "goto :from_bare",
+            'if "%~1"=="" call :from_if_call',
+            "call :from_bare_call",
+            "echo x || goto :from_or",
+            "exit /b 0",
+            ":from_if",
+            "exit /b 0",
+            ":from_bare",
+            "exit /b 0",
+            ":from_if_call",
+            "exit /b 0",
+            ":from_bare_call",
+            "exit /b 0",
+            ":from_or",
+            "exit /b 0",
+        ]
+        issues = _check_global_style_rules(lines, "test.cmd")
+        s010_issues = [issue for issue in issues if issue.rule.code == "S010"]
+        assert not s010_issues
+
+    def test_goto_in_comment_or_echo_does_not_count_as_s010_ref(self) -> None:
+        """GOTO inside REM or ECHO should not mark a label as referenced."""
+        lines = [
+            "@echo off",
+            "REM goto :never_used",
+            "echo goto :never_used",
+            ":never_used",
+            "exit /b 0",
+        ]
+        issues = _check_global_style_rules(lines, "test.cmd")
+        s010_issues = [issue for issue in issues if issue.rule.code == "S010"]
+        assert len(s010_issues) == 1
+        assert "never_used" in s010_issues[0].context.lower()
+
+    def test_for_f_noprofile_command_does_not_trigger_w036(self) -> None:
+        """usebackq backtick commands are not data files (issue #37)."""
+        line = (
+            'for /f "usebackq delims=" %%V in '
+            '(`powershell -NoProfile -Command "1+1"`) do set "D=%%V"'
+        )
+        assert _for_f_file_set_operand(line) == ""
+        issues = _check_advanced_for_rules(line, 2)
+        assert not [issue for issue in issues if issue.rule.code == "W036"]
+
+    def test_for_f_data_file_still_triggers_w036(self) -> None:
+        """FOR /F over a .txt file without skip= still reports W036."""
+        line = "FOR /F %%a IN (data.txt) DO echo %%a"
+        issues = _check_advanced_for_rules(line, 2)
+        assert any(issue.rule.code == "W036" for issue in issues)
+
+    def test_for_f_usebackq_single_quoted_file_triggers_w036(self) -> None:
+        """With usebackq, a single-quoted operand is a filename."""
+        line = "FOR /F \"usebackq tokens=1\" %%a IN ('datafile.txt') DO echo %%a"
+        assert "datafile.txt" in _for_f_file_set_operand(line)
+        issues = _check_advanced_for_rules(line, 2)
+        assert any(issue.rule.code == "W036" for issue in issues)
 
     def test_check_unreachable_code_after_goto(self) -> None:
         """Test unreachable code detection after GOTO."""
@@ -3503,6 +3618,73 @@ class TestEmbeddedScriptDetection:  # pylint: disable=too-few-public-methods
         assert 3 in skip_lines
         assert 4 in skip_lines
 
+    def test_hyphenated_batch_filename_is_not_powershell(self) -> None:
+        """Filenames like set-permissions.bat are batch, not cmdlets (issue #38)."""
+        hyphen_line = r"if %choice%==7 set X=C:\Windows\set-permissions.bat"
+        plain_line = r"if %choice%==7 set X=C:\Windows\setpermissions.bat"
+        hyphen_skip = _detect_embedded_script_blocks(["@echo off", hyphen_line])
+        plain_skip = _detect_embedded_script_blocks(["@echo off", plain_line])
+        assert 2 not in hyphen_skip
+        assert 2 not in plain_skip
+        assert hyphen_skip == plain_skip
+
+    def test_cmdlet_like_script_filenames_are_not_powershell(self) -> None:
+        """Cmdlet patterns must not backtrack into names with blocked extensions."""
+        filename_lines = (
+            r"set X=set-permissions.bat",
+            r"set X=Get-Item.cmd",
+            r"set X=Write-Output.exe",
+            r"set X=New-Item.com",
+            r"set X=Set-config.ps1",
+            r"set X=Set-config.psm1",
+            r"set X=Set-config.psd1",
+            r"set X=Set-config.ps1xml",
+            r"set X=Set-config.vbs",
+        )
+        for filename_line in filename_lines:
+            skip_lines = _detect_embedded_script_blocks(["@echo off", filename_line])
+            assert 2 not in skip_lines, filename_line
+
+    def test_real_powershell_cmdlets_are_still_detected(self) -> None:
+        """Bare Get-/Set-/Write-/New- cmdlets still open a PowerShell skip region."""
+        skip_lines = _detect_embedded_script_blocks(
+            ["@echo off", "Write-Host $name", "Get-ChildItem", "Set-Item -Path x"]
+        )
+        assert 2 in skip_lines
+        assert 3 in skip_lines
+        assert 4 in skip_lines
+
+    def test_hyphenated_filename_keeps_per_line_rules(self, tmp_path: Path) -> None:
+        """set-permissions.bat must still get W005 and SEC006 (issue #38)."""
+        hyphen = tmp_path / "a.cmd"
+        plain = tmp_path / "b.cmd"
+        hyphen.write_text(
+            "@echo off\n"
+            r"if %choice%==7 set X=C:\Windows\set-permissions.bat" + "\n"
+            "exit /b 0\n",
+            encoding="utf-8",
+        )
+        plain.write_text(
+            "@echo off\n"
+            r"if %choice%==7 set X=C:\Windows\setpermissions.bat" + "\n"
+            "exit /b 0\n",
+            encoding="utf-8",
+        )
+        hyphen_codes = {
+            (issue.line_number, issue.rule.code)
+            for issue in lint_batch_file(str(hyphen))
+            if issue.rule.code in {"E006", "W005", "SEC006"}
+        }
+        plain_codes = {
+            (issue.line_number, issue.rule.code)
+            for issue in lint_batch_file(str(plain))
+            if issue.rule.code in {"E006", "W005", "SEC006"}
+        }
+        assert hyphen_codes == plain_codes
+        assert (2, "E006") in hyphen_codes
+        assert (2, "W005") in hyphen_codes
+        assert (2, "SEC006") in hyphen_codes
+
     def test_detect_embedded_vbscript_block(self) -> None:
         """VBScript syntax after a label is skipped during linting."""
         from blinter.parsing.embedded import _detect_embedded_script_blocks
@@ -4260,3 +4442,132 @@ class TestExitFlowW001Goto:  # pylint: disable=too-few-public-methods
         issues = _check_missing_exit_statement(lines)
         codes = {issue.rule.code for issue in issues}
         assert "W001" not in codes
+
+
+class TestResidualFalsePositives:
+    """Residual edge cases of the false positives fixed in v1.1.24 (#37-#40)."""
+
+    @staticmethod
+    def _lint(tmp_path: Path, name: str, content: str) -> set[str]:
+        batch_file = tmp_path / name
+        batch_file.write_text(content, encoding="utf-8")
+        return {issue.rule.code for issue in lint_batch_file(str(batch_file))}
+
+    def test_w036_command_operand_containing_parentheses(self, tmp_path: Path) -> None:
+        """#37: the operand ends at the balancing parenthesis, not the first one."""
+        content = (
+            "@echo off\n"
+            'for /f "usebackq delims=" %%L in (`powershell -NoProfile -Command '
+            '"(Get-Item .).FullName"`) do set "D=%%L"\n'
+            "exit /b 0\n"
+        )
+        assert "W036" not in self._lint(tmp_path, "test.bat", content)
+
+    def test_w036_still_reported_for_a_quoted_data_file(self, tmp_path: Path) -> None:
+        """#37 control: a double-quoted operand is still a data file."""
+        content = (
+            "@echo off\n"
+            'for /f "usebackq delims=" %%V in ("C:\\data\\input-file.txt")'
+            ' do set "D=%%V"\n'
+            "exit /b 0\n"
+        )
+        assert "W036" in self._lint(tmp_path, "test.bat", content)
+
+    def test_cmdlet_lookalike_filenames_are_batch_code(self) -> None:
+        """#38: drive-relative, quoted and ForEach-Object file names are not cmdlets."""
+        for line in (
+            "if %choice%==7 set X=C:Set-Permissions",
+            'if %choice%==7 set "X=set-permissions.bat"',
+            r"call C:\Windows\ForEach-Object.bat",
+        ):
+            assert not _detect_embedded_script_blocks(["@echo off", line]), line
+
+    def test_real_cmdlets_are_still_powershell(self) -> None:
+        """#38 control: cmdlets standing alone still start a skip region."""
+        lines = [
+            "@echo off",
+            ":psblock",
+            "Get-ChildItem C:\\ | ForEach-Object { $_.Name }",
+            "Set-Location C:\\",
+        ]
+        assert {3, 4} <= _detect_embedded_script_blocks(lines)
+
+    def test_hyphenated_filename_keeps_its_findings(self, tmp_path: Path) -> None:
+        """#38: a quoted hyphenated filename still draws the same rules as its twin."""
+        hyphen = self._lint(
+            tmp_path, "a.bat", '@echo off\nif %c%==7 set "X=set-permissions.bat"\n'
+        )
+        plain = self._lint(
+            tmp_path, "b.bat", '@echo off\nif %c%==7 set "X=setpermissions.bat"\n'
+        )
+        assert hyphen == plain
+
+    def test_inline_rem_segment_is_not_a_label_reference(self) -> None:
+        """#39: ``echo done & rem call :x`` executes no CALL."""
+        lines = [
+            "@echo off",
+            "echo done & rem call :unused",
+            "echo goto :unused",
+            "exit /b 0",
+            ":unused",
+            "exit /b 0",
+        ]
+        issues = _check_global_style_rules(lines, "test.cmd")
+        assert len([issue for issue in issues if issue.rule.code == "S010"]) == 1
+
+    def test_reference_after_a_separator_still_counts(self) -> None:
+        """#39 control: a jump in a later segment is a reference."""
+        lines = [
+            "@echo off",
+            "echo hi & goto :used",
+            'if "%~1"=="" goto :used',
+            ":used",
+            "exit /b 0",
+        ]
+        issues = _check_global_style_rules(lines, "test.cmd")
+        assert not [issue for issue in issues if issue.rule.code == "S010"]
+
+    def test_setlocal_after_an_if_predicate_is_counted(self) -> None:
+        """#40: ``if defined FLAG setlocal`` runs a SETLOCAL."""
+        from blinter.parsing.context import _is_endlocal_command, _is_setlocal_command
+
+        assert _is_setlocal_command("if defined FLAG setlocal")
+        assert _is_setlocal_command("echo step & setlocal")
+        assert _is_setlocal_command('if /i "%a%"=="b" setlocal enabledelayedexpansion')
+        assert _is_endlocal_command("if not exist out.txt endlocal")
+        assert not _is_setlocal_command("REM a bare setlocal inherits caller state")
+        assert not _is_setlocal_command("echo run setlocal first")
+
+    def test_conditional_setlocal_counts_toward_p024(self) -> None:
+        """#40: a conditional second SETLOCAL is no longer undercounted."""
+        lines = [
+            "@echo off",
+            "setlocal",
+            "echo s1",
+            "echo s2",
+            "echo s3",
+            "echo s4",
+            "echo s5",
+            "if defined FLAG setlocal",
+        ]
+        issues = _check_new_global_rules(lines, "test.bat")
+        p024 = [issue for issue in issues if issue.rule.code == "P024"]
+        assert len(p024) == 1
+        assert p024[0].line_number == 8
+
+    def test_quoted_if_operand_holding_a_space(self) -> None:
+        """#40: a quoted operand is one token, so the predicate ends where it does."""
+        from blinter.parsing.context import _is_setlocal_command
+
+        assert _is_setlocal_command(r'if exist "C:\Program Files\a.txt" setlocal')
+        assert _is_setlocal_command(
+            'if not "%A%"=="b c" setlocal enabledelayedexpansion'
+        )
+
+    def test_escaped_separator_and_pipe_do_not_start_a_command(self) -> None:
+        """#40: a caret escapes ``&``, and a pipe runs its right side elsewhere."""
+        from blinter.parsing.context import _command_segments, _is_setlocal_command
+
+        assert _command_segments("echo a ^& setlocal") == []
+        assert not _is_setlocal_command("echo a ^& setlocal")
+        assert _command_segments('dir | find "x"') == ['dir | find "x"']

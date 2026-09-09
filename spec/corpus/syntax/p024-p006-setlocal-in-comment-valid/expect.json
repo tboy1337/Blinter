@@ -1,0 +1,13 @@
+{
+  "config": {},
+  "description": "REM mentioning setlocal is not a SETLOCAL command (P024/P006)",
+  "lines": {},
+  "must_not": [
+    "P006",
+    "P024"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

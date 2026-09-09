@@ -82,7 +82,7 @@ This installs the latest `blinter.exe` to `%LOCALAPPDATA%\Programs\Blinter\bin`,
 - Download the latest `Blinter-v1.x.x.zip` from [GitHub Releases](https://github.com/tboy1337/Blinter/releases)
 - Extract the archive; the executable is `Blinter-v1.x.x\blinter.exe`
 - The one-line installer above is preferred; it keeps `blinter` on your `PATH` without manual setup.
-- ⚠️ **Note**: Some antivirus software may flag the executable as a false positive due to PyInstaller's runtime unpacking behavior. The executable is completely safe (all source code is open for inspection). **We recommend using pip installation to avoid this issue.**
+- ⚠️ **Note**: Some antivirus software may flag the standalone executable as a false positive. The executable is completely safe (all source code is open for inspection). If a scanner flags it, use pip installation.
 
 ### Uninstall
 
@@ -522,6 +522,17 @@ uv sync --extra dev
 uv run python scripts/verify.py   # after uv sync
 # or: py scripts/verify.py        # full gate (format, mypy, pylint, bandit, pip-audit, pytest)
 py scripts/verify.py --fix        # auto-fix whitespace and imports first
+```
+
+Windows standalone executable (no Python on the target machine). Release builds
+run on GitHub Actions `windows-latest` with Visual Studio 2022 (MSVC 14.3+),
+which is what Nuitka needs for Python 3.14. The onefile is LTO-compiled, payload-
+compressed (no UPX), and unpacks to a versioned cache directory after the first run:
+
+```bash
+pip install nuitka
+py scripts/build_exe.py          # Visual Studio 2022 / MSVC 14.3+ (same as CI)
+# py scripts/build_exe.py --mingw  # last-resort local MinGW64 (not used in CI)
 ```
 
 Optional manual steps (same checks as `verify.py`):
