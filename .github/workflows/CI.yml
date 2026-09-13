@@ -194,7 +194,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Submit dependency snapshot
-        uses: advanced-security/component-detection-dependency-submission-action@v0.1.4
+        uses: advanced-security/component-detection-dependency-submission-action@v0.1.6
         with:
           detectorArgs: Pip=EnableIfDefaultOff
 
