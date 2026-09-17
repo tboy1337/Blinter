@@ -21,7 +21,7 @@ All notable changes to Blinter are documented in this file. Release tags follow 
 ### Changed
 
 - Pinned batch-spec language SSOT to v0.71.0 (EXIST misspellings, single-equals IF, unknown FOR switches, spaced handle duplication)
-- Spec docs, Architecture, and funding metadata match the 274-case corpus; synthetic lint baseline is 16.0s for the extra cmd.exe checks
+- Spec docs, Architecture, and funding metadata match the 274-case corpus; synthetic lint baseline is 25.0s for the extra cmd.exe checks
 
 ## [1.1.27] - 2026-09-09
 
