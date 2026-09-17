@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "ALLUSERSPROFILE is the correct name (W064 negative)",
+  "lines": {},
+  "must_not": [
+    "W064"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

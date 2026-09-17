@@ -44,7 +44,7 @@ _VALID_MODIFIERS_FROZENSET_RE = re.compile(
     r"VALID_MODIFIERS:\s*FrozenSet\[str\]\s*=\s*frozenset\(\{([^}]*)\}\)"
 )
 _E_RULE_CASE_RE = re.compile(r"^e(\d{3})-", re.IGNORECASE)
-_E_RULE_COVERAGE_TARGET = {f"E{index:03d}" for index in range(1, 43)}
+_E_RULE_COVERAGE_TARGET = {f"E{index:03d}" for index in range(1, 48)}
 _RULES_IN_CODE_RE = re.compile(r'RULES\[\s*["\']([A-Z]+\d+)["\']\s*\]')
 _RULE_CODE_KWARG_RE = re.compile(r'rule_code\s*=\s*["\']([A-Z]+\d+)["\']')
 _S011_RULE_USAGE_RE = re.compile(r"_s011_rule\s*\(")
@@ -98,6 +98,23 @@ _MATRIX_CORPUS_RULE_ALLOWLIST: frozenset[str] = frozenset(
         "syntax/exit-shift-smoke-valid",
         "syntax/if-defined-var",
         "syntax/if-else-block",
+        "syntax/e043-doublecolon-outside-valid",
+        "syntax/e044-else-sameline-valid",
+        "syntax/e045-switch-valid",
+        "syntax/e046-redir-valid",
+        "syntax/e047-escaped-valid",
+        "syntax/sec014-quoted-arg-valid",
+        "syntax/sec025-quoted-cd-valid",
+        "syntax/sec001-setp-quoted-valid",
+        "syntax/w064-allusersprofile-valid",
+        "syntax/w065-if-literal-valid",
+        "syntax/w066-redir-at-end-valid",
+        "syntax/s029-echo-off-valid",
+        "syntax/s030-nul-valid",
+        "syntax/w067-set-custom-valid",
+        "syntax/w068-delayed-valid",
+        "syntax/w069-time-zero-valid",
+        "syntax/w070-set-and-cmd-valid",
     }
 )
 
@@ -698,7 +715,7 @@ def _audit_corpus(findings: list[AuditFinding], valid_rules: set[str]) -> None:
             AuditFinding(
                 "error",
                 "corpus",
-                f"E001–E042 corpus coverage incomplete: missing {', '.join(missing_target)}",
+                f"E001–E047 corpus coverage incomplete: missing {', '.join(missing_target)}",
             )
         )
     error_rules = {c for c in valid_rules if c.startswith("E") and c[1:].isdigit()}
@@ -712,7 +729,7 @@ def _audit_corpus(findings: list[AuditFinding], valid_rules: set[str]) -> None:
             AuditFinding(
                 "warning",
                 "corpus",
-                f"E001–E042 coverage {target_pct:.1f}% ({len(covered_target)}/{len(target_rules)})",
+                f"E001–E047 coverage {target_pct:.1f}% ({len(covered_target)}/{len(target_rules)})",
             )
         )
     if pct < 100.0:

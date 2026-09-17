@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "Unquoted %CD% can inject commands (SEC025)",
+  "lines": {
+    "2": [
+      "SEC025"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "SEC025"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

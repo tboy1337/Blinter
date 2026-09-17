@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "@ prefix after the first line (S029)",
+  "lines": {
+    "2": [
+      "S029"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S029"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

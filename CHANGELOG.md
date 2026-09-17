@@ -2,6 +2,26 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.28] - 2026-09-17
+
+### Added
+
+- Fifteen cmd.exe rules (E043–E047, SEC025, W064–W070, S029–S030) covering `::` inside blocks, ELSE on a new line, invalid FOR/IF switches, spaced `2> &1`, unescaped FOR /F specials, unquoted `%CD%`, IF wildcards, parse-time `%var%` after SET in a block, `%TIME%` space padding, and SET/PATH/PROMPT `&&` in `.bat` files
+- Corpus fixtures for those rules (274 committed cases)
+
+### Fixed
+
+- **E046** flags only a space before `&` in stream merges (`2> &1`); `2>>&1` is valid append-duplication on live cmd
+- **W017** also flags `IF ERRORLEVEL 0` (always true for non-negative codes)
+- **E036** also flags `IF EXIT` / `IF EXITS` misspellings of EXIST
+- **E003** flags a single `=` in IF and a missing space before `(`
+- **W044** flags `SET` with a space before `=` even without a space after
+- **SEC001** / **SEC014** retargeted to unquoted SET /P dataflow and unquoted arguments
+
+### Changed
+
+- Pinned batch-spec language SSOT to v0.71.0 (EXIST misspellings, single-equals IF, unknown FOR switches, spaced handle duplication)
+
 ## [1.1.27] - 2026-09-09
 
 ### Added
@@ -218,6 +238,7 @@ All notable changes to Blinter are documented in this file. Release tags follow 
 
 Older 1.0.x releases are available on the [GitHub Releases](https://github.com/tboy1337/Blinter/releases) page.
 
+[1.1.28]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.28
 [1.1.27]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.27
 [1.1.26]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.26
 [1.1.25]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.25

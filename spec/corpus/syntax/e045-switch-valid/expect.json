@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "Documented switches are valid (E045 negative)",
+  "lines": {},
+  "must_not": [
+    "E045"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

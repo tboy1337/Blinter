@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "Double-colon comment inside parenthesized block (E043)",
+  "lines": {
+    "3": [
+      "E043"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E043"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

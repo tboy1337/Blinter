@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "Quoted %CD% is safe (SEC025 negative)",
+  "lines": {},
+  "must_not": [
+    "SEC025"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "config": {},
+  "description": "Invalid internal command switches and extra args (E045)",
+  "lines": {
+    "2": [
+      "E045"
+    ],
+    "3": [
+      "E045"
+    ],
+    "4": [
+      "E045"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E045"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

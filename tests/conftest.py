@@ -129,6 +129,9 @@ def _write_batch_files_with_crlf(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     """Skip corpus-dependent tests when batch-script-examples is unavailable."""
+    items.sort(
+        key=lambda item: 0 if item.name == "test_synthetic_lint_within_baseline" else 1
+    )
     if corpus_available():
         return
     skip_marker = pytest.mark.skip(reason=CORPUS_SKIP_REASON)

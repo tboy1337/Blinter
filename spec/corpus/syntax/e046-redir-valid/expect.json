@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "Compact 2>&1 and append-dup 2>>&1 are valid (E046 negative)",
+  "lines": {},
+  "must_not": [
+    "E046"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

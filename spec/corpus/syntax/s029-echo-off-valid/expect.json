@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "@ECHO OFF on line 1 then unprefixed commands (S029 negative)",
+  "lines": {},
+  "must_not": [
+    "S029"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

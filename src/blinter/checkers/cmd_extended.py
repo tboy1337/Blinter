@@ -1,0 +1,860 @@
+"""Extra cmd.exe checks kept out of syntax.py and warnings.py so those stay smaller."""
+
+from __future__ import annotations
+
+import re
+from typing import Dict, List, Optional, Set
+
+from blinter.checkers.globals.exit_flow import _update_paren_depth
+from blinter.constants import SYSTEM_ENV_VARS
+from blinter.logging_config import logger
+from blinter.models import LintIssue
+from blinter.parsing.context import (
+    _command_body,
+    _is_comment_line,
+    _is_echo_statement,
+    _split_tokens,
+)
+from blinter.rules.registry import RULES
+
+_USER_ARG_PERCENT_RE = re.compile(
+    r"(?<!%)%~?[fdpnxsatz]*[1-9]|(?<!%)%\*",
+    re.IGNORECASE,
+)
+_USER_ARG_DELAYED_RE = re.compile(
+    r"!~?[fdpnxsatz]*[1-9]!|!\*!",
+    re.IGNORECASE,
+)
+_CD_EXPANSION_RE = re.compile(
+    r"%__CD__%|%CD%|!CD!",
+    re.IGNORECASE,
+)
+_ALLUSERPROFILE_RE = re.compile(
+    r"%ALLUSERPROFILE%|!ALLUSERPROFILE!|A\+L\+USERPROFILE",
+    re.IGNORECASE,
+)
+_TIME_RAW_PERCENT_RE = re.compile(r"%TIME%", re.IGNORECASE)
+_TIME_RAW_DELAYED_RE = re.compile(r"!TIME!", re.IGNORECASE)
+_TIME_SAFE_RE = re.compile(r"[%!]TIME: =0[%!]", re.IGNORECASE)
+_DEVICE_COLON_RE = re.compile(r"(?<![A-Za-z])(NUL|CON|PRN):", re.IGNORECASE)
+_MALFORMED_REDIR_RE = re.compile(
+    r"[12]\s*(?:>>|>|<)\s+&",
+)
+_STREAM_MERGE_RE = re.compile(r"[12]>&[12]")
+_SET_NAME_RE = re.compile(
+    r'set\s+(?:/[a-z]\s+)?"?([A-Za-z_][\w]*)\s*=',
+    re.IGNORECASE,
+)
+_SET_P_NAME_RE = re.compile(
+    r'set\s+/p\s+"?([A-Za-z_][\w]*)\s*=',
+    re.IGNORECASE,
+)
+_FOR_F_SINGLE_QUOTE_CMD_RE = re.compile(
+    r"for\s+/f\b(?:(?!\bin\b).)*\bin\s*\(\s*'([^']*)'",
+    re.IGNORECASE | re.DOTALL,
+)
+_FOR_F_USEBACKQ_CMD_RE = re.compile(
+    r"for\s+/f\b[^\n]*usebackq[^\n]*\bin\s*\(\s*`([^`]*)`",
+    re.IGNORECASE | re.DOTALL,
+)
+_UNARY_IF_RE = re.compile(
+    r"\bif\s+(?:/i\s+)?(?:not\s+)?(?:exist|defined|errorlevel|cmdextversion)\b",
+    re.IGNORECASE,
+)
+_IF_COMPARE_OP_RE = re.compile(r"==|equ|neq|lss|leq|gtr|geq", re.IGNORECASE)
+_ECHO_OFF_ON_RE = re.compile(r"echo\s+(off|on)\s*$", re.IGNORECASE)
+_REDIR_TOKEN_RE = re.compile(r"(?:\d+)?(?:>>|>|<)(?:&\d+|\S+)")
+_SWITCH_TOKEN_RE = re.compile(r"^/[A-Za-z0-9]+$")
+_PLAIN_SET_RE = re.compile(r"^set\s+(?!/)", re.IGNORECASE)
+_PATH_CMD_RE = re.compile(r"^path(?:\s|$)", re.IGNORECASE)
+_PROMPT_CMD_RE = re.compile(r"^prompt(?:\s|$)", re.IGNORECASE)
+_TITLE_RE = re.compile(r"^title(?:\s|$)", re.IGNORECASE)
+_SYSTEM_VAR_ALT = "|".join(
+    sorted((re.escape(name) for name in SYSTEM_ENV_VARS), key=len, reverse=True)
+)
+_SET_SYSTEM_RE = re.compile(
+    rf'set\s+(?:/[a-z]\s+)*"?({_SYSTEM_VAR_ALT})\s*=',
+    re.IGNORECASE,
+)
+
+_ALLOWED_SWITCHES: Dict[str, Optional[frozenset[str]]] = {
+    "if": frozenset({"i"}),
+    "for": frozenset({"d", "f", "l", "r"}),
+    "set": frozenset({"a", "p"}),
+    "exit": frozenset({"b"}),
+    "cd": frozenset({"d"}),
+    "chdir": frozenset({"d"}),
+    "date": frozenset({"t"}),
+    "time": frozenset({"t"}),
+    "shift": None,
+}
+_NO_SWITCH_COMMANDS = frozenset(
+    {
+        "goto",
+        "md",
+        "mkdir",
+        "setlocal",
+        "endlocal",
+        "cls",
+        "pause",
+        "ver",
+        "popd",
+    }
+)
+_NO_ARG_COMMANDS = frozenset({"cls", "pause", "ver", "popd", "endlocal"})
+_EXTENDED_RULES = {
+    "E043": RULES["E043"],
+    "E044": RULES["E044"],
+    "E045": RULES["E045"],
+    "E046": RULES["E046"],
+    "E047": RULES["E047"],
+    "S029": RULES["S029"],
+    "S030": RULES["S030"],
+    "SEC001": RULES["SEC001"],
+    "SEC025": RULES["SEC025"],
+    "W064": RULES["W064"],
+    "W065": RULES["W065"],
+    "W066": RULES["W066"],
+    "W067": RULES["W067"],
+    "W068": RULES["W068"],
+    "W069": RULES["W069"],
+    "W070": RULES["W070"],
+}
+_SPECIALS_IN_FOR_F = frozenset("&<>|")
+
+
+def _strip_double_quoted_strings(text: str) -> str:
+    """Replace double-quoted spans with empty quotes so unquoted forms remain."""
+    return re.sub(r'"[^"]*"', '""', text)
+
+
+def _is_caret_escaped(text: str, index: int) -> bool:
+    """Return True when the character at index is escaped by an odd caret run."""
+    caret_count = 0
+    pos = index - 1
+    while pos >= 0 and text[pos] == "^":
+        caret_count += 1
+        pos -= 1
+    return caret_count % 2 == 1
+
+
+def _paren_depth_before(lines: List[str], line_num: int) -> int:
+    """Return parenthesis block depth before processing line_num (1-based)."""
+    if line_num < 1:
+        return 0
+    depth = 0
+    for index, raw in enumerate(lines, start=1):
+        if index >= line_num:
+            return depth
+        depth = _update_paren_depth(raw.strip(), depth)
+        if depth < 0:
+            depth = 0
+    return depth
+
+
+def _split_amp_commands(text: str) -> List[str]:
+    """Split on unquoted ``&`` / ``&&`` / ``||`` without breaking ``2>&1``."""
+    parts: List[str] = []
+    current: List[str] = []
+    quote = ""
+    index = 0
+    length = len(text)
+    while index < length:
+        char = text[index]
+        if quote:
+            current.append(char)
+            if char == quote:
+                quote = ""
+            index += 1
+            continue
+        if char == "^":
+            current.append(char)
+            if index + 1 < length:
+                current.append(text[index + 1])
+                index += 2
+                continue
+            index += 1
+            continue
+        if char in '"`':
+            quote = char
+            current.append(char)
+            index += 1
+            continue
+        if char in "12" and index + 2 < length and text[index + 1 : index + 3] == ">&":
+            current.append(
+                text[index : index + 4] if index + 3 < length else text[index:]
+            )
+            index += 4 if index + 3 < length else (length - index)
+            continue
+        two = text[index : index + 2]
+        if two in ("&&", "||"):
+            parts.append("".join(current))
+            current = []
+            index += 2
+            continue
+        if char == "&":
+            parts.append("".join(current))
+            current = []
+            index += 1
+            continue
+        current.append(char)
+        index += 1
+    parts.append("".join(current))
+    return parts
+
+
+def _split_andand_pairs(text: str) -> List[tuple[str, str]]:
+    """Return (left, right) pairs for each unquoted ``&&`` chain."""
+    pairs: List[tuple[str, str]] = []
+    current: List[str] = []
+    quote = ""
+    index = 0
+    length = len(text)
+    while index < length:
+        char = text[index]
+        if quote:
+            current.append(char)
+            if char == quote:
+                quote = ""
+            index += 1
+            continue
+        if char == "^":
+            current.append(char)
+            if index + 1 < length:
+                current.append(text[index + 1])
+                index += 2
+                continue
+            index += 1
+            continue
+        if char in '"`':
+            quote = char
+            current.append(char)
+            index += 1
+            continue
+        if char in "12" and index + 2 < length and text[index + 1 : index + 3] == ">&":
+            current.append(
+                text[index : index + 4] if index + 3 < length else text[index:]
+            )
+            index += 4 if index + 3 < length else (length - index)
+            continue
+        two = text[index : index + 2]
+        if two == "&&":
+            left = "".join(current).strip()
+            rest = text[index + 2 :]
+            right = rest.split("&&")[0].strip() if rest else ""
+            if left:
+                pairs.append((left, right))
+            current = []
+            index += 2
+            continue
+        current.append(char)
+        index += 1
+    return pairs
+
+
+def _strip_redirections(text: str) -> str:
+    """Remove redirection tokens so leftover words are real arguments."""
+    return _REDIR_TOKEN_RE.sub(" ", text).strip()
+
+
+def _issue(line_num: int, code: str, context: str) -> LintIssue:
+    """Build a lint issue and log the decision point."""
+    logger.debug("Rule %s on line %s: %s", code, line_num, context)
+    return LintIssue(line_number=line_num, rule=_EXTENDED_RULES[code], context=context)
+
+
+def _skip_comment_or_echo(stripped: str) -> bool:
+    """True for REM/:: comments or ECHO output lines."""
+    return _is_comment_line(stripped) or _is_echo_statement(stripped)
+
+
+def check_extended_syntax_line(
+    line: str, line_num: int, lines: Optional[List[str]] = None
+) -> List[LintIssue]:
+    """Line-level extra syntax errors (E043-E047)."""
+    stripped = line.strip()
+    if stripped.startswith("::"):
+        return _check_e043_colon_block(stripped, line_num, lines)
+    issues: List[LintIssue] = []
+    if not stripped or _is_comment_line(stripped):
+        return issues
+    issues.extend(_check_e044_else_newline(stripped, line_num))
+    issues.extend(_check_e045_switches(stripped, line_num))
+    issues.extend(_check_e046_malformed_redir(stripped, line_num))
+    issues.extend(_check_e047_for_f_unescaped(stripped, line_num))
+    issues.extend(_check_e047_echo_parens(stripped, line_num, lines))
+    return issues
+
+
+def _check_e043_colon_block(
+    stripped: str, line_num: int, lines: Optional[List[str]]
+) -> List[LintIssue]:
+    """E043: ``::`` used as a comment inside a parenthesized block."""
+    if not stripped.startswith("::"):
+        return []
+    if lines is None:
+        return []
+    if _paren_depth_before(lines, line_num) <= 0:
+        return []
+    return [
+        _issue(
+            line_num,
+            "E043",
+            "Double-colon comments inside parentheses are parsed as labels and break the block",
+        )
+    ]
+
+
+def _check_e044_else_newline(stripped: str, line_num: int) -> List[LintIssue]:
+    """E044: ELSE as the first token on a new line is not paired with IF."""
+    body = _command_body(stripped)
+    if not body:
+        return []
+    tokens = _split_tokens(body.lstrip(")").lstrip())
+    if not tokens:
+        tokens = _split_tokens(body)
+    first = tokens[0].lower() if tokens else ""
+    # A valid close is ") ELSE"; a bare ELSE (optionally after stray whitespace) is the bug.
+    if stripped.lower().startswith(")") and re.search(
+        r"\)\s*else\b", stripped, re.IGNORECASE
+    ):
+        return []
+    if first != "else":
+        return []
+    return [
+        _issue(
+            line_num,
+            "E044",
+            "ELSE must share the line with the closing parenthesis of the IF block",
+        )
+    ]
+
+
+def _leading_switch_tokens(tokens: List[str]) -> List[str]:
+    """Return slash-switches that appear immediately after the command word."""
+    switches: List[str] = []
+    for token in tokens[1:]:
+        if token == "/?":
+            continue
+        if _SWITCH_TOKEN_RE.match(token):
+            switches.append(token)
+            continue
+        break
+    return switches
+
+
+def _shift_switch_is_invalid(token: str) -> bool:
+    """True when SHIFT uses a non-digit switch (numeric range is W050)."""
+    body = token[1:]
+    return not body.isdigit()
+
+
+def _e045_switch_issues(
+    command: str, leading: List[str], line_num: int
+) -> List[LintIssue]:
+    """Return E045 issues for invalid leading slash-switches."""
+    issues: List[LintIssue] = []
+    if command in _NO_SWITCH_COMMANDS:
+        for token in leading:
+            issues.append(
+                _issue(
+                    line_num,
+                    "E045",
+                    f"{command.upper()} does not accept switch {token}",
+                )
+            )
+        return issues
+    if command not in _ALLOWED_SWITCHES:
+        return issues
+    allowed = _ALLOWED_SWITCHES[command]
+    for token in leading:
+        if command == "shift":
+            if _shift_switch_is_invalid(token):
+                issues.append(
+                    _issue(
+                        line_num,
+                        "E045",
+                        f"SHIFT does not accept switch {token}",
+                    )
+                )
+            continue
+        if allowed is None:
+            continue
+        if token[1:].lower() not in allowed:
+            issues.append(
+                _issue(
+                    line_num,
+                    "E045",
+                    f"{command.upper()} does not accept switch {token}",
+                )
+            )
+    return issues
+
+
+def _check_e045_switches(stripped: str, line_num: int) -> List[LintIssue]:
+    """E045: unknown slash-switches or extra args on internals."""
+    if _skip_comment_or_echo(stripped):
+        return []
+    issues: List[LintIssue] = []
+    for raw_segment in _split_amp_commands(_command_body(stripped) or stripped):
+        segment = (
+            _strip_redirections(raw_segment).strip().lstrip("@").lstrip("(").strip()
+        )
+        if not segment:
+            continue
+        tokens = _split_tokens(segment)
+        if not tokens:
+            continue
+        command = tokens[0].lower()
+        issues.extend(
+            _e045_switch_issues(command, _leading_switch_tokens(tokens), line_num)
+        )
+        if command in _NO_ARG_COMMANDS:
+            remainder = [
+                tok
+                for tok in tokens[1:]
+                if not _SWITCH_TOKEN_RE.match(tok) and tok != "/?"
+            ]
+            if remainder:
+                issues.append(
+                    _issue(
+                        line_num,
+                        "E045",
+                        f"{command.upper()} does not take arguments",
+                    )
+                )
+    return issues
+
+
+def _check_e046_malformed_redir(stripped: str, line_num: int) -> List[LintIssue]:
+    """E046: space between ``>``/``>>``/``<`` and ``&`` splits handle duplication."""
+    if _MALFORMED_REDIR_RE.search(stripped):
+        return [
+            _issue(
+                line_num,
+                "E046",
+                "Malformed stream merge; write 2>&1 or 1>&2 with no space before &",
+            )
+        ]
+    return []
+
+
+def _unescaped_specials(command_text: str) -> bool:
+    """True when ``& < > |`` appear unescaped in a FOR /F command string."""
+    for index, char in enumerate(command_text):
+        if char in _SPECIALS_IN_FOR_F and not _is_caret_escaped(command_text, index):
+            return True
+    return False
+
+
+def _check_e047_for_f_unescaped(stripped: str, line_num: int) -> List[LintIssue]:
+    """E047: unescaped specials inside FOR /F ``IN ('command')`` / usebackq ticks."""
+    snippets: List[str] = []
+    for match in _FOR_F_SINGLE_QUOTE_CMD_RE.finditer(stripped):
+        if "usebackq" not in stripped.lower():
+            snippets.append(match.group(1))
+    for match in _FOR_F_USEBACKQ_CMD_RE.finditer(stripped):
+        snippets.append(match.group(1))
+    for snippet in snippets:
+        if _unescaped_specials(snippet):
+            return [
+                _issue(
+                    line_num,
+                    "E047",
+                    "Unescaped & < > | inside FOR /F IN ('command'); escape as ^& ^< ^> ^|",
+                )
+            ]
+    return []
+
+
+def _echo_body(stripped: str) -> Optional[str]:
+    """Return ECHO output text, or None when the line is not ECHO."""
+    match = re.match(r"@?echo(?:\s+|(\())", stripped, re.IGNORECASE)
+    if match is None:
+        return None
+    if match.group(1):
+        return stripped[match.end() - 1 :]
+    return stripped[match.end() :]
+
+
+def _echo_has_unescaped_paren(body: str) -> bool:
+    """True when ECHO text has an unquoted, unescaped parenthesis."""
+    unquoted = _strip_double_quoted_strings(body)
+    for index, char in enumerate(unquoted):
+        if char in "()" and not _is_caret_escaped(unquoted, index):
+            return True
+    return False
+
+
+def _check_e047_echo_parens(
+    stripped: str, line_num: int, lines: Optional[List[str]]
+) -> List[LintIssue]:
+    """E047: unescaped parentheses in ECHO inside a parenthesized block."""
+    if lines is None:
+        return []
+    body = _echo_body(stripped)
+    if body is None:
+        return []
+    depth = _paren_depth_before(lines, line_num)
+    if depth <= 0:
+        if re.search(r"\(\s*@?echo\b", stripped, re.IGNORECASE):
+            depth = 1
+        else:
+            return []
+    if not _echo_has_unescaped_paren(body):
+        return []
+    return [
+        _issue(
+            line_num,
+            "E047",
+            "Unescaped parentheses in ECHO inside a block; escape as ^( ^)",
+        )
+    ]
+
+
+def check_extended_warning_line(
+    line: str,
+    line_num: int,
+    lines: Optional[List[str]] = None,
+    file_path: str = "",
+) -> List[LintIssue]:
+    """Line-level extra warnings (W064-W067, W069-W070)."""
+    issues: List[LintIssue] = []
+    stripped = line.strip()
+    if not stripped or _is_comment_line(stripped):
+        return issues
+    issues.extend(_check_w064_alluserprofile(stripped, line_num))
+    issues.extend(_check_w065_if_wildcard(stripped, line_num))
+    issues.extend(_check_w066_redir_not_at_end(stripped, line_num))
+    issues.extend(_check_w067_set_system_var(stripped, line_num))
+    issues.extend(_check_w069_time_leading_space(stripped, line_num, lines))
+    issues.extend(_check_w070_set_andand(stripped, line_num, file_path))
+    return issues
+
+
+def check_extended_warning_file(
+    lines: List[str], file_path: str = ""
+) -> List[LintIssue]:
+    """File-level warnings that need block state (W068)."""
+    del file_path
+    return _check_w068_block_percent(lines)
+
+
+def _check_w064_alluserprofile(stripped: str, line_num: int) -> List[LintIssue]:
+    """W064: ALLUSERPROFILE misspelling of ALLUSERSPROFILE."""
+    if not _ALLUSERPROFILE_RE.search(stripped):
+        return []
+    return [
+        _issue(
+            line_num,
+            "W064",
+            "ALLUSERPROFILE is a typo; use %ALLUSERSPROFILE%",
+        )
+    ]
+
+
+def _check_w065_if_wildcard(stripped: str, line_num: int) -> List[LintIssue]:
+    """W065: ``*`` / ``?`` in IF == comparisons are literal, not globs."""
+    if not re.match(r"@?if\b", stripped, re.IGNORECASE):
+        return []
+    if _UNARY_IF_RE.search(stripped):
+        return []
+    if _IF_COMPARE_OP_RE.search(stripped) is None:
+        return []
+    if "*" not in stripped and "?" not in stripped:
+        return []
+    return [
+        _issue(
+            line_num,
+            "W065",
+            "IF == does not glob; * and ? are literal characters",
+        )
+    ]
+
+
+def _check_w066_redir_not_at_end(stripped: str, line_num: int) -> List[LintIssue]:
+    """W066: ``2>&1`` / ``1>&2`` should be the last token of the command."""
+    for segment in _split_amp_commands(stripped):
+        match = _STREAM_MERGE_RE.search(segment)
+        if match is None:
+            continue
+        after = segment[match.end() :].strip()
+        if after:
+            return [
+                _issue(
+                    line_num,
+                    "W066",
+                    "Place 2>&1 at the end of the command so stderr is captured",
+                )
+            ]
+    return []
+
+
+def _regex_group(match: re.Match[str], index: int = 1) -> str:
+    """Return a regex capture as ``str`` so mypy does not see ``str | Any``."""
+    captured = match.group(index)
+    return "" if captured is None else str(captured)
+
+
+def _check_w067_set_system_var(stripped: str, line_num: int) -> List[LintIssue]:
+    """W067: SET of a real system environment variable."""
+    match = _SET_SYSTEM_RE.search(stripped)
+    if match is None:
+        return []
+    name = _regex_group(match).upper()
+    return [
+        _issue(
+            line_num,
+            "W067",
+            f"SET {name}= overwrites a system environment variable",
+        )
+    ]
+
+
+def _check_w069_time_leading_space(
+    stripped: str, line_num: int, lines: Optional[List[str]]
+) -> List[LintIssue]:
+    """W069: raw %TIME% keeps a leading space before 10:00."""
+    if _is_echo_statement(stripped) or _TITLE_RE.match(stripped):
+        return []
+    if _TIME_SAFE_RE.search(stripped):
+        return []
+    if lines is not None:
+        start = max(0, line_num - 6)
+        nearby = "".join(lines[start:line_num])
+        if _TIME_SAFE_RE.search(nearby):
+            return []
+    if _TIME_RAW_PERCENT_RE.search(stripped) or _TIME_RAW_DELAYED_RE.search(stripped):
+        return [
+            _issue(
+                line_num,
+                "W069",
+                "Replace the leading space in %TIME% with %TIME: =0% before concatenating",
+            )
+        ]
+    return []
+
+
+def _is_errorlevel_sensitive_cmd(segment: str) -> bool:
+    """True for SET (not /A /P), PATH, or PROMPT commands."""
+    body = segment.strip().lstrip("@").lstrip("(").strip()
+    if _PLAIN_SET_RE.match(body):
+        return True
+    if _PATH_CMD_RE.match(body) or _PROMPT_CMD_RE.match(body):
+        return True
+    return False
+
+
+def _check_w070_set_andand(
+    stripped: str, line_num: int, file_path: str
+) -> List[LintIssue]:
+    """W070: SET/PATH/PROMPT chained with && in a .bat file."""
+    if not file_path.lower().endswith(".bat"):
+        return []
+    for left, _right in _split_andand_pairs(stripped):
+        if _is_errorlevel_sensitive_cmd(left):
+            return [
+                _issue(
+                    line_num,
+                    "W070",
+                    "In .bat files SET/PATH/PROMPT do not reset ERRORLEVEL, so && is unreliable",
+                )
+            ]
+    return []
+
+
+def _percent_expansion_of(name: str, text: str) -> bool:
+    """True when ``%name%`` or ``%name:...%`` appears (not delayed ``!name!``)."""
+    pattern = rf"%{re.escape(name)}(?:%|:)"
+    return re.search(pattern, text, re.IGNORECASE) is not None
+
+
+def _effective_block_depth(stripped: str, depth_before: int) -> int:
+    """Depth for commands that sit after an opening ``(`` on this line."""
+    if depth_before > 0:
+        return depth_before
+    if re.search(r"\(\s*set\s+", stripped, re.IGNORECASE):
+        return depth_before + 1
+    return depth_before
+
+
+def _check_w068_block_percent(lines: List[str]) -> List[LintIssue]:
+    """W068: %var% after SET of that var inside the same parenthesized block."""
+    issues: List[LintIssue] = []
+    assigned: Dict[int, Set[str]] = {}
+    for line_num, line in enumerate(lines, 1):
+        stripped = line.strip()
+        depth_before = _paren_depth_before(lines, line_num)
+        for depth_key in [key for key in assigned if key > depth_before]:
+            del assigned[depth_key]
+        if depth_before == 0:
+            assigned.clear()
+        if not stripped or _is_comment_line(stripped):
+            continue
+        depth = _effective_block_depth(stripped, depth_before)
+        if depth <= 0:
+            continue
+        for segment in _split_amp_commands(stripped):
+            for depth_key, names in assigned.items():
+                if depth_key > depth:
+                    continue
+                for name in names:
+                    set_match = _SET_NAME_RE.match(segment.strip().lstrip("@"))
+                    if (
+                        set_match is not None
+                        and _regex_group(set_match).lower() == name
+                    ):
+                        continue
+                    if _percent_expansion_of(name, segment):
+                        issues.append(
+                            _issue(
+                                line_num,
+                                "W068",
+                                f"%{name}% is expanded when the block is parsed; "
+                                f"use !{name}! with EnableDelayedExpansion",
+                            )
+                        )
+            set_match = _SET_NAME_RE.search(segment)
+            if set_match is not None:
+                assigned.setdefault(depth, set()).add(_regex_group(set_match).lower())
+    return issues
+
+
+def check_extended_style_line(line: str, line_num: int) -> List[LintIssue]:
+    """S029 @command after line 1 and S030 redundant device colon."""
+    issues: List[LintIssue] = []
+    stripped = line.strip()
+    if not stripped or _is_comment_line(stripped):
+        issues.extend(_check_s030_device_colon(stripped, line_num) if stripped else [])
+        return issues
+    issues.extend(_check_s029_at_prefix(stripped, line_num))
+    issues.extend(_check_s030_device_colon(stripped, line_num))
+    return issues
+
+
+def _check_s029_at_prefix(stripped: str, line_num: int) -> List[LintIssue]:
+    """S029: ``@command`` after the first line except ``@ECHO OFF`` / ``ON``."""
+    if line_num <= 1 or not stripped.startswith("@"):
+        return []
+    rest = stripped[1:].lstrip()
+    if _ECHO_OFF_ON_RE.match(rest):
+        return []
+    return [
+        _issue(
+            line_num,
+            "S029",
+            "Use @ECHO OFF on the first line instead of prefixing later commands with @",
+        )
+    ]
+
+
+def _check_s030_device_colon(stripped: str, line_num: int) -> List[LintIssue]:
+    """S030: NUL:/CON:/PRN: redundant trailing colon."""
+    if not stripped or _is_comment_line(stripped):
+        return []
+    match = _DEVICE_COLON_RE.search(stripped)
+    if match is None:
+        return []
+    device = _regex_group(match).upper()
+    return [
+        _issue(
+            line_num,
+            "S030",
+            f"{device}: is redundant; write {device} without a colon",
+        )
+    ]
+
+
+def check_sec025_unquoted_cd(line: str, line_num: int) -> List[LintIssue]:
+    """SEC025: unquoted %CD% / %__CD__% / !CD!."""
+    stripped = line.strip()
+    if not stripped or _is_comment_line(stripped):
+        return []
+    unquoted = _strip_double_quoted_strings(stripped)
+    if _CD_EXPANSION_RE.search(unquoted) is None:
+        return []
+    return [
+        _issue(
+            line_num,
+            "SEC025",
+            'Quote current-directory expansion, for example "%CD%"',
+        )
+    ]
+
+
+def _var_used_unquoted(text: str, name: str) -> bool:
+    """True when %name% or !name! remains outside double quotes."""
+    unquoted = _strip_double_quoted_strings(text)
+    percent = rf"%{re.escape(name)}(?:%|:)"
+    delayed = rf"!{re.escape(name)}(?:!|:)"
+    if re.search(percent, unquoted, re.IGNORECASE):
+        return True
+    if re.search(delayed, unquoted, re.IGNORECASE):
+        return True
+    return False
+
+
+def _is_defined_check_only(text: str, name: str) -> bool:
+    """True when the only mention is IF DEFINED name (not an unquoted expansion)."""
+    if re.search(
+        rf"\bif\s+(?:/i\s+)?(?:not\s+)?defined\s+{re.escape(name)}\b",
+        text,
+        re.IGNORECASE,
+    ):
+        return not _var_used_unquoted(text, name)
+    return False
+
+
+def check_sec001_same_line(stripped: str, line_num: int) -> Optional[LintIssue]:
+    """SEC001 when SET /P and an unquoted use share the same line (e.g. ``&&``)."""
+    match = _SET_P_NAME_RE.search(stripped)
+    if match is None:
+        return None
+    name = _regex_group(match)
+    after = stripped[match.end() :]
+    if not _var_used_unquoted(after, name):
+        return None
+    return _issue(
+        line_num,
+        "SEC001",
+        f"SET /P {name} is used unquoted on the same line and can inject commands",
+    )
+
+
+def check_sec001_setp_dataflow(lines: List[str]) -> List[LintIssue]:
+    """SEC001: SET /P names later used unquoted in a command."""
+    issues: List[LintIssue] = []
+    pending: Dict[str, int] = {}
+    for line_num, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if not stripped or _is_comment_line(stripped):
+            continue
+        setp_match = _SET_P_NAME_RE.search(stripped)
+        for match in _SET_P_NAME_RE.finditer(stripped):
+            pending[_regex_group(match).lower()] = line_num
+        for name in list(pending):
+            if _is_defined_check_only(stripped, name):
+                continue
+            if setp_match is not None:
+                after = stripped[setp_match.end() :]
+                if _var_used_unquoted(after, name):
+                    continue
+            if setp_match is None and _var_used_unquoted(stripped, name):
+                issues.append(
+                    _issue(
+                        line_num,
+                        "SEC001",
+                        f"SET /P {name} is later used unquoted and can inject commands",
+                    )
+                )
+    return issues
+
+
+def has_unquoted_user_args(stripped: str) -> bool:
+    """True when unquoted %1-%9, %*, %~1 or delayed equivalents appear."""
+    unquoted = _strip_double_quoted_strings(stripped)
+    if _USER_ARG_PERCENT_RE.search(unquoted):
+        return True
+    if _USER_ARG_DELAYED_RE.search(unquoted):
+        return True
+    return False

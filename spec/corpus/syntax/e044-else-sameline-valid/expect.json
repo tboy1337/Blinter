@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "ELSE on the same line as ) is valid (E044 negative)",
+  "lines": {},
+  "must_not": [
+    "E044"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

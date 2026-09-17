@@ -1,6 +1,6 @@
 """Shared numeric and string constants for checker modules."""
 
-from typing import Set
+from typing import FrozenSet, Set
 
 MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 LARGE_FILE_WARNING_BYTES = 10 * 1024 * 1024
@@ -79,6 +79,12 @@ PSEUDO_ENV_VARS: Set[str] = {
     "RANDOM",
     "TIME",
 }
+
+# Real process environment variables (not cmd.exe pseudo-env). SET of these
+# changes the rest of the process; distinct from W049 pseudo-env assignment.
+SYSTEM_ENV_VARS: FrozenSet[str] = frozenset(
+    name.upper() for name in BUILTIN_VARS if name.upper() not in PSEUDO_ENV_VARS
+)
 
 MAGIC_NUMBER_EXCEPTIONS: Set[str] = {
     # Basic numbers

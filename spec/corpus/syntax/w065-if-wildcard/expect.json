@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "Wildcard in IF == comparison (W065)",
+  "lines": {
+    "2": [
+      "W065"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W065"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

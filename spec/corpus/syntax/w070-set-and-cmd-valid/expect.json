@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "SET chained with && in a .cmd file is not W070",
+  "lines": {},
+  "must_not": [
+    "W070"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

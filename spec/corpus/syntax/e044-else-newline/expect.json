@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "ELSE on a new line (E044)",
+  "lines": {
+    "5": [
+      "E044"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E044"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "ALLUSERPROFILE typo (W064)",
+  "lines": {
+    "2": [
+      "W064"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W064"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

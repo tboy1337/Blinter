@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "%TIME: =0% replaces the leading space (W069 negative)",
+  "lines": {},
+  "must_not": [
+    "W069"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

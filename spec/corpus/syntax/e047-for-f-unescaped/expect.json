@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "Unescaped pipe inside FOR /F command (E047)",
+  "lines": {
+    "2": [
+      "E047"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E047"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

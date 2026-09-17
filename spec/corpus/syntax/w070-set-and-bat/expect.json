@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "SET chained with && in a .bat file (W070)",
+  "lines": {
+    "2": [
+      "W070"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W070"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "Malformed 2>&1 redirection (E046)",
+  "lines": {
+    "2": [
+      "E046"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E046"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

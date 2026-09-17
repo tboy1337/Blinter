@@ -822,3 +822,84 @@ entries:
   - SEC006
   corpus:
   - integration/embedded-ps-filename-not-skipped
+- construct: cmd.exe ERRORLEVEL 0 tests, IF EXIT typos, double-colon labels inside blocks, ELSE on a new line, invalid internal switches, stream-merge typos, and parse-time percent expansion
+  sources:
+  - MS Learn if
+  - MS Learn for
+  - vendor/batch-spec/audit/cmd-help/if-help.txt
+  - cmd.exe parenthesized block parsing
+  ssot_artifacts:
+  - rules E003 E036 E043 E044 E045 E046 E047 S016 S029 S030 SEC001 SEC014 SEC025 W017
+    W044 W064 W065 W066 W067 W068 W069 W070
+  rules:
+  - E003
+  - E036
+  - E043
+  - E044
+  - E045
+  - E046
+  - E047
+  - S016
+  - S029
+  - S030
+  - SEC001
+  - SEC014
+  - SEC025
+  - W017
+  - W044
+  - W064
+  - W065
+  - W066
+  - W067
+  - W068
+  - W069
+  - W070
+  corpus:
+  - syntax/w017-errorlevel-zero
+  - syntax/w017-not-errorlevel-zero
+  - syntax/w017-not-errorlevel-one-valid
+  - syntax/e003-if-single-equals
+  - syntax/e003-if-missing-space-paren
+  - syntax/e003-if-format
+  - syntax/e036-if-exists-typo
+  - syntax/e036-if-exist-valid
+  - syntax/e043-doublecolon-in-block
+  - syntax/e043-doublecolon-outside-valid
+  - syntax/e044-else-newline
+  - syntax/e044-else-sameline-valid
+  - syntax/e045-invalid-switch
+  - syntax/e045-switch-valid
+  - syntax/e046-malformed-redir
+  - syntax/e046-redir-valid
+  - syntax/e047-for-f-unescaped
+  - syntax/e047-echo-parens-block
+  - syntax/e047-escaped-valid
+  - syntax/s016-double-colon-lf
+  - syntax/s029-at-command
+  - syntax/s029-echo-off-valid
+  - syntax/s030-device-colon
+  - syntax/s030-nul-valid
+  - syntax/sec014-unquoted-arg
+  - syntax/sec014-quoted-arg-valid
+  - integration/sec014-unescaped-input
+  - syntax/sec025-unquoted-cd
+  - syntax/sec025-quoted-cd-valid
+  - syntax/sec001-setp-unquoted-use
+  - syntax/sec001-setp-quoted-valid
+  - integration/sec001-command-injection
+  - syntax/w044-set-space-before-eq
+  - syntax/w044-set-spacing
+  - syntax/w064-alluserprofile-typo
+  - syntax/w064-allusersprofile-valid
+  - syntax/w065-if-wildcard
+  - syntax/w065-if-literal-valid
+  - syntax/w066-redir-not-at-end
+  - syntax/w066-redir-at-end-valid
+  - syntax/w067-set-system-var
+  - syntax/w067-set-custom-valid
+  - syntax/w068-block-percent
+  - syntax/w068-delayed-valid
+  - syntax/w069-time-space
+  - syntax/w069-time-zero-valid
+  - syntax/w070-set-and-bat
+  - syntax/w070-set-and-cmd-valid

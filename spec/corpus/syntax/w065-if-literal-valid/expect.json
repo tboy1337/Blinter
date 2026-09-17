@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "Literal IF == without wildcards (W065 negative)",
+  "lines": {},
+  "must_not": [
+    "W065"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

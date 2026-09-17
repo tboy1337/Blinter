@@ -1,11 +1,13 @@
 {
   "config": {},
-  "description": "IF EXISTS typo (E036)",
+  "description": "IF EXISTS / EXIT / EXITS typos (E036)",
   "lines": {
     "2": ["E036"],
-    "3": ["E036", "W001"]
+    "3": ["E036"],
+    "4": ["E036"],
+    "5": ["E036"]
   },
   "must_not": [],
-  "rules": ["E036", "W001"],
+  "rules": ["E036"],
   "tags": ["syntax", "control-flow"]
 }

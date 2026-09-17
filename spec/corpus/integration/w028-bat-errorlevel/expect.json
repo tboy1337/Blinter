@@ -3,12 +3,14 @@
   "description": "w028 bat errorlevel",
   "lines": {
     "2": [
-      "W001"
+      "W001",
+      "W067"
     ]
   },
   "must_not": [],
   "rules": [
-    "W001"
+    "W001",
+    "W067"
   ],
   "tags": [
     "integration"

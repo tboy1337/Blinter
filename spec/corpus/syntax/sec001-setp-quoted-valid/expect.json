@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "Quoted SET /P use is not injection (SEC001 negative)",
+  "lines": {},
+  "must_not": [
+    "SEC001"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

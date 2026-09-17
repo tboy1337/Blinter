@@ -9,6 +9,10 @@ from typing import (
     cast,
 )
 
+from blinter.checkers.cmd_extended import (
+    check_sec025_unquoted_cd,
+    has_unquoted_user_args,
+)
 from blinter.constants import MAGIC_NUMBER_EXCEPTIONS
 from blinter.models import LintIssue
 from blinter.parsing.context import _is_comment_line
@@ -50,8 +54,6 @@ _SEC012_TEMP_FILE_PATTERN = re.compile(
     r"|\.(tmp|bat|cmd|exe)\b.*(%temp%|%tmp%|\\temp\\|\bc:\\temp\\)",
     re.IGNORECASE,
 )
-_USER_ARG_PERCENT_PATTERN = re.compile(r"%([1-9]|\*)")
-_USER_ARG_DELAYED_PATTERN = re.compile(r"!([1-9]|\*)!")
 
 
 def _has_path_traversal_risk(stripped: str) -> bool:
@@ -70,17 +72,10 @@ def _has_unsafe_temp_creation(stripped: str) -> bool:
 
 
 def _has_unescaped_user_args(stripped: str) -> bool:
-    """Return True when batch args (%1-%9, %*, !1!-!9!, !*!) use shell operators."""
-    has_user_arg = (
-        _USER_ARG_PERCENT_PATTERN.search(stripped) is not None
-        or _USER_ARG_DELAYED_PATTERN.search(stripped) is not None
-    )
-    if not has_user_arg:
+    """Return True when unquoted %1-%9, %*, %~1 or delayed equivalents appear."""
+    if _is_comment_line(stripped):
         return False
-    special_chars = ["&", "|", ">", "<", "^"]
-    if not any(char in stripped for char in special_chars):
-        return False
-    return re.search(r"\^[&|><^]", stripped) is None
+    return has_unquoted_user_args(stripped)
 
 
 def _check_sec014_unescaped_input(
@@ -95,7 +90,7 @@ def _check_sec014_unescaped_input(
     return LintIssue(
         line_number,
         RULES["SEC014"],
-        context="User input parameters should be escaped",
+        context='Quote user arguments, for example "%~1"',
     )
 
 
@@ -144,6 +139,7 @@ def _check_advanced_security(
     sec014 = _check_sec014_unescaped_input(line, line_number, lines, labels)
     if sec014 is not None:
         issues.append(sec014)
+    issues.extend(check_sec025_unquoted_cd(line, line_number))
     sec017 = _check_sec017_predictable_temp(line, line_number)
     if sec017 is not None:
         issues.append(sec017)

@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "Space before SET equals becomes part of the name (W044)",
+  "lines": {
+    "2": [
+      "W044"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W044"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

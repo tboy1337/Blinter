@@ -165,6 +165,7 @@ def lint_batch_file(  # pylint: disable=too-many-locals
             config,
             skip_lines,
             called_scripts_vars,
+            file_path,
         )
     )
 

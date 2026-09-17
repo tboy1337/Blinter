@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "SET /P value later used unquoted (SEC001)",
+  "lines": {
+    "3": [
+      "SEC001"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "SEC001"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

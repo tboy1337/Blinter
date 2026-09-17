@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "Percent expansion after SET in the same block (W068)",
+  "lines": {
+    "4": [
+      "W068"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W068"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "Unescaped ECHO parentheses inside a block (E047)",
+  "lines": {
+    "3": [
+      "E047"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E047"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

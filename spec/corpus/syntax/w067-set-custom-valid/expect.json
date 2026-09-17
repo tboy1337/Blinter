@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "SET of a custom variable (W067 negative)",
+  "lines": {},
+  "must_not": [
+    "W067"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

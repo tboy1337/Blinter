@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "2>&1 before other redirection (W066)",
+  "lines": {
+    "2": [
+      "W066"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W066"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

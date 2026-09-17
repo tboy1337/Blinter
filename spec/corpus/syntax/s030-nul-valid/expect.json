@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "NUL without a colon (S030 negative)",
+  "lines": {},
+  "must_not": [
+    "S030"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

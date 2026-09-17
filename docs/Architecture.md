@@ -28,6 +28,7 @@ src/blinter/
     performance.py     # Performance rules
     vars.py            # Variable rules
     line_endings.py    # Line-ending rules (E018, etc.)
+    cmd_extended.py    # Extra cmd.exe syntax, warning, and style checks
     advanced/          # Split from former advanced.py (facade __init__.py)
     globals/           # Split from former globals.py (facade __init__.py)
   engine/
@@ -118,7 +119,7 @@ When `follow_calls` is enabled, Blinter resolves `CALL` targets to read variable
 | ANTLR grammar, expansion rules, command catalog, cmd-help | [`vendor/batch-spec`](../vendor/batch-spec) ([`tboy1337/batch-spec`](https://github.com/tboy1337/batch-spec), pinned in [`spec/batch-spec.lock`](../spec/batch-spec.lock)) |
 | [`spec/data/rules.yaml`](../spec/data/rules.yaml) | Rule catalog (`checker: regex`; see `RULE_COUNT`) |
 | [`spec/data/commands-linter.yaml`](../spec/data/commands-linter.yaml) | Security/style command policy (merged with batch-spec `commands.yaml` for `patterns.py`; pins W009 `older_windows_commands`) |
-| [`spec/corpus/`](../spec/corpus/) | 235 committed fixtures + `expect.json` oracles |
+| [`spec/corpus/`](../spec/corpus/) | 274 committed fixtures + `expect.json` oracles |
 | [`spec/audit/`](../spec/audit/) | Reference matrix and audit baselines |
 
 Clone with `git clone --recurse-submodules` or run `git submodule update --init --recursive` after checkout.

@@ -1,8 +1,8 @@
 {
   "description": "Text after closing parenthesis inside a FOR block is invalid (E042)",
-  "rules": ["E042"],
+  "rules": ["E042", "E047"],
   "lines": {
-    "3": ["E042"]
+    "3": ["E042", "E047"]
   },
   "must_not": [],
   "config": {},

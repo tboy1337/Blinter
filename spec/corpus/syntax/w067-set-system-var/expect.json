@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "SET of a system environment variable (W067)",
+  "lines": {
+    "2": [
+      "W067"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W067"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

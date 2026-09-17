@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "Quoted %~1 is safe (SEC014 negative)",
+  "lines": {},
+  "must_not": [
+    "SEC014"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

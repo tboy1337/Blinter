@@ -6,6 +6,7 @@ from typing import (
     Optional,
 )
 
+from blinter.checkers.cmd_extended import check_extended_style_line
 from blinter.models import LintIssue
 from blinter.rules.helpers import _s011_rule
 from blinter.rules.registry import RULES
@@ -127,5 +128,7 @@ def _check_style_issues(
                     context=f"Function call has {len(params)} parameters, consider grouping them",
                 )
             )
+
+    issues.extend(check_extended_style_line(line, line_num))
 
     return issues

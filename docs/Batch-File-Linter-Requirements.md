@@ -48,6 +48,11 @@
 - **E040**: FOR block parenthesis must be on same line as DO
 - **E041**: SET /P missing variable assignment
 - **E042**: Text after closing parenthesis in block
+- **E043**: Double-colon comment inside parenthesized block
+- **E044**: ELSE on a new line
+- **E045**: Invalid internal command switch or argument
+- **E046**: Malformed stream redirection
+- **E047**: Unescaped specials in FOR /F command or ECHO in a block
 ### Warning Level Rules (W001-W999)
 **Auto-generated from spec/data/rules.yaml**
 
@@ -111,6 +116,13 @@
 - **W061**: Unbalanced PUSHD and POPD commands
 - **W062**: CD without /D for cross-drive path
 - **W063**: FOR /F loop variable beyond tokens range
+- **W064**: ALLUSERPROFILE environment-variable typo
+- **W065**: Wildcard in IF string comparison
+- **W066**: 2>&1 not at the end of the command
+- **W067**: SET of a system environment variable
+- **W068**: Percent expansion of a variable set in the same parenthesized block
+- **W069**: TIME expansion without replacing the leading space
+- **W070**: SET PATH or PROMPT chained with AND in a .bat file
 ### Style Level Rules (S001-S999)
 **Auto-generated from spec/data/rules.yaml**
 
@@ -139,6 +151,8 @@
 - **S026**: Inconsistent continuation character usage
 - **S027**: Missing blank lines around code blocks
 - **S028**: Redundant parentheses in simple commands
+- **S029**: @ prefix after the first line
+- **S030**: Redundant colon on device name
 ### Security Level Rules (SEC001+)
 **Auto-generated from spec/data/rules.yaml**
 
@@ -166,6 +180,7 @@
 - **SEC022**: Potential hosts file modification
 - **SEC023**: Autorun.inf creation detected
 - **SEC024**: Batch file copying itself to removable media
+- **SEC025**: Unquoted current-directory expansion
 ### Performance Level Rules (P001-P999)
 **Auto-generated from spec/data/rules.yaml**
 
@@ -198,7 +213,7 @@
 
 <!-- GENERATED:rule-catalog:end -->
 
-**Blinter** provides comprehensive static analysis with **built-in rules** registered in `blinter.rules.registry` (currently **176** rules; see `RULE_COUNT` in that module). Rule IDs may have gaps where rules were retired or consolidated (for example W041, S025, P011).
+**Blinter** provides comprehensive static analysis with **built-in rules** registered in `blinter.rules.registry` (currently **191** rules; see `RULE_COUNT` in that module). Rule IDs may have gaps where rules were retired or consolidated (for example W041, S025, P011).
 
 Across 5 severity levels:
 

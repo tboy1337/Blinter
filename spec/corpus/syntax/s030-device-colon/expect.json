@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "Redundant colon on NUL device (S030)",
+  "lines": {
+    "2": [
+      "S030"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "S030"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

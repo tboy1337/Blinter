@@ -11,6 +11,7 @@ from typing import (
     Tuple,
 )
 
+from blinter.checkers.cmd_extended import check_extended_warning_line
 from blinter.checkers.globals.exit_flow import _update_paren_depth
 from blinter.checkers.warnings_compat import _check_compatibility_warnings
 from blinter.constants import PSEUDO_ENV_VARS
@@ -133,6 +134,17 @@ def _check_errorlevel_comparison(stripped: str, line_num: int) -> List[LintIssue
                 ),
             )
         )
+    elif re.search(r"errorlevel\s+0\b", w017_if_content, re.IGNORECASE):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["W017"],
+                context=(
+                    "IF ERRORLEVEL 0 is always true for native commands "
+                    "(ERRORLEVEL n means >= n)"
+                ),
+            )
+        )
     return issues
 
 
@@ -203,12 +215,12 @@ def _check_unicode_filenames(stripped: str, line_num: int) -> List[LintIssue]:
 
 def _check_set_spacing(stripped: str, line_num: int) -> List[LintIssue]:
     """Check SET command spacing around equals (W044)."""
-    if re.match(r"set\s+(?!/)([^\s=]+)\s+=\s+\S", stripped, re.IGNORECASE):
+    if re.match(r"set\s+(?!/)([^\s=]+)\s+=", stripped, re.IGNORECASE):
         return [
             LintIssue(
                 line_number=line_num,
                 rule=RULES["W044"],
-                context="Spaces around = in SET create a variable name with trailing spaces",
+                context="A space before = in SET is part of the variable name",
             )
         ]
     return []
@@ -898,6 +910,7 @@ def _check_warning_issues(
     _delayed_expansion_enabled: bool,
     *,
     lines: list[str] | None = None,
+    file_path: str = "",
 ) -> List[LintIssue]:
     """Check for warning level issues."""
     issues: List[LintIssue] = []
@@ -937,5 +950,13 @@ def _check_warning_issues(
     issues.extend(_check_ren_destination_path(stripped, line_num))
     issues.extend(_check_compatibility_warnings(line, line_num, stripped))
     issues.extend(_check_command_warnings(line, line_num, stripped))
+    issues.extend(
+        check_extended_warning_line(
+            line,
+            line_num,
+            lines=line_context or None,
+            file_path=file_path,
+        )
+    )
 
     return issues

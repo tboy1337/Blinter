@@ -15,8 +15,8 @@ rules:
 - code: E003
   name: IF statement improper formatting
   severity: ERROR
-  explanation: IF statement has improper spacing or syntax that will prevent correct execution
-  recommendation: 'Use proper spacing: IF "condition" operator "value" command'
+  explanation: IF statement has improper spacing or syntax that will prevent correct execution, including a single = where == is required and a missing space before (
+  recommendation: 'Use proper spacing: IF "condition" == "value" ( and IF EXIST/DEFINED/ERRORLEVEL forms without a single equals'
   checker: regex
 - code: E004
   name: IF EXIST syntax mixing
@@ -43,7 +43,7 @@ rules:
   name: Empty variable check syntax error
   severity: ERROR
   explanation: Incorrect syntax for checking if variables are empty will cause comparison errors
-  recommendation: 'Use proper syntax: IF "%%VAR%%"=="" for empty variable checks'
+  recommendation: 'Use IF NOT DEFINED VAR or IF "%VAR%"=="" for empty variable checks'
   checker: regex
 - code: E008
   name: Unreachable code after EXIT or GOTO
@@ -261,6 +261,8 @@ rules:
     bad:
       - IF EXISTS file.txt echo found
       - IF NOT EXISTS file.txt echo missing
+      - IF EXIT file.txt echo found
+      - IF EXITS file.txt echo found
     good:
       - IF EXIST file.txt echo found
       - IF NOT EXIST file.txt echo missing
@@ -350,6 +352,93 @@ rules:
       - |-
         for %%D in (C) do (
             echo --- text ^(parens^) ---
+        )
+- code: E043
+  name: Double-colon comment inside parenthesized block
+  severity: ERROR
+  explanation: 'Inside a parenthesized block, cmd.exe treats :: as a label rather than a comment; labels in blocks break block parsing'
+  recommendation: Use REM for comments inside IF/FOR parenthesized blocks
+  checker: regex
+  examples:
+    bad:
+      - |-
+        if 1==1 (
+          :: do not comment like this
+          echo ok
+        )
+    good:
+      - |-
+        if 1==1 (
+          REM use rem inside blocks
+          echo ok
+        )
+- code: E044
+  name: ELSE on a new line
+  severity: ERROR
+  explanation: ELSE must share the line with the closing parenthesis of the IF block; an ELSE that starts a new line is not paired and runs with silent wrong control flow
+  recommendation: 'Write ) ELSE ( on the same line as the close of the IF block'
+  checker: regex
+  examples:
+    bad:
+      - |-
+        if 1==1 (
+          echo yes
+        )
+        else (
+          echo no
+        )
+    good:
+      - |-
+        if 1==1 (
+          echo yes
+        ) else (
+          echo no
+        )
+- code: E045
+  name: Invalid internal command switch or argument
+  severity: ERROR
+  explanation: Several cmd.exe internal commands accept only a documented set of slash-switches or no arguments at all; unknown switches and extra arguments fail at runtime
+  recommendation: Use only documented switches (for example IF /I, CD /D, SET /A /P, EXIT /B, FOR /D /F /L /R, DATE /T, TIME /T, SHIFT /0-/8) and omit arguments for CLS, PAUSE, VER, POPD, and ENDLOCAL
+  checker: regex
+  examples:
+    bad:
+      - IF /X 1==1 echo bad
+      - FOR /Q %%i IN (1) DO echo %%i
+      - CLS extra
+    good:
+      - IF /I 1==1 echo ok
+      - FOR /L %%i IN (1,1,1) DO echo %%i
+      - CLS
+- code: E046
+  name: Malformed stream redirection
+  severity: ERROR
+  explanation: 'Merging stderr and stdout requires 2>&1 or 1>&2; a space before & (2> &1) is a live syntax error. 2>>&1 is valid append-duplication'
+  recommendation: 'Write 2>&1 or 1>&2 with no space before &, and place 2>&1 at the end of the command'
+  checker: regex
+  examples:
+    bad:
+      - DIR 2> &1
+    good:
+      - DIR >log.txt 2>&1
+      - DIR 2>>&1
+- code: E047
+  name: Unescaped specials in FOR /F command or ECHO in a block
+  severity: ERROR
+  explanation: 'Unescaped & < > | inside a FOR /F IN (''command'') string, or unescaped parentheses in ECHO inside a parenthesized block, terminate the loop or block early'
+  recommendation: 'Escape as ^& ^< ^> ^| and ^( ^) inside those contexts'
+  checker: regex
+  examples:
+    bad:
+      - for /f %%a in ('dir /b | sort') do echo %%a
+      - |-
+        if 1==1 (
+          echo text (parens)
+        )
+    good:
+      - for /f %%a in ('dir /b ^| sort') do echo %%a
+      - |-
+        if 1==1 (
+          echo text ^(parens^)
         )
 - code: P001
   name: Redundant file existence check
@@ -666,11 +755,37 @@ rules:
   explanation: Simple single commands don't need parentheses for code blocks
   recommendation: 'Remove parentheses for single commands: IF condition command'
   checker: regex
+- code: S029
+  name: '@ prefix after the first line'
+  severity: STYLE
+  explanation: 'Prefixing commands with @ after line 1 hides individual commands without documenting the script-wide echo policy; @ECHO OFF at the start is the conventional way to suppress command echo'
+  recommendation: 'Use @ECHO OFF (or @ECHO ON) on the first line and omit @ on later commands except when a single line must stay silent'
+  checker: regex
+  examples:
+    bad:
+      - |-
+        @ECHO OFF
+        @DIR
+    good:
+      - |-
+        @ECHO OFF
+        DIR
+- code: S030
+  name: Redundant colon on device name
+  severity: STYLE
+  explanation: 'Device names such as NUL, CON, and PRN do not need a trailing colon; NUL: is a redundant form'
+  recommendation: Write NUL, CON, or PRN without a colon
+  checker: regex
+  examples:
+    bad:
+      - 'DIR >NUL:'
+    good:
+      - DIR >NUL
 - code: SEC001
   name: Potential command injection vulnerability
   severity: SECURITY
-  explanation: User input used in commands without validation could allow malicious code execution
-  recommendation: Validate and sanitize all user input before using in commands
+  explanation: 'SET /P input stored in a variable and later used unquoted in a command can inject extra commands if the user types & | > or similar'
+  recommendation: Quote every use of SET /P variables, or validate with IF DEFINED and character checks before expanding them
   checker: regex
 - code: SEC002
   name: Unsafe SET command usage
@@ -749,8 +864,8 @@ rules:
 - code: SEC014
   name: Unescaped user input in command execution
   severity: SECURITY
-  explanation: User input containing special characters can break command execution
-  recommendation: 'Escape special characters in user input: ^&, ^|, ^>, ^<, ^^'
+  explanation: 'Unquoted batch arguments %1-%9, %*, and %~1 are filled at runtime and can inject extra commands when they contain & | > < or similar'
+  recommendation: 'Always quote arguments, for example "%~1" or "%*"'
   checker: regex
 - code: SEC015
   name: Process killing without authentication
@@ -812,6 +927,17 @@ rules:
   explanation: Self-replicating batch files exhibit virus-like behavior
   recommendation: Remove self-copying logic or limit to specific controlled directories
   checker: regex
+- code: SEC025
+  name: Unquoted current-directory expansion
+  severity: SECURITY
+  explanation: 'Unquoted %CD%, %__CD__%, or !CD! can insert extra commands when the current directory contains & | > < or similar'
+  recommendation: Always quote directory expansions, for example "%CD%"
+  checker: regex
+  examples:
+    bad:
+      - echo %CD%
+    good:
+      - echo "%CD%"
 - code: W001
   name: Missing exit code
   severity: WARNING
@@ -902,12 +1028,11 @@ rules:
 - code: W017
   name: Errorlevel comparison semantic difference
   severity: WARNING
-  explanation: IF %ERRORLEVEL% NEQ 1 has different behavior than IF NOT ERRORLEVEL 1 - NEQ 1 matches any
-    value except 1 (0,2,3...), while NOT ERRORLEVEL 1 only matches values less than 1 (i.e., 0).
-    IF NOT ERRORLEVEL 0 matches only negative exit codes (NOT >= 0), not general failure.
-  recommendation: Use 'IF NOT ERRORLEVEL 1' for traditional success checks, 'IF %ERRORLEVEL% NEQ 0'
-    or 'IF %ERRORLEVEL% EQU 0' for explicit comparisons, and avoid 'IF NOT ERRORLEVEL 0' unless
-    negative exit codes are intended
+  explanation: IF ERRORLEVEL 0 is always true for native commands because ERRORLEVEL n means >= n. IF NOT
+    ERRORLEVEL 0 is almost always false except for negative exit codes. IF %ERRORLEVEL% NEQ 1 matches
+    any value except 1 (0,2,3...), while NOT ERRORLEVEL 1 only matches values less than 1 (i.e., 0).
+  recommendation: Use IF ERRORLEVEL 1 for traditional failure checks, IF %ERRORLEVEL% NEQ 0 or IF %ERRORLEVEL%
+    EQU 0 for explicit comparisons, and avoid IF ERRORLEVEL 0, IF NOT ERRORLEVEL 0, and IF %ERRORLEVEL% NEQ 1
   checker: regex
 - code: W018
   name: Multi-byte characters with potential line ending risks
@@ -1072,14 +1197,16 @@ rules:
 - code: W044
   name: SET command spacing around equals
   severity: WARNING
-  explanation: Spaces around the equals sign in SET create a variable name that includes trailing or leading spaces
-  recommendation: 'Use SET var=value with no spaces around ='
+  explanation: A space before the equals sign in SET is part of the variable name (set X =Hello names the variable "X "), so later %X% expansions miss it
+  recommendation: 'Use SET var=value or SET "var=value" with no space before ='
   checker: regex
   examples:
     bad:
+      - 'set X =Hello'
       - 'set X = Hello'
     good:
       - 'set X=Hello'
+      - 'set "X=Hello"'
 - code: W045
   name: SET /A leading zero octal literal
   severity: WARNING
@@ -1194,3 +1321,91 @@ rules:
   explanation: FOR /F assigns implicit loop variables in alphabetical order from the declared variable; references beyond the tokens= count resolve as literal percent text (for example %%d becomes %d when only tokens=1-3 is declared, %%b becomes %b with tokens=*, or %%c with tokens=2* when only %%a and %%b are assigned)
   recommendation: Declare enough tokens in the tokens= clause or reference only variables within the assigned range; for multiline DO blocks, check every line in the block body
   checker: regex
+- code: W064
+  name: ALLUSERPROFILE environment-variable typo
+  severity: WARNING
+  explanation: ALLUSERPROFILE is a common misspelling of ALLUSERSPROFILE and expands empty
+  recommendation: Use %ALLUSERSPROFILE%
+  checker: regex
+  examples:
+    bad:
+      - echo %ALLUSERPROFILE%
+    good:
+      - echo %ALLUSERSPROFILE%
+- code: W065
+  name: Wildcard in IF string comparison
+  severity: WARNING
+  explanation: IF == comparisons are literal string matches; * and ? are not glob wildcards there
+  recommendation: Use FOR, FINDSTR, or an explicit list of comparisons instead of * or ? in IF ==
+  checker: regex
+  examples:
+    bad:
+      - 'IF "%var%"=="foo*" echo match'
+    good:
+      - echo %var% | FINDSTR /B foo
+- code: W066
+  name: 2>&1 not at the end of the command
+  severity: WARNING
+  explanation: 'Stream merge 2>&1 applies to the redirection state at that point; placing it before other redirects often fails to capture stderr as intended'
+  recommendation: 'Put 2>&1 at the end of the command, for example DIR >log.txt 2>&1'
+  checker: regex
+  examples:
+    bad:
+      - DIR 2>&1 >log.txt
+    good:
+      - DIR >log.txt 2>&1
+- code: W067
+  name: SET of a system environment variable
+  severity: WARNING
+  explanation: Assigning PATH, USERNAME, USERPROFILE, TEMP, TMP, APPDATA, and similar system variables changes the process environment for the rest of the script and child processes
+  recommendation: Prefer a distinct variable name, or restore the original value if a temporary override is required
+  checker: regex
+  examples:
+    bad:
+      - set USERNAME=demo
+    good:
+      - set SCRIPT_USER=demo
+- code: W068
+  name: Percent expansion of a variable set in the same parenthesized block
+  severity: WARNING
+  explanation: 'cmd.exe expands %var% when a parenthesized block is parsed, so SET inside the block does not update later %var% on that same parse'
+  recommendation: Use !var! with SETLOCAL EnableDelayedExpansion, or SET the variable before the block
+  checker: regex
+  examples:
+    bad:
+      - |-
+        if 1==1 (
+          set price=$350
+          echo %price%
+        )
+    good:
+      - |-
+        setlocal EnableDelayedExpansion
+        if 1==1 (
+          set price=$350
+          echo !price!
+        )
+- code: W069
+  name: TIME expansion without replacing the leading space
+  severity: WARNING
+  explanation: 'Before 10:00, %TIME% begins with a space rather than a zero, which breaks concatenations, filenames, and colon/dot stripping'
+  recommendation: 'Substitute the leading space with %TIME: =0% before using TIME in names or further replacements'
+  checker: regex
+  examples:
+    bad:
+      - set stamp=%TIME%
+    good:
+      - 'set stamp=%TIME: =0%'
+- code: W070
+  name: SET PATH or PROMPT chained with AND in a .bat file
+  severity: WARNING
+  explanation: 'In .bat files SET, PATH, and PROMPT do not reset ERRORLEVEL to 0 on success, so cmd1 && cmd2 may skip the second command; .cmd files do reset it'
+  recommendation: 'Avoid && after SET, PATH, or PROMPT in .bat files; use a separate line, or rename the script to .cmd'
+  checker: regex
+  examples:
+    bad:
+      - set foo=bar && echo ok
+    good:
+      - |-
+        set foo=bar
+        echo ok

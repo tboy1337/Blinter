@@ -9,7 +9,11 @@ from typing import (
     Tuple,
 )
 
-from blinter.checkers.warnings import _paren_depth_before_line
+from blinter.checkers.cmd_extended import check_extended_syntax_line
+from blinter.checkers.warnings import (
+    _paren_depth_before_line,
+    _strip_double_quoted_strings,
+)
 from blinter.models import LintIssue
 from blinter.parsing.structure import _delayed_expansion_state_for_lines
 from blinter.patterns import (
@@ -122,24 +126,23 @@ def _check_set_p_syntax(stripped: str, line_num: int) -> List[LintIssue]:
 
 
 def _check_if_exists_typo(stripped: str, line_num: int) -> List[LintIssue]:
-    """Flag IF EXISTS / IF NOT EXISTS typo (E036). cmd.exe requires IF EXIST."""
-    if re.search(r"\bif\s+(?:/i\s+)?not\s+exists\b", stripped, re.IGNORECASE):
-        return [
-            LintIssue(
-                line_number=line_num,
-                rule=RULES["E036"],
-                context="IF NOT EXISTS is invalid; use IF NOT EXIST",
-            )
-        ]
-    if re.search(r"\bif\s+(?:/i\s+)?exists\b", stripped, re.IGNORECASE):
-        return [
-            LintIssue(
-                line_number=line_num,
-                rule=RULES["E036"],
-                context="IF EXISTS is invalid; use IF EXIST",
-            )
-        ]
-    return []
+    """Flag IF EXISTS / EXIT / EXITS typos (E036). cmd.exe requires IF EXIST."""
+    match = re.search(
+        r"\bif\s+(?:/i\s+)?(not\s+)?exi(sts|t|ts)\b",
+        stripped,
+        re.IGNORECASE,
+    )
+    if match is None:
+        return []
+    negation = "NOT " if match.group(1) else ""
+    typo = f"EXI{match.group(2)}".upper()
+    return [
+        LintIssue(
+            line_number=line_num,
+            rule=RULES["E036"],
+            context=f"IF {negation}{typo} is invalid; use IF {negation}EXIST",
+        )
+    ]
 
 
 def _check_if_statement_formatting(stripped: str, line_num: int) -> List[LintIssue]:
@@ -201,6 +204,41 @@ def _check_if_statement_formatting(stripped: str, line_num: int) -> List[LintIss
                     ),
                 )
             )
+    issues.extend(_check_if_equals_paren(stripped, line_num))
+    return issues
+
+
+def _check_if_equals_paren(stripped: str, line_num: int) -> List[LintIssue]:
+    """E003: single ``=`` where ``==`` is required, or ``IF a==b(`` glued paren."""
+    if not re.match(r"@?if\b", stripped, re.IGNORECASE):
+        return []
+    if re.search(
+        r"\bif\s+(?:/i\s+)?(?:not\s+)?(?:exist|defined|errorlevel|cmdextversion)\b",
+        stripped,
+        re.IGNORECASE,
+    ):
+        return []
+    unquoted = _strip_double_quoted_strings(stripped)
+    issues: List[LintIssue] = []
+    if re.search(r"(?:==|equ|neq|lss|leq|gtr|geq)\S*\(", unquoted, re.IGNORECASE):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E003"],
+                context="IF comparison must have a space before (",
+            )
+        )
+    without_double_equals = re.sub(r"==", "", unquoted)
+    if re.search(r"=", without_double_equals) and not re.search(
+        r"\b(equ|neq|lss|leq|gtr|geq)\b", unquoted, re.IGNORECASE
+    ):
+        issues.append(
+            LintIssue(
+                line_number=line_num,
+                rule=RULES["E003"],
+                context="IF string comparison requires ==, not a single =",
+            )
+        )
     return issues
 
 
@@ -1101,5 +1139,6 @@ def _check_syntax_errors(
     issues.extend(_check_text_after_close_paren_in_block(stripped, line_num, lines))
     issues.extend(_check_empty_variable_syntax(stripped, line_num))
     issues.extend(_check_smart_quotes(line, line_num))
+    issues.extend(check_extended_syntax_line(line, line_num, lines))
 
     return issues

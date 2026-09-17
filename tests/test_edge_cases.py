@@ -4168,6 +4168,51 @@ class TestAdvancedSecurityPerformanceRules:
         codes = {issue.rule.code for issue in issues}
         assert "SEC014" in codes
 
+    def test_sec014_flags_unquoted_arg_without_specials(self) -> None:
+        """SEC014 triggers for unquoted %1 even when the source has no &|><."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_advanced_security,
+        )
+
+        lines = ["@echo off\n", "echo %1\n"]
+        issues = _check_advanced_security(lines[1], 2, lines, {})
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC014" in codes
+
+    def test_sec014_ignores_quoted_arg(self) -> None:
+        """SEC014 does not flag quoted %~1."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_advanced_security,
+        )
+
+        lines = ["@echo off\n", 'echo "%~1"\n']
+        issues = _check_advanced_security(lines[1], 2, lines, {})
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC014" not in codes
+
+    def test_sec025_flags_unquoted_cd(self) -> None:
+        """SEC025 triggers for unquoted %CD%."""
+        from blinter.checkers.advanced.style_security_perf import (
+            _check_advanced_security,
+        )
+
+        issues = _check_advanced_security("echo %CD%\n", 1, ["@echo off\n"], {})
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC025" in codes
+
+    def test_sec001_quoted_setp_use_is_safe(self) -> None:
+        """SEC001 does not flag SET /P variables that are only used quoted."""
+        from blinter.checkers.security import _check_security_issues
+
+        lines = [
+            "@echo off\n",
+            "set /p input=Enter:\n",
+            'echo "%input%"\n',
+        ]
+        issues = _check_security_issues(lines[0], 1, lines)
+        codes = {issue.rule.code for issue in issues}
+        assert "SEC001" not in codes
+
     def test_sec014_flags_unescaped_percent5(self) -> None:
         """SEC014 triggers for unescaped %5 with special characters."""
         from blinter.checkers.advanced.style_security_perf import (

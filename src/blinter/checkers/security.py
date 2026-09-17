@@ -6,6 +6,10 @@ from typing import (
     Optional,
 )
 
+from blinter.checkers.cmd_extended import (
+    check_sec001_same_line,
+    check_sec001_setp_dataflow,
+)
 from blinter.models import LintIssue
 from blinter.parsing.context import (
     _is_command_in_safe_context,
@@ -92,14 +96,8 @@ def _is_safe_unquoted_set_value(var_val: str) -> bool:
 def _check_sec001_user_input_in_command(
     stripped: str, line_num: int
 ) -> Optional[LintIssue]:
-    """SEC001: Potential command injection vulnerability."""
-    if not re.search(r"set\s+/p\s+[^=]+=.*%.*%", stripped, re.IGNORECASE):
-        return None
-    return LintIssue(
-        line_number=line_num,
-        rule=RULES["SEC001"],
-        context="User input used in command without validation",
-    )
+    """SEC001: SET /P used unquoted on the same line."""
+    return check_sec001_same_line(stripped, line_num)
 
 
 def _check_sec002_unquoted_set(stripped: str, line_num: int) -> Optional[LintIssue]:
@@ -446,5 +444,7 @@ def _check_security_issues(
     issues.extend(_check_path_security(line, stripped, line_num))
     issues.extend(_check_info_disclosure_sec(line, stripped, line_num))
     issues.extend(_check_malware_security(line, stripped, line_num))
+    if lines is not None and line_num == 1:
+        issues.extend(check_sec001_setp_dataflow(lines))
 
     return issues

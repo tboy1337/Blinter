@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "Double-colon outside a block is not E043",
+  "lines": {},
+  "must_not": [
+    "E043"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

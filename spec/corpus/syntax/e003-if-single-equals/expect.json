@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "IF single equals instead of == (E003)",
+  "lines": {
+    "2": [
+      "E003"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "E003"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

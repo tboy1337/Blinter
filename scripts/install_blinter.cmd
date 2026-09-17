@@ -132,7 +132,7 @@ if exist "%BLINTER_RELEASE_FILE%" (
         goto :end
     )
     if exist "%BLINTER_BIN%\blinter.exe" (
-        echo Upgrading from !INSTALLED_RELEASE! to !BLINTER_VERSION!...
+        echo Upgrading from "!INSTALLED_RELEASE!" to !BLINTER_VERSION!...
         echo.
         set NEEDS_BACKUP=1
     )

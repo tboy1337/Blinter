@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "%TIME% used without replacing the leading space (W069)",
+  "lines": {
+    "2": [
+      "W069"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W069"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

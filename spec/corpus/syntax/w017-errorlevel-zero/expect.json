@@ -1,0 +1,16 @@
+{
+  "config": {},
+  "description": "IF ERRORLEVEL 0 is always true (W017)",
+  "lines": {
+    "2": [
+      "W017"
+    ]
+  },
+  "must_not": [],
+  "rules": [
+    "W017"
+  ],
+  "tags": [
+    "syntax"
+  ]
+}

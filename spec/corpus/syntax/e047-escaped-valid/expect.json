@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "Escaped FOR /F specials and ECHO parens are valid (E047 negative)",
+  "lines": {},
+  "must_not": [
+    "E047"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

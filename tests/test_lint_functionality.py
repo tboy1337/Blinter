@@ -3202,3 +3202,111 @@ EXIT /b 0
             assert len(s019_issues) == 0, f"Found unexpected S019 issues: {s019_issues}"
         finally:
             os.unlink(temp_file)
+
+    def test_w017_if_errorlevel_zero(self) -> None:
+        """IF ERRORLEVEL 0 is always true and must trigger W017."""
+        content = """@echo off
+IF ERRORLEVEL 0 echo always true
+IF ERRORLEVEL 1 echo failure
+exit /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            w017 = [issue for issue in issues if issue.rule.code == "W017"]
+            assert len(w017) == 1
+            assert "always true" in w017[0].context.lower()
+        finally:
+            os.unlink(temp_file)
+
+    def test_e036_if_exit_and_exits_typos(self) -> None:
+        """IF EXIT and IF EXITS are EXISTS-family typos (E036)."""
+        content = """@echo off
+IF EXIT file.txt echo found
+IF EXITS file.txt echo found
+IF EXIST file.txt echo found
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e036 = [issue for issue in issues if issue.rule.code == "E036"]
+            assert len(e036) == 2
+        finally:
+            os.unlink(temp_file)
+
+    def test_e003_single_equals_and_glued_paren(self) -> None:
+        """E003 flags a single = in IF and a missing space before (."""
+        content = """@echo off
+IF "%var%"="value" echo bad
+IF 1==1(echo glued
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            e003 = [issue for issue in issues if issue.rule.code == "E003"]
+            assert len(e003) >= 2
+        finally:
+            os.unlink(temp_file)
+
+    def test_e046_spaced_handle_dup_only(self) -> None:
+        """E046 flags a space before & in 2> &1, not append-dup 2>>&1."""
+        bad = self.create_temp_batch_file("@echo off\nDIR 2> &1\n")
+        try:
+            codes = {issue.rule.code for issue in lint_batch_file(bad)}
+            assert "E046" in codes
+        finally:
+            os.unlink(bad)
+        good = self.create_temp_batch_file("@echo off\nDIR 2>>&1\nDIR 2>&1\n")
+        try:
+            codes = {issue.rule.code for issue in lint_batch_file(good)}
+            assert "E046" not in codes
+        finally:
+            os.unlink(good)
+
+    def test_e043_doublecolon_inside_block(self) -> None:
+        """E043 flags :: comments inside parentheses."""
+        content = """@echo off
+if 1==1 (
+  :: bad comment
+  echo ok
+)
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            assert "E043" in {issue.rule.code for issue in issues}
+        finally:
+            os.unlink(temp_file)
+
+    def test_w044_space_before_equals(self) -> None:
+        """W044 flags SET with a space before = even without a space after."""
+        content = """@echo off
+set X =Hello
+exit /b 0
+"""
+        temp_file = self.create_temp_batch_file(content)
+        try:
+            issues = lint_batch_file(temp_file)
+            assert "W044" in {issue.rule.code for issue in issues}
+        finally:
+            os.unlink(temp_file)
+
+    def test_w070_set_andand_bat_only(self) -> None:
+        """W070 fires for SET && in .bat files and not in .cmd files."""
+        bat_content = "@echo off\nset foo=bar && echo ok\n"
+        bat_file = self.create_temp_batch_file(bat_content)
+        try:
+            bat_codes = {issue.rule.code for issue in lint_batch_file(bat_file)}
+            assert "W070" in bat_codes
+        finally:
+            os.unlink(bat_file)
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".cmd", delete=False, encoding="utf-8"
+        ) as cmd_file:
+            cmd_file.write(bat_content)
+            cmd_path = cmd_file.name
+        try:
+            cmd_codes = {issue.rule.code for issue in lint_batch_file(cmd_path)}
+            assert "W070" not in cmd_codes
+        finally:
+            os.unlink(cmd_path)

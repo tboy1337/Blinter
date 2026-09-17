@@ -1,0 +1,12 @@
+{
+  "config": {},
+  "description": "2>&1 at end of command (W066 negative)",
+  "lines": {},
+  "must_not": [
+    "W066"
+  ],
+  "rules": [],
+  "tags": [
+    "syntax"
+  ]
+}

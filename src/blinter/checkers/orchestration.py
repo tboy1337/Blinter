@@ -20,6 +20,7 @@ from blinter.checkers.advanced import (
     _check_enhanced_performance,
     _check_enhanced_security_rules,
 )
+from blinter.checkers.cmd_extended import check_extended_warning_file
 from blinter.checkers.globals import (
     _check_cmd_case_consistency,
     _check_code_duplication,
@@ -109,6 +110,7 @@ def _append_line_checks(  # pylint: disable=too-many-arguments,too-many-position
     run_style: bool,
     run_security: bool,
     run_performance: bool,
+    file_path: str = "",
 ) -> None:
     """Run enabled per-line checker groups for a single script line."""
     if run_errors:
@@ -128,6 +130,7 @@ def _append_line_checks(  # pylint: disable=too-many-arguments,too-many-position
                 set_vars,
                 has_delayed_expansion,
                 lines=lines,
+                file_path=file_path,
             )
         )
         issues.extend(_check_advanced_for_rules(line, line_number, lines=lines))
@@ -186,6 +189,7 @@ def _append_global_checks(  # pylint: disable=too-many-arguments,too-many-positi
         issues.extend(_check_code_duplication(lines))
         issues.extend(_check_enhanced_commands(lines))
         issues.extend(_check_missing_pause(lines))
+        issues.extend(check_extended_warning_file(lines, file_path=""))
 
     if run_security:
         issues.extend(_check_enhanced_security_rules(lines))
@@ -217,6 +221,7 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
     config: BlinterConfig,
     skip_lines: Optional[Set[int]] = None,
     called_scripts_vars: Optional[Dict[int, Set[str]]] = None,
+    file_path: str = "",
 ) -> List[LintIssue]:
     """Process all line-by-line and global checks.
 
@@ -260,6 +265,7 @@ def _process_file_checks(  # pylint: disable=too-many-arguments,too-many-positio
             run_style=run_style,
             run_security=run_security,
             run_performance=run_performance,
+            file_path=file_path,
         )
 
     _append_global_checks(
