@@ -893,7 +893,7 @@ def main() -> None:
     report = _format_report(findings)
     out = args.write_baseline or (AUDIT_DIR / "baseline-latest.md")
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(report, encoding="utf-8")
+    out.write_text(report, encoding="utf-8", newline="\n")
     print(report)
     print(f"Wrote {out}")
     errors = [f for f in findings if f.level == "error"]
