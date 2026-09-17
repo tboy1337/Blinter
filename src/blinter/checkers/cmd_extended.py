@@ -146,9 +146,7 @@ def _paren_depth_before(lines: List[str], line_num: int) -> int:
     for index, raw in enumerate(lines, start=1):
         if index >= line_num:
             return depth
-        depth = _update_paren_depth(raw.strip(), depth)
-        if depth < 0:
-            depth = 0
+        depth = max(_update_paren_depth(raw.strip(), depth), 0)
     return depth
 
 
