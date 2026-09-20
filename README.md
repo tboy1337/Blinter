@@ -17,7 +17,7 @@
 ## Features ✨
 
 ### 🔍 **Rule Categories**
-- **Built-in Rules** -- the registry currently ships **191** rules across 5 severity levels (see `blinter.rules.registry.RULE_COUNT`; numbering gaps reflect retired or consolidated rule IDs)
+- **Built-in Rules** -- the registry currently ships **191** rules across 5 severity levels (see `blinter.rules.registry.RULE_COUNT`)
 - **Error Level (E001-E999)**: Critical syntax errors that prevent execution
 - **Warning Level (W001-W999)**: Potential runtime issues and bad practices
 - **Style Level (S001-S999)**: Code formatting and readability improvements
@@ -101,35 +101,6 @@ pip uninstall Blinter
 uv tool uninstall Blinter
 ```
 
-### 🔧 Manual Installation
-
-1. Clone the repository (include the batch-spec submodule):
-```cmd
-git clone --recurse-submodules https://github.com/tboy1337/Blinter.git
-cd Blinter
-```
-
-If you already cloned without submodules:
-```cmd
-git submodule update --init --recursive
-```
-
-2. Install development dependencies (includes runtime deps).
-
-**uv** (creates `.venv`, editable install, and the `dev` extra):
-```cmd
-uv sync --extra dev
-```
-
-**pip** (optional venv, then editable install):
-```cmd
-python -m venv venv
-venv\Scripts\activate.bat
-pip install -e ".[dev]"
-```
-
-After `uv sync --extra dev`, run the quality gate with `uv run python scripts/verify.py`. After a pip install, use `py scripts/verify.py`.
-
 ### Prerequisites
 - **Python 3.11+** (required for pip installation and development; uv can provision this interpreter)
 - **Windows OS** (required for standalone executable)
@@ -203,47 +174,10 @@ blinter --help
 blinter --version
 ```
 
-**If using a local development install:**
-```cmd
-uv sync --extra dev
-# or: pip install -e .
-
-# Analyze a single batch file
-blinter script.bat
-
-# Analyze all batch files in a directory (recursive)
-blinter /path/to/batch/files
-
-# Analyze batch files in directory only (non-recursive)
-blinter /path/to/batch/files --no-recursive
-
-# Analyze with summary
-blinter script.bat --summary
-
-# Analyze script and scripts it calls with shared variable context
-blinter script.bat --follow-calls
-
-# Analyze with custom maximum line length
-blinter script.bat --max-line-length 120
-
-# Create configuration file
-blinter --create-config
-
-# Ignore configuration file
-blinter script.bat --no-config
-
-# Get help
-blinter --help
-
-# Get version
-blinter --version
-```
-
 ### Command Line Options
 
 - `<path>`: Path to a batch file (`.bat` or `.cmd`) OR directory containing batch files
 - `--summary`: Display summary statistics of issues found
-- `--severity`: Deprecated legacy flag (emits a warning, no effect); use `min_severity` in `blinter.ini` instead
 - `--max-line-length <n>`: Set maximum line length for S011 and S020 rules (default: 100)
 - `--no-recursive`: When processing directories, only analyze files in the specified directory (not subdirectories)
 - `--follow-calls`: Automatically analyze scripts called by CALL statements and merge their variable context. When enabled, variables defined in called scripts (including transitively called scripts within depth and file limits) are recognized as "defined" in the calling script (position-aware: only after the CALL statement). This eliminates false positive undefined variable errors for configuration scripts
@@ -276,8 +210,6 @@ blinter --version
 **Configuration notes:**
 - When both `enabled_rules` and `disabled_rules` are set, a rule must appear in `enabled_rules` to run; `disabled_rules` then removes matches from that allowlist.
 - `max_line_length` in `blinter.ini` controls style rules S011/S020 (default `100`). The hard read limit for individual lines is `10,000` characters (`MAX_LINE_LENGTH` in the engine); lines longer than that are rejected before linting.
-
-**Rule migration:** Style rule `S006` was merged into `S022`. If your `blinter.ini` references `S006` in `enabled_rules` or `disabled_rules`, use `S022` instead.
 
 ### Command Line Override
 
@@ -388,46 +320,6 @@ with ThreadPoolExecutor(max_workers=4) as executor:
     results = list(executor.map(lint_batch_file, files))
 ```
 
-Advanced integrators can import from submodules directly:
-
-```python
-from blinter.rules.registry import RULES
-from blinter.patterns import DANGEROUS_COMMAND_PATTERNS
-from blinter.checkers.syntax import _check_syntax_errors
-```
-
-See [docs/Architecture.md](docs/Architecture.md) for the full module map and extension points.
-
-### Package layout
-
-```
-src/blinter/
-  __init__.py          # Public API
-  models.py            # BlinterConfig, LintIssue, Rule
-  rules/               # RULES registry
-  patterns.py          # Dangerous-command patterns
-  parsing/             # Structure and context analysis
-  checkers/            # Rule implementations by category
-  engine/              # lint_batch_file orchestration
-  io/                  # Encoding and file discovery
-  config/              # blinter.ini loading
-  output/              # CLI formatters
-  cli/                 # Command-line entry point
-```
-
-```mermaid
-flowchart BT
-  models --> constants
-  constants --> patterns
-  patterns --> rules
-  rules --> parsing
-  parsing --> checkers
-  checkers --> engine
-  engine --> cli
-  config --> cli
-  io --> engine
-```
-
 ### 🔧 **Configuration Options (`BlinterConfig`)**
 
 | Parameter | Type | Default | Description |
@@ -441,8 +333,6 @@ flowchart BT
 | `enabled_rules` | `Set[str]` | empty | If non-empty, only these rule codes run |
 | `disabled_rules` | `Set[str]` | empty | Rule codes to skip |
 | `min_severity` | `RuleSeverity` \| `None` | `None` | Minimum severity to report (via `blinter.ini`; no dedicated CLI flag) |
-
-*Note: E006 uses an `E` prefix but reports as **Warning** severity (intentional — environment variables may be set externally).*
 
 ### Supported File Types
 - `.bat` files (traditional batch files)
@@ -474,11 +364,6 @@ blinter ./scripts --summary           # With summary statistics
 
 # Manual zip only (extract first):
 Blinter-v1.x.x\blinter.exe ./my-batch-scripts
-
-# Local development install:
-blinter ./my-batch-scripts      # Analyze all files recursively
-blinter . --no-recursive       # Current directory only
-blinter ./scripts --summary     # With summary statistics
 ```
 
 ## 🔥 **Integration Example**
@@ -510,82 +395,6 @@ The `blinter` CLI exit codes:
 | **2** | Unexpected internal error |
 
 Warnings and style issues alone do not fail the run when exit code would otherwise be 0.
-
-## Development
-
-Install development dependencies and run the quality gate locally before releasing:
-
-```bash
-uv sync --extra dev
-# or: pip install -e ".[dev]"
-# or: pip install -e . && pip install -r requirements-dev.txt
-uv run python scripts/verify.py   # after uv sync
-# or: py scripts/verify.py        # full gate (format, mypy, pylint, bandit, pip-audit, pytest)
-py scripts/verify.py --fix        # auto-fix whitespace and imports first
-```
-
-Windows standalone executable (no Python on the target machine). Release builds
-run on GitHub Actions `windows-latest` with Visual Studio 2022 (MSVC 14.3+),
-which is what Nuitka needs for Python 3.14. The onefile is LTO-compiled, payload-
-compressed (no UPX), and unpacks to a versioned cache directory after the first run:
-
-```bash
-pip install nuitka
-py scripts/build_exe.py          # Visual Studio 2022 / MSVC 14.3+ (same as CI)
-# py scripts/build_exe.py --mingw  # last-resort local MinGW64 (not used in CI)
-```
-
-Optional manual steps (same checks as `verify.py`):
-
-```bash
-py -m pytest
-py -m mypy src/blinter tests
-py -m pylint src/blinter --output-format=text > pylint-output.txt
-py -m bandit -r src/blinter
-py -m pip-audit -r requirements.txt -r requirements-dev.txt
-py -m black --check src tests
-py -m isort --check-only src tests
-```
-
-### Optional corpus tests
-
-Some tests depend on a **local, large, varied collection** of `.bat` and `.cmd` files. Neither the scripts nor their lint baseline are included in the repository for privacy reasons. A fresh clone runs the full test suite without them — corpus-related tests skip automatically.
-
-Affected modules:
-
-- [`tests/test_batch_script_examples.py`](tests/test_batch_script_examples.py) — corpus regression and baseline snapshot tests (some marked `@pytest.mark.slow`)
-- [`tests/test_main_cli.py`](tests/test_main_cli.py) — `TestCorpusCli` directory-scan integration
-
-To run optional corpus testing locally:
-
-```bash
-# 1. Create a private folder at repo root (gitignored)
-mkdir batch-script-examples
-# 2. Add your own .bat / .cmd files
-# 3. Generate a local baseline snapshot (also gitignored)
-py scripts/generate_corpus_baseline.py
-# 4. Run optional corpus tests and checks
-py -m pytest tests/test_batch_script_examples.py -v
-py scripts/corpus_lint.py
-py scripts/corpus_lint.py --check-baseline
-```
-
-Baseline snapshots are per-machine and only comparable against the same local corpus. Regenerate with `py scripts/generate_corpus_baseline.py` after rule changes or corpus updates.
-
-See [docs/Architecture.md](docs/Architecture.md) for module layout and extension points.
-
-## Contributing 🤝
-
-**Contributions are welcome!** See [CONTRIBUTING.md](CONTRIBUTING.md) for the full process, coding standards, and testing policy.
-
-### Ways to Contribute
-- 🐛 Report bugs or issues
-- 💡 Suggest new rules or features
-- 📖 Improve documentation
-- 🧪 Add test cases
-- 🔧 Submit bug fixes or enhancements
-
-Report security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
 **Special thanks go out to [BrainWaveCC](https://github.com/BrainWaveCC) for all the help bug hunting.**
 
