@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import logging
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tomllib
+from types import ModuleType
 
 ROOT = Path(__file__).resolve().parent.parent
 ENTRY_MODULE = "blinter"
@@ -46,6 +48,18 @@ NOFOLLOW_IMPORT_TO: tuple[str, ...] = (
     "asyncio",
     "multiprocessing",
     "test",
+    "ssl",
+    "_ssl",
+    "socket",
+    "_socket",
+    "wmi",
+    "_wmi",
+)
+NATIVE_EXTENSION_SUFFIXES: frozenset[str] = frozenset({".pyd", ".so", ".dll"})
+CHARSET_NORMALIZER_MODULE_NAMES: tuple[str, ...] = (
+    "charset_normalizer",
+    "charset_normalizer.md",
+    "charset_normalizer.cd",
 )
 
 logger = logging.getLogger(__name__)
@@ -85,6 +99,73 @@ def _require_file(path: Path, description: str) -> None:
     if not path.is_file():
         raise FileNotFoundError(f"Missing {description}: {path}")
     logger.debug("Found %s at %s", description, path)
+
+
+def _module_file_path(module: ModuleType) -> Path | None:
+    """Return a module's __file__ path, or None when the module is namespace-only."""
+    file_object: object = getattr(module, "__file__", None)
+    if not isinstance(file_object, str) or not file_object:
+        logger.warning(
+            "Module %s has no __file__; skipping native-extension check",
+            getattr(module, "__name__", type(module).__name__),
+        )
+        return None
+    return Path(file_object)
+
+
+def assert_pure_python_charset_normalizer() -> None:
+    """Raise RuntimeError when charset_normalizer ships a native speedup module."""
+    logger.info("Checking charset_normalizer is pure Python (no speedup extension)")
+    modules: list[ModuleType] = []
+    for module_name in CHARSET_NORMALIZER_MODULE_NAMES:
+        try:
+            modules.append(importlib.import_module(module_name))
+        except ImportError as exc:
+            if module_name == "charset_normalizer":
+                raise RuntimeError(
+                    "charset_normalizer must be installed before compiling blinter.exe"
+                ) from exc
+            logger.info(
+                "Optional charset_normalizer submodule %s is not installed",
+                module_name,
+            )
+
+    for module in modules:
+        path = _module_file_path(module)
+        if path is None:
+            continue
+        suffix = path.suffix.casefold()
+        logger.info("charset_normalizer module %s -> %s", module.__name__, path)
+        if suffix in NATIVE_EXTENSION_SUFFIXES:
+            raise RuntimeError(
+                "charset_normalizer must be installed as pure Python "
+                f"(got native extension {path}). Reinstall with: "
+                "uv pip install --no-binary charset-normalizer charset-normalizer"
+            )
+    logger.info("charset_normalizer is pure Python")
+
+
+def _log_bundled_native_extensions(repo_root: Path) -> None:
+    """Log leftover .pyd/.dll files under dist/ after a Nuitka onefile build."""
+    dist_dir = repo_root / OUTPUT_DIR
+    if not dist_dir.is_dir():
+        logger.warning(
+            "Nuitka output directory %s is missing; cannot inventory natives", dist_dir
+        )
+        return
+    native_files = sorted(
+        path
+        for path in dist_dir.rglob("*")
+        if path.is_file()
+        and path.suffix.casefold() in NATIVE_EXTENSION_SUFFIXES
+        and path.name.casefold() != OUTPUT_FILENAME.casefold()
+    )
+    if not native_files:
+        logger.info("No leftover .pyd/.dll files under %s", dist_dir)
+        return
+    logger.info("Nuitka dist tree contains %s native files:", len(native_files))
+    for native_path in native_files:
+        logger.info("  %s", native_path.relative_to(dist_dir).as_posix())
 
 
 def _validate_inputs(repo_root: Path) -> Path:
@@ -203,6 +284,7 @@ def run_nuitka(command: list[str], repo_root: Path) -> int:
         logger.error("Nuitka reported success but %s is missing", output_exe)
         return 1
     logger.info("Built %s (%s bytes)", output_exe, output_exe.stat().st_size)
+    _log_bundled_native_extensions(repo_root)
     return 0
 
 
@@ -228,7 +310,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         pyproject_path = _validate_inputs(repo_root)
         version = _read_project_version(pyproject_path)
-    except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
+        assert_pure_python_charset_normalizer()
+    except (OSError, ValueError, RuntimeError, tomllib.TOMLDecodeError) as exc:
         logger.error("%s", exc)
         return 2
 

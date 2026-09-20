@@ -2,6 +2,13 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.29] - 2026-09-20
+
+### Changed
+
+- Windows `blinter.exe` Nuitka builds install `charset-normalizer` as pure Python and nofollow unused `ssl`/`socket`/`wmi` extensions so fewer CPython `.pyd` files unpack at runtime
+- Architecture docs cover the x64 onefile extract layout; the README still warns that antivirus may false-positive the standalone exe
+
 ## [1.1.28] - 2026-09-17
 
 ### Added
@@ -239,6 +246,7 @@ All notable changes to Blinter are documented in this file. Release tags follow 
 
 Older 1.0.x releases are available on the [GitHub Releases](https://github.com/tboy1337/Blinter/releases) page.
 
+[1.1.29]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.29
 [1.1.28]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.28
 [1.1.27]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.27
 [1.1.26]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.26

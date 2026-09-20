@@ -126,7 +126,8 @@ jobs:
           uv pip install --upgrade setuptools
           uv pip install --upgrade wheel
           uv pip install --upgrade nuitka
-          uv pip install --upgrade -r requirements.txt
+          $env:CHARSET_NORMALIZER_USE_MYPYC = "0"
+          uv pip install --upgrade -r requirements.txt --no-binary charset-normalizer
         shell: pwsh
 
       - name: Build executable
@@ -287,7 +288,8 @@ jobs:
           uv pip install --upgrade setuptools
           uv pip install --upgrade wheel
           uv pip install --upgrade nuitka
-          uv pip install --upgrade -r requirements.txt
+          $env:CHARSET_NORMALIZER_USE_MYPYC = "0"
+          uv pip install --upgrade -r requirements.txt --no-binary charset-normalizer
         shell: pwsh
 
       - name: Build executable

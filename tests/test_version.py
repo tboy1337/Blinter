@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tomllib
+from types import ModuleType
 
 import pytest
 from pytest_mock import MockerFixture
@@ -28,8 +29,10 @@ from scripts.build_exe import (
     PYTHON_FLAGS,
     TYPED_MARKER,
     _is_windows,
+    _log_bundled_native_extensions,
     _read_project_version,
     _validate_inputs,
+    assert_pure_python_charset_normalizer,
     build_nuitka_command,
     main,
     nuitka_environment,
@@ -39,6 +42,21 @@ from scripts.extract_release_notes import extract_latest_section
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _UV_EXECUTABLE = shutil.which("uv")
+_NETWORK_WMI_NOFOLLOW: tuple[str, ...] = (
+    "ssl",
+    "_ssl",
+    "socket",
+    "_socket",
+    "wmi",
+    "_wmi",
+)
+
+
+def _module_with_file(name: str, path: Path) -> ModuleType:
+    """Return a module-like object whose __file__ points at path."""
+    module = ModuleType(name)
+    module.__file__ = str(path)
+    return module
 
 
 class TestVersion:
@@ -226,6 +244,133 @@ class TestBuildExe:
             assert f"--python-flag={python_flag}" in command
         for module_name in NOFOLLOW_IMPORT_TO:
             assert f"--nofollow-import-to={module_name}" in command
+        for module_name in _NETWORK_WMI_NOFOLLOW:
+            assert module_name in NOFOLLOW_IMPORT_TO
+
+    def test_ci_installs_charset_normalizer_without_binary_wheels(self) -> None:
+        """Exe CI jobs must install charset-normalizer from source, not the speedup wheel."""
+        ci_text = (_REPO_ROOT / ".github" / "workflows" / "CI.yml").read_text(
+            encoding="utf-8"
+        )
+        assert ci_text.count("--no-binary charset-normalizer") == 2
+        assert ci_text.count('$env:CHARSET_NORMALIZER_USE_MYPYC = "0"') == 2
+
+    def test_preflight_rejects_native_charset_normalizer(
+        self, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """A charset_normalizer .pyd speedup must abort the Nuitka build."""
+        init_py = tmp_path / "__init__.py"
+        init_py.write_text("# package\n", encoding="utf-8")
+        md_pyd = tmp_path / "md.pyd"
+        md_pyd.write_bytes(b"native")
+        cd_py = tmp_path / "cd.py"
+        cd_py.write_text("# cd\n", encoding="utf-8")
+        imported = {
+            "charset_normalizer": _module_with_file("charset_normalizer", init_py),
+            "charset_normalizer.md": _module_with_file("charset_normalizer.md", md_pyd),
+            "charset_normalizer.cd": _module_with_file("charset_normalizer.cd", cd_py),
+        }
+
+        def fake_import(name: str) -> ModuleType:
+            module = imported.get(name)
+            if module is None:
+                raise ImportError(name)
+            return module
+
+        mocker.patch(
+            "scripts.build_exe.importlib.import_module", side_effect=fake_import
+        )
+        with pytest.raises(RuntimeError, match="pure Python"):
+            assert_pure_python_charset_normalizer()
+
+    def test_preflight_accepts_pure_python_charset_normalizer(
+        self, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """Pure-Python charset_normalizer modules must pass the Nuitka preflight."""
+        init_py = tmp_path / "__init__.py"
+        init_py.write_text("# package\n", encoding="utf-8")
+        md_py = tmp_path / "md.py"
+        md_py.write_text("# md\n", encoding="utf-8")
+        cd_py = tmp_path / "cd.py"
+        cd_py.write_text("# cd\n", encoding="utf-8")
+        imported = {
+            "charset_normalizer": _module_with_file("charset_normalizer", init_py),
+            "charset_normalizer.md": _module_with_file("charset_normalizer.md", md_py),
+            "charset_normalizer.cd": _module_with_file("charset_normalizer.cd", cd_py),
+        }
+
+        def fake_import(name: str) -> ModuleType:
+            module = imported.get(name)
+            if module is None:
+                raise ImportError(name)
+            return module
+
+        mocker.patch(
+            "scripts.build_exe.importlib.import_module", side_effect=fake_import
+        )
+        assert_pure_python_charset_normalizer()
+
+    def test_preflight_fails_when_charset_normalizer_missing(
+        self, mocker: MockerFixture
+    ) -> None:
+        """The Nuitka build must fail loudly if charset_normalizer is not installed."""
+        mocker.patch(
+            "scripts.build_exe.importlib.import_module",
+            side_effect=ImportError("missing"),
+        )
+        with pytest.raises(RuntimeError, match="must be installed"):
+            assert_pure_python_charset_normalizer()
+
+    def test_preflight_skips_optional_submodule_and_namespace_module(
+        self, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """Optional md/cd ImportError and missing __file__ must not abort the build."""
+        init_py = tmp_path / "__init__.py"
+        init_py.write_text("# package\n", encoding="utf-8")
+        package = _module_with_file("charset_normalizer", init_py)
+        namespace = ModuleType("charset_normalizer.md")
+
+        def fake_import(name: str) -> ModuleType:
+            if name == "charset_normalizer":
+                return package
+            if name == "charset_normalizer.md":
+                return namespace
+            raise ImportError(name)
+
+        mocker.patch(
+            "scripts.build_exe.importlib.import_module", side_effect=fake_import
+        )
+        assert_pure_python_charset_normalizer()
+
+    def test_log_bundled_native_extensions_lists_pyds(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Post-build inventory must log leftover .pyd files under dist/."""
+        dist_dir = tmp_path / OUTPUT_DIR
+        nested = dist_dir / "blinter.dist"
+        nested.mkdir(parents=True)
+        (nested / "_ssl.pyd").write_bytes(b"pyd")
+        (dist_dir / OUTPUT_FILENAME).write_bytes(b"exe")
+        caplog.set_level("INFO")
+        _log_bundled_native_extensions(tmp_path)
+        assert "_ssl.pyd" in caplog.text
+
+    def test_log_bundled_native_extensions_handles_missing_dist(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Inventory must warn when dist/ was not created."""
+        caplog.set_level("WARNING")
+        _log_bundled_native_extensions(tmp_path)
+        assert "cannot inventory natives" in caplog.text
+
+    def test_log_bundled_native_extensions_when_empty(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Inventory must log when the dist tree has no leftover natives."""
+        (tmp_path / OUTPUT_DIR).mkdir()
+        caplog.set_level("INFO")
+        _log_bundled_native_extensions(tmp_path)
+        assert "No leftover .pyd/.dll files" in caplog.text
 
     def test_build_command_uses_mingw_when_requested(self) -> None:
         """Local MinGW builds must opt into the experimental 3.13+ flag."""
@@ -318,6 +463,10 @@ class TestBuildExe:
         repo_root = Path(__file__).resolve().parent.parent
         mocker.patch("scripts.build_exe.ROOT", repo_root)
         mocker.patch("scripts.build_exe._is_windows", return_value=True)
+        mocker.patch(
+            "scripts.build_exe.assert_pure_python_charset_normalizer",
+            return_value=None,
+        )
         run = mocker.patch("scripts.build_exe.run_nuitka", return_value=0)
         assert main(["--mingw"]) == 0
         command = run.call_args[0][0]
@@ -332,6 +481,10 @@ class TestBuildExe:
         repo_root = Path(__file__).resolve().parent.parent
         mocker.patch("scripts.build_exe.ROOT", repo_root)
         mocker.patch("scripts.build_exe._is_windows", return_value=False)
+        mocker.patch(
+            "scripts.build_exe.assert_pure_python_charset_normalizer",
+            return_value=None,
+        )
         run = mocker.patch("scripts.build_exe.run_nuitka", return_value=0)
         assert main(["--mingw"]) == 0
         command = run.call_args[0][0]
@@ -345,10 +498,28 @@ class TestBuildExe:
         repo_root = Path(__file__).resolve().parent.parent
         mocker.patch("scripts.build_exe.ROOT", repo_root)
         mocker.patch(
+            "scripts.build_exe.assert_pure_python_charset_normalizer",
+            return_value=None,
+        )
+        mocker.patch(
             "scripts.build_exe.run_nuitka",
             side_effect=OSError("nuitka missing"),
         )
         assert main([]) == 1
+
+    def test_main_returns_2_when_charset_normalizer_is_native(
+        self, mocker: MockerFixture
+    ) -> None:
+        """A native charset_normalizer wheel must fail before Nuitka starts."""
+        repo_root = Path(__file__).resolve().parent.parent
+        mocker.patch("scripts.build_exe.ROOT", repo_root)
+        mocker.patch(
+            "scripts.build_exe.assert_pure_python_charset_normalizer",
+            side_effect=RuntimeError("native speedup"),
+        )
+        run = mocker.patch("scripts.build_exe.run_nuitka", return_value=0)
+        assert main([]) == 2
+        run.assert_not_called()
 
 
 class TestUvSupport:

@@ -138,4 +138,8 @@ Corpus policy: every rule in `rules.yaml` must have at least one corpus assertio
 
 ## Windows executable
 
-GitHub Actions compiles a Nuitka `--mode=onefile` `blinter.exe` via [`scripts/build_exe.py`](../scripts/build_exe.py) using `--msvc=latest` on `windows-latest` (Visual Studio 2022 / MSVC 14.3+, required for Python 3.14). The build enables LTO, caches the onefile extract under `{CACHE_DIR}/{COMPANY}/{PRODUCT}/{VERSION}` for faster relaunch and a stable path for Windows Firewall, and does **not** use UPX. The release zip still contains a single `Blinter-vVERSION/blinter.exe` so the existing installer contract is unchanged.
+GitHub Actions compiles a Nuitka `--mode=onefile` `blinter.exe` via [`scripts/build_exe.py`](../scripts/build_exe.py) using `--msvc=latest` on `windows-latest` (Visual Studio 2022 / MSVC 14.3+, required for Python 3.14). The shipped binary is **Windows x86-64**; it runs natively on Intel/AMD 64-bit Windows and on Windows 11 ARM64 via Prism x64 emulation. There is no 32-bit or native ARM64 matrix.
+
+The exe venv installs `charset-normalizer` with `--no-binary` so Nuitka compiles the pure-Python package into the binary. CPython still ships native extensions (`python314.dll`, `unicodedata.pyd`, and similar). Windows cannot `LoadLibrary` those from the onefile blob, so the bootstrap extracts them to `{CACHE_DIR}/{COMPANY}/{PRODUCT}/{VERSION}` (`%LOCALAPPDATA%\tboy1337\Blinter\<version>\` on Windows) and loads them from disk. The build nofollows unused `ssl`/`socket`/`wmi` modules to keep that payload smaller. The executable is unsigned, so some antivirus ML engines may still flag the extract-then-load pattern.
+
+The build enables LTO, uses `--onefile-cache-mode=cached` for faster relaunch and a stable path for Windows Firewall, and does **not** use UPX. The release zip still contains a single `Blinter-vVERSION/blinter.exe` so the existing installer contract is unchanged.
