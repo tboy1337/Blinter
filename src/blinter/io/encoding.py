@@ -225,7 +225,7 @@ def _detect_charset_norm_bytes(raw_data: bytes, encodings_list: List[str]) -> Li
     Thread-safe: Yes - uses only local variables
     """
     try:
-        best_match = from_bytes(raw_data).best()  # type: ignore[misc]
+        best_match = from_bytes(raw_data).best()
         detected_encoding = _charset_norm_match_encoding(cast(object, best_match))
         if detected_encoding is None:
             return encodings_list

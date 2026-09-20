@@ -2,6 +2,18 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.30] - 2026-09-20
+
+### Fixed
+
+- **W063** scopes FOR /F token overflow to the current loop: nested `FOR /F` (including `@` and `IF EXIST` prefixes) is not treated as outer overflow, `echo (` does not swallow the next line, and `DO` inside `IN (...)` is not the loop body
+- **W049** still warns when SET assigns a space-only value to a pseudo-environment variable; `SET "errorlevel="` remains a valid clear
+
+### Changed
+
+- Parenthesis-depth and empty-assignment caches live in parsing with identity-safe keys, so large scripts lint without quadratic scans and without a checkers/parsing import cycle
+- Coverage, mypy, pylint (`fail-under=10`), and pytest configs drop unused boilerplate; coverage still maps installed `site-packages/blinter` into `src/blinter`
+
 ## [1.1.29] - 2026-09-20
 
 ### Changed
@@ -246,6 +258,7 @@ All notable changes to Blinter are documented in this file. Release tags follow 
 
 Older 1.0.x releases are available on the [GitHub Releases](https://github.com/tboy1337/Blinter/releases) page.
 
+[1.1.30]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.30
 [1.1.29]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.29
 [1.1.28]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.28
 [1.1.27]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.27

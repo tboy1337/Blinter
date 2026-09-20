@@ -196,38 +196,43 @@ def _resolve_cli_log_level(verbose: bool, quiet: bool) -> Optional[int]:
     return None
 
 
-def _process_dash_argument(
-    arg: str,
-    index: int,
-    state: _ArgParseState,
-) -> int:
-    """Handle a single ``--`` argument and return the next argv index."""
+def _apply_value_option(arg: str, index: int, state: _ArgParseState) -> Optional[int]:
+    """Apply a value-taking ``--`` option; return next index or None."""
     if arg == "--max-line-length":
         parsed_length = _parse_max_line_length_arg(index)
         if parsed_length is None:
             sys.exit(1)
         next_index, state.cli_max_line_length = parsed_length
         return next_index
-
     if arg == "--config":
         parsed_config = _parse_config_arg(index)
         if parsed_config is None:
             sys.exit(1)
         next_index, state.config_path = parsed_config
         return next_index
-
     if arg == "--output":
         parsed_output = _parse_output_arg(index)
         if parsed_output is None:
             sys.exit(1)
         next_index, state.cli_output_path = parsed_output
         return next_index
-
     if arg == "--format":
         parsed_format = _parse_format_arg(index)
         if parsed_format is None:
             sys.exit(1)
         next_index, state.cli_output_format = parsed_format
+        return next_index
+    return None
+
+
+def _process_dash_argument(
+    arg: str,
+    index: int,
+    state: _ArgParseState,
+) -> int:
+    """Handle a single ``--`` argument and return the next argv index."""
+    next_index = _apply_value_option(arg, index, state)
+    if next_index is not None:
         return next_index
 
     if arg == "--verbose":

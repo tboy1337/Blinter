@@ -146,7 +146,7 @@ def _check_performance_issues(  # pylint: disable=too-many-arguments,too-many-po
     line: str,
     has_setlocal: bool,
     has_set_commands: bool,
-    has_delayed_expansion: bool,
+    _has_delayed_expansion: bool,
     uses_delayed_vars: bool,
     has_disable_delayed_expansion: bool,  # pylint: disable=unused-argument
     has_literal_exclamations: bool,

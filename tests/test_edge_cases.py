@@ -30,6 +30,7 @@ from blinter.checkers.advanced import (
 )
 from blinter.checkers.advanced.vars_syntax import (
     _check_for_f_suboptions,
+    _check_for_f_token_overflow,
     _check_percent_tilde_syntax,
     _check_set_a_arithmetic,
     _for_f_file_set_operand,
@@ -1317,11 +1318,207 @@ class TestForFSuboptionsE038:
         issues = _check_for_f_suboptions(line, 1)
         assert not issues
 
+
+class TestForFTokenOverflowW063:
+    """W063 must not treat a parenthesis inside ordinary DO text as a block."""
+
+    def test_parenthesized_multiline_do_still_w063(self) -> None:
+        lines = [
+            'for /f "tokens=1-2" %%a in ("one two") do (',
+            "echo %%c",
+            ")",
+        ]
+        issues = _check_for_f_token_overflow(lines[0], 1, lines=lines)
+        assert [issue.rule.code for issue in issues] == ["W063"]
+
+    def test_echo_open_paren_does_not_consume_next_line(self) -> None:
+        lines = [
+            'for /f "tokens=1" %%a in (input.txt) do echo (',
+            "echo %%b",
+        ]
+        issues = _check_for_f_token_overflow(lines[0], 1, lines=lines)
+        assert not [issue for issue in issues if issue.rule.code == "W063"]
+
+    def test_nested_for_f_inner_var_is_not_outer_overflow(self) -> None:
+        lines = [
+            'for /f "tokens=1" %%a in (a.txt) do (',
+            'for /f "tokens=1" %%b in (b.txt) do echo %%b',
+            ")",
+        ]
+        outer = _check_for_f_token_overflow(lines[0], 1, lines=lines)
+        inner = _check_for_f_token_overflow(lines[1], 2, lines=lines)
+        assert not [issue for issue in outer if issue.rule.code == "W063"]
+        assert not [issue for issue in inner if issue.rule.code == "W063"]
+
+    def test_nested_for_f_still_flags_outer_overflow_after_inner(self) -> None:
+        lines = [
+            'for /f "tokens=1" %%a in (a.txt) do (',
+            'for /f "tokens=1" %%b in (b.txt) do echo %%b',
+            "echo %%c",
+            ")",
+        ]
+        issues = _check_for_f_token_overflow(lines[0], 1, lines=lines)
+        assert [issue.rule.code for issue in issues] == ["W063"]
+
+    def test_triple_nested_for_f_does_not_rewind_into_inner_body(self) -> None:
+        lines = [
+            'for /f "tokens=1" %%a in (a.txt) do (',
+            'for /f "tokens=1" %%b in (b.txt) do (',
+            'for /f "tokens=1" %%c in (c.txt) do echo %%c',
+            "echo %%d",
+            ")",
+            "echo %%a",
+            ")",
+        ]
+        outer = _check_for_f_token_overflow(lines[0], 1, lines=lines)
+        middle = _check_for_f_token_overflow(lines[1], 2, lines=lines)
+        inner = _check_for_f_token_overflow(lines[2], 3, lines=lines)
+        assert not [issue for issue in outer if issue.rule.code == "W063"]
+        assert [issue.rule.code for issue in middle] == ["W063"]
+        assert not [issue for issue in inner if issue.rule.code == "W063"]
+
+    def test_echo_for_f_text_is_not_nested_command(self) -> None:
+        lines = [
+            'for /f "tokens=1" %%a in (a.txt) do (',
+            'echo for /f "tokens=1" %%b in (b.txt) do echo %%b',
+            ")",
+        ]
+        issues = _check_for_f_token_overflow(lines[0], 1, lines=lines)
+        assert [issue.rule.code for issue in issues] == ["W063"]
+
+    def test_nested_at_for_f_inner_var_is_not_outer_overflow(self) -> None:
+        lines = [
+            'for /f "tokens=1" %%a in (a.txt) do (',
+            '@for /f "tokens=1" %%b in (b.txt) do echo %%b',
+            ")",
+        ]
+        outer = _check_for_f_token_overflow(lines[0], 1, lines=lines)
+        inner = _check_for_f_token_overflow(lines[1], 2, lines=lines)
+        assert not [issue for issue in outer if issue.rule.code == "W063"]
+        assert not [issue for issue in inner if issue.rule.code == "W063"]
+
+    def test_if_exist_nested_for_f_inner_var_is_not_outer_overflow(self) -> None:
+        lines = [
+            'for /f "tokens=1" %%a in (a.txt) do (',
+            'if exist b.txt for /f "tokens=1" %%b in (b.txt) do echo %%b',
+            ")",
+        ]
+        outer = _check_for_f_token_overflow(lines[0], 1, lines=lines)
+        inner = _check_for_f_token_overflow(lines[1], 2, lines=lines)
+        assert not [issue for issue in outer if issue.rule.code == "W063"]
+        assert not [issue for issue in inner if issue.rule.code == "W063"]
+
+    def test_do_inside_in_operand_is_not_loop_do(self) -> None:
+        line = "for /f \"tokens=1\" %%a in ('echo do %%b') do echo %%a"
+        issues = _check_for_f_token_overflow(line, 1)
+        assert not [issue for issue in issues if issue.rule.code == "W063"]
+
+    def test_overflow_after_in_operand_containing_do(self) -> None:
+        line = "for /f \"tokens=1\" %%a in ('echo do %%a') do echo %%b"
+        issues = _check_for_f_token_overflow(line, 1)
+        assert [issue.rule.code for issue in issues] == ["W063"]
+
+    def test_single_quoted_operand_close_paren_is_not_in_end(self) -> None:
+        line = "for /f \"tokens=1\" %%a in ('echo ) do echo %%b') do echo %%a"
+        issues = _check_for_f_token_overflow(line, 1)
+        assert not [issue for issue in issues if issue.rule.code == "W063"]
+
+    def test_ampersand_after_nested_for_f_still_w063(self) -> None:
+        line = (
+            'for /f "tokens=1" %%a in (a.txt) do '
+            'for /f "tokens=1" %%b in (b.txt) do echo %%b & echo %%c'
+        )
+        issues = _check_for_f_token_overflow(line, 1)
+        assert [issue.rule.code for issue in issues] == ["W063"]
+
+    def test_quoted_paren_in_nested_do_is_not_block_end(self) -> None:
+        lines = [
+            'for /f "tokens=1" %%a in (a.txt) do (',
+            'for /f "tokens=1" %%b in (b.txt) do (',
+            'echo "close ) here"',
+            "echo %%b",
+            ")",
+            ")",
+        ]
+        outer = _check_for_f_token_overflow(lines[0], 1, lines=lines)
+        inner = _check_for_f_token_overflow(lines[1], 2, lines=lines)
+        assert not [issue for issue in outer if issue.rule.code == "W063"]
+        assert not [issue for issue in inner if issue.rule.code == "W063"]
+
+    def test_caret_escaped_paren_in_nested_do_is_not_block_end(self) -> None:
+        lines = [
+            'for /f "tokens=1" %%a in (a.txt) do (',
+            'for /f "tokens=1" %%b in (b.txt) do (',
+            "echo close ^)",
+            "echo %%b",
+            ")",
+            ")",
+        ]
+        outer = _check_for_f_token_overflow(lines[0], 1, lines=lines)
+        assert not [issue for issue in outer if issue.rule.code == "W063"]
+
+    def test_quoted_open_paren_does_not_extend_outer_body(self) -> None:
+        lines = [
+            'for /f "tokens=1" %%a in (a.txt) do (',
+            'echo "open ( paren"',
+            ")",
+            "echo %%b",
+        ]
+        issues = _check_for_f_token_overflow(lines[0], 1, lines=lines)
+        assert not [issue for issue in issues if issue.rule.code == "W063"]
+
+    def test_echo_for_f_before_real_nested_for_f_still_w063(self) -> None:
+        lines = [
+            'for /f "tokens=1" %%a in (a.txt) do (',
+            'echo for /f %%c & for /f "tokens=1" %%b in (b.txt) do echo %%b',
+            ")",
+        ]
+        issues = _check_for_f_token_overflow(lines[0], 1, lines=lines)
+        assert [issue.rule.code for issue in issues] == ["W063"]
+
+    def test_caret_escaped_close_paren_in_operand_is_not_in_end(self) -> None:
+        line = 'for /f "tokens=1" %%a in (foo^) do echo %%b) do echo %%a'
+        issues = _check_for_f_token_overflow(line, 1)
+        assert not [issue for issue in issues if issue.rule.code == "W063"]
+
+    def test_set_value_containing_for_f_still_w063(self) -> None:
+        lines = [
+            'for /f "tokens=1" %%a in (a.txt) do (',
+            "set foo=for /f %%b",
+            ")",
+        ]
+        issues = _check_for_f_token_overflow(lines[0], 1, lines=lines)
+        assert [issue.rule.code for issue in issues] == ["W063"]
+
     def test_invalid_skip_word_still_e038(self) -> None:
         line = 'for /f "skip=abc tokens=*" %%a in ("data") do echo %%a'
         issues = _check_for_f_suboptions(line, 1)
         e038_issues = [i for i in issues if i.rule.code == "E038"]
         assert len(e038_issues) == 1
+
+
+class TestPseudoEnvAssignmentW049:
+    """SET \"name=\" clears a shadow; space-only values still assign (W049)."""
+
+    def test_quoted_clear_is_not_w049(self) -> None:
+        issues = _check_warning_issues('set "errorlevel="', 1, set(), False)
+        assert not [issue for issue in issues if issue.rule.code == "W049"]
+
+    def test_quoted_space_value_is_w049(self) -> None:
+        issues = _check_warning_issues('set "errorlevel= "', 1, set(), False)
+        assert [issue.rule.code for issue in issues if issue.rule.code == "W049"] == [
+            "W049"
+        ]
+
+    def test_unquoted_space_value_is_w049(self) -> None:
+        issues = _check_warning_issues("set errorlevel= ", 1, set(), False)
+        assert [issue.rule.code for issue in issues if issue.rule.code == "W049"] == [
+            "W049"
+        ]
+
+    def test_unquoted_clear_is_not_w049(self) -> None:
+        issues = _check_warning_issues("set errorlevel=", 1, set(), False)
+        assert not [issue for issue in issues if issue.rule.code == "W049"]
 
 
 class TestTextAfterCloseParenE042:

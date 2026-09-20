@@ -25,7 +25,7 @@ load-plugins=
 persistent=yes
 
 # Specify a score threshold to be exceeded before program exits with error.
-fail-under=8
+fail-under=10
 
 # Return non-zero exit code if any of these messages/categories are detected
 fail-on=
@@ -279,7 +279,7 @@ docstring-min-length=-1
 function-naming-style=snake_case
 
 # Regular expression matching correct function names.
-function-rgx=[a-z_][a-z0-9_]{2,30}$
+function-rgx=[a-z_][a-z0-9_]{2,50}$
 
 # Good variable names which should always be accepted, separated by a comma.
 good-names=i,

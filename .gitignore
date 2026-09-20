@@ -41,6 +41,7 @@ nuitka-crash-report.xml
 # Test and quality tooling
 testResults.xml
 spec/corpus/**/temp.txt
+spec/corpus/**/log.txt
 .pytest_cache/
 .coverage
 .coverage.*

@@ -1,21 +1,24 @@
 """Syntax error checks (E-prefix rules)."""
 
+# pylint: disable=too-many-lines
+
 import re
 from typing import (
     Dict,
     List,
     Optional,
     Set,
-    Tuple,
 )
 
 from blinter.checkers.cmd_extended import check_extended_syntax_line
 from blinter.checkers.warnings import (
-    _paren_depth_before_line,
     _strip_double_quoted_strings,
 )
 from blinter.models import LintIssue
-from blinter.parsing.structure import _delayed_expansion_state_for_lines
+from blinter.parsing.structure import (
+    _delayed_expansion_state_for_lines,
+    _paren_depth_before_line,
+)
 from blinter.patterns import (
     _COMPILED_IF_PATTERN,
     BUILTIN_COMMANDS,
@@ -678,8 +681,7 @@ def _check_variable_expansion(
         de_state = _delayed_expansion_state_for_lines(lines)
     de_active = (
         de_state is not None
-        and line_num >= 1
-        and line_num <= len(de_state)
+        and 1 <= line_num <= len(de_state)
         and de_state[line_num - 1]
     )
     if de_active:

@@ -5,6 +5,11 @@ from typing import List
 
 from blinter.logging_config import logger
 from blinter.models import LintIssue
+from blinter.parsing.context import (
+    _split_command_separators,
+    _split_tokens,
+    _strip_if_predicate,
+)
 from blinter.rules.expansion_data import VALID_MODIFIERS
 from blinter.rules.helpers import PERCENT_TILDE_TOKEN_RE, strip_for_metavar_tilde_tokens
 from blinter.rules.registry import RULES
@@ -16,6 +21,7 @@ _FOR_F_OPTIONS_RE = re.compile(
 _FOR_LOOP_VAR_RE = re.compile(r"%%([a-zA-Z])", re.IGNORECASE)
 _FOR_BODY_VAR_RE = re.compile(r"%%([a-zA-Z])")
 _SKIP_VARIABLE_RE = re.compile(r"(?:%[^%]+%|![^!]+!)")
+_INNER_FOR_F_RE = re.compile(r"\bfor\s+/f\b", re.IGNORECASE)
 
 
 def _is_valid_for_f_skip_value(skip_value: str) -> bool:
@@ -114,28 +120,109 @@ def _check_for_f_suboptions(line: str, line_number: int) -> List[LintIssue]:
     return issues
 
 
+def _for_in_close_index(text: str) -> int | None:
+    """Return the index of the ')' that closes FOR IN (, if present."""
+    open_match = re.search(r"\bin\s*\(", text, re.IGNORECASE)
+    if not open_match:
+        return None
+    start = open_match.end()
+    depth = 1
+    quote = ""
+    index = start
+    while index < len(text):
+        char = text[index]
+        if quote:
+            if char == quote:
+                quote = ""
+            index += 1
+            continue
+        if char == "^":
+            index += 2
+            continue
+        if char in ('"', "'", "`"):
+            quote = char
+            index += 1
+            continue
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+        index += 1
+    fallback = re.search(r"\bin\s*\(([^)]*)\)", text, re.IGNORECASE)
+    if fallback:
+        logger.debug(
+            "FOR /F parentheses did not balance; using first-close fallback: %s",
+            text.strip(),
+        )
+        return fallback.end() - 1
+    return None
+
+
+def _for_do_span(text: str) -> tuple[int, int] | None:
+    """Return start/end of the FOR DO token after IN (...)."""
+    close_at = _for_in_close_index(text)
+    search_from = close_at + 1 if close_at is not None else 0
+    match = re.search(r"\bdo\b", text[search_from:], re.IGNORECASE)
+    if match is None:
+        return None
+    start = search_from + match.start()
+    return start, search_from + match.end()
+
+
+def _prefix_allows_for_f_command(prefix: str) -> bool:
+    """Return True when prefix is only IF/@/DO/ELSE, not another command."""
+    parts = _split_command_separators(prefix)
+    tail = parts[-1] if parts else prefix
+    tokens = _split_tokens(tail.strip().lstrip("(").strip())
+    while tokens and tokens[0] == "@":
+        tokens = tokens[1:]
+    while tokens and tokens[0].lower() in ("do", "else"):
+        tokens = tokens[1:]
+    while True:
+        stripped = _strip_if_predicate(tokens)
+        if stripped == tokens:
+            break
+        tokens = stripped
+    return not tokens
+
+
 def _for_do_body_text(lines: list[str], line_number: int) -> str:
     """Return FOR DO body text for same-line or multiline parenthesized blocks."""
     if line_number < 1 or line_number > len(lines):
         return ""
     current = lines[line_number - 1]
-    do_match = re.search(r"\bdo\b(.*)$", current, re.IGNORECASE)
-    if not do_match:
+    do_span = _for_do_span(current)
+    if do_span is None:
         return ""
-    after_do = str(do_match.group(1))
-    depth = after_do.count("(") - after_do.count(")")
-    if depth <= 0:
+    after_do = current[do_span[1] :]
+    if not re.match(r"\s*\(", after_do):
         return after_do
     parts = [after_do]
-    for idx in range(line_number, len(lines)):
+    combined = after_do
+    idx = line_number
+    while True:
+        end = _parenthesized_do_body_end(combined)
+        if end >= 0:
+            return combined[:end]
+        if idx >= len(lines):
+            return combined
         nxt = lines[idx].strip()
+        idx += 1
         if not nxt or nxt.startswith("rem ") or nxt.startswith("::"):
             continue
         parts.append(nxt)
-        depth += nxt.count("(") - nxt.count(")")
-        if depth <= 0:
-            break
-    return "\n".join(parts)
+        combined = "\n".join(parts)
+
+
+def _for_f_do_body(line: str, line_number: int, lines: list[str] | None) -> str:
+    """Return the FOR DO body from a multi-line block or the rest of this line."""
+    do_span = _for_do_span(line)
+    remainder = line[do_span[1] :] if do_span is not None else ""
+    if lines is not None and re.match(r"\s*\(", remainder):
+        return _for_do_body_text(lines, line_number)
+    return remainder
 
 
 def _check_for_f_token_overflow(
@@ -156,17 +243,101 @@ def _check_for_f_token_overflow(
         return []
     start_letter = str(loop_var_match.group(1)).lower()
 
-    if lines is not None:
-        body = _for_do_body_text(lines, line_number)
-    else:
-        do_match = re.search(r"\bdo\b(.*)$", line, re.IGNORECASE)
-        body = do_match.group(1) if do_match else ""
+    body = _for_f_do_body(line, line_number, lines)
     if not body:
         return []
 
+    return _for_f_token_overflow_issues(body, line_number, start_letter, slot_count)
+
+
+def _line_span_containing(text: str, index: int) -> str:
+    """Return the single line of text that contains index."""
+    line_start = text.rfind("\n", 0, index) + 1
+    line_end = text.find("\n", index)
+    if line_end == -1:
+        return text[line_start:]
+    return text[line_start:line_end]
+
+
+def _parenthesized_do_body_end(after_do: str) -> int:
+    """Return the end index of a parenthesized DO body, or -1 if unclosed."""
+    open_at = after_do.find("(")
+    if open_at < 0:
+        return 0
+    depth = 0
+    index = open_at
+    in_double_quote = False
+    while index < len(after_do):
+        char = after_do[index]
+        if char == "^":
+            index += 2
+            continue
+        if char == '"':
+            in_double_quote = not in_double_quote
+            index += 1
+            continue
+        if in_double_quote:
+            index += 1
+            continue
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return index + 1
+        index += 1
+    return -1
+
+
+def _nested_for_f_end(body: str, match_start: int, match_end: int) -> int:
+    """Return the index in body after a nested FOR /F starting at match_start."""
+    rest = body[match_start:]
+    do_span = _for_do_span(rest)
+    if do_span is None:
+        return match_end
+    after_do = rest[do_span[1] :]
+    if after_do.lstrip().startswith("("):
+        consumed = _parenthesized_do_body_end(after_do)
+        if consumed < 0:
+            consumed = len(after_do)
+        return match_start + do_span[1] + consumed
+    newline_at = after_do.find("\n")
+    if newline_at == -1:
+        parts = _split_command_separators(after_do)
+        first = parts[0] if parts else after_do
+        return match_start + do_span[1] + len(first)
+    return match_start + do_span[1] + newline_at
+
+
+def _without_nested_for_f_commands(body: str) -> str:
+    """Remove nested FOR /F commands so W063 only sees the current loop body."""
+    pieces: List[str] = []
+    pos = 0
+    for match in _INNER_FOR_F_RE.finditer(body):
+        if match.start() < pos:
+            continue
+        line = _line_span_containing(body, match.start())
+        rel = match.start() - (body.rfind("\n", 0, match.start()) + 1)
+        if not _prefix_allows_for_f_command(line[:rel]):
+            logger.debug(
+                "Skipping FOR /F mention that is not a nested command: %s",
+                line.strip(),
+            )
+            continue
+        pieces.append(body[pos : match.start()])
+        pos = _nested_for_f_end(body, match.start(), match.end())
+    pieces.append(body[pos:])
+    return "".join(pieces)
+
+
+def _for_f_token_overflow_issues(
+    body: str, line_number: int, start_letter: str, slot_count: int
+) -> List[LintIssue]:
+    """Build W063 issues for FOR /F body variables past tokens= slots."""
+    scan_body = _without_nested_for_f_commands(body)
     max_index = slot_count - 1
     issues: List[LintIssue] = []
-    for ref_match in _FOR_BODY_VAR_RE.finditer(body):
+    for ref_match in _FOR_BODY_VAR_RE.finditer(scan_body):
         ref_letter = str(ref_match.group(1)).lower()
         ref_index = ord(ref_letter) - ord(start_letter)
         if ref_index < 0 or ref_index > max_index:
@@ -199,32 +370,16 @@ def _for_f_operand_text(line: str) -> str:
     open_match = re.search(r"\bin\s*\(", line, re.IGNORECASE)
     if not open_match:
         return ""
-    start = open_match.end()
-    depth = 1
-    quote = ""
-    for index in range(start, len(line)):
-        char = line[index]
-        if quote:
-            if char == quote:
-                quote = ""
-            continue
-        if char in '"`':
-            quote = char
-            continue
-        if char == "(":
-            depth += 1
-        elif char == ")":
-            depth -= 1
-            if depth == 0:
-                return line[start:index]
-    fallback = re.search(r"\bin\s*\(([^)]*)\)", line, re.IGNORECASE)
-    if fallback:
-        logger.debug(
-            "FOR /F parentheses did not balance; using first-close fallback: %s",
-            line.strip(),
-        )
-        return str(fallback.group(1))
-    return ""
+    close_at = _for_in_close_index(line)
+    if close_at is None:
+        return ""
+    return line[open_match.end() : close_at]
+
+
+def _for_f_operand_looks_like_tabular_file(file_operand: str) -> bool:
+    """Return True when a FOR /F file operand looks like a headered data file."""
+    lowered = file_operand.lower()
+    return "file" in lowered or ".txt" in lowered or ".csv" in lowered
 
 
 def _for_f_file_set_operand(line: str) -> str:
@@ -285,14 +440,6 @@ def _check_advanced_for_rules(
 
     # W034: FOR /F missing usebackq option
     if "/f" in stripped:
-        options_match = re.search(
-            r'for\s+/f\s+(?:"([^"]*)"|([^"\s]+))',
-            line,
-            re.IGNORECASE,
-        )
-        options = ""
-        if options_match:
-            options = str(options_match.group(1) or options_match.group(2) or "")
         if "useback" not in stripped:
             if "`" in line:
                 issues.append(
@@ -332,11 +479,7 @@ def _check_advanced_for_rules(
         "/f" in stripped
         and file_operand
         and "skip=" not in stripped
-        and (
-            "file" in file_operand.lower()
-            or ".txt" in file_operand.lower()
-            or ".csv" in file_operand.lower()
-        )
+        and _for_f_operand_looks_like_tabular_file(file_operand)
     ):
         issues.append(
             LintIssue(
@@ -485,7 +628,6 @@ def _is_valid_percent_tilde_parameter(parameter: str, *, has_path_search: bool) 
 def _check_percent_tilde_syntax(stripped: str, line_number: int) -> List[LintIssue]:
     """Check for percent-tilde syntax issues (E017, E019)."""
     issues: List[LintIssue] = []
-    valid_modifiers = VALID_MODIFIERS
     scan_line = strip_for_metavar_tilde_tokens(stripped)
 
     for match in _PERCENT_TILDE_TOKEN_RE.finditer(scan_line):

@@ -24,7 +24,6 @@ from blinter.checkers.globals.exit_flow import (
     _is_truly_executable_command,
     _line_makes_code_reachable,
     _scan_for_unreachable_code,
-    _update_paren_depth,
 )
 from blinter.checkers.globals.style_globals import (
     _check_cmd_case_consistency,
@@ -39,6 +38,7 @@ from blinter.checkers.globals.style_globals import (
     _find_most_common_case,
     _find_single_line_mixed_indent,
 )
+from blinter.parsing.structure import _update_paren_depth
 
 __all__ = [
     "_check_global_style_rules",

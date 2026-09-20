@@ -1,6 +1,6 @@
 """Exit statements and unreachable-code detection."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
 from typing import (
     Dict,
@@ -10,6 +10,7 @@ from typing import (
 )
 
 from blinter.models import LintIssue
+from blinter.parsing.structure import _update_paren_depth
 from blinter.rules.registry import RULES
 
 
@@ -209,7 +210,7 @@ def _follow_goto_target(
 
 
 @dataclass
-class _ReachabilityScanState:
+class _ReachabilityScanState:  # pylint: disable=too-many-instance-attributes
     """Mutable state while scanning for paths that reach EOF."""
 
     reachable: bool = True
@@ -217,6 +218,9 @@ class _ReachabilityScanState:
     if_branch_exited: bool = False
     else_branch_exited: bool = False
     in_else_branch: bool = False
+    lines: List[str] = field(default_factory=list)
+    labels: Dict[str, int] = field(default_factory=dict)
+    visiting_labels: Set[str] = field(default_factory=set)
 
 
 def _update_reachability_for_line(
@@ -240,9 +244,6 @@ def _scan_line_for_reachability(
     state: _ReachabilityScanState,
     stripped: str,
     index: int,
-    lines: List[str],
-    labels: Dict[str, int],
-    visiting_labels: Set[str],
 ) -> Optional[bool]:
     """Process one line; return True/False to stop, or None to continue scanning."""
     if not stripped or stripped.startswith("rem") or stripped.startswith("::"):
@@ -270,13 +271,15 @@ def _scan_line_for_reachability(
         previous_depth,
         state.paren_depth,
         (state.if_branch_exited, state.else_branch_exited),
-        lines,
+        state.lines,
         index,
     ):
         return False
 
     if state.paren_depth == 0:
-        return _follow_goto_target(stripped, labels, visiting_labels, lines)
+        return _follow_goto_target(
+            stripped, state.labels, state.visiting_labels, state.lines
+        )
 
     return None
 
@@ -291,18 +294,15 @@ def _can_execution_reach_eof(
         visiting_labels = set()
 
     labels = _build_label_index(lines)
-    state = _ReachabilityScanState()
+    state = _ReachabilityScanState(
+        lines=lines,
+        labels=labels,
+        visiting_labels=visiting_labels,
+    )
 
     for index in range(start_index, len(lines)):
         stripped = lines[index].strip().lower()
-        scan_result = _scan_line_for_reachability(
-            state,
-            stripped,
-            index,
-            lines,
-            labels,
-            visiting_labels,
-        )
+        scan_result = _scan_line_for_reachability(state, stripped, index)
         if scan_result is not None:
             return scan_result
 
@@ -431,56 +431,6 @@ def _scan_for_unreachable_code(
             return None
 
     return None
-
-
-_BLOCK_CLOSE_PATTERN = re.compile(
-    r"^\)(?:\s*(?:"
-    r">>?\s*(?:\"[^\"]*\"|\S+)?|"
-    r"[12]>&?[12]?|"
-    r">\s*(?:\"[^\"]*\"|\S+)"
-    r"))?",
-    re.IGNORECASE,
-)
-
-
-def _is_bare_paren_block_open(line: str) -> bool:
-    """Return True for ``( command `` groups that are not IF/FOR headers."""
-    if not re.match(r"^\(", line):
-        return False
-    return re.search(r"\b(?:if|for)\b", line, re.IGNORECASE) is None
-
-
-def _line_opens_block_depth(line: str) -> int:
-    """Return how many IF/FOR/(group) blocks open on this line."""
-    if _is_bare_paren_block_open(line):
-        return 1
-    if re.search(r"\bfor\b", line, re.IGNORECASE) and (
-        re.search(r"\bdo\s*\(\s*$", line, re.IGNORECASE)
-        or re.search(r"\bin\s*\(\s*$", line, re.IGNORECASE)
-    ):
-        return 1
-    if (
-        re.search(r"\bif\b", line, re.IGNORECASE)
-        and re.search(r"\(\s*$", line)
-        and not re.match(r"echo\b", line, re.IGNORECASE)
-    ):
-        return 1
-    return 0
-
-
-def _update_paren_depth(line: str, current_depth: int) -> int:
-    """Update parentheses depth based on the line content."""
-    close_match = _BLOCK_CLOSE_PATTERN.match(line)
-    if close_match:
-        current_depth -= 1
-        remainder = line[close_match.end() :].strip()
-        if re.match(r"else\b", remainder, re.IGNORECASE) and re.search(
-            r"\(", remainder
-        ):
-            current_depth += 1
-        return current_depth
-
-    return current_depth + _line_opens_block_depth(line)
 
 
 def _line_makes_code_reachable(line: str) -> bool:

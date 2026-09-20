@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional, Set
 
-from blinter.checkers.globals.exit_flow import _update_paren_depth
 from blinter.constants import SYSTEM_ENV_VARS
 from blinter.logging_config import logger
 from blinter.models import LintIssue
@@ -15,6 +14,7 @@ from blinter.parsing.context import (
     _is_echo_statement,
     _split_tokens,
 )
+from blinter.parsing.structure import _paren_depth_before_line
 from blinter.rules.registry import RULES
 
 _USER_ARG_PERCENT_RE = re.compile(
@@ -136,18 +136,6 @@ def _is_caret_escaped(text: str, index: int) -> bool:
         caret_count += 1
         pos -= 1
     return caret_count % 2 == 1
-
-
-def _paren_depth_before(lines: List[str], line_num: int) -> int:
-    """Return parenthesis block depth before processing line_num (1-based)."""
-    if line_num < 1:
-        return 0
-    depth = 0
-    for index, raw in enumerate(lines, start=1):
-        if index >= line_num:
-            return depth
-        depth = max(_update_paren_depth(raw.strip(), depth), 0)
-    return depth
 
 
 def _split_amp_commands(text: str) -> List[str]:
@@ -292,7 +280,7 @@ def _check_e043_colon_block(
         return []
     if lines is None:
         return []
-    if _paren_depth_before(lines, line_num) <= 0:
+    if _paren_depth_before_line(lines, line_num) <= 0:
         return []
     return [
         _issue(
@@ -493,7 +481,7 @@ def _check_e047_echo_parens(
     body = _echo_body(stripped)
     if body is None:
         return []
-    depth = _paren_depth_before(lines, line_num)
+    depth = _paren_depth_before_line(lines, line_num)
     if depth <= 0:
         if re.search(r"\(\s*@?echo\b", stripped, re.IGNORECASE):
             depth = 1
@@ -682,7 +670,7 @@ def _check_w068_block_percent(lines: List[str]) -> List[LintIssue]:
     assigned: Dict[int, Set[str]] = {}
     for line_num, line in enumerate(lines, 1):
         stripped = line.strip()
-        depth_before = _paren_depth_before(lines, line_num)
+        depth_before = _paren_depth_before_line(lines, line_num)
         for depth_key in [key for key in assigned if key > depth_before]:
             del assigned[depth_key]
         if depth_before == 0:

@@ -1,22 +1,24 @@
 """Warning-level line checks (W-prefix rules)."""
 
-from contextvars import ContextVar
 import re
 from typing import (
-    Dict,
     FrozenSet,
     List,
-    Optional,
     Set,
     Tuple,
 )
 
 from blinter.checkers.cmd_extended import check_extended_warning_line
-from blinter.checkers.globals.exit_flow import _update_paren_depth
 from blinter.checkers.warnings_compat import _check_compatibility_warnings
 from blinter.constants import PSEUDO_ENV_VARS
 from blinter.models import LintIssue
-from blinter.parsing.structure import _collect_empty_assigned_variables
+from blinter.parsing.structure import (
+    _collect_empty_assigned_variables,
+    _defined_vars_cache_var,
+    _empty_assigned_vars_cache_var,
+    _identity_cached,
+    _paren_depth_before_line,
+)
 from blinter.patterns import _COMPILED_IF_PATTERN
 from blinter.rules.registry import RULES
 
@@ -228,7 +230,7 @@ def _check_set_spacing(stripped: str, line_num: int) -> List[LintIssue]:
 
 def _is_pseudo_env_clear_assignment(var_name: str, value_part: str) -> bool:
     """True when SET clears a shadow pseudo-env var (SET \"errorlevel=\")."""
-    return var_name in PSEUDO_ENV_VARS and value_part.strip() == ""
+    return var_name in PSEUDO_ENV_VARS and value_part == ""
 
 
 def _check_set_a_pseudo_env_assignment(stripped: str, line_num: int) -> List[LintIssue]:
@@ -253,54 +255,6 @@ def _check_set_a_pseudo_env_assignment(stripped: str, line_num: int) -> List[Lin
             context=(f"SET /A assigns to pseudo-environment variable {var_name}"),
         )
     ]
-
-
-_paren_depth_cache_var: ContextVar[Optional[Dict[int, List[int]]]] = ContextVar(
-    "paren_depth_cache", default=None
-)
-_defined_vars_cache_var: ContextVar[Optional[Dict[int, frozenset[str]]]] = ContextVar(
-    "defined_vars_cache", default=None
-)
-
-
-def _begin_paren_depth_pass() -> None:
-    """Start a per-lint parenthesis-depth cache for the current context."""
-    _paren_depth_cache_var.set({})
-
-
-def _build_paren_depth_before(lines: list[str]) -> list[int]:
-    """Return parenthesis block depth before each 1-based line."""
-    depth = 0
-    result: list[int] = []
-    for line in lines:
-        result.append(depth)
-        depth = _update_paren_depth(line.strip(), depth)
-        if depth < 0:
-            depth = 0
-    return result
-
-
-def _paren_depth_before_for_lines(lines: list[str]) -> list[int]:
-    """Return cached parenthesis depth-before values within a single lint pass."""
-    cache = _paren_depth_cache_var.get()
-    if cache is None:
-        return _build_paren_depth_before(lines)
-    lines_id = id(lines)
-    cached = cache.get(lines_id)
-    if cached is None:
-        cached = _build_paren_depth_before(lines)
-        cache[lines_id] = cached
-    return cached
-
-
-def _paren_depth_before_line(lines: list[str], line_num: int) -> int:
-    """Return parenthesis block depth before processing line_num (1-based)."""
-    if line_num < 1:
-        return 0
-    depths = _paren_depth_before_for_lines(lines)
-    if line_num > len(depths):
-        return depths[-1] if depths else 0
-    return depths[line_num - 1]
 
 
 def _check_shift_inside_paren_block(
@@ -453,40 +407,10 @@ def _check_double_digit_batch_param(stripped: str, line_num: int) -> List[LintIs
     return []
 
 
-def _check_pseudo_env_assignment(stripped: str, line_num: int) -> List[LintIssue]:
-    """Warn when assigning to cmd.exe pseudo-environment variables (W049)."""
-    quoted = re.match(
-        r'set\s+"([^"]+)"',
-        stripped,
-        re.IGNORECASE,
-    )
-    if quoted:
-        assignment = str(quoted.group(1))
-        if "=" not in assignment:
-            return []
-        var_name, _, value_part = assignment.partition("=")
-        var_name = var_name.strip().upper()
-        if _is_pseudo_env_clear_assignment(var_name, value_part):
-            return []
-        if var_name in PSEUDO_ENV_VARS:
-            return [
-                LintIssue(
-                    line_number=line_num,
-                    rule=RULES["W049"],
-                    context=(f"SET assigns to pseudo-environment variable {var_name}"),
-                )
-            ]
-        return []
-
-    unquoted = re.match(
-        r"set\s+(?!/)([^\s=]+)\s*=(.*)$",
-        stripped,
-        re.IGNORECASE,
-    )
-    if not unquoted:
-        return []
-    var_name = str(unquoted.group(1)).strip().upper()
-    value_part = str(unquoted.group(2))
+def _pseudo_env_assignment_issues(
+    var_name: str, value_part: str, line_num: int
+) -> List[LintIssue]:
+    """Return W049 issues when SET assigns to a pseudo-environment variable."""
     if _is_pseudo_env_clear_assignment(var_name, value_part):
         return []
     if var_name not in PSEUDO_ENV_VARS:
@@ -498,6 +422,37 @@ def _check_pseudo_env_assignment(stripped: str, line_num: int) -> List[LintIssue
             context=f"SET assigns to pseudo-environment variable {var_name}",
         )
     ]
+
+
+def _check_pseudo_env_assignment(line: str, line_num: int) -> List[LintIssue]:
+    """Warn when assigning to cmd.exe pseudo-environment variables (W049)."""
+    command = line.rstrip("\r\n").lstrip()
+    quoted = re.match(
+        r'set\s+"([^"]+)"',
+        command,
+        re.IGNORECASE,
+    )
+    if quoted:
+        assignment = str(quoted.group(1))
+        if "=" not in assignment:
+            return []
+        var_name, _, value_part = assignment.partition("=")
+        return _pseudo_env_assignment_issues(
+            var_name.strip().upper(), value_part, line_num
+        )
+
+    unquoted = re.match(
+        r"set\s+(?!/)([^\s=]+)\s*=(.*)$",
+        command,
+        re.IGNORECASE,
+    )
+    if not unquoted:
+        return []
+    return _pseudo_env_assignment_issues(
+        str(unquoted.group(1)).strip().upper(),
+        str(unquoted.group(2)),
+        line_num,
+    )
 
 
 def _check_set_a_octal_literal(stripped: str, line_num: int) -> List[LintIssue]:
@@ -519,11 +474,9 @@ def _check_set_a_octal_literal(stripped: str, line_num: int) -> List[LintIssue]:
 
 def _check_unquoted_numeric_if_compare(stripped: str, line_num: int) -> List[LintIssue]:
     """Check unquoted IF numeric comparisons with leading zeros (W046)."""
-    lhs_pattern = (
-        r"if\s+(?!\"|')[^\"']*?\b0+\d+\b\s+" r"(equ|neq|==|!=|lss|leq|gtr|geq)\s+"
-    )
+    lhs_pattern = r"if\s+(?!\"|')[^\"']*?\b0+\d+\b\s+(equ|neq|==|!=|lss|leq|gtr|geq)\s+"
     rhs_pattern = (
-        r"if\s+(?!\"|')[^\"']*?\b(?:equ|neq|==|!=|lss|leq|gtr|geq)\s+" r"\b0+\d+\b"
+        r"if\s+(?!\"|')[^\"']*?\b(?:equ|neq|==|!=|lss|leq|gtr|geq)\s+\b0+\d+\b"
     )
     if re.search(lhs_pattern, stripped, re.IGNORECASE) or re.search(
         rhs_pattern, stripped, re.IGNORECASE
@@ -538,42 +491,22 @@ def _check_unquoted_numeric_if_compare(stripped: str, line_num: int) -> List[Lin
     return []
 
 
-_empty_assigned_vars_cache_var: ContextVar[Optional[Dict[int, frozenset[str]]]] = (
-    ContextVar("empty_assigned_vars_cache", default=None)
-)
-
-
-def _begin_empty_assigned_vars_pass() -> None:
-    """Start a per-lint empty-assigned-vars cache for the current context."""
-    _empty_assigned_vars_cache_var.set({})
-    _defined_vars_cache_var.set({})
-
-
 def _uppercased_defined_vars(set_vars: Set[str]) -> frozenset[str]:
     """Return uppercased defined variable names, cached per lint pass."""
-    cache = _defined_vars_cache_var.get()
-    if cache is None:
-        return frozenset(name.upper() for name in set_vars)
-    cache_key = id(set_vars)
-    cached = cache.get(cache_key)
-    if cached is None:
-        cached = frozenset(name.upper() for name in set_vars)
-        cache[cache_key] = cached
-    return cached
+    return _identity_cached(
+        _defined_vars_cache_var.get(),
+        set_vars,
+        lambda: frozenset(name.upper() for name in set_vars),
+    )
 
 
 def _empty_assigned_vars_for_lines(lines: list[str]) -> FrozenSet[str]:
     """Return variables assigned empty values, cached per lint pass."""
-    cache = _empty_assigned_vars_cache_var.get()
-    if cache is None:
-        return frozenset(_collect_empty_assigned_variables(lines))
-
-    cache_key = id(lines)
-    cached = cache.get(cache_key)
-    if cached is None:
-        cached = frozenset(_collect_empty_assigned_variables(lines))
-        cache[cache_key] = cached
-    return cached
+    return _identity_cached(
+        _empty_assigned_vars_cache_var.get(),
+        lines,
+        lambda: frozenset(_collect_empty_assigned_variables(lines)),
+    )
 
 
 _SUBSTRING_EXPANSION_RE = re.compile(r"%([A-Za-z_][A-Za-z0-9_]*):~[^%]+%")
@@ -926,7 +859,7 @@ def _check_warning_issues(
     issues.extend(_check_unicode_filenames(stripped, line_num))
     issues.extend(_check_call_ambiguity(stripped, line_num))
     issues.extend(_check_set_spacing(stripped, line_num))
-    issues.extend(_check_pseudo_env_assignment(stripped, line_num))
+    issues.extend(_check_pseudo_env_assignment(line, line_num))
     issues.extend(_check_set_a_pseudo_env_assignment(stripped, line_num))
     issues.extend(_check_invalid_shift_switch(stripped, line_num))
     issues.extend(_check_shift_inside_paren_block(stripped, line_num, line_context))

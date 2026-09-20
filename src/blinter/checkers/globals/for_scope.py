@@ -6,8 +6,8 @@ from dataclasses import dataclass
 import re
 from typing import List
 
-from blinter.checkers.globals.exit_flow import _update_paren_depth
 from blinter.models import LintIssue
+from blinter.parsing.structure import _update_paren_depth
 from blinter.rules.registry import RULES
 
 _FOR_HEADER_RE = re.compile(

@@ -3,11 +3,13 @@
 from contextvars import ContextVar
 import re
 from typing import (
+    Callable,
     Dict,
     List,
     Optional,
     Set,
     Tuple,
+    TypeVar,
 )
 
 from blinter.constants import BUILTIN_VARS
@@ -287,17 +289,131 @@ def _parse_suppression_comments(lines: List[str]) -> Dict[int, Set[str]]:
     return suppressions
 
 
+_CacheValueT = TypeVar("_CacheValueT")
+
+_BLOCK_CLOSE_PATTERN = re.compile(
+    r"^\)(?:\s*(?:"
+    r">>?\s*(?:\"[^\"]*\"|\S+)?|"
+    r"[12]>&?[12]?|"
+    r">\s*(?:\"[^\"]*\"|\S+)"
+    r"))?",
+    re.IGNORECASE,
+)
+
+_paren_depth_cache_var: ContextVar[Optional[Dict[int, tuple[object, List[int]]]]] = (
+    ContextVar("paren_depth_cache", default=None)
+)
+_defined_vars_cache_var: ContextVar[
+    Optional[Dict[int, tuple[object, frozenset[str]]]]
+] = ContextVar("defined_vars_cache", default=None)
+_empty_assigned_vars_cache_var: ContextVar[
+    Optional[Dict[int, tuple[object, frozenset[str]]]]
+] = ContextVar("empty_assigned_vars_cache", default=None)
+
+
+def _identity_cached(
+    cache: Optional[Dict[int, tuple[object, _CacheValueT]]],
+    source: object,
+    builder: Callable[[], _CacheValueT],
+) -> _CacheValueT:
+    """Return builder() cached by object identity within a lint pass."""
+    if cache is None:
+        return builder()
+    source_id = id(source)
+    cached = cache.get(source_id)
+    if cached is None or cached[0] is not source:
+        value = builder()
+        cache[source_id] = (source, value)
+        return value
+    return cached[1]
+
+
+def _is_bare_paren_block_open(line: str) -> bool:
+    """Return True for ``( command `` groups that are not IF/FOR headers."""
+    if not re.match(r"^\(", line):
+        return False
+    return re.search(r"\b(?:if|for)\b", line, re.IGNORECASE) is None
+
+
+def _line_opens_block_depth(line: str) -> int:
+    """Return how many IF/FOR/(group) blocks open on this line."""
+    if _is_bare_paren_block_open(line):
+        return 1
+    if re.search(r"\bfor\b", line, re.IGNORECASE) and (
+        re.search(r"\bdo\s*\(\s*$", line, re.IGNORECASE)
+        or re.search(r"\bin\s*\(\s*$", line, re.IGNORECASE)
+    ):
+        return 1
+    if (
+        re.search(r"\bif\b", line, re.IGNORECASE)
+        and re.search(r"\(\s*$", line)
+        and not re.match(r"echo\b", line, re.IGNORECASE)
+    ):
+        return 1
+    return 0
+
+
+def _update_paren_depth(line: str, current_depth: int) -> int:
+    """Update parentheses depth based on the line content."""
+    close_match = _BLOCK_CLOSE_PATTERN.match(line)
+    if close_match:
+        current_depth -= 1
+        remainder = line[close_match.end() :].strip()
+        if re.match(r"else\b", remainder, re.IGNORECASE) and re.search(
+            r"\(", remainder
+        ):
+            current_depth += 1
+        return current_depth
+
+    return current_depth + _line_opens_block_depth(line)
+
+
+def _begin_paren_depth_pass() -> None:
+    """Start a per-lint parenthesis-depth cache for the current context."""
+    _paren_depth_cache_var.set({})
+
+
+def _begin_empty_assigned_vars_pass() -> None:
+    """Start a per-lint empty-assigned-vars cache for the current context."""
+    _empty_assigned_vars_cache_var.set({})
+    _defined_vars_cache_var.set({})
+
+
 def _begin_structure_cache_pass() -> None:
     """Initialize per-lint caches used by checker modules."""
-    from blinter.checkers.warnings import (
-        _begin_empty_assigned_vars_pass,
-        _begin_paren_depth_pass,
-    )
-
     _begin_invocation_prefix_pass()
     _begin_delayed_expansion_pass()
     _begin_paren_depth_pass()
     _begin_empty_assigned_vars_pass()
+
+
+def _build_paren_depth_before(lines: List[str]) -> List[int]:
+    """Return parenthesis block depth before each 1-based line."""
+    depth = 0
+    result: List[int] = []
+    for line in lines:
+        result.append(depth)
+        depth = max(_update_paren_depth(line.strip(), depth), 0)
+    return result
+
+
+def _paren_depth_before_for_lines(lines: List[str]) -> List[int]:
+    """Return cached parenthesis depth-before values within a single lint pass."""
+    return _identity_cached(
+        _paren_depth_cache_var.get(),
+        lines,
+        lambda: _build_paren_depth_before(lines),
+    )
+
+
+def _paren_depth_before_line(lines: List[str], line_num: int) -> int:
+    """Return parenthesis block depth before processing line_num (1-based)."""
+    if line_num < 1:
+        return 0
+    depths = _paren_depth_before_for_lines(lines)
+    if line_num > len(depths):
+        return depths[-1] if depths else 0
+    return depths[line_num - 1]
 
 
 _delayed_expansion_cache_var: ContextVar[
