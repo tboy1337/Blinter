@@ -2,6 +2,13 @@
 
 All notable changes to Blinter are documented in this file. Release tags follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.31] - 2026-09-22
+
+### Changed
+
+- Canonical repository, installer, and security contact are the [BatchLang organization](https://github.com/BatchLang/Blinter) and BatchLang@proton.me
+- Standalone `blinter.exe` reports company BatchLang and extracts native files to `%LOCALAPPDATA%\BatchLang\Blinter\<version>`
+
 ## [1.1.30] - 2026-09-20
 
 ### Fixed
@@ -258,6 +265,7 @@ All notable changes to Blinter are documented in this file. Release tags follow 
 
 Older 1.0.x releases are available on the [GitHub Releases](https://github.com/tboy1337/Blinter/releases) page.
 
+[1.1.31]: https://github.com/BatchLang/Blinter/releases/tag/v1.1.31
 [1.1.30]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.30
 [1.1.29]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.29
 [1.1.28]: https://github.com/tboy1337/Blinter/releases/tag/v1.1.28

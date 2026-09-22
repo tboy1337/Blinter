@@ -5,7 +5,7 @@ REM ============================================================================
 REM Blinter Uninstaller
 REM Purpose: Remove Blinter from %LOCALAPPDATA% and user PATH
 REM Author: tboy1337
-REM Repository: https://github.com/tboy1337/Blinter
+REM Repository: https://github.com/BatchLang/Blinter
 REM ============================================================================
 
 REM Attempt to change to system drive to avoid issues with current directory/drive

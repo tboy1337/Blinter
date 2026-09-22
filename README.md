@@ -24,7 +24,7 @@
 - **Security Level (SEC001+)**: Security vulnerabilities and dangerous operations
 - **Performance Level (P001-P999)**: Optimization opportunities and efficiency improvements
 
-📖 **For complete rule descriptions with examples and implementation details, see [Batch-File-Linter-Requirements.md](https://github.com/tboy1337/Blinter/blob/main/docs/Batch-File-Linter-Requirements.md)**
+📖 **For complete rule descriptions with examples and implementation details, see [Batch-File-Linter-Requirements.md](https://github.com/BatchLang/Blinter/blob/main/docs/Batch-File-Linter-Requirements.md)**
 
 ### 📋 **Output Format**
 - **Rule Codes**: Each issue has a unique identifier (e.g., E002, W005, SEC003)
@@ -73,13 +73,13 @@ uvx blinter
 If you prefer a standalone `.exe` over pip, use the one-line installer:
 
 ```cmd
-curl -L https://raw.githubusercontent.com/tboy1337/Blinter/main/scripts/install_blinter.cmd -o install_blinter.cmd && (call install_blinter.cmd || cd .) && del install_blinter.cmd
+curl -L https://raw.githubusercontent.com/BatchLang/Blinter/main/scripts/install_blinter.cmd -o install_blinter.cmd && (call install_blinter.cmd || cd .) && del install_blinter.cmd
 ```
 
 This installs the latest `blinter.exe` to `%LOCALAPPDATA%\Programs\Blinter\bin`, adds it to your user `PATH`, and handles updates automatically. Restart your terminal or IDE after installation for `PATH` changes to take effect.
 
 **Manual zip download (fallback):**
-- Download the latest `Blinter-v1.x.x.zip` from [GitHub Releases](https://github.com/tboy1337/Blinter/releases)
+- Download the latest `Blinter-v1.x.x.zip` from [GitHub Releases](https://github.com/BatchLang/Blinter/releases)
 - Extract the archive; the executable is `Blinter-v1.x.x\blinter.exe`
 - The one-line installer above is preferred; it keeps `blinter` on your `PATH` without manual setup.
 - ⚠️ **Note**: Some antivirus software may flag the standalone executable as a false positive. The executable is completely safe (all source code is open for inspection). If a scanner flags it, use pip installation.
@@ -88,7 +88,7 @@ This installs the latest `blinter.exe` to `%LOCALAPPDATA%\Programs\Blinter\bin`,
 
 **Standalone executable (one-line installer):**
 ```cmd
-curl -L https://raw.githubusercontent.com/tboy1337/Blinter/main/scripts/uninstall_blinter.cmd -o uninstall_blinter.cmd && (call uninstall_blinter.cmd || cd .) && del uninstall_blinter.cmd
+curl -L https://raw.githubusercontent.com/BatchLang/Blinter/main/scripts/uninstall_blinter.cmd -o uninstall_blinter.cmd && (call uninstall_blinter.cmd || cd .) && del uninstall_blinter.cmd
 ```
 
 **pip installation:**
@@ -400,7 +400,7 @@ Warnings and style issues alone do not fail the run when exit code would otherwi
 
 ## License 📄
 
-This project is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later) — see [COPYING](https://github.com/tboy1337/Blinter/blob/main/COPYING) for details.
+This project is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later) — see [COPYING](https://github.com/BatchLang/Blinter/blob/main/COPYING) for details.
 
 <div align="center">
 

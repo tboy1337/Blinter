@@ -21,7 +21,7 @@ ICON_PATH = Path("resources") / "blinter_icon.ico"
 TYPED_MARKER = Path("src") / "blinter" / "py.typed"
 OUTPUT_DIR = Path("dist")
 OUTPUT_FILENAME = "blinter.exe"
-COMPANY_NAME = "tboy1337"
+COMPANY_NAME = "BatchLang"
 PRODUCT_NAME = "Blinter"
 FILE_DESCRIPTION = "Blinter - Professional Batch File Linter for Windows"
 # Cached extract path: faster relaunch, stable path for Windows Firewall/AV.

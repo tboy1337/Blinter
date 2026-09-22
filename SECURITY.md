@@ -16,10 +16,10 @@ Security fixes are provided for the latest release on [PyPI](https://pypi.org/pr
 Use one of the following channels:
 
 1. **GitHub private vulnerability reporting (preferred)**  
-   Open the [Security](https://github.com/tboy1337/Blinter/security) tab on this repository and choose **Report a vulnerability**. GitHub keeps the report private while we investigate.
+   Open the [Security](https://github.com/BatchLang/Blinter/security) tab on this repository and choose **Report a vulnerability**. GitHub keeps the report private while we investigate.
 
 2. **Email**  
-   Send details to [tboy1337@proton.me](mailto:tboy1337@proton.me) with the subject line `Blinter security`. Encrypt sensitive details with PGP if possible.
+   Send details to [BatchLang@proton.me](mailto:BatchLang@proton.me) with the subject line `Blinter security`. Encrypt sensitive details with PGP if possible.
 
 Include as much of the following as you can:
 

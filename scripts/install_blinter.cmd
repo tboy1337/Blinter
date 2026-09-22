@@ -5,7 +5,7 @@ REM ============================================================================
 REM Blinter Installer/Updater
 REM Purpose: Download and install the latest Blinter release to %LOCALAPPDATA%
 REM Author: tboy1337
-REM Repository: https://github.com/tboy1337/Blinter
+REM Repository: https://github.com/BatchLang/Blinter
 REM ============================================================================
 
 REM Attempt to change to system drive to avoid issues with current directory/drive
@@ -310,7 +310,7 @@ goto :end
 REM Write PowerShell script to fetch latest release URL and tag
 :write_get_release_script
 (
-echo $releases = Invoke-RestMethod -Uri 'https://api.github.com/repos/tboy1337/Blinter/releases?per_page=100'
+echo $releases = Invoke-RestMethod -Uri 'https://api.github.com/repos/BatchLang/Blinter/releases?per_page=100'
 echo $release = $releases ^| Where-Object { -not $_.prerelease -and -not $_.draft } ^| Select-Object -First 1
 echo if (-not $release^) { Write-Output 'NOT_FOUND'; exit 0 }
 echo $asset = $release.assets ^| Where-Object { $_.name -like 'Blinter-v*.zip' } ^| Select-Object -First 1
@@ -432,7 +432,7 @@ echo +========================================================+
 echo + Installation failed. Please review the errors above. +
 echo +========================================================+
 echo.
-echo For help, visit: https://github.com/tboy1337/Blinter/issues
+echo For help, visit: https://github.com/BatchLang/Blinter/issues
 echo.
 timeout /t 5 /nobreak
 endlocal

@@ -4,7 +4,7 @@ requires = [ "setuptools>=77" ]
 
 [project]
 name = "Blinter"
-version = "1.1.30"
+version = "1.1.31"
 description = """\
   Blinter is a linter for Windows batch files. It provides comprehensive static analysis to identify syntax errors, \
   security vulnerabilities, performance issues and style problems.\
@@ -30,8 +30,8 @@ keywords = [
 ]
 license = "AGPL-3.0-or-later"
 license-files = [ "COPYING" ]
-maintainers = [ { name = "tboy1337", email = "tboy1337@proton.me" } ]
-authors = [ { name = "tboy1337", email = "tboy1337@proton.me" } ]
+maintainers = [ { name = "tboy1337", email = "BatchLang@proton.me" } ]
+authors = [ { name = "tboy1337", email = "BatchLang@proton.me" } ]
 requires-python = ">=3.11"
 classifiers = [
   "Development Status :: 5 - Production/Stable",
@@ -71,10 +71,10 @@ optional-dependencies.dev = [
   "pyyaml",
   "types-pyyaml",
 ]
-urls.Documentation = "https://github.com/tboy1337/Blinter"
-urls.Homepage = "https://github.com/tboy1337/Blinter"
-urls.Issues = "https://github.com/tboy1337/Blinter/issues"
-urls.Repository = "https://github.com/tboy1337/Blinter.git"
+urls.Documentation = "https://github.com/BatchLang/Blinter"
+urls.Homepage = "https://github.com/BatchLang/Blinter"
+urls.Issues = "https://github.com/BatchLang/Blinter/issues"
+urls.Repository = "https://github.com/BatchLang/Blinter.git"
 scripts.blinter = "blinter.cli.main:main"
 
 [tool.setuptools]

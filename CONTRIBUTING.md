@@ -4,8 +4,8 @@ Thank you for helping improve Blinter. This document explains how to report issu
 
 ## Ways to Contribute
 
-- Report bugs or false positives via [GitHub Issues](https://github.com/tboy1337/Blinter/issues)
-- Suggest new rules or features via [GitHub Issues](https://github.com/tboy1337/Blinter/issues)
+- Report bugs or false positives via [GitHub Issues](https://github.com/BatchLang/Blinter/issues)
+- Suggest new rules or features via [GitHub Issues](https://github.com/BatchLang/Blinter/issues)
 - Submit pull requests with bug fixes, new rules, tests, or documentation
 - Improve docs under `docs/` or the `README.md`
 
@@ -23,7 +23,7 @@ Security issues must **not** be filed as public issues. See [SECURITY.md](SECURI
 ## Pull Request Process
 
 1. Fork the repository and create a branch from `main`.
-2. Clone with submodules: `git clone --recurse-submodules https://github.com/tboy1337/Blinter.git`
+2. Clone with submodules: `git clone --recurse-submodules https://github.com/BatchLang/Blinter.git`
 3. Install development dependencies: `uv sync --extra dev` (or `pip install -e ".[dev]"`)
 4. Make your changes and add or update tests where appropriate.
 5. Run the full local quality gate: `uv run python scripts/verify.py` (or `py scripts/verify.py`)
