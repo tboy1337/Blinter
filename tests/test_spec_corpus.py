@@ -29,14 +29,18 @@ def test_spec_corpus_case(case: object) -> None:
 
 
 def test_documented_corpus_count_matches_fixtures() -> None:
-    """Docs and funding copy must track the committed corpus size."""
+    """Docs track the committed corpus size. funding.json must not.
+
+    FLOSS/Fund crawls a submitted manifest. A case count in funding.json
+    changes on every corpus update and makes that crawl fail.
+    """
     count = len(discover_spec_corpus_cases())
     architecture = (_REPO_ROOT / "docs" / "Architecture.md").read_text(encoding="utf-8")
     spec_readme = (_REPO_ROOT / "spec" / "README.md").read_text(encoding="utf-8")
     funding = (_REPO_ROOT / "funding.json").read_text(encoding="utf-8")
     assert f"{count} committed fixtures" in architecture
     assert f"{count}-case conformance corpus" in spec_readme
-    assert f"{count}-case conformance corpus" in funding
+    assert "-case conformance corpus" not in funding
 
 
 def test_wmic_read_only_corpus_is_oracle_runnable() -> None:
